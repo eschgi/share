@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">Share</string>
+
+    <!-- Downloads (TransferNotification.kt) -->
+    <string name="downloads_channel">Downloads</string>
+    <string name="downloads_saving">Saving to this phone</string>
+    <!-- 5 of 23 · 45 MB of 356 MB -->
+    <string name="downloads_progress">%1$d of %2$d · %3$s of %4$s</string>
+    <string name="downloads_cancel">Cancel</string>
+    <plurals name="downloads_saved">
+        <item quantity="one">%d file saved</item>
+        <item quantity="other">%d files saved</item>
+    </plurals>
+    <plurals name="downloads_failed">
+        <item quantity="one">%d file couldn\'t be saved.</item>
+        <item quantity="other">%d files couldn\'t be saved.</item>
+    </plurals>
+    <string name="downloads_retry">Try again</string>
+    <string name="downloads_no_space">The phone is full</string>
+    <string name="downloads_no_space_text">Make room, then tap to try again.</string>
+    <string name="downloads_waiting">Waiting for a connection to go on saving</string>
+    <string name="downloads_where_media">In the gallery, album \"Share\"</string>
+    <string name="downloads_where_documents">In Files › Downloads › Share</string>
+    <string name="downloads_where_both">In the album \"Share\" and in Downloads › Share</string>
+</resources>

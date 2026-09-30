@@ -1,0 +1,12 @@
+{
+  "name": "share-app-tools",
+  "private": true,
+  "type": "module",
+  "description": "One-off generators for the app: fonts and icons. Their output is committed.",
+  "scripts": {
+    "fonts": "node fonts/build.mjs"
+  },
+  "devDependencies": {
+    "subset-font": "^2.4.0"
+  }
+}

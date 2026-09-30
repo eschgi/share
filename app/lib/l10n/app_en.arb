@@ -1,0 +1,353 @@
+{
+  "@@locale": "en",
+  "commonCancel": "Cancel",
+  "commonHide": "Hide",
+  "commonRetry": "Try again",
+  "commonSave": "Save",
+  "commonClose": "Close",
+  "commonOffline": "No connection to the server. Check your internet and try again.",
+  "commonFailed": "Something went wrong. Try again.",
+  "commonSignedOut": "This phone was signed out. Sign in again.",
+  "waitTime": "{minutes, plural, =1{1 min} other{{minutes} min}}",
+  "@waitTime": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "firstStartTitle": "What would you like to do?",
+  "firstStartSend": "Send files",
+  "firstStartSendDetail": "Photos, videos, documents. All you need is a PIN.",
+  "firstStartSee": "See & download",
+  "firstStartSeeDetail": "Everything that was shared. Needs an account or an invite.",
+  "firstStartScan": "Got an invite? Scan it",
+  "sendServerTitle": "Where do you want to send?",
+  "@sendServerTitle": {
+    "description": "Asks for the server before opening the website for sending with a PIN."
+  },
+  "sendServerLead": "Enter the address you were given. Sending works in the browser, with your PIN.",
+  "sendServerOpen": "Open in the browser",
+  "signInTitle": "Sign in",
+  "signInLead": "To see and download the shared files.",
+  "signInServer": "Server",
+  "signInServerHint": "share.example.com",
+  "signInUsername": "Username",
+  "signInPassword": "Password",
+  "signInShowPassword": "Show password",
+  "signInHidePassword": "Hide password",
+  "signInButton": "Sign in",
+  "signInOr": "or",
+  "signInScan": "Scan an invite code",
+  "signInNoPassword": "No password yet? Ask for an invite. One scan and you're in.",
+  "signInWrong": "{left, plural, =0{Wrong username or password.} =1{Wrong username or password. 1 try left.} other{Wrong username or password. {left} tries left.}}",
+  "@signInWrong": {
+    "placeholders": {
+      "left": {
+        "type": "int"
+      }
+    }
+  },
+  "signInLocked": "Too many wrong passwords. Try again in {time}.",
+  "@signInLocked": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "serverBadAddress": "That doesn't look like an address. Enter it like share.example.com.",
+  "serverNotShare": "There is no Share server at this address.",
+  "joinInvitedBy": "{inviter} invited you",
+  "@joinInvitedBy": {
+    "placeholders": {
+      "inviter": {
+        "type": "String"
+      }
+    }
+  },
+  "joinInvited": "You're invited",
+  "joinLead": "This phone will be signed in as {name}. No password needed.",
+  "@joinLead": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "joinName": "Name",
+  "joinRole": "Role",
+  "joinValid": "Valid",
+  "roleMemberLong": "Member: see, download, send",
+  "roleAdminLong": "Admin: also delete files, and manage PINs and people",
+  "joinValidUntil": "Once, until {when}",
+  "@joinValidUntil": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "joinButton": "Join as {name}",
+  "@joinButton": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "joinNotYouInviter": "Not {name}? Stop here and ask {inviter} for your own invite.",
+  "@joinNotYouInviter": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "inviter": {
+        "type": "String"
+      }
+    }
+  },
+  "joinNotYou": "Not {name}? Stop here and ask for your own invite.",
+  "@joinNotYou": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "joinProblemTitle": "This invite doesn't work",
+  "joinUsed": "It was used already; each invite works once. Ask for a new one.",
+  "joinExpired": "It has expired. Ask for a new one.",
+  "joinRevoked": "It was withdrawn.",
+  "joinUnknown": "The link isn't complete. Open it again from the message you got.",
+  "joinLocked": "Too many tries. Wait a few minutes and try again.",
+  "scanNotAnInvite": "That code isn't a Share invite.",
+  "scanUnavailable": "Scanning needs Google Play services. Paste the invite link instead.",
+  "pasteInvite": "Paste invite link",
+  "pasteInviteHint": "https://share.example.com/join#…",
+  "libraryTitle": "Library",
+  "filterAll": "All",
+  "filterPhotos": "Photos",
+  "filterVideos": "Videos",
+  "filterDocuments": "Documents",
+  "dayToday": "Today",
+  "dayYesterday": "Yesterday",
+  "dayMeta": "{count, plural, =1{1 file} other{{count} files}} · {size}",
+  "@dayMeta": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "libraryEmpty": "Nothing here yet. What people send shows up here, by the day it arrived.",
+  "libraryNothingFound": "No files match.",
+  "librarySearch": "Search file names",
+  "librarySavedOnPhone": "On this phone",
+  "navLibrary": "Library",
+  "navSettings": "Settings",
+  "selectCount": "{count} selected",
+  "@selectCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "selectAll": "Select all",
+  "selectTip": "Tap a day's circle to select all of it. Long-press and drag to select many at once.",
+  "daySelected": "{selected} of {count} selected",
+  "@daySelected": {
+    "placeholders": {
+      "selected": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "downloadCount": "Download {count}",
+  "@downloadCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "shareSelected": "Share",
+  "selectDay": "Select the day",
+  "@selectDay": {
+    "description": "Accessibility label of a day's circle."
+  },
+  "savingTitle": "{count, plural, =1{Saving 1 file} other{Saving {count} files}}",
+  "@savingTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "savedTitle": "{count, plural, =1{1 file saved} other{{count} files saved}}",
+  "@savedTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "savingOf": "{done} of {total}",
+  "@savingOf": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "bytesOf": "{done} of {total}",
+  "@bytesOf": {
+    "placeholders": {
+      "done": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "routeLocal": "Direct · local Wi-Fi",
+  "routePublic": "Over the internet",
+  "destPhotos": "{count, plural, =1{1 photo or video} other{{count} photos & videos}}",
+  "@destPhotos": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "destPhotosWhere": "Gallery › album \"Share\"",
+  "destDocs": "{count, plural, =1{1 document} other{{count} documents}}",
+  "@destDocs": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "destDocsWhere": "Files › Downloads › Share",
+  "savingKeepsGoing": "Keeps going if you leave the app.",
+  "savingSkipped": "{count, plural, =1{1 file was already on this phone, so it's skipped.} other{{count} files were already on this phone, so they're skipped.}}",
+  "@savingSkipped": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "savingFailed": "{count, plural, =1{1 file couldn't be saved.} other{{count} files couldn't be saved.}}",
+  "@savingFailed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "savingNoSpace": "The phone is full. Make room and try again.",
+  "viewerDownload": "Download",
+  "viewerShare": "Share",
+  "viewerDetails": "Details",
+  "viewerFrom": "From {name}",
+  "@viewerFrom": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "viewerFromPin": "Sent with a PIN",
+  "viewerOpenVideo": "Play",
+  "viewerNoPreview": "No preview for this file. Download it to open it.",
+  "serverTitle": "Server",
+  "serverPublic": "Public address",
+  "serverPublicHelp": "Works everywhere, over the internet.",
+  "serverLocal": "Local address",
+  "serverOptional": "optional",
+  "serverLocalHelp": "Used automatically when this phone can reach it, for example on the home Wi-Fi.",
+  "routeUsingLocal": "Using the local address",
+  "routeUsingLocalDetail": "Reached in {ms} ms · same server as the public address",
+  "@routeUsingLocalDetail": {
+    "placeholders": {
+      "ms": {
+        "type": "int"
+      }
+    }
+  },
+  "routeUsingPublic": "Using the public address",
+  "routeNoLocal": "No local address is set.",
+  "routeLocalUnreachable": "The local address doesn't answer here.",
+  "routeLocalWrongCert": "The local address answered, but with an unknown certificate.",
+  "routeLocalOtherServer": "The local address is another Share server.",
+  "routeChecking": "Checking…",
+  "serverCheckAgain": "Check again",
+  "serverInviteFills": "An invite fills in both addresses.",
+  "serverLocalMustBeHttps": "The local address needs https:// and usually a port, like https://192.168.8.1:8443.",
+  "settingsTitle": "Settings",
+  "settingsSignedInHere": "Signed in on this phone",
+  "roleAdmin": "Admin",
+  "roleMember": "Member",
+  "settingsLanguage": "Language",
+  "settingsLanguageAutomatic": "Automatic · {language}",
+  "@settingsLanguageAutomatic": {
+    "placeholders": {
+      "language": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsLanguageSystem": "Automatic",
+  "settingsServer": "Server",
+  "settingsServerLocal": "Local address in use",
+  "settingsServerPublic": "Public address in use",
+  "settingsPassword": "Password",
+  "settingsPasswordNone": "None: set one to sign in on other phones",
+  "settingsPasswordSet": "Set · username {username}",
+  "@settingsPasswordSet": {
+    "placeholders": {
+      "username": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsPasswordCurrent": "Current password",
+  "settingsPasswordNew": "New password",
+  "settingsPasswordTooShort": "At least 8 characters.",
+  "settingsPasswordWrong": "The current password is wrong.",
+  "settingsUsernameTaken": "Someone else has that username.",
+  "settingsUsernameBad": "3 to 32 letters, digits, dots, dashes or underscores.",
+  "settingsSignOut": "Sign out",
+  "settingsSignOutConfirm": "Sign out of this phone? You can come back with an invite or your password.",
+  "settingsDeleteAccount": "Delete my account",
+  "settingsDeleteTitle": "Delete your account?",
+  "settingsDeleteBody": "All your phones get signed out. The files you sent stay for everyone.",
+  "settingsDeleteButton": "Delete account",
+  "settingsLastAdmin": "You're the only admin. Make someone else admin first.",
+  "languageEnglish": "English",
+  "languageGerman": "Deutsch",
+  "languageItalian": "Italiano",
+  "fetchTitle": "{count, plural, =1{Getting the file ready…} other{Getting {count} files ready…}}",
+  "@fetchTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "openNoApp": "No app on this phone can open this file.",
+  "fetchFailed": "Couldn't get the file. Try again later."
+}

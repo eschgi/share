@@ -5,8 +5,9 @@ A self-hosted place where family and friends drop photos, videos and documents.
 - **Sending** works in any browser with a 5-character PIN: no app, no account. Uploads go in
   pieces and continue after a dropped connection, so videos of several gigabytes get through,
   also behind Cloudflare's 100 MB request limit.
-- **Seeing and downloading** everything is for people with an account, in an Android app
-  (planned).
+- **Seeing and downloading** everything is for people with an account, in an Android app.
+  They join with an invite, without a password. At home the app uses the server's local address
+  and skips the internet.
 - Files are stored unchanged in one folder per upload day: `<storage_dir>/2026-09-30/IMG_0001.jpg`.
 
 The server is one Go program without dependencies at runtime. It runs on a router or another
@@ -17,9 +18,11 @@ small Linux machine with a USB drive, or on a VPS. The website is embedded in it
 | Part | State |
 |------|-------|
 | Server: PINs, uploads, storage, thumbnails | works |
-| Website: sending with a PIN (English, German, Italian) | works |
+| Server: accounts and invites, library and downloads, a local address for the app | works |
+| Website: sending with a PIN, the invite page (English, German, Italian) | works |
 | Website: continuing after the page was closed, install as an app | works |
-| Android app: see and download, then send and manage | next |
+| Android app: see and download | built and tested, not yet tried on a phone |
+| Android app: send, manage PINs and people | planned |
 
 The plan and the screens are in [`docs/`](docs/).
 
@@ -41,7 +44,7 @@ cat > config.json <<EOF
 EOF
 server/share init                  # prepares the storage folder and checks the drive
 server/share pin create --day      # prints a PIN and a link
-server/share serve                 # http://localhost:8080
+server/share serve                 # http://localhost:8080; also prints an invite for the first admin
 ```
 
 Plain `http://` is accepted only for `localhost`.
@@ -57,13 +60,22 @@ has a default. Unknown or misspelled fields stop the server with a message sayin
 Behind a Cloudflare Tunnel, [`deploy/cloudflared`](deploy/cloudflared/README.md) lists the
 hostname and the Cloudflare settings Share needs.
 
+For the app, two settings matter:
+
+- `local`: a second address on the home network, over HTTPS with a certificate the server makes
+  itself (`share cert` shows it). The app trusts it only because it learned the certificate's
+  fingerprint over the public address, and uses it whenever the phone can reach it.
+- `app.apk_file`: the APK the invite page offers for download. Without it, the page only offers
+  `app.play_store_url`, once there is one.
+
 ## Repository
 
 | Folder | What's in it |
 |--------|--------------|
 | `server/` | The Go server (`cmd/share`), with the website embedded |
 | `web/` | The website: Vite, TypeScript, Preact and Uppy |
-| `contract/` | JSON fixtures the server and website tests share: PIN rules, error codes, API responses |
+| `app/` | The Android app: Flutter, with Kotlin for downloads, the local address and the phone's key ([README](app/README.md)) |
+| `contract/` | JSON fixtures the server, website and app tests share: PIN rules, error codes, API responses |
 | `deploy/` | The Cloudflare Tunnel settings |
 | `scripts/` | `build.sh` and `build.ps1`: the website, then the server for linux/arm64 and linux/amd64 |
 | `docs/` | The plan and the screen mockups |
@@ -73,6 +85,8 @@ hostname and the Cloudflare settings Share needs.
 ```sh
 (cd server && go vet ./... && go test ./...)   # -short skips the 120 MiB upload test
 (cd web && npm run typecheck && npm test)
+(cd app && flutter analyze && flutter test)
+(cd app/android && ./gradlew testDirectDebugUnitTest testPlayDebugUnitTest)
 scripts/build.sh                               # dist/share-linux-arm64, dist/share-linux-amd64
 ```
 

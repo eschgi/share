@@ -61,3 +61,30 @@ jobs:
           ls -l /tmp/share-linux-*
       - name: Known vulnerabilities
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+  app:
+    name: App
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.1
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - name: Test (without the golden screenshots, which depend on font rendering)
+        run: flutter test
+      - name: Android unit tests and lint, both flavors
+        run: |
+          flutter build apk --config-only
+          cd android
+          ./gradlew --console=plain testDirectDebugUnitTest testPlayDebugUnitTest lintDirectDebug

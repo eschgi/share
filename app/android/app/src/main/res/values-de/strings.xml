@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="downloads_channel">Downloads</string>
+    <string name="downloads_saving">Wird auf diesem Handy gespeichert</string>
+    <string name="downloads_progress">%1$d von %2$d · %3$s von %4$s</string>
+    <string name="downloads_cancel">Abbrechen</string>
+    <plurals name="downloads_saved">
+        <item quantity="one">%d Datei gespeichert</item>
+        <item quantity="other">%d Dateien gespeichert</item>
+    </plurals>
+    <plurals name="downloads_failed">
+        <item quantity="one">%d Datei konnte nicht gespeichert werden.</item>
+        <item quantity="other">%d Dateien konnten nicht gespeichert werden.</item>
+    </plurals>
+    <string name="downloads_retry">Nochmal versuchen</string>
+    <string name="downloads_no_space">Das Handy ist voll</string>
+    <string name="downloads_no_space_text">Mach Platz und tippe dann, um es nochmal zu versuchen.</string>
+    <string name="downloads_waiting">Wartet auf eine Verbindung, um weiter zu speichern</string>
+    <string name="downloads_where_media">In der Galerie, Album „Share“</string>
+    <string name="downloads_where_documents">In Dateien › Downloads › Share</string>
+    <string name="downloads_where_both">Im Album „Share“ und in Downloads › Share</string>
+</resources>

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Files fetched for sharing with another app or opening in one (Fetcher.kt). -->
+<paths>
+    <cache-path name="fetch" path="fetch/" />
+</paths>

@@ -1,0 +1,6 @@
+# Screenshots are for comparing with the mockups, not a gate: they change with every
+# Flutter or font update. Make them explicitly:
+#   flutter test --run-skipped --tags golden --update-goldens
+tags:
+  golden:
+    skip: "run explicitly with --tags golden"

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The website's icon (web/public/icons/icon.svg): Lucide "images" (ISC licence), inside
+     the adaptive icon's safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="2.1"
+        android:scaleY="2.1"
+        android:translateX="28.8"
+        android:translateY="28.8">
+        <path
+            android:pathData="M18,22H4a2,2 0,0 1,-2 -2V6"
+            android:strokeWidth="1.9"
+            android:strokeColor="#FFF7F1"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="m22,13 l-1.296,-1.296a2.41,2.41 0,0 0,-3.408 0L11,18"
+            android:strokeWidth="1.9"
+            android:strokeColor="#FFF7F1"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M10,8a2,2 0,1 0,4 0a2,2 0,1 0,-4 0"
+            android:strokeWidth="1.9"
+            android:strokeColor="#FFF7F1"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M8,2h12a2,2 0,0 1,2 2v12a2,2 0,0 1,-2 2h-12a2,2 0,0 1,-2 -2v-12a2,2 0,0 1,2 -2z"
+            android:strokeWidth="1.9"
+            android:strokeColor="#FFF7F1"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+    </group>
+</vector>

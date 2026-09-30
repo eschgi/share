@@ -1,0 +1,44 @@
+{
+  "notes": "What the app's Dart side and its Kotlin side hand each other over the platform channel (app/lib/data/platform.dart, app/android/app/src/main/kotlin/com/eschgi/share/platform/PlatformChannel.kt). Both sides' tests read this file. server_config is what server.save stores and the downloads read; files is the argument of transfer.download; the events arrive on com.eschgi.share/events. The transfer event is the batch in batch_items: skipped files don't count towards the totals.",
+  "server_config": {
+    "public_url": "https://share.example.com",
+    "local_url": "https://192.168.8.1:8443",
+    "pins": ["3f1c9e0a5b7d2c4e6f8091a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6"],
+    "server_id": "q3m7k2x9w4t8r5n6p2j7h3c9d4"
+  },
+  "files": [
+    {"id": "aaaaaaaaaaaaaaaaaaaaaaaaaa", "name": "IMG_2041.jpg", "size": 1000, "mime": "image/jpeg", "kind": "photo", "day": "2026-09-30"},
+    {"id": "bbbbbbbbbbbbbbbbbbbbbbbbbb", "name": "VID_0412.mp4", "size": 2000, "mime": "video/mp4", "kind": "video", "day": "2026-09-30"},
+    {"id": "cccccccccccccccccccccccccc", "name": "Car insurance.pdf", "size": 500, "mime": "application/pdf", "kind": "document", "day": "2026-09-29"},
+    {"id": "dddddddddddddddddddddddddd", "name": "Menu.docx", "size": 700, "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "kind": "document", "day": "2026-09-29"}
+  ],
+  "batch_items": [
+    {"file": "aaaaaaaaaaaaaaaaaaaaaaaaaa", "state": "done", "bytes": 1000},
+    {"file": "bbbbbbbbbbbbbbbbbbbbbbbbbb", "state": "queued", "bytes": 500},
+    {"file": "cccccccccccccccccccccccccc", "state": "skipped", "bytes": 0},
+    {"file": "dddddddddddddddddddddddddd", "state": "failed", "bytes": 100}
+  ],
+  "transfer_event": {
+    "type": "transfer",
+    "batch": "5b0f2f7e-8f43-4d4b-9f0e-6a1c2d3e4f50",
+    "running": true,
+    "total": 3,
+    "done": 1,
+    "failed": 1,
+    "skipped": 1,
+    "bytes_total": 3700,
+    "bytes_done": 1600,
+    "media": 2,
+    "documents": 1,
+    "local": true,
+    "no_space": false
+  },
+  "route_event": {
+    "type": "route",
+    "route": "local",
+    "reason": "none",
+    "millis": 12,
+    "checking": false
+  },
+  "route_reasons": ["none", "noLocal", "unreachable", "wrongCertificate", "otherServer"]
+}
