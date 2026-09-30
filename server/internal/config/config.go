@@ -16,7 +16,7 @@ import (
 	"slices"
 	"strings"
 	"time"
-	_ "time/tzdata" // OpenWrt ships without zoneinfo; without this every time zone would be UTC
+	_ "time/tzdata" // routers often ship without zoneinfo; without this every time zone would be UTC
 )
 
 // SupportedLanguages are the languages the website and the app are translated into.

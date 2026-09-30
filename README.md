@@ -9,8 +9,8 @@ A self-hosted place where family and friends drop photos, videos and documents.
   (planned).
 - Files are stored unchanged in one folder per upload day: `<storage_dir>/2026-09-30/IMG_0001.jpg`.
 
-The server is one Go program without dependencies at runtime. It runs on a GL.iNet/OpenWrt router
-with a USB drive, or on a small VPS. The website is embedded in it.
+The server is one Go program without dependencies at runtime. It runs on a router or another
+small Linux machine with a USB drive, or on a VPS. The website is embedded in it.
 
 ## Status
 
@@ -64,7 +64,7 @@ hostname and the Cloudflare settings Share needs.
 | `server/` | The Go server (`cmd/share`), with the website embedded |
 | `web/` | The website: Vite, TypeScript, Preact and Uppy |
 | `contract/` | JSON fixtures the server and website tests share: PIN rules, error codes, API responses |
-| `deploy/` | A procd service for OpenWrt, and the Cloudflare Tunnel settings |
+| `deploy/` | The Cloudflare Tunnel settings |
 | `scripts/` | `build.sh` and `build.ps1`: the website, then the server for linux/arm64 and linux/amd64 |
 | `docs/` | The plan and the screen mockups |
 
