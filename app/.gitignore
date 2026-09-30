@@ -52,3 +52,6 @@ app.*.map.json
 
 # The icon font subsetter's packages (tool/fonts).
 /tool/node_modules/
+
+# Written by failing golden tests.
+/test/failures/

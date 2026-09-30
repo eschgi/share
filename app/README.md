@@ -46,6 +46,14 @@ certificates. Both sides read `contract/app/platform.json`, which is what they h
 The golden screenshots depend on the machine's font rendering, so they are skipped by default
 and not run in CI. After changing a screen, `--update-goldens` writes them again.
 
+## Themes
+
+`lib/ui/theme.dart` has the colours by role (`ShareColors`), and each theme gives the roles its
+values (`AppTheme`): Ember (the mockups), Midnight, Moss, Plum and Black, and the light Linen
+and Frost. Automatic switches between Linen and Ember with the phone. Screens only use the roles,
+so a new theme is one more entry; `test/themes_golden_test.dart` shows each theme on three
+screens.
+
 ## Languages and fonts
 
 The texts are in `lib/l10n/app_{en,de,it}.arb`; `flutter pub get` generates the Dart code from

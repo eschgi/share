@@ -37,7 +37,11 @@ class AppServices {
   /// The language the person picked, or null for the phone's.
   final language = ValueNotifier<String?>(null);
 
+  /// The theme the person picked (ThemeChoice), or null for Ember.
+  final theme = ValueNotifier<String?>(null);
+
   Future<void> start() async {
+    theme.value = await platform.readSecret('theme');
     language.value = await platform.readSecret('language');
     await session.restore();
     await pin.restore();
@@ -46,6 +50,11 @@ class AppServices {
   Future<void> setLanguage(String? code) async {
     language.value = code;
     await platform.writeSecret('language', code);
+  }
+
+  Future<void> setTheme(String? choice) async {
+    theme.value = choice;
+    await platform.writeSecret('theme', choice);
   }
 }
 
@@ -104,18 +113,24 @@ class _ShareAppState extends State<ShareApp> {
   @override
   Widget build(BuildContext context) => Services(
         services: widget.services,
-        child: ValueListenableBuilder<String?>(
-          valueListenable: widget.services.language,
-          builder: (context, language, _) => MaterialApp(
-            navigatorKey: _navigator,
-            onGenerateTitle: (_) => 'Share',
-            debugShowCheckedModeBanner: false,
-            theme: shareTheme(),
-            locale: language == null ? null : Locale(language),
-            supportedLocales: AppLocalizations.supportedLocales,
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            home: const SessionGate(),
-          ),
+        child: ListenableBuilder(
+          listenable: Listenable.merge([widget.services.language, widget.services.theme]),
+          builder: (context, _) {
+            final language = widget.services.language.value;
+            final (light, dark, mode) = ThemeChoice.resolve(widget.services.theme.value);
+            return MaterialApp(
+              navigatorKey: _navigator,
+              onGenerateTitle: (_) => 'Share',
+              debugShowCheckedModeBanner: false,
+              theme: shareTheme(light),
+              darkTheme: shareTheme(dark),
+              themeMode: mode,
+              locale: language == null ? null : Locale(language),
+              supportedLocales: AppLocalizations.supportedLocales,
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              home: const SessionGate(),
+            );
+          },
         ),
       );
 }

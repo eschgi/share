@@ -4,7 +4,8 @@
   "type": "module",
   "description": "One-off generators for the app: fonts and icons. Their output is committed.",
   "scripts": {
-    "fonts": "node fonts/build.mjs"
+    "fonts": "node fonts/build.mjs",
+    "icons": "node fonts/build.mjs --icons-only"
   },
   "devDependencies": {
     "subset-font": "^2.4.0"

@@ -813,5 +813,55 @@
     }
   },
   "pinOther": "Use another PIN",
-  "pinSignIn": "Sign in instead"
+  "pinSignIn": "Sign in instead",
+  "settingsTheme": "Theme",
+  "themeAutomatic": "Automatic",
+  "themeAutomaticDetail": "Linen by day, Ember at night",
+  "@themeAutomaticDetail": {
+    "description": "Follows the phone's dark mode. The names are those of the themes below."
+  },
+  "themeAutomaticNow": "Automatic · {name}",
+  "@themeAutomaticNow": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "themeEmber": "Ember",
+  "@themeEmber": {
+    "description": "The default theme: warm dark brown with terracotta."
+  },
+  "themeMidnight": "Midnight",
+  "@themeMidnight": {
+    "description": "Night blue."
+  },
+  "themeMoss": "Moss",
+  "@themeMoss": {
+    "description": "Dark forest green."
+  },
+  "themePlum": "Plum",
+  "@themePlum": {
+    "description": "Dark aubergine with violet."
+  },
+  "themeBlack": "Black",
+  "@themeBlack": {
+    "description": "True black, for OLED screens."
+  },
+  "themeLinen": "Linen",
+  "@themeLinen": {
+    "description": "Light: cream with terracotta."
+  },
+  "themeFrost": "Frost",
+  "@themeFrost": {
+    "description": "Light: cool white with blue."
+  },
+  "themeDark": "Dark",
+  "@themeDark": {
+    "description": "The heading above the dark themes."
+  },
+  "themeLight": "Light",
+  "@themeLight": {
+    "description": "The heading above the light themes."
+  }
 }

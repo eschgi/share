@@ -36,7 +36,7 @@ class PhotoStack extends StatelessWidget {
               color: ShareColors.tones[tone],
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: const Color(0xFFD9CEC1), width: 5),
-              boxShadow: const [BoxShadow(color: Color(0x80000000), blurRadius: 36, offset: Offset(0, 16))],
+              boxShadow: [BoxShadow(color: context.colors.shadow, blurRadius: 36, offset: const Offset(0, 16))],
             ),
             child: Icon(AppIcons.image, size: 38, color: Colors.white.withValues(alpha: 0.6)),
           ),
@@ -59,7 +59,7 @@ class PhotoStack extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: const Color(0xFFEEE6DC),
                   borderRadius: BorderRadius.circular(14),
-                  boxShadow: const [BoxShadow(color: Color(0x80000000), blurRadius: 36, offset: Offset(0, 16))],
+                  boxShadow: [BoxShadow(color: context.colors.shadow, blurRadius: 36, offset: const Offset(0, 16))],
                 ),
                 child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                   Icon(AppIcons.fileText, size: 38, color: c.accent),

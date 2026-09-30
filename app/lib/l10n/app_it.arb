@@ -271,5 +271,18 @@
   "pinValidUntil": "Questo PIN vale fino a {when}",
   "pinSendTo": "A {host}",
   "pinOther": "Usa un altro PIN",
-  "pinSignIn": "Accedi invece"
+  "pinSignIn": "Accedi invece",
+  "settingsTheme": "Tema",
+  "themeAutomatic": "Automatico",
+  "themeAutomaticDetail": "Di giorno Lino, di notte Brace",
+  "themeAutomaticNow": "Automatico · {name}",
+  "themeEmber": "Brace",
+  "themeMidnight": "Mezzanotte",
+  "themeMoss": "Muschio",
+  "themePlum": "Prugna",
+  "themeBlack": "Nero",
+  "themeLinen": "Lino",
+  "themeFrost": "Brina",
+  "themeDark": "Scuri",
+  "themeLight": "Chiari"
 }

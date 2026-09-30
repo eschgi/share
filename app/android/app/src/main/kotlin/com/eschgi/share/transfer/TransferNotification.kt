@@ -50,7 +50,7 @@ object TransferNotification {
         ensureChannels(c)
         val builder = NotificationCompat.Builder(c, channel)
             .setSmallIcon(R.drawable.ic_stat_share)
-            .setColor(ContextCompat.getColor(c, R.color.accent))
+            .setColor(accent(c))
             .setContentTitle(c.getString(title))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -169,7 +169,7 @@ object TransferNotification {
         ensureChannels(c)
         return NotificationCompat.Builder(c, channel)
             .setSmallIcon(R.drawable.ic_stat_share)
-            .setColor(ContextCompat.getColor(c, R.color.accent))
+            .setColor(accent(c))
             .setCategory(Notification.CATEGORY_STATUS)
     }
 
@@ -209,6 +209,15 @@ object TransferNotification {
         Intent(c, TransferReceiver::class.java).setAction(action),
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
+
+    /** The accent of the theme picked in the app, as in lib/ui/theme.dart. */
+    private fun accent(c: Context): Int = when (runCatching { SecretStore(c).read(SecretStore.THEME) }.getOrNull()) {
+        "midnight" -> 0xFF3B7DD8.toInt()
+        "moss" -> 0xFF6B8A38.toInt()
+        "plum" -> 0xFF9B5CC9.toInt()
+        "frost" -> 0xFF2F6BCB.toInt()
+        else -> ContextCompat.getColor(c, R.color.accent) // Ember, Black, Linen, Automatic: terracotta
+    }
 
     /** The app's resources in the language picked in the app, if one was. */
     private fun localized(context: Context): Context {

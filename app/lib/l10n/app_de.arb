@@ -271,5 +271,18 @@
   "pinValidUntil": "Diese PIN gilt bis {when}",
   "pinSendTo": "An {host}",
   "pinOther": "Andere PIN verwenden",
-  "pinSignIn": "Stattdessen anmelden"
+  "pinSignIn": "Stattdessen anmelden",
+  "settingsTheme": "Design",
+  "themeAutomatic": "Automatisch",
+  "themeAutomaticDetail": "Tagsüber Leinen, nachts Glut",
+  "themeAutomaticNow": "Automatisch · {name}",
+  "themeEmber": "Glut",
+  "themeMidnight": "Mitternacht",
+  "themeMoss": "Moos",
+  "themePlum": "Pflaume",
+  "themeBlack": "Schwarz",
+  "themeLinen": "Leinen",
+  "themeFrost": "Frost",
+  "themeDark": "Dunkel",
+  "themeLight": "Hell"
 }

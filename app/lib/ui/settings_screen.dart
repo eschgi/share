@@ -14,6 +14,7 @@ import 'admin/trash_screen.dart';
 import 'format.dart';
 import 'icons.dart';
 import 'server_screen.dart';
+import 'theme_sheet.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
@@ -246,6 +247,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: t.settingsLanguage,
             subtitle: chosen == null ? t.settingsLanguageAutomatic(_languageName(t, phone)) : _languageName(t, chosen),
             onTap: _pickLanguage,
+          ),
+          SettingsRow(
+            leading: SettingsRow.icon(context, AppIcons.palette),
+            title: t.settingsTheme,
+            subtitle: themeSummary(context, Services.of(context).theme.value),
+            onTap: () => showModalBottomSheet<void>(context: context, isScrollControlled: true, builder: (_) => const ThemeSheet()),
           ),
           SettingsRow(
             leading: SettingsRow.icon(context, AppIcons.server),

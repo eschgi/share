@@ -1,6 +1,6 @@
 // Builds the app's bundled fonts and lib/ui/icons.dart. Run once after changing the icon
-// list (npm install && npm run fonts in app/tool); the output is committed, so building the
-// app never needs the network.
+// list (npm install && npm run icons in app/tool; npm run fonts also makes the text fonts
+// again); the output is committed, so building the app never needs the network.
 //
 // - Noto Serif Bold for headings, Roboto Mono SemiBold for PINs and paths: the variable
 //   fonts from Google Fonts, pinned to the one weight the app uses and cut down to Latin.
@@ -48,6 +48,7 @@ const icons = {
   minus: 'minus',
   minusCircle: 'circle-minus',
   more: 'ellipsis-vertical',
+  palette: 'palette',
   play: 'play',
   playCircle: 'circle-play',
   plus: 'plus',
@@ -85,16 +86,20 @@ const latin = range(0x20, 0x7e) + range(0xa0, 0x17f) + range(0x2010, 0x2027) + r
 
 const googleFonts = 'https://raw.githubusercontent.com/google/fonts/main/ofl';
 await mkdir(out, { recursive: true });
+// --icons-only keeps the text fonts as they are: Google Fonts' main branch may have moved on.
+const textFonts = !process.argv.includes('--icons-only');
 
-const serif = await get(`${googleFonts}/notoserif/NotoSerif%5Bwdth,wght%5D.ttf`);
-await writeFile(new URL('NotoSerif-Bold.ttf', out),
-  await subsetFont(serif, latin, { targetFormat: 'truetype', variationAxes: { wght: 700, wdth: 100 } }));
-await writeFile(new URL('OFL-NotoSerif.txt', out), await get(`${googleFonts}/notoserif/OFL.txt`));
+if (textFonts) {
+  const serif = await get(`${googleFonts}/notoserif/NotoSerif%5Bwdth,wght%5D.ttf`);
+  await writeFile(new URL('NotoSerif-Bold.ttf', out),
+    await subsetFont(serif, latin, { targetFormat: 'truetype', variationAxes: { wght: 700, wdth: 100 } }));
+  await writeFile(new URL('OFL-NotoSerif.txt', out), await get(`${googleFonts}/notoserif/OFL.txt`));
 
-const mono = await get(`${googleFonts}/robotomono/RobotoMono%5Bwght%5D.ttf`);
-await writeFile(new URL('RobotoMono-SemiBold.ttf', out),
-  await subsetFont(mono, range(0x20, 0x7e) + range(0xa0, 0xff), { targetFormat: 'truetype', variationAxes: { wght: 600 } }));
-await writeFile(new URL('OFL-RobotoMono.txt', out), await get(`${googleFonts}/robotomono/OFL.txt`));
+  const mono = await get(`${googleFonts}/robotomono/RobotoMono%5Bwght%5D.ttf`);
+  await writeFile(new URL('RobotoMono-SemiBold.ttf', out),
+    await subsetFont(mono, range(0x20, 0x7e) + range(0xa0, 0xff), { targetFormat: 'truetype', variationAxes: { wght: 600 } }));
+  await writeFile(new URL('OFL-RobotoMono.txt', out), await get(`${googleFonts}/robotomono/OFL.txt`));
+}
 
 const cdn = `https://cdn.jsdelivr.net/npm/lucide-static@${lucideVersion}`;
 const codepoints = JSON.parse((await get(`${cdn}/font/codepoints.json`)).toString());

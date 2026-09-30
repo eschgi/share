@@ -89,6 +89,9 @@ class SecretStore(context: Context) {
         /** The PIN session (shp_…) of a phone that sends without an account. */
         const val PIN_TOKEN = "pin_token"
 
+        /** The theme picked in the app (lib/ui/theme.dart), or none for Ember. */
+        const val THEME = "theme"
+
         /** The language picked in the app, or none for the phone's. */
         const val LANGUAGE = "language"
 
