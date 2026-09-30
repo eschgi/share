@@ -1,0 +1,16 @@
+{
+  "name": "Share",
+  "public_url": "https://share.example.com",
+  "listen": "127.0.0.1:8080",
+  "storage_dir": "/mnt/usb/share",
+  "time_zone": "Europe/Rome",
+  "languages": ["en", "de", "it"],
+  "default_language": "en",
+  "upload": {
+    "chunk_size_mib": 20,
+    "max_file_size_gib": 0,
+    "min_free_space_mib": 2048,
+    "incomplete_ttl_hours": 168
+  },
+  "trash_days": 30
+}

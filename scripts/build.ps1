@@ -1,0 +1,47 @@
+# Builds the website into the server, then the server for the router (linux/arm64) and for
+# a VPS (linux/amd64). Output: dist\share-linux-arm64, dist\share-linux-amd64.
+#
+#   scripts\build.ps1                    version from git
+#   scripts\build.ps1 -Version 0.1.0
+param([string]$Version = "")
+
+$ErrorActionPreference = "Stop"
+$root = Split-Path -Parent $PSScriptRoot
+
+if (-not $Version) {
+    $Version = (git -C $root describe --tags --always --dirty 2>$null)
+    if (-not $Version) { $Version = "dev" }
+}
+
+Write-Host "Building the website"
+Push-Location "$root\web"
+try {
+    npm ci --no-audit --no-fund
+    if ($LASTEXITCODE -ne 0) { throw "npm ci failed" }
+    npm run build
+    if ($LASTEXITCODE -ne 0) { throw "website build failed" }
+} finally { Pop-Location }
+
+New-Item -ItemType Directory -Force "$root\dist" | Out-Null
+$env:CGO_ENABLED = "0"
+$env:GOOS = "linux"
+Push-Location "$root\server"
+try {
+    foreach ($arch in "arm64", "amd64") {
+        $env:GOARCH = $arch
+        $out = "$root\dist\share-linux-$arch"
+        Write-Host "Building $out ($Version)"
+        go build -trimpath -ldflags "-s -w -X main.version=$Version" -o $out ./cmd/share
+        if ($LASTEXITCODE -ne 0) { throw "go build failed for $arch" }
+    }
+} finally {
+    Pop-Location
+    Remove-Item Env:GOOS, Env:GOARCH, Env:CGO_ENABLED -ErrorAction SilentlyContinue
+}
+
+Get-ChildItem "$root\dist\share-linux-*" | ForEach-Object {
+    "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
+} | Set-Content -Encoding ascii "$root\dist\SHA256SUMS"
+
+Write-Host "Done:"
+Get-ChildItem "$root\dist"

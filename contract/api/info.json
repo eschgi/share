@@ -1,0 +1,15 @@
+{
+  "method": "GET",
+  "path": "/api/info",
+  "auth": "none",
+  "status": 200,
+  "response": {
+    "server_id": "q3ld5x2k7mbqz4bwdbyj6qsqxa",
+    "name": "Share",
+    "api_version": 1,
+    "languages": ["en", "de", "it"],
+    "default_language": "en",
+    "chunk_size_bytes": 20971520,
+    "max_file_size_bytes": 0
+  }
+}

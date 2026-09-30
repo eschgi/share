@@ -1,0 +1,25 @@
+{
+  "name": "share-web",
+  "private": true,
+  "type": "module",
+  "description": "The Share website: sending files with a PIN. Built into the Go server.",
+  "scripts": {
+    "dev": "vite",
+    "build": "node scripts/clean-dist.mjs && vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@fontsource/noto-serif": "^5.3.0",
+    "@fontsource/roboto": "^5.3.0",
+    "@fontsource/roboto-mono": "^5.3.0",
+    "@uppy/core": "^6.2.0",
+    "@uppy/tus": "^6.0.0",
+    "preact": "^10.29.8"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.3.1",
+    "vitest": "^5.0.3"
+  }
+}

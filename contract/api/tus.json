@@ -1,0 +1,24 @@
+{
+  "description": "tus 1.0.0 at /tus/ with the core, creation and termination extensions. Authenticate every request (PIN cookie or Authorization: Bearer). Upload ids are file ids.",
+  "create": {
+    "method": "POST",
+    "path": "/tus/",
+    "headers": {"Tus-Resumable": "1.0.0", "Upload-Length": "1048576", "Upload-Metadata": "filename SU1HXzEuanBn,filetype aW1hZ2UvanBlZw=="},
+    "status": 201,
+    "response_headers": {"Location": "/tus/q3ld5x2k7mbqz4bwdbyj6qsqxa"},
+    "notes": "Location is always a path; resolve it against the address in use. Metadata keys filename/filetype (or name/type) and lastModified (Unix ms) are read; others are dropped."
+  },
+  "patch": {
+    "method": "PATCH",
+    "headers": {"Tus-Resumable": "1.0.0", "Upload-Offset": "0", "Content-Type": "application/offset+octet-stream"},
+    "status": 204,
+    "response_headers": {"Upload-Offset": "20971520"},
+    "notes": "Keep each PATCH at or below chunk_size_bytes from /api/info (Cloudflare rejects bodies over 100 MB). The last PATCH also carries Share-File-Id."
+  },
+  "head_finished": {
+    "method": "HEAD",
+    "status": 200,
+    "response_headers": {"Upload-Offset": "1048576", "Upload-Length": "1048576"},
+    "notes": "A finished upload keeps answering HEAD with offset == length, so a client that lost the final response knows it is done."
+  }
+}

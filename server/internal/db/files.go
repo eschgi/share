@@ -1,0 +1,210 @@
+package db
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"strings"
+	"time"
+)
+
+// File states.
+const (
+	StateReceiving  = "receiving"
+	StateFinalizing = "finalizing"
+	StateReady      = "ready"
+	StateTrashed    = "trashed"
+)
+
+// File kinds, used for the photos/videos/documents filters.
+const (
+	KindPhoto    = "photo"
+	KindVideo    = "video"
+	KindDocument = "document"
+)
+
+// File is one upload, from the first byte until it is in the library (and later the trash).
+type File struct {
+	ID               string
+	State            string
+	Name             string
+	Size             int64
+	Received         int64
+	Mime             string
+	Kind             string
+	RelPath          string // path inside storage_dir, e.g. 2026-09-27/IMG_1.jpg
+	UploadDay        string // YYYY-MM-DD in the configured time zone
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	UploadedAt       *time.Time
+	ClientModifiedAt *time.Time
+	Width, Height    *int64
+	DurationMS       *int64
+	Thumb            string
+	PinID            string
+	PinSessionID     string
+	UserID           string
+	DeviceID         string
+	DeletedAt        *time.Time
+	DeletedBy        string
+}
+
+const fileColumns = `id, state, name, size, received, mime, kind, rel_path, upload_day, created_at, updated_at,
+	uploaded_at, client_modified_at, width, height, duration_ms, thumb, pin_id, pin_session_id, user_id,
+	device_id, deleted_at, deleted_by`
+
+func scanFile(row interface{ Scan(...any) error }) (File, error) {
+	var f File
+	var relPath, day, pinID, sessionID, userID, deviceID, deletedBy sql.NullString
+	var created, updated int64
+	var uploaded, clientModified, deleted, width, height, duration sql.NullInt64
+	err := row.Scan(&f.ID, &f.State, &f.Name, &f.Size, &f.Received, &f.Mime, &f.Kind, &relPath, &day,
+		&created, &updated, &uploaded, &clientModified, &width, &height, &duration, &f.Thumb,
+		&pinID, &sessionID, &userID, &deviceID, &deleted, &deletedBy)
+	if errors.Is(err, sql.ErrNoRows) {
+		return f, ErrNotFound
+	}
+	if err != nil {
+		return f, err
+	}
+	f.RelPath, f.UploadDay = relPath.String, day.String
+	f.CreatedAt, f.UpdatedAt = fromMS(created), fromMS(updated)
+	f.UploadedAt, f.ClientModifiedAt, f.DeletedAt = optTime(uploaded), optTime(clientModified), optTime(deleted)
+	f.Width, f.Height, f.DurationMS = optInt(width), optInt(height), optInt(duration)
+	f.PinID, f.PinSessionID, f.UserID, f.DeviceID, f.DeletedBy =
+		pinID.String, sessionID.String, userID.String, deviceID.String, deletedBy.String
+	return f, nil
+}
+
+func optInt(v sql.NullInt64) *int64 {
+	if !v.Valid {
+		return nil
+	}
+	return &v.Int64
+}
+
+func queryFiles(ctx context.Context, q interface {
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+}, query string, args ...any) ([]File, error) {
+	rows, err := q.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []File
+	for rows.Next() {
+		f, err := scanFile(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, f)
+	}
+	return out, rows.Err()
+}
+
+// InsertReceiving records a new upload before tus creates its files. The kind is only a
+// guess from the name until finalize looks at the content.
+func (d *DB) InsertReceiving(ctx context.Context, f File) error {
+	if f.Kind == "" {
+		f.Kind = KindDocument
+	}
+	_, err := d.ExecContext(ctx, `INSERT INTO files (id, state, name, size, received, mime, kind, created_at, updated_at,
+			client_modified_at, pin_id, pin_session_id, user_id, device_id)
+		VALUES (?, 'receiving', ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		f.ID, f.Name, f.Size, f.Mime, f.Kind, ms(f.CreatedAt), ms(f.UpdatedAt), nullMS(f.ClientModifiedAt),
+		nullString(f.PinID), nullString(f.PinSessionID), nullString(f.UserID), nullString(f.DeviceID))
+	return err
+}
+
+// FileByID returns one file row.
+func (d *DB) FileByID(ctx context.Context, id string) (File, error) {
+	return scanFile(d.QueryRowContext(ctx, "SELECT "+fileColumns+" FROM files WHERE id = ?", id))
+}
+
+// SetReceived records how many bytes of a receiving upload have arrived.
+func (d *DB) SetReceived(ctx context.Context, id string, received int64, at time.Time) error {
+	_, err := d.ExecContext(ctx,
+		"UPDATE files SET received = ?, updated_at = ? WHERE id = ? AND state = 'receiving'", received, ms(at), id)
+	return err
+}
+
+// UnfinishedCount counts the receiving uploads of one PIN session or one user.
+func (d *DB) UnfinishedCount(ctx context.Context, pinSessionID, userID string) (int, error) {
+	var n int
+	err := d.QueryRowContext(ctx, `SELECT COUNT(*) FROM files WHERE state = 'receiving'
+		AND ((?1 != '' AND pin_session_id = ?1) OR (?2 != '' AND user_id = ?2))`, pinSessionID, userID).Scan(&n)
+	return n, err
+}
+
+// OutstandingBytes is how much disk space unfinished uploads will still need.
+func (d *DB) OutstandingBytes(ctx context.Context) (int64, error) {
+	var n sql.NullInt64
+	err := d.QueryRowContext(ctx, "SELECT SUM(size - received) FROM files WHERE state = 'receiving'").Scan(&n)
+	return n.Int64, err
+}
+
+// RelPathTaken reports whether a library path is in use, ignoring case, because exFAT and
+// NTFS drives treat IMG.jpg and img.jpg as the same file.
+func (d *DB) RelPathTaken(ctx context.Context, relPath string) (bool, error) {
+	var n int
+	err := d.QueryRowContext(ctx, `SELECT COUNT(*) FROM files
+		WHERE rel_path = ? COLLATE NOCASE AND state IN ('finalizing', 'ready')`, relPath).Scan(&n)
+	return n > 0, err
+}
+
+// MarkFinalizing claims a library path for a complete upload. It returns false if the row
+// isn't receiving any more, and ErrConflict if the path was just taken by another upload.
+func (d *DB) MarkFinalizing(ctx context.Context, id, relPath, day string, at time.Time) (bool, error) {
+	res, err := d.ExecContext(ctx, `UPDATE files SET state = 'finalizing', rel_path = ?, upload_day = ?, updated_at = ?
+		WHERE id = ? AND state = 'receiving'`, relPath, day, ms(at), id)
+	if isUniqueViolation(err) {
+		return false, ErrConflict
+	}
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n == 1, err
+}
+
+// MarkReady puts a finalized file into the library and bumps the library version.
+func (d *DB) MarkReady(ctx context.Context, id, mime, kind string, at time.Time) error {
+	return d.Tx(ctx, func(tx *sql.Tx) error {
+		res, err := tx.ExecContext(ctx, `UPDATE files SET state = 'ready', mime = ?, kind = ?, received = size,
+				uploaded_at = ?, updated_at = ?
+			WHERE id = ? AND state = 'finalizing'`, mime, kind, ms(at), ms(at), id)
+		if err != nil {
+			return err
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			return nil // already ready: finalize is idempotent
+		}
+		return bumpLibraryVersion(ctx, tx)
+	})
+}
+
+// DeleteFileRow removes a row. Used for uploads that are terminated or abandoned before
+// they reach the library.
+func (d *DB) DeleteFileRow(ctx context.Context, id string) error {
+	_, err := d.ExecContext(ctx, "DELETE FROM files WHERE id = ? AND state IN ('receiving', 'finalizing')", id)
+	return err
+}
+
+// FilesInStates lists the files in any of the given states, oldest change first.
+func (d *DB) FilesInStates(ctx context.Context, states ...string) ([]File, error) {
+	if len(states) == 0 {
+		return nil, nil
+	}
+	args := make([]any, len(states))
+	for i, s := range states {
+		args[i] = s
+	}
+	return queryFiles(ctx, d, "SELECT "+fileColumns+" FROM files WHERE state IN (?"+strings.Repeat(", ?", len(states)-1)+
+		") ORDER BY updated_at, id", args...)
+}
+
+// IdleReceiving lists receiving uploads that haven't changed since before.
+func (d *DB) IdleReceiving(ctx context.Context, before time.Time) ([]File, error) {
+	return queryFiles(ctx, d, "SELECT "+fileColumns+" FROM files WHERE state = 'receiving' AND updated_at < ? ORDER BY updated_at",
+		ms(before))
+}

@@ -1,0 +1,12 @@
+{
+  "method": "POST",
+  "path": "/api/pin/unlock",
+  "auth": "none",
+  "request": {"code": "K7M2Q", "client": "web"},
+  "status": 200,
+  "response": {
+    "session": {"kind": "pin", "pin_kind": "permanent", "expires_at": null},
+    "moved_uploads": 0
+  },
+  "notes": "The website gets the session as the HttpOnly cookie __Host-share_pin instead of a token in the body."
+}

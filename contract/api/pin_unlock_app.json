@@ -1,0 +1,13 @@
+{
+  "method": "POST",
+  "path": "/api/pin/unlock",
+  "auth": "none",
+  "request": {"code": "k7m2q", "client": "app"},
+  "status": 200,
+  "response": {
+    "token": "shp_0123456789abcdefghijklmnopqrstuvwxyzABCDEFG",
+    "session": {"kind": "pin", "pin_kind": "day", "expires_at": "2026-09-28T10:00:00Z"},
+    "moved_uploads": 0
+  },
+  "notes": "Send the old token as Authorization: Bearer when unlocking again after session_ended; its unfinished uploads move to the new session and moved_uploads counts them. expires_at is null for a permanent PIN."
+}

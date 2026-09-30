@@ -1,0 +1,28 @@
+# Build output
+/dist/
+/server/share
+/server/share.exe
+/server/internal/webui/dist/*
+!/server/internal/webui/dist/.gitkeep
+
+# Node
+node_modules/
+
+# Local configuration and data: they hold paths, PINs and keys
+config.json
+*.db
+*.db-wal
+*.db-shm
+
+# Android signing
+key.properties
+*.jks
+*.keystore
+
+# Rendered mockups; docs/share-mockup.html is the source
+/docs/share-mockup/
+
+# Editors and OS
+.idea/
+.vscode/
+.DS_Store

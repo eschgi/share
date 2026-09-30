@@ -1,0 +1,29 @@
+// PIN input rules, identical to the server's (contract/pin_codes.json).
+
+export const pinAlphabet = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+export const pinLength = 5;
+
+/** The characters of a typed PIN that count: capitals, no spaces or dashes, only the alphabet. */
+export function cleanPinInput(input: string): string {
+  let out = '';
+  for (const ch of input.toUpperCase()) {
+    if (pinAlphabet.includes(ch)) out += ch;
+  }
+  return out.slice(0, pinLength);
+}
+
+/** The normalized code, or null if the input can't be a PIN (that is never sent as a try). */
+export function normalizePin(input: string): string | null {
+  let out = '';
+  for (const ch of input.toUpperCase()) {
+    if (ch === ' ' || ch === '-' || ch === '\t') continue;
+    if (!pinAlphabet.includes(ch)) return null;
+    out += ch;
+  }
+  return out.length === pinLength ? out : null;
+}
+
+/** A PIN from the page address: share.example.com/#K7M2Q. */
+export function pinFromHash(hash: string): string | null {
+  return normalizePin(decodeURIComponent(hash.replace(/^#/, '')));
+}

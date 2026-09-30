@@ -1,0 +1,23 @@
+{
+  "method": "POST",
+  "path": "/api/pin/unlock",
+  "auth": "none",
+  "cases": [
+    {
+      "request": {"code": "abc", "client": "web"},
+      "status": 400,
+      "response": {"error": {"code": "pin_format", "message": "A PIN has 5 letters or numbers."}}
+    },
+    {
+      "request": {"code": "22222", "client": "web"},
+      "status": 401,
+      "response": {"error": {"code": "pin_wrong", "message": "That PIN didn't work.", "attempts_left": 4}}
+    },
+    {
+      "request": {"code": "22222", "client": "web"},
+      "status": 429,
+      "headers": {"Retry-After": "600"},
+      "response": {"error": {"code": "pin_locked", "message": "Too many wrong PINs. Wait a moment and try again.", "retry_after_seconds": 600}}
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "method": "GET",
+  "path": "/api/session",
+  "auth": "pin",
+  "cases": [
+    {
+      "status": 200,
+      "response": {"kind": "pin", "pin_kind": "day", "expires_at": "2026-09-28T10:00:00Z"}
+    },
+    {
+      "status": 401,
+      "response": {"error": {"code": "session_ended", "message": "The PIN you used has ended. Enter a new PIN to continue."}}
+    },
+    {
+      "status": 401,
+      "response": {"error": {"code": "unauthorized", "message": "Enter a PIN or sign in first."}}
+    }
+  ]
+}

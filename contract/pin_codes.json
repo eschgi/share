@@ -1,0 +1,19 @@
+{
+  "description": "How typed PINs are normalized. Server, website and app must agree. code null means the input can't be a PIN at all, which doesn't count as a wrong try.",
+  "alphabet": "23456789ABCDEFGHJKLMNPQRSTUVWXYZ",
+  "length": 5,
+  "cases": [
+    {"input": "K7M2Q", "code": "K7M2Q"},
+    {"input": "k7m2q", "code": "K7M2Q"},
+    {"input": " k7-m2 q ", "code": "K7M2Q"},
+    {"input": "4hx9t", "code": "4HX9T"},
+    {"input": "K7M2", "code": null},
+    {"input": "K7M2QX", "code": null},
+    {"input": "K7M2O", "code": null},
+    {"input": "K7M20", "code": null},
+    {"input": "K7M21", "code": null},
+    {"input": "K7M2I", "code": null},
+    {"input": "K7M2Ä", "code": null},
+    {"input": "", "code": null}
+  ]
+}
