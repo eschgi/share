@@ -1,0 +1,18 @@
+{
+  "method": "GET",
+  "path": "/api/app",
+  "auth": "none",
+  "status": 200,
+  "response": {
+    "android_package": "com.eschgi.share",
+    "link_scheme": "com.eschgi.share",
+    "apk": {
+      "version_code": 3,
+      "version_name": "0.3.0",
+      "size": 18874368,
+      "sha256": "9b74c9897bac770ffc029102a200c5de9b74c9897bac770ffc029102a200c5de"
+    },
+    "play_store_url": null
+  },
+  "notes": "apk is null when the server offers none; /download/share.apk sends it. play_store_url is null until the app is on Google Play."
+}

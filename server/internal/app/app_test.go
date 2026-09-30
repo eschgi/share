@@ -47,13 +47,19 @@ type env struct {
 	free  atomic.Int64
 }
 
-func newEnv(t *testing.T) *env {
+func newEnv(t *testing.T) *env { return newEnvWith(t, "") }
+
+// newEnvWith adds settings to the test configuration, e.g. `"local": {...}`.
+func newEnvWith(t *testing.T, settings string) *env {
 	t.Helper()
 	dir := t.TempDir()
 	storageDir := filepath.Join(dir, "storage")
+	if settings != "" {
+		settings = ", " + settings
+	}
 	cfg, err := config.Parse([]byte(fmt.Sprintf(
-		`{"public_url": "https://share.example.test", "storage_dir": %q, "time_zone": "Europe/Rome", "listen": "127.0.0.1:0"}`,
-		storageDir)))
+		`{"public_url": "https://share.example.test", "storage_dir": %q, "time_zone": "Europe/Rome", "listen": "127.0.0.1:0"%s}`,
+		storageDir, settings)))
 	if err != nil {
 		t.Fatal(err)
 	}

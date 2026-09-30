@@ -1,0 +1,17 @@
+{
+  "method": "GET",
+  "path": "/api/library?kind=photo",
+  "auth": "device",
+  "status": 200,
+  "response": {
+    "version": 42,
+    "days": [
+      {
+        "day": "2026-09-27",
+        "count": 6,
+        "bytes": 74000000
+      }
+    ]
+  },
+  "notes": "The upload days that have files, newest first. version grows with every change to the library (new files, thumbnails, deletions): poll this and reload when it changes. kind is photo, video or document; q matches part of the file name. PIN sessions get 403 forbidden on every library endpoint."
+}

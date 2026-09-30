@@ -14,6 +14,10 @@ export default defineConfig({
     // No inlined data: URIs, so the strict Content-Security-Policy needs no exceptions.
     assetsInlineLimit: 0,
     target: 'es2022',
+    // Two pages: sending (screens 1–6) and the invite page (9), which needs no Uppy.
+    rolldownOptions: {
+      input: { index: 'index.html', join: 'join.html' },
+    },
   },
   oxc: {
     jsx: { runtime: 'automatic', importSource: 'preact' },

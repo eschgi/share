@@ -76,3 +76,22 @@ export interface UnlockResult {
 }
 
 export const unlock = (code: string) => request<UnlockResult>('POST', '/api/pin/unlock', { code, client: 'web' });
+
+export interface InvitePeek {
+  inviter: string | null; // null for invites made on the server's console
+  name: string;
+  role: 'admin' | 'member';
+  expires_at: string;
+  adds_phone: boolean;
+}
+
+export const peekInvite = (token: string) => request<InvitePeek>('POST', '/api/invites/peek', { token });
+
+export interface AppInfo {
+  android_package: string;
+  link_scheme: string;
+  apk: { version_code: number; version_name: string; size: number; sha256: string } | null;
+  play_store_url: string | null;
+}
+
+export const getApp = () => request<AppInfo>('GET', '/api/app');

@@ -1,0 +1,20 @@
+{
+  "method": "GET",
+  "path": "/api/me",
+  "auth": "device",
+  "status": 200,
+  "response": {
+    "user": {
+      "id": "u7ld5x2k7mbqz4bwdbyj6qsqxa",
+      "name": "Maria",
+      "role": "member",
+      "username": null,
+      "has_password": false
+    },
+    "device": {
+      "id": "d2ld5x2k7mbqz4bwdbyj6qsqxa",
+      "name": "Pixel 8"
+    }
+  },
+  "notes": "Also: POST /api/auth/logout (204) signs this phone out; PUT /api/me/password {username, password, current_password?} (204; current_password is needed once there is a password; errors bad_request, password_wrong, username_taken); POST /api/me/delete (204) removes the account and signs out all its phones, 409 last_admin for the only admin. A revoked phone gets 401 signed_out everywhere."
+}

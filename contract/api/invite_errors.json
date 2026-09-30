@@ -1,0 +1,41 @@
+{
+  "description": "Error responses of /api/invites/peek and /api/invites/accept.",
+  "cases": [
+    {
+      "status": 404,
+      "response": {
+        "error": {
+          "code": "invite_unknown",
+          "message": "This invite doesn't exist. Check the link."
+        }
+      }
+    },
+    {
+      "status": 410,
+      "response": {
+        "error": {
+          "code": "invite_used",
+          "message": "This invite was used already. Ask for a new one."
+        }
+      }
+    },
+    {
+      "status": 410,
+      "response": {
+        "error": {
+          "code": "invite_expired",
+          "message": "This invite has expired. Ask for a new one."
+        }
+      }
+    },
+    {
+      "status": 410,
+      "response": {
+        "error": {
+          "code": "invite_revoked",
+          "message": "This invite was withdrawn."
+        }
+      }
+    }
+  ]
+}

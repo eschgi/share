@@ -75,5 +75,25 @@
   "done.close": "You can close this page now.",
   "install.title": "Add {name} to your home screen",
   "install.lead": "Next time it opens like an app.",
-  "install.button": "Install"
+  "install.button": "Install",
+
+  "join.invitedBy": "{inviter} invited you",
+  "join.invited": "You're invited",
+  "join.lead": "To see and download the shared files, install the {name} app first. It takes a minute.",
+  "join.step1": "Download the app",
+  "join.step1Detail": "{size}, straight from this server",
+  "join.step2": "Open it and tap Install",
+  "join.step2Detail": "Your phone may ask you to allow this once, and warn that the app isn't from the Play Store. That's expected.",
+  "join.step3": "Come back and tap Join",
+  "join.step3Detail": "The invite works once, until {when}.",
+  "join.download": "Download the app",
+  "join.already": "Already installed? Join as {name}",
+  "join.noApk": "This server doesn't offer the app yet. Ask the person who invited you.",
+  "join.notAndroid": "Open this link on your Android phone: the app is for Android.",
+  "join.problemTitle": "This invite doesn't work",
+  "join.used": "It was used already; each invite works once. Ask for a new one.",
+  "join.expired": "It has expired. Ask for a new one.",
+  "join.revoked": "It was withdrawn.",
+  "join.unknown": "The link isn't complete. Open it again from the message you got.",
+  "join.locked": "Too many tries. Wait a few minutes and open the link again."
 }

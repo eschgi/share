@@ -35,6 +35,14 @@ Usage:
   share pin list              list PINs
   share pin end CODE          end a PIN now
   share pin new-code CODE     replace a PIN's code; the old code stops working
+  share invite --name NAME [--admin]
+                              print a link that signs someone's phone in, once, within 24 hours
+  share invite --for USER     print a link that signs in another phone for USER (username or id)
+  share users                 list the people with an account and their phones
+  share password USERNAME [--name NAME] [--admin]
+                              give USERNAME a new password (making the account if needed)
+  share cert                  show the local address's certificate
+  share cert regenerate       replace it; phones learn the new one by themselves
   share version               print the version
 
 Every command takes --config PATH (default ./config.json).
@@ -63,6 +71,14 @@ func run(args []string) error {
 		return check(rest)
 	case "pin":
 		return pin(rest)
+	case "invite":
+		return invite(rest)
+	case "users":
+		return users(rest)
+	case "password":
+		return password(rest)
+	case "cert":
+		return cert(rest)
 	case "version", "--version":
 		fmt.Println("share", version)
 		return nil

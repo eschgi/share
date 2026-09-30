@@ -12,5 +12,12 @@
     "min_free_space_mib": 2048,
     "incomplete_ttl_hours": 168
   },
-  "trash_days": 30
+  "trash_days": 30,
+  "local": {
+    "listen": ":8443",
+    "url": "https://192.168.8.1:8443"
+  },
+  "app": {
+    "apk_file": "/mnt/usb/share/.share/share.apk"
+  }
 }

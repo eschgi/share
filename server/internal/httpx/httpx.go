@@ -60,6 +60,8 @@ func WriteAuthError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, auth.ErrSessionEnded):
 		WriteError(w, http.StatusUnauthorized, "session_ended", "The PIN you used has ended. Enter a new PIN to continue.")
+	case errors.Is(err, auth.ErrSignedOut):
+		WriteError(w, http.StatusUnauthorized, "signed_out", "This phone was signed out. Sign in again.")
 	case errors.Is(err, auth.ErrUnauthorized):
 		WriteError(w, http.StatusUnauthorized, "unauthorized", "Enter a PIN or sign in first.")
 	default:

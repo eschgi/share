@@ -1,0 +1,17 @@
+{
+  "method": "POST",
+  "path": "/api/invites/peek",
+  "auth": "none",
+  "request": {
+    "token": "shi_0123456789abcdefghijklmnopqrstuvwxyzABCDEFG"
+  },
+  "status": 200,
+  "response": {
+    "inviter": "Stefan",
+    "name": "Maria",
+    "role": "member",
+    "expires_at": "2026-09-28T21:00:00Z",
+    "adds_phone": false
+  },
+  "notes": "Shows what an invite is for without using it. inviter is null for invites made on the server's console. adds_phone: the invite signs in another phone for someone who has an account. Errors: invite_unknown, invite_used, invite_expired, invite_revoked, invite_locked."
+}

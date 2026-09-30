@@ -53,6 +53,15 @@ type Local struct {
 	URL    string `json:"url"`
 }
 
+// URLHost is the host of the local address, for its certificate.
+func (l Local) URLHost() string {
+	u, err := url.Parse(l.URL)
+	if err != nil {
+		return ""
+	}
+	return u.Hostname()
+}
+
 // Upload holds the limits for tus uploads.
 type Upload struct {
 	ChunkSizeMiB       int   `json:"chunk_size_mib"`
@@ -86,6 +95,8 @@ func Default() Config {
 			IncompleteTTLHours: 168,
 		},
 		TrashDays: 30,
+		// The app from this repository; a fork with its own app changes both.
+		App: App{AndroidPackage: "com.eschgi.share", LinkScheme: "com.eschgi.share"},
 	}
 }
 

@@ -1,0 +1,234 @@
+package main
+
+import (
+	"context"
+	"crypto/rand"
+	"errors"
+	"fmt"
+	"os"
+	"strings"
+	"text/tabwriter"
+	"time"
+
+	"github.com/eschgi/share/server/internal/auth"
+	"github.com/eschgi/share/server/internal/config"
+	"github.com/eschgi/share/server/internal/db"
+	"github.com/eschgi/share/server/internal/ids"
+	"github.com/eschgi/share/server/internal/localtls"
+	"github.com/eschgi/share/server/internal/storage"
+)
+
+// openDB opens and migrates the database of cfg, for the commands that work on it directly.
+func openDB(ctx context.Context, cfg *config.Config) (*db.DB, *auth.Service, error) {
+	layout := storage.Layout{StorageDir: cfg.StorageDir, DataDir: cfg.DataDir}
+	d, err := db.Open(layout.DBPath())
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := d.Migrate(ctx, layout.BackupDir()); err != nil {
+		d.Close()
+		return nil, nil, err
+	}
+	return d, auth.NewService(d, time.Now, cfg.Proxies, cfg.ClientIPHeader), nil
+}
+
+func invite(args []string) error {
+	f := newFlags("invite")
+	name := f.fs.String("name", "", "who the invite is for")
+	admin := f.fs.Bool("admin", false, "make them an admin")
+	forUser := f.fs.String("for", "", "sign in another phone for this person (username or id)")
+	if _, err := f.parse(args); err != nil {
+		return err
+	}
+	cfg, err := f.load()
+	if err != nil {
+		return err
+	}
+	if (*name == "") == (*forUser == "") {
+		return errors.New("give --name for someone new, or --for for someone with an account")
+	}
+	ctx := context.Background()
+	d, svc, err := openDB(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+	role := db.RoleMember
+	if *admin {
+		role = db.RoleAdmin
+	}
+	userID := ""
+	if *forUser != "" {
+		u, err := findUser(ctx, d, *forUser)
+		if err != nil {
+			return err
+		}
+		userID = u.ID
+	}
+	token, in, err := svc.CreateInvite(ctx, *name, role, userID, "cli", auth.InviteLifetime)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Invite for %s (%s)\n", in.Name, in.Role)
+	fmt.Printf("Link:  %s/join#%s\n", strings.TrimSuffix(cfg.PublicURL, "/"), token)
+	fmt.Printf("Works: once, until %s\n", in.ExpiresAt.In(cfg.Location).Format("2006-01-02 15:04"))
+	return nil
+}
+
+// findUser finds a person by username or id.
+func findUser(ctx context.Context, d *db.DB, who string) (db.User, error) {
+	u, err := d.UserByUsername(ctx, who)
+	if errors.Is(err, db.ErrNotFound) {
+		u, err = d.UserByID(ctx, who)
+	}
+	if errors.Is(err, db.ErrNotFound) {
+		return u, fmt.Errorf("nobody with username or id %q; see share users", who)
+	}
+	return u, err
+}
+
+func users(args []string) error {
+	f := newFlags("users")
+	if _, err := f.parse(args); err != nil {
+		return err
+	}
+	cfg, err := f.load()
+	if err != nil {
+		return err
+	}
+	ctx := context.Background()
+	d, _, err := openDB(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+	list, err := d.Users(ctx)
+	if err != nil {
+		return err
+	}
+	if len(list) == 0 {
+		fmt.Println("Nobody has an account yet. The server prints an invite for the first admin when it starts.")
+		return nil
+	}
+	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
+	fmt.Fprintln(w, "NAME\tUSERNAME\tROLE\tPHONES\tLAST SEEN\tID")
+	for _, u := range list {
+		devices, err := d.DevicesOf(ctx, u.ID)
+		if err != nil {
+			return err
+		}
+		seen := "never"
+		if len(devices) > 0 {
+			seen = devices[0].LastSeenAt.In(cfg.Location).Format("2006-01-02 15:04")
+		}
+		fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%s\t%s\n", u.Name, orDash(u.Username), u.Role, len(devices), seen, u.ID)
+	}
+	return w.Flush()
+}
+
+func orDash(s string) string {
+	if s == "" {
+		return "-"
+	}
+	return s
+}
+
+func password(args []string) error {
+	f := newFlags("password")
+	name := f.fs.String("name", "", "the name shown in the app, for a new account")
+	admin := f.fs.Bool("admin", false, "make a new account an admin")
+	positional, err := f.parse(args)
+	if err != nil {
+		return err
+	}
+	if len(positional) != 1 {
+		return errors.New("usage: share password USERNAME [--name NAME] [--admin]")
+	}
+	username := positional[0]
+	cfg, err := f.load()
+	if err != nil {
+		return err
+	}
+	ctx := context.Background()
+	d, svc, err := openDB(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+	u, err := d.UserByUsername(ctx, username)
+	switch {
+	case errors.Is(err, db.ErrNotFound):
+		role := db.RoleMember
+		if *admin {
+			role = db.RoleAdmin
+		}
+		display := *name
+		if display == "" {
+			display = username
+		}
+		u = db.User{ID: ids.New(), Name: display, Role: role, CreatedAt: time.Now(), CreatedBy: "cli"}
+		if err := d.InsertUser(ctx, u); err != nil {
+			return err
+		}
+		fmt.Printf("New account %s (%s)\n", u.Name, u.Role)
+	case err != nil:
+		return err
+	}
+	pass := randomPassword()
+	if err := svc.SetLoginFor(ctx, u.ID, username, pass); err != nil {
+		return err
+	}
+	fmt.Printf("Username: %s\nPassword: %s\n", username, pass)
+	fmt.Println("Sign in with these in the app; the password can be changed there.")
+	return nil
+}
+
+// randomPassword is 16 characters in four groups, without look-alikes, easy to read out.
+func randomPassword() string {
+	const alphabet = "23456789abcdefghjkmnpqrstuvwxyz"
+	b := make([]byte, 16)
+	rand.Read(b)
+	var out strings.Builder
+	for i, c := range b {
+		if i > 0 && i%4 == 0 {
+			out.WriteByte('-')
+		}
+		out.WriteByte(alphabet[int(c)%len(alphabet)])
+	}
+	return out.String()
+}
+
+func cert(args []string) error {
+	f := newFlags("cert")
+	positional, err := f.parse(args)
+	if err != nil {
+		return err
+	}
+	cfg, err := f.load()
+	if err != nil {
+		return err
+	}
+	if cfg.Local.URL == "" {
+		return errors.New("there is no local address: set local.listen and local.url in the config")
+	}
+	switch {
+	case len(positional) == 1 && positional[0] == "regenerate":
+		if err := localtls.Regenerate(cfg.DataDir, cfg.Local.URLHost()); err != nil {
+			return err
+		}
+		fmt.Println("New certificate for the local address. Phones fall back to the public address once,")
+		fmt.Println("learn the new certificate there, and then use the local address again.")
+	case len(positional) == 0:
+		if err := localtls.Ensure(cfg.DataDir, cfg.Local.URLHost()); err != nil {
+			return err
+		}
+	default:
+		return errors.New("usage: share cert [regenerate]")
+	}
+	l, err := localtls.NewLoader(cfg.DataDir)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Local address: %s\nSHA-256:       %s\n", cfg.Local.URL, l.Fingerprint())
+	return nil
+}

@@ -1,0 +1,27 @@
+{
+  "method": "GET",
+  "path": "/api/files?day=2026-09-27&limit=100",
+  "auth": "device",
+  "status": 200,
+  "response": {
+    "files": [
+      {
+        "id": "q3ld5x2k7mbqz4bwdbyj6qsqxa",
+        "name": "IMG_0001.jpg",
+        "size": 3145728,
+        "mime": "image/jpeg",
+        "kind": "photo",
+        "day": "2026-09-27",
+        "uploaded_at": "2026-09-27T10:00:00Z",
+        "updated_at": "2026-09-27T10:02:00Z",
+        "width": 4032,
+        "height": 3024,
+        "duration_ms": null,
+        "has_thumb": true,
+        "from": "Maria"
+      }
+    ],
+    "next_cursor": "MTc5MDQ5MzYwMDAwMC5xM2xkNXgyazdtYnF6NGJ3ZGJ5ajZxc3F4YQ"
+  },
+  "notes": "Newest first; limit is 1 to 500 (200 if left out). Pass next_cursor as cursor for the next page; it is null on the last. Filters: kind, q, day. from is the sender's name when they have an account, null for a PIN. width, height and duration_ms are null when unknown."
+}

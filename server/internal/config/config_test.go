@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -78,7 +79,7 @@ func TestErrors(t *testing.T) {
 		{"default not in languages", `{"public_url": "https://a.example", "storage_dir": "/s", "languages": ["de"]}`, "default_language"},
 		{"chunk too big", `{"public_url": "https://a.example", "storage_dir": "/s", "upload": {"chunk_size_mib": 100}}`, "chunk_size_mib"},
 		{"half tls", `{"public_url": "https://a.example", "storage_dir": "/s", "tls_cert_file": "/c.pem"}`, "tls_key_file"},
-		{"package without scheme", `{"public_url": "https://a.example", "storage_dir": "/s", "app": {"android_package": "com.eschgi.share"}}`, "app.link_scheme"},
+		{"package without scheme", `{"public_url": "https://a.example", "storage_dir": "/s", "app": {"android_package": "com.example.share", "link_scheme": ""}}`, "app.link_scheme"},
 		{"bad package", `{"public_url": "https://a.example", "storage_dir": "/s", "app": {"android_package": "share", "link_scheme": "share"}}`, "android_package"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -105,5 +106,19 @@ func TestAllProblemsAreReportedTogether(t *testing.T) {
 func TestLocalhostHTTPIsAllowedForDevelopment(t *testing.T) {
 	if _, err := Parse([]byte(`{"public_url": "http://localhost:8080", "storage_dir": "/s"}`)); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestExampleIsValid(t *testing.T) {
+	data, err := os.ReadFile("../../../config.example.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Parse(data)
+	if err != nil {
+		t.Fatalf("config.example.json: %v", err)
+	}
+	if cfg.Local.URLHost() != "192.168.8.1" || cfg.App.LinkScheme != "com.eschgi.share" {
+		t.Errorf("local = %+v, app = %+v", cfg.Local, cfg.App)
 	}
 }

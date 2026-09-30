@@ -816,3 +816,66 @@ button.small {
 .install .btn {
   margin: 10px 0 0;
 }
+
+/* Screen 9: the invite page. */
+.appico.lg {
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  margin: 26px 0 22px;
+}
+.appico.lg .ic {
+  width: 38px;
+  height: 38px;
+}
+.steps {
+  margin-top: 20px;
+  background: var(--s1);
+  border: 1px solid var(--line-soft);
+  border-radius: 18px;
+  padding: 4px 16px;
+  flex: none;
+}
+.step {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 12px 0;
+}
+.step + .step {
+  border-top: 1px solid var(--line-soft);
+}
+.step .num {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: 13px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.step b {
+  display: block;
+  font-size: 15.5px;
+  font-weight: 600;
+}
+.step div span {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-3);
+}
+a.btn {
+  text-decoration: none;
+}
+.btn.link {
+  background: none;
+  height: 52px;
+  font-size: 16.5px;
+  font-weight: 500;
+  color: var(--accent-text);
+}

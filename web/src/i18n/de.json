@@ -75,5 +75,25 @@
   "done.close": "Du kannst diese Seite jetzt schließen.",
   "install.title": "{name} auf den Startbildschirm legen",
   "install.lead": "Dann öffnet es sich wie eine App.",
-  "install.button": "Installieren"
+  "install.button": "Installieren",
+
+  "join.invitedBy": "{inviter} hat dich eingeladen",
+  "join.invited": "Du bist eingeladen",
+  "join.lead": "Um die geteilten Dateien zu sehen und herunterzuladen, installiere zuerst die {name}-App. Das dauert nur eine Minute.",
+  "join.step1": "App herunterladen",
+  "join.step1Detail": "{size}, direkt von diesem Server",
+  "join.step2": "Öffnen und auf „Installieren“ tippen",
+  "join.step2Detail": "Dein Handy fragt eventuell einmal nach der Erlaubnis und warnt, dass die App nicht aus dem Play Store kommt. Das ist normal.",
+  "join.step3": "Zurückkommen und auf „Beitreten“ tippen",
+  "join.step3Detail": "Die Einladung gilt einmal, bis {when}.",
+  "join.download": "App herunterladen",
+  "join.already": "Schon installiert? Als {name} beitreten",
+  "join.noApk": "Dieser Server bietet die App noch nicht an. Frag die Person, die dich eingeladen hat.",
+  "join.notAndroid": "Öffne diesen Link auf deinem Android-Handy: Die App gibt es für Android.",
+  "join.problemTitle": "Diese Einladung funktioniert nicht",
+  "join.used": "Sie wurde schon benutzt; jede Einladung gilt nur einmal. Frag nach einer neuen.",
+  "join.expired": "Sie ist abgelaufen. Frag nach einer neuen.",
+  "join.revoked": "Sie wurde zurückgezogen.",
+  "join.unknown": "Der Link ist unvollständig. Öffne ihn nochmal aus der Nachricht, die du bekommen hast.",
+  "join.locked": "Zu viele Versuche. Warte ein paar Minuten und öffne den Link nochmal."
 }

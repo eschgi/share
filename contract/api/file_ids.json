@@ -1,0 +1,13 @@
+{
+  "method": "GET",
+  "path": "/api/files/ids?day=2026-09-27",
+  "auth": "device",
+  "status": 200,
+  "response": {
+    "ids": [
+      "q3ld5x2k7mbqz4bwdbyj6qsqxa"
+    ],
+    "bytes": 74000000
+  },
+  "notes": "Every matching file, for Select all, with their total size. Same filters as /api/files."
+}

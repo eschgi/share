@@ -75,5 +75,25 @@
   "done.close": "Ora puoi chiudere questa pagina.",
   "install.title": "Aggiungi {name} alla schermata Home",
   "install.lead": "La prossima volta si apre come un'app.",
-  "install.button": "Installa"
+  "install.button": "Installa",
+
+  "join.invitedBy": "{inviter} ti ha invitato",
+  "join.invited": "Hai ricevuto un invito",
+  "join.lead": "Per vedere e scaricare i file condivisi, installa prima l'app {name}. Ci vuole un minuto.",
+  "join.step1": "Scarica l'app",
+  "join.step1Detail": "{size}, direttamente da questo server",
+  "join.step2": "Aprila e tocca Installa",
+  "join.step2Detail": "Il telefono potrebbe chiederti il permesso una volta e avvisarti che l'app non viene dal Play Store. È normale.",
+  "join.step3": "Torna qui e tocca Entra",
+  "join.step3Detail": "L'invito vale una volta, fino a {when}.",
+  "join.download": "Scarica l'app",
+  "join.already": "Già installata? Entra come {name}",
+  "join.noApk": "Questo server non offre ancora l'app. Chiedi a chi ti ha invitato.",
+  "join.notAndroid": "Apri questo link sul tuo telefono Android: l'app è per Android.",
+  "join.problemTitle": "Questo invito non funziona",
+  "join.used": "È già stato usato: ogni invito vale una volta sola. Chiedine uno nuovo.",
+  "join.expired": "È scaduto. Chiedine uno nuovo.",
+  "join.revoked": "È stato ritirato.",
+  "join.unknown": "Il link non è completo. Aprilo di nuovo dal messaggio che hai ricevuto.",
+  "join.locked": "Troppi tentativi. Aspetta qualche minuto e riapri il link."
 }

@@ -14,6 +14,8 @@ import (
 	"github.com/eschgi/share/server/internal/auth"
 	"github.com/eschgi/share/server/internal/config"
 	"github.com/eschgi/share/server/internal/httpx"
+	"github.com/eschgi/share/server/internal/localtls"
+	"github.com/eschgi/share/server/internal/storage"
 	"github.com/eschgi/share/server/internal/thumbs"
 )
 
@@ -26,16 +28,38 @@ type API struct {
 	Auth        *auth.Service
 	ServerID    string
 	MaxFileSize int64 // the effective limit: config and drive together; 0 = none
+	Lib         *storage.Library
 	Thumbs      *thumbs.Store
+	Local       *localtls.Loader // nil without a local address
+	APK         *APK
 	Now         func() time.Time
 }
 
 // Register adds the API routes to mux.
 func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/info", a.info)
+	mux.HandleFunc("GET /api/app", a.appInfo)
+	mux.HandleFunc("GET /download/share.apk", a.downloadAPK)
+
 	mux.HandleFunc("POST /api/pin/unlock", a.unlock)
 	mux.HandleFunc("GET /api/session", a.session)
 	mux.HandleFunc("POST /api/session/end", a.endSession)
+
+	mux.HandleFunc("POST /api/auth/login", a.login)
+	mux.HandleFunc("POST /api/auth/logout", a.logout)
+	mux.HandleFunc("POST /api/invites/peek", a.peekInvite)
+	mux.HandleFunc("POST /api/invites/accept", a.acceptInvite)
+	mux.HandleFunc("GET /api/me", a.me)
+	mux.HandleFunc("PUT /api/me/password", a.setPassword)
+	mux.HandleFunc("POST /api/me/delete", a.deleteMe)
+	mux.HandleFunc("GET /api/server", a.serverInfo)
+
+	mux.HandleFunc("GET /api/library", a.library)
+	mux.HandleFunc("GET /api/files", a.files)
+	mux.HandleFunc("GET /api/files/ids", a.fileIDs)
+	mux.HandleFunc("GET /api/files/{id}", a.file)
+	mux.HandleFunc("GET /api/files/{id}/content", a.content)
+	mux.HandleFunc("GET /api/files/{id}/thumb", a.thumb)
 	mux.HandleFunc("PUT /api/files/{id}/thumb", a.putThumb)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusNotFound, "not_found", "No such API endpoint.")
@@ -87,6 +111,7 @@ type UnlockResponse struct {
 	Token        string  `json:"token,omitempty"`
 	Session      Session `json:"session"`
 	MovedUploads int64   `json:"moved_uploads"`
+	Server       *Server `json:"server,omitempty"` // for the app: where it can send
 }
 
 func (a *API) unlock(w http.ResponseWriter, r *http.Request) {
@@ -132,7 +157,8 @@ func (a *API) unlock(w http.ResponseWriter, r *http.Request) {
 		MovedUploads: res.Moved,
 	}
 	if req.Client == "app" {
-		resp.Token = res.Token
+		srv := a.server()
+		resp.Token, resp.Server = res.Token, &srv
 	} else {
 		auth.SetSessionCookie(w, res.Token, res.ExpiresAt, a.Now())
 	}

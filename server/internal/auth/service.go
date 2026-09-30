@@ -1,5 +1,5 @@
-// Package auth decides who a request is: PIN unlocking, PIN sessions, and later signed-in
-// devices. It also owns the rate limits for guessing.
+// Package auth decides who a request is: PIN unlocking and PIN sessions, signed-in phones,
+// passwords and invites. It also owns the rate limits for guessing.
 package auth
 
 import (
@@ -73,6 +73,11 @@ type Service struct {
 	perClient *ratelimit.Limiter
 	perIP     *ratelimit.Limiter
 	global    *ratelimit.Limiter
+
+	// Wrong passwords per username and per IP address, and unknown invites per IP address.
+	loginPerUser *ratelimit.Limiter
+	loginPerIP   *ratelimit.Limiter
+	invitePerIP  *ratelimit.Limiter
 }
 
 // NewService returns a Service with the standard limits.
@@ -82,6 +87,10 @@ func NewService(d *db.DB, now func() time.Time, proxies []netip.Prefix, clientIP
 		perClient: ratelimit.New(5, 10*time.Minute, 10*time.Minute),
 		perIP:     ratelimit.New(30, 10*time.Minute, 10*time.Minute),
 		global:    ratelimit.New(300, time.Hour, 10*time.Minute),
+
+		loginPerUser: ratelimit.New(10, 10*time.Minute, 10*time.Minute),
+		loginPerIP:   ratelimit.New(30, 10*time.Minute, 10*time.Minute),
+		invitePerIP:  ratelimit.New(20, 10*time.Minute, 10*time.Minute),
 	}
 }
 
@@ -91,6 +100,9 @@ func (s *Service) PruneLimits() {
 	s.perClient.Prune(now)
 	s.perIP.Prune(now)
 	s.global.Prune(now)
+	s.loginPerUser.Prune(now)
+	s.loginPerIP.Prune(now)
+	s.invitePerIP.Prune(now)
 }
 
 // UnlockResult is a new PIN session.
@@ -219,6 +231,8 @@ func (s *Service) Authenticate(ctx context.Context, r *http.Request) (*Principal
 		return nil, ErrUnauthorized
 	case ids.TokenHasPrefix(token, ids.PrefixPinSession):
 		return s.authenticatePin(ctx, token)
+	case ids.TokenHasPrefix(token, ids.PrefixDevice):
+		return s.authenticateDevice(ctx, token)
 	default:
 		return nil, ErrUnauthorized
 	}
