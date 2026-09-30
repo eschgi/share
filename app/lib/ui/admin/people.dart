@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 
 import '../../app.dart';
@@ -21,7 +22,7 @@ class PeopleGroup extends StatelessWidget {
     final t = AppLocalizations.of(context);
     final c = context.colors;
     final locale = Localizations.localeOf(context).languageCode;
-    final now = DateTime.now();
+    final now = clock.now();
     return SettingsGroup(children: [
       for (final p in people.users)
         SettingsRow(
@@ -142,7 +143,7 @@ class _PersonSheetState extends State<PersonSheet> {
     final t = AppLocalizations.of(context);
     final c = context.colors;
     final locale = Localizations.localeOf(context).languageCode;
-    final now = DateTime.now();
+    final now = clock.now();
     final p = _person;
     return SafeArea(
       child: SingleChildScrollView(
@@ -224,7 +225,7 @@ class _InviteSheet extends StatelessWidget {
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(invite.name, style: Theme.of(context).textTheme.headlineSmall),
-                Text(owner != null ? t.inviteForPhone(owner.name) : t.inviteOpenUntil(formatWhen(invite.expiresAt, DateTime.now(), locale)),
+                Text(owner != null ? t.inviteForPhone(owner.name) : t.inviteOpenUntil(formatWhen(invite.expiresAt, clock.now(), locale)),
                     style: TextStyle(fontSize: 14, color: context.colors.text3)),
               ]),
             ),

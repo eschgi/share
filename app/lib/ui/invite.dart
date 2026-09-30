@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 
 import '../app.dart';
@@ -106,7 +107,7 @@ class _InviteScreenState extends State<InviteScreen> {
             Divider(color: c.lineSoft),
             _Fact(icon: AppIcons.shield, label: t.joinRole, value: peek.role == Role.admin ? t.roleAdminLong : t.roleMemberLong),
             Divider(color: c.lineSoft),
-            _Fact(icon: AppIcons.clock, label: t.joinValid, value: t.joinValidUntil(formatWhen(peek.expiresAt, DateTime.now(), locale))),
+            _Fact(icon: AppIcons.clock, label: t.joinValid, value: t.joinValidUntil(formatWhen(peek.expiresAt, clock.now(), locale))),
           ]),
         ),
       ]);

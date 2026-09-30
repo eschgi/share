@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/rendering.dart';
@@ -205,7 +206,7 @@ class _LibraryScreenState extends State<LibraryScreen> with WidgetsBindingObserv
     final t = AppLocalizations.of(context);
     final c = context.colors;
     final locale = Localizations.localeOf(context).languageCode;
-    final now = DateTime.now();
+    final now = clock.now();
 
     final slivers = <Widget>[
       if (!_c.selecting) SliverToBoxAdapter(child: _Filters(kind: _c.filter.kind, onKind: _setKind)),

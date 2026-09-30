@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 
 import '../../data/models.dart';
@@ -84,7 +85,7 @@ class PinSendScreen extends StatelessWidget {
             Text(t.pinSendTo(session.server.host), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             if (session.kind == PinKind.day && expires != null) ...[
               const SizedBox(height: 4),
-              Text(t.pinValidUntil(formatWhen(expires, DateTime.now(), locale)), style: TextStyle(fontSize: 14.5, color: c.warn)),
+              Text(t.pinValidUntil(formatWhen(expires, clock.now(), locale)), style: TextStyle(fontSize: 14.5, color: c.warn)),
             ],
             const SizedBox(height: 8),
             Text(t.pinSendLead, style: TextStyle(fontSize: 16, height: 1.5, color: c.text2)),

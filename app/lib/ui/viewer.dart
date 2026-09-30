@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -62,7 +63,7 @@ class _ViewerScreenState extends State<ViewerScreen> {
             Text(f.name, style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 12),
             for (final line in [
-              '${formatDay(f.day, DateTime.now(), locale, today: t.dayToday, yesterday: t.dayYesterday)}, ${formatTime(f.uploadedAt, locale)}',
+              '${formatDay(f.day, clock.now(), locale, today: t.dayToday, yesterday: t.dayYesterday)}, ${formatTime(f.uploadedAt, locale)}',
               f.from == null ? t.viewerFromPin : t.viewerFrom(f.from!),
               [formatBytes(f.size, locale), if (f.width != null && f.height != null) '${f.width} × ${f.height}', f.mime].join(' · '),
             ])
@@ -90,7 +91,7 @@ class _ViewerScreenState extends State<ViewerScreen> {
         leading: const ShareBackButton(),
         titleSpacing: 0,
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(formatDay(f.day, DateTime.now(), locale, today: t.dayToday, yesterday: t.dayYesterday),
+          Text(formatDay(f.day, clock.now(), locale, today: t.dayToday, yesterday: t.dayYesterday),
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, fontFamily: null)),
           Text(formatTime(f.uploadedAt, locale), style: TextStyle(fontSize: 12.5, color: c.text3)),
         ]),

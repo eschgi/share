@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:share_app/app.dart';
@@ -12,8 +13,8 @@ import 'support/fake_platform.dart';
 import 'support/fake_server.dart';
 import 'support/fonts.dart';
 
-String today() => DateTime.now().toIso8601String().substring(0, 10);
-String daysAgo(int n) => DateTime.now().subtract(Duration(days: n)).toIso8601String().substring(0, 10);
+String today() => clock.now().toIso8601String().substring(0, 10);
+String daysAgo(int n) => clock.now().subtract(Duration(days: n)).toIso8601String().substring(0, 10);
 
 const inviteToken = 'shi_0123456789abcdefghijklmnopqrstuvwxyzABCDEFG';
 

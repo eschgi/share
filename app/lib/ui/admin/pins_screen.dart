@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -144,7 +145,7 @@ class _PinCard extends StatelessWidget {
     final t = AppLocalizations.of(context);
     final c = context.colors;
     final locale = Localizations.localeOf(context).languageCode;
-    final now = DateTime.now();
+    final now = clock.now();
     final permanent = pin.kind == PinKind.permanent;
     final action = TextButton.styleFrom(
       foregroundColor: c.accentText,
@@ -309,7 +310,7 @@ class _NewPinSheetState extends State<NewPinSheet> {
     final t = AppLocalizations.of(context);
     final c = context.colors;
     final locale = Localizations.localeOf(context).languageCode;
-    final now = DateTime.now();
+    final now = clock.now();
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: SafeArea(

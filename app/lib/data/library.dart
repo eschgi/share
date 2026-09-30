@@ -4,6 +4,8 @@ library;
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:clock/clock.dart';
+
 import 'api.dart';
 import 'models.dart';
 import 'platform.dart';
@@ -96,7 +98,7 @@ class LibraryRepository {
     Uint8List? bytes;
     if (file != null && await file.exists()) {
       bytes = await file.readAsBytes();
-      file.setLastModified(DateTime.now()).ignore();
+      file.setLastModified(clock.now()).ignore();
     } else {
       try {
         bytes = await api.bytes('/api/files/${f.id}/thumb');

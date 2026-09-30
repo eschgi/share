@@ -1,6 +1,7 @@
 @Tags(['golden'])
 library;
 
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:share_app/data/models.dart';
@@ -15,6 +16,10 @@ import 'support/fonts.dart';
 
 /// Screenshots of the app's screens, for comparing with `docs/share-mockup/<lang>/*.png`.
 ///   flutter test --run-skipped --tags golden --update-goldens
+
+/// The screenshots show times, so they're taken at a fixed one: the mockups' morning.
+Future<void> atTen(Future<void> Function() body) => withClock(Clock.fixed(DateTime(2026, 9, 30, 10, 4)), body);
+
 void main() {
   setUpAll(loadFonts);
 
@@ -29,25 +34,25 @@ void main() {
     ..addDay(daysAgo(3), 8, startId: 200);
 
   for (final lang in ['en', 'de', 'it']) {
-    testWidgets('first start, $lang', (tester) async {
+    testWidgets('first start, $lang', (tester) => atTen(() async {
       await startApp(tester, FakePlatform()..secrets['language'] = lang, FakeServer());
       await shot(tester, '$lang/07-first-start');
-    });
+    }));
 
-    testWidgets('invite, $lang', (tester) async {
+    testWidgets('invite, $lang', (tester) => atTen(() async {
       final platform = FakePlatform()..secrets['language'] = lang;
       await startApp(tester, platform, FakeServer());
       platform.linkEvents.add('https://share.example.com/join#$inviteToken');
       await shot(tester, '$lang/10-invite');
-    });
+    }));
 
-    testWidgets('library, $lang', (tester) async {
+    testWidgets('library, $lang', (tester) => atTen(() async {
       await startApp(tester, signedInPhone()..secrets['language'] = lang, library());
       await shot(tester, '$lang/11-library');
-    });
+    }));
   }
 
-  testWidgets('sign in', (tester) async {
+  testWidgets('sign in', (tester) => atTen(() async {
     await startApp(tester, FakePlatform(), FakeServer());
     await tester.tap(find.text('See & download'));
     await tester.pumpAndSettle();
@@ -55,17 +60,17 @@ void main() {
     await tester.enterText(find.byType(TextField).at(1), 'maria');
     await tester.enterText(find.byType(TextField).at(2), 'correct horse');
     await shot(tester, 'en/08-sign-in');
-  });
+  }));
 
-  testWidgets('selecting', (tester) async {
+  testWidgets('selecting', (tester) => atTen(() async {
     await startApp(tester, signedInPhone(), library());
     await tester.tap(find.bySemanticsLabel('Select the day').first);
     await tester.pumpAndSettle();
     await tester.longPress(find.byType(GestureDetector).at(12));
     await shot(tester, 'en/12-select');
-  });
+  }));
 
-  testWidgets('downloading', (tester) async {
+  testWidgets('downloading', (tester) => atTen(() async {
     final platform = signedInPhone();
     await startApp(tester, platform, library());
     await tester.tap(find.bySemanticsLabel('Select the day').first);
@@ -76,9 +81,9 @@ void main() {
       batch: 'batch-1', running: true, total: 6, done: 3, failed: 0, skipped: 1,
       bytesTotal: 18000000, bytesDone: 9100000, media: 5, documents: 1, local: true));
     await shot(tester, 'en/13-downloading');
-  });
+  }));
 
-  testWidgets('server', (tester) async {
+  testWidgets('server', (tester) => atTen(() async {
     final platform = signedInPhone()..current = const RouteStatus(ServerRoute.local, millis: 12);
     platform.server = platform.server!.copyWith(localUrl: Uri.parse('https://192.168.8.1:8443'), pins: ['a' * 64]);
     await startApp(tester, platform, FakeServer());
@@ -86,11 +91,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Server'));
     await shot(tester, 'en/16-server');
-  });
+  }));
 
   // The admin screens, with the mockups' people and PINs, at times that read the same every day.
   FakeServer admin() {
-    final now = DateTime.now();
+    final now = clock.now();
     final today = DateTime(now.year, now.month, now.day);
     String at(DateTime t) => t.toUtc().toIso8601String();
     final server = FakeServer()..me = FakeServer.adminMe;
@@ -120,13 +125,13 @@ void main() {
     return server;
   }
 
-  testWidgets('settings', (tester) async {
+  testWidgets('settings', (tester) => atTen(() async {
     await startApp(tester, signedInPhone()..current = const RouteStatus(ServerRoute.local, millis: 12), admin());
     await tester.tap(find.text('Settings').last);
     await shot(tester, 'en/17-settings');
-  });
+  }));
 
-  testWidgets('upload PINs', (tester) async {
+  testWidgets('upload PINs', (tester) => atTen(() async {
     await startApp(tester, signedInPhone(), admin());
     await tester.tap(find.text('Settings').last);
     await tester.pumpAndSettle();
@@ -134,9 +139,9 @@ void main() {
     await shot(tester, 'en/18-pins');
     await tester.tap(find.text('New PIN'));
     await shot(tester, 'en/19-new-pin');
-  });
+  }));
 
-  testWidgets('invite someone', (tester) async {
+  testWidgets('invite someone', (tester) => atTen(() async {
     await startApp(tester, signedInPhone(), admin());
     await tester.tap(find.text('Settings').last);
     await tester.pumpAndSettle();
@@ -148,9 +153,9 @@ void main() {
     await tester.pumpAndSettle();
     FocusManager.instance.primaryFocus?.unfocus();
     await shot(tester, 'en/20-invite');
-  });
+  }));
 
-  testWidgets('deleting', (tester) async {
+  testWidgets('deleting', (tester) => atTen(() async {
     await startApp(tester, signedInPhone(), library()..me = FakeServer.adminMe);
     await tester.longPress(find.byType(GestureDetector).at(8));
     await tester.pumpAndSettle();
@@ -160,11 +165,11 @@ void main() {
     }
     await tester.tap(find.bySemanticsLabel('Delete'));
     await shot(tester, 'en/21-delete');
-  });
+  }));
 
-  testWidgets('recently deleted', (tester) async {
+  testWidgets('recently deleted', (tester) => atTen(() async {
     final server = admin();
-    final now = DateTime.now().toUtc();
+    final now = clock.now().toUtc();
     final example = ((contractResponse('api/trash.json')['files'] as List).first as Map).cast<String, dynamic>();
     server.trash = [
       for (final (i, name) in ['IMG_2041.jpg', 'IMG_2042.jpg', 'Car_insurance.pdf'].indexed)
@@ -190,9 +195,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('IMG_2042.jpg'));
     await shot(tester, 'en/22-recently-deleted');
-  });
+  }));
 
-  testWidgets('sending', (tester) async {
+  testWidgets('sending', (tester) => atTen(() async {
     final platform = signedInPhone()..current = const RouteStatus(ServerRoute.local, millis: 12);
     await startApp(tester, platform, FakeServer());
     await tester.tap(find.text('Send').last);
@@ -208,9 +213,9 @@ void main() {
       ],
     ));
     await shot(tester, 'en/15-send');
-  });
+  }));
 
-  testWidgets('a PIN, without an account', (tester) async {
+  testWidgets('a PIN, without an account', (tester) => atTen(() async {
     await startApp(tester, FakePlatform(), FakeServer());
     await tester.tap(find.text('Send files'));
     await tester.pumpAndSettle();
@@ -222,5 +227,5 @@ void main() {
     await tester.enterText(find.byType(TextField), 'K7M2Q');
     await tester.tap(find.text('Unlock'));
     await shot(tester, 'en/24-pin-send');
-  });
+  }));
 }

@@ -2,6 +2,8 @@
 /// missing or odd field gives a default instead of an exception.
 library;
 
+import 'package:clock/clock.dart';
+
 typedef Json = Map<String, dynamic>;
 
 String _str(Object? v, [String fallback = '']) => v is String ? v : fallback;
@@ -79,7 +81,7 @@ class InvitePeek {
         inviter: j['inviter'] is String ? j['inviter'] as String : null,
         name: _str(j['name']),
         role: Role.parse(j['role']),
-        expiresAt: _time(j['expires_at']) ?? DateTime.now(),
+        expiresAt: _time(j['expires_at']) ?? clock.now(),
         addsPhone: _bool(j['adds_phone']),
       );
 

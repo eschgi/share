@@ -4,6 +4,8 @@ library;
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:clock/clock.dart';
+
 import 'api.dart';
 import 'models.dart';
 import 'platform.dart';
@@ -44,7 +46,7 @@ class SessionRepository {
     // one (`share cert regenerate`), which /api/server tells over the public address.
     platform.routes.listen((r) {
       if (r.reason != RouteReason.wrongCertificate || _current is! SignedInState) return;
-      final now = DateTime.now();
+      final now = clock.now();
       if (_certCheckedAt != null && now.difference(_certCheckedAt!) < const Duration(minutes: 5)) return;
       _certCheckedAt = now;
       unawaited(refreshServer());

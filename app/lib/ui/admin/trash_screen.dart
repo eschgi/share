@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 
 import '../../app.dart';
@@ -183,7 +184,7 @@ class _TrashRow extends StatelessWidget {
     final c = context.colors;
     final locale = Localizations.localeOf(context).languageCode;
     final f = item.file;
-    final left = item.purgeAt.difference(DateTime.now()).inDays.clamp(0, 999);
+    final left = item.purgeAt.difference(clock.now()).inDays.clamp(0, 999);
     return InkWell(
       onTap: onTap,
       child: Padding(

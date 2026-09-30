@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:clock/clock.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
@@ -27,12 +28,12 @@ class FakeServer {
         final code = (_body(req)['code'] as String? ?? '').toUpperCase();
         if (code != pinCode) return json({'error': {'code': 'pin_wrong', 'message': '', 'attempts_left': 4}}, 401);
         final res = contractResponse('api/pin_unlock_app.json');
-        res['session'] = {...(res['session'] as Map).cast<String, dynamic>(), 'expires_at': DateTime.now().add(const Duration(hours: 20)).toUtc().toIso8601String()};
+        res['session'] = {...(res['session'] as Map).cast<String, dynamic>(), 'expires_at': clock.now().add(const Duration(hours: 20)).toUtc().toIso8601String()};
         return json(res);
       },
       'GET /api/session': (_) => pinEnded
           ? json({'error': {'code': 'session_ended', 'message': ''}}, 401)
-          : json({'kind': 'pin', 'pin_kind': 'day', 'expires_at': DateTime.now().add(const Duration(hours: 20)).toUtc().toIso8601String()}),
+          : json({'kind': 'pin', 'pin_kind': 'day', 'expires_at': clock.now().add(const Duration(hours: 20)).toUtc().toIso8601String()}),
     };
   }
 
@@ -65,7 +66,7 @@ class FakeServer {
 
   Map<String, dynamic> _pin(String kind, String code) {
     _made++;
-    final now = DateTime.now().toUtc();
+    final now = clock.now().toUtc();
     return {
       'id': 'p${_made}new${'a' * 20}',
       'code': code,
@@ -99,7 +100,7 @@ class FakeServer {
           final ids = (_body(req)['ids'] as List).cast<String>().toSet();
           final gone = files.where((f) => ids.contains(f['id'])).toList();
           files.removeWhere((f) => ids.contains(f['id']));
-          final now = DateTime.now().toUtc();
+          final now = clock.now().toUtc();
           trash.insertAll(0, [
             for (final f in gone)
               {...f, 'deleted_at': now.toIso8601String(), 'deleted_by': 'Stefan', 'purge_at': now.add(const Duration(days: 30)).toIso8601String()},
@@ -134,8 +135,8 @@ class FakeServer {
       'name': name,
       'role': role,
       'user_id': userId,
-      'created_at': DateTime.now().toUtc().toIso8601String(),
-      'expires_at': DateTime.now().toUtc().add(const Duration(days: 1)).toIso8601String(),
+      'created_at': clock.now().toUtc().toIso8601String(),
+      'expires_at': clock.now().toUtc().add(const Duration(days: 1)).toIso8601String(),
     };
     people['invites'] = [..._invites, invite];
     return json({'token': token, 'link': 'https://share.example.com/join#$token', 'invite': invite}, 201);
