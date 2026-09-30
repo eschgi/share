@@ -8,8 +8,9 @@ import android.database.sqlite.SQLiteOpenHelper
 import androidx.core.database.sqlite.transaction
 
 /**
- * The download queue, kept on disk so it survives the process: batches, their files, and the
- * index of files already saved on this phone (file id → MediaStore URI).
+ * The transfer queues, kept on disk so they survive the process: download batches and their
+ * files, the index of files already saved on this phone (file id → MediaStore URI), and the
+ * uploads (UploadQueue).
  */
 class TransferDb private constructor(context: Context) : SQLiteOpenHelper(context, "transfers.db", null, VERSION) {
 
@@ -43,10 +44,40 @@ class TransferDb private constructor(context: Context) : SQLiteOpenHelper(contex
         )
         db.execSQL("CREATE INDEX items_queued ON items (state, batch)")
         db.execSQL("CREATE TABLE saved (file_id TEXT PRIMARY KEY, uri TEXT NOT NULL, saved_at INTEGER NOT NULL)")
+        createUploads(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        // Only version 1 so far.
+        if (oldVersion < 2) createUploads(db)
+    }
+
+    /** Version 2: sending from the phone. */
+    private fun createUploads(db: SQLiteDatabase) {
+        db.execSQL(
+            """CREATE TABLE upload_batches (
+                id TEXT PRIMARY KEY,
+                created_at INTEGER NOT NULL,
+                auth TEXT NOT NULL, -- device (signed in) | pin
+                state TEXT NOT NULL DEFAULT 'active', -- active | paused | finished | cancelled
+                paused TEXT -- why: signed_out | pin_ended | user
+            )""",
+        )
+        db.execSQL(
+            """CREATE TABLE uploads (
+                batch TEXT NOT NULL REFERENCES upload_batches(id) ON DELETE CASCADE,
+                seq INTEGER NOT NULL,
+                uri TEXT NOT NULL,
+                name TEXT NOT NULL,
+                size INTEGER NOT NULL,
+                mime TEXT NOT NULL,
+                state TEXT NOT NULL DEFAULT 'queued', -- queued | done | failed | lost | cancelled
+                upload_id TEXT, -- the tus upload, which becomes the file's id
+                bytes INTEGER NOT NULL DEFAULT 0,
+                error TEXT,
+                PRIMARY KEY (batch, seq)
+            )""",
+        )
+        db.execSQL("CREATE INDEX uploads_queued ON uploads (state, batch)")
     }
 
     fun addBatch(id: String, files: List<FileRef>, skipped: Set<String>, now: Long) {
@@ -237,7 +268,7 @@ class TransferDb private constructor(context: Context) : SQLiteOpenHelper(contex
     )
 
     companion object {
-        private const val VERSION = 1
+        private const val VERSION = 2
         private const val ITEM_COLUMNS = "i.batch, i.file_id, i.name, i.size, i.mime, i.kind, i.state, i.bytes, i.target"
 
         @Volatile private var instance: TransferDb? = null

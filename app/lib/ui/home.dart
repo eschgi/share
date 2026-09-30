@@ -4,10 +4,10 @@ import '../data/models.dart';
 import '../l10n/app_localizations.dart';
 import 'icons.dart';
 import 'library/library_screen.dart';
+import 'send/send_screen.dart';
 import 'settings_screen.dart';
 
-/// Signed in: the library and the settings. (Sending from the app comes with the next step;
-/// until then the website does it.)
+/// Signed in: the library, sending, and the settings.
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key, required this.user});
   final User user;
@@ -27,11 +27,14 @@ class _HomeShellState extends State<HomeShell> {
       onDestinationSelected: (i) => setState(() => _tab = i),
       destinations: [
         NavigationDestination(icon: const Icon(AppIcons.images), label: t.navLibrary),
+        NavigationDestination(icon: const Icon(AppIcons.upload), label: t.navSend),
         NavigationDestination(icon: const Icon(AppIcons.settings), label: t.navSettings),
       ],
     );
+    void toSettings() => setState(() => _tab = 2);
     return IndexedStack(index: _tab, children: [
-      LibraryScreen(user: widget.user, navigation: nav, onAvatar: () => setState(() => _tab = 1)),
+      LibraryScreen(user: widget.user, navigation: nav, onAvatar: toSettings),
+      SendScreen(user: widget.user, navigation: nav, onAvatar: toSettings),
       SettingsScreen(user: widget.user, navigation: nav),
     ]);
   }

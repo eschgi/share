@@ -89,13 +89,20 @@ class Api {
 
   Future<void> put(String path, Object body) => _send('PUT', path, body: body);
 
+  Future<void> patch(String path, Object body) => _send('PATCH', path, body: body);
+
+  Future<void> delete(String path) => _send('DELETE', path);
+
   Future<Uint8List> bytes(String path) async => (await _send('GET', path, raw: true)).bodyBytes;
 
   /// A request to a server this phone isn't set up for yet, e.g. to look at an invite.
-  Future<Json> getFrom(Uri server, String path) async => _json(await _request(_public, server, 'GET', path, auth: false));
+  Future<Json> getFrom(Uri server, String path, {String? bearer}) async =>
+      _json(await _request(_public, server, 'GET', path, auth: false, bearer: bearer));
 
-  Future<Json> postTo(Uri server, String path, Object body) async =>
-      _json(await _request(_public, server, 'POST', path, body: body, auth: false));
+  /// A request to a server this phone isn't signed in to, e.g. to look at an invite; with
+  /// [bearer], as a PIN session.
+  Future<Json> postTo(Uri server, String path, Object body, {String? bearer}) async =>
+      _json(await _request(_public, server, 'POST', path, body: body, auth: false, bearer: bearer));
 
   Future<http.Response> _send(String method, String path, {Map<String, String>? query, Object? body, bool raw = false}) async {
     final c = _config;
@@ -113,10 +120,11 @@ class Api {
   }
 
   Future<http.Response> _request(http.Client client, Uri base, String method, String path,
-      {Map<String, String>? query, Object? body, bool auth = true}) async {
+      {Map<String, String>? query, Object? body, bool auth = true, String? bearer}) async {
     final uri = base.replace(path: path, queryParameters: query == null || query.isEmpty ? null : query);
     final req = http.Request(method, uri);
-    if (auth && token != null) req.headers['Authorization'] = 'Bearer $token';
+    final key = bearer ?? (auth ? token : null);
+    if (key != null) req.headers['Authorization'] = 'Bearer $key';
     if (body != null) {
       req.headers['Content-Type'] = 'application/json';
       req.body = jsonEncode(body);

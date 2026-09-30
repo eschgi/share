@@ -60,3 +60,16 @@ String formatWhen(DateTime when, DateTime now, String locale) {
 
 /// "12:32" for the viewer's title.
 String formatTime(DateTime t, String locale) => DateFormat.Hm(locale).format(t);
+
+/// "12 Sep", "12. Sep.", "12 set": a date in the current year, for "since" lines.
+String formatShortDate(DateTime d, DateTime now, String locale) {
+  final pattern = switch (locale) {
+    'de' => d.year == now.year ? 'd. MMM' : 'd. MMM y',
+    _ => d.year == now.year ? 'd MMM' : 'd MMM y',
+  };
+  return DateFormat(pattern, locale).format(d);
+}
+
+/// How long ago a phone was used: 0 today, 1 yesterday, and so on.
+int daysAgo(DateTime when, DateTime now) =>
+    DateTime(now.year, now.month, now.day).difference(DateTime(when.year, when.month, when.day)).inDays;

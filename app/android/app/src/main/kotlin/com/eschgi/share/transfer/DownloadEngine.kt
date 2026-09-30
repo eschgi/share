@@ -16,8 +16,7 @@ import kotlin.concurrent.thread
 
 /**
  * Downloads what [TransferDb] has queued, three files at a time, until the queue is empty or
- * its host stops it. The host is a user-initiated job from Android 14 on and a foreground
- * worker before; the engine doesn't care which. Every byte goes straight into the file's
+ * its host stops it (see [TransferHost]); the engine doesn't care which one. Every byte goes straight into the file's
  * sink, so any later run continues where this one stopped.
  */
 object DownloadEngine {
@@ -26,17 +25,6 @@ object DownloadEngine {
     private const val MAX_ATTEMPTS = 8
     private const val TICK_MS = 250L
     private const val SPACE_MARGIN = 64L * 1024 * 1024
-
-    enum class Result { FINISHED, RESCHEDULE }
-
-    interface Host {
-        val isStopped: Boolean
-
-        /** About once a second, for the host's notification. */
-        fun onProgress(progress: Progress)
-    }
-
-    data class Progress(val files: Int, val done: Int, val bytesTotal: Long, val bytesDone: Long)
 
     private val lock = Any()
     @Volatile private var running = false
@@ -66,9 +54,9 @@ object DownloadEngine {
     private enum class Stop { SIGNED_OUT, OFFLINE }
 
     /** Blocks until the queue is done or [host] stops. */
-    fun run(context: Context, host: Host): Result {
+    fun run(context: Context, host: TransferHost): RunResult {
         synchronized(lock) {
-            if (running) return Result.FINISHED // the running one will see the new files
+            if (running) return RunResult.FINISHED // the running one will see the new files
             running = true
         }
         val app = context.applicationContext
@@ -82,14 +70,14 @@ object DownloadEngine {
                     running = false
                     return when {
                         // Stopped by the system (or the person): the host decides what's next.
-                        host.isStopped -> Result.RESCHEDULE
+                        host.isStopped -> RunResult.RESCHEDULE
                         stopped == Stop.OFFLINE -> {
                             TransferNotification.waiting(app)
-                            Result.RESCHEDULE
+                            RunResult.RESCHEDULE
                         }
                         else -> {
                             TransferNotification.summary(app, seen.toList())
-                            Result.FINISHED
+                            RunResult.FINISHED
                         }
                     }
                 }
@@ -100,7 +88,7 @@ object DownloadEngine {
     }
 
     /** One pass over the queue; returns why it stopped early, if it did. */
-    private fun runOnce(app: Context, host: Host, seen: MutableSet<String>): Stop? {
+    private fun runOnce(app: Context, host: TransferHost, seen: MutableSet<String>): Stop? {
         val db = TransferDb.get(app)
         val token = SecretStore(app).read(SecretStore.DEVICE_TOKEN)
         val config = ServerStore(app).config()
@@ -147,7 +135,7 @@ object DownloadEngine {
         return stop.get()
     }
 
-    private fun download(app: Context, db: TransferDb, server: ServerConnection, item: TransferItem, host: Host, stop: AtomicReference<Stop?>) {
+    private fun download(app: Context, db: TransferDb, server: ServerConnection, item: TransferItem, host: TransferHost, stop: AtomicReference<Stop?>) {
         val resolver = app.contentResolver
         val file = item.file
         // Saved already, e.g. by another batch that got there first.
@@ -257,7 +245,7 @@ object DownloadEngine {
     /** 1, 2, 4 … 30 seconds. */
     internal fun backoff(attempt: Int): Long = (1000L shl (attempt - 1).coerceIn(0, 5)).coerceAtMost(30_000)
 
-    private fun pause(ms: Long, abort: Abort, host: Host) {
+    private fun pause(ms: Long, abort: Abort, host: TransferHost) {
         val until = System.currentTimeMillis() + ms.coerceAtMost(120_000)
         while (System.currentTimeMillis() < until && !abort.stopped && !host.isStopped) Thread.sleep(100)
     }
@@ -269,7 +257,7 @@ object DownloadEngine {
         Long.MAX_VALUE
     }
 
-    private fun progress(batches: List<BatchSnapshot>) = Progress(
+    private fun progress(batches: List<BatchSnapshot>) = TransferProgress(
         files = batches.sumOf { it.total },
         done = batches.sumOf { it.done + it.failed },
         bytesTotal = batches.sumOf { it.bytesTotal },

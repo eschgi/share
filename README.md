@@ -6,8 +6,9 @@ A self-hosted place where family and friends drop photos, videos and documents.
   pieces and continue after a dropped connection, so videos of several gigabytes get through,
   also behind Cloudflare's 100 MB request limit.
 - **Seeing and downloading** everything is for people with an account, in an Android app.
-  They join with an invite, without a password. At home the app uses the server's local address
-  and skips the internet.
+  They join with an invite, without a password, and send from the app too. At home the app uses
+  the server's local address and skips the internet. Admins manage PINs and people there, and
+  deleted files wait 30 days in Recently deleted.
 - Files are stored unchanged in one folder per upload day: `<storage_dir>/2026-09-30/IMG_0001.jpg`.
 
 The server is one Go program without dependencies at runtime. It runs on a router or another
@@ -19,10 +20,12 @@ small Linux machine with a USB drive, or on a VPS. The website is embedded in it
 |------|-------|
 | Server: PINs, uploads, storage, thumbnails | works |
 | Server: accounts and invites, library and downloads, a local address for the app | works |
+| Server: managing PINs and people, deleting and restoring files | works |
 | Website: sending with a PIN, the invite page (English, German, Italian) | works |
 | Website: continuing after the page was closed, install as an app | works |
 | Android app: see and download | built and tested, not yet tried on a phone |
-| Android app: send, manage PINs and people | planned |
+| Android app: send, manage PINs and people, Recently deleted | built and tested, not yet tried on a phone |
+| Self-updating app, Google Play, a VPS setup | planned |
 
 The plan and the screens are in [`docs/`](docs/).
 

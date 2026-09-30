@@ -196,6 +196,16 @@ ThemeData shareTheme() {
       behavior: SnackBarBehavior.floating,
     ),
     dividerTheme: DividerThemeData(color: c.lineSoft, thickness: 1, space: 1),
+    floatingActionButtonTheme: FloatingActionButtonThemeData(
+      backgroundColor: c.accent,
+      foregroundColor: c.onAccent,
+      elevation: 6,
+      highlightElevation: 8,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      extendedPadding: const EdgeInsets.symmetric(horizontal: 26),
+      extendedSizeConstraints: const BoxConstraints(minHeight: 60),
+      extendedTextStyle: const TextStyle(fontFamily: 'Roboto', fontSize: 17, fontWeight: FontWeight.w600),
+    ),
     progressIndicatorTheme: ProgressIndicatorThemeData(color: c.accent, linearTrackColor: c.s3),
   );
 }

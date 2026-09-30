@@ -41,19 +41,27 @@ data class ServerConfig(
     }
 }
 
-/** Where [ServerConfig] is kept: plain preferences, since none of it is secret. */
+/**
+ * Where [ServerConfig] is kept: plain preferences, since none of it is secret. Two slots: the
+ * server this phone is signed in to, and the one it sends to with a PIN.
+ */
 class ServerStore(context: Context) {
     private val prefs = context.applicationContext.getSharedPreferences("server", Context.MODE_PRIVATE)
 
-    fun load(): String? = prefs.getString(KEY, null)
+    fun load(slot: String = DEVICE): String? = prefs.getString(key(slot), null)
 
-    fun save(json: String?) {
-        prefs.edit(commit = true) { if (json == null) remove(KEY) else putString(KEY, json) }
+    fun save(json: String?, slot: String = DEVICE) {
+        prefs.edit(commit = true) { if (json == null) remove(key(slot)) else putString(key(slot), json) }
     }
 
     fun config(): ServerConfig? = ServerConfig.parse(load())
 
-    private companion object {
-        const val KEY = "config"
+    fun pinConfig(): ServerConfig? = ServerConfig.parse(load(PIN))
+
+    private fun key(slot: String) = if (slot == PIN) "pin_config" else "config"
+
+    companion object {
+        const val DEVICE = "device"
+        const val PIN = "pin"
     }
 }

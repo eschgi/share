@@ -86,6 +86,9 @@ class SecretStore(context: Context) {
         /** The device key (shd_…), written by the Dart session code. */
         const val DEVICE_TOKEN = "device_token"
 
+        /** The PIN session (shp_…) of a phone that sends without an account. */
+        const val PIN_TOKEN = "pin_token"
+
         /** The language picked in the app, or none for the phone's. */
         const val LANGUAGE = "language"
 

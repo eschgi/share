@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'data/admin.dart';
 import 'data/api.dart';
 import 'data/library.dart';
+import 'data/pin.dart';
 import 'data/platform.dart';
 import 'data/server.dart';
 import 'data/session.dart';
@@ -11,6 +13,8 @@ import 'l10n/app_localizations.dart';
 import 'ui/first_start.dart';
 import 'ui/home.dart';
 import 'ui/invite.dart';
+import 'ui/send/pin_entry_screen.dart';
+import 'ui/send/send_screen.dart';
 import 'ui/theme.dart';
 
 /// Everything the screens use, made once. Tests build it with a fake platform and a mock
@@ -19,12 +23,16 @@ class AppServices {
   AppServices({required this.platform, Api? api}) : api = api ?? Api(platform: platform) {
     session = SessionRepository(api: this.api, platform: platform);
     library = LibraryRepository(api: this.api, platform: platform);
+    admin = AdminRepository(api: this.api);
+    pin = PinRepository(api: this.api, platform: platform);
   }
 
   final Platform platform;
   final Api api;
   late final SessionRepository session;
   late final LibraryRepository library;
+  late final AdminRepository admin;
+  late final PinRepository pin;
 
   /// The language the person picked, or null for the phone's.
   final language = ValueNotifier<String?>(null);
@@ -32,6 +40,7 @@ class AppServices {
   Future<void> start() async {
     language.value = await platform.readSecret('language');
     await session.restore();
+    await pin.restore();
   }
 
   Future<void> setLanguage(String? code) async {
@@ -86,7 +95,7 @@ class _ShareAppState extends State<ShareApp> {
       case final InviteLink link:
         _navigator.currentState?.push(MaterialPageRoute<void>(builder: (_) => InviteScreen(link: link)));
       case final PinLink link:
-        widget.services.platform.openUrl('${link.server}/#${link.code}');
+        _navigator.currentState?.push(MaterialPageRoute<void>(builder: (_) => PinEntryScreen(server: link.server, code: link.code)));
       case null:
         break;
     }
@@ -123,7 +132,13 @@ class SessionGate extends StatelessWidget {
       initialData: session.current,
       builder: (context, snap) => switch (snap.data!) {
         SessionLoading() => const Scaffold(),
-        SignedOutState(:final byServer) => FirstStartScreen(signedOutByServer: byServer),
+        SignedOutState(:final byServer) => StreamBuilder<PinSession?>(
+            stream: Services.of(context).pin.states,
+            initialData: Services.of(context).pin.current,
+            builder: (context, pin) => pin.data == null
+                ? FirstStartScreen(signedOutByServer: byServer)
+                : PinSendScreen(session: pin.data!),
+          ),
         SignedInState(:final user) => HomeShell(user: user),
       },
     );

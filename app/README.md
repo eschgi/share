@@ -1,11 +1,13 @@
 # Share for Android
 
-The app to see and download what was sent to a Share server. People join with an invite (a QR
-code or a link, no password) or sign in with a username and password.
+The app to see, download and send what's on a Share server. People join with an invite (a QR
+code or a link, no password) or sign in with a username and password; without an account the
+app sends with a PIN, like the website. Admins manage PINs, people and Recently deleted.
 
 Flutter draws the screens. Kotlin (`android/app/src/main/kotlin`) does what has to work without
 them: the phone's key in the Android KeyStore, the choice between the local and the public
-address, and the downloads, which keep going when the app is closed.
+address, and the transfers. Downloads and uploads (tus, in pieces) keep going when the app is
+closed and continue where they stopped.
 
 ## Running it
 

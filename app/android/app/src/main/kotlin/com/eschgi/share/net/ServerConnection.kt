@@ -12,10 +12,11 @@ import javax.net.ssl.HttpsURLConnection
 /** Requests to this phone's server with its key, over the local or the public address. */
 class ServerConnection(private val config: ServerConfig, private val token: String?) {
 
-    fun open(path: String, local: Boolean, readTimeoutMs: Int = 60_000): HttpURLConnection {
+    fun open(path: String, local: Boolean, readTimeoutMs: Int = 60_000, method: String = "GET"): HttpURLConnection {
         val useLocal = local && config.hasLocal
         val base = if (useLocal) config.localUrl!! else config.publicUrl
         val conn = URL(base + path).openConnection() as HttpURLConnection
+        conn.requestMethod = method // Android's HttpURLConnection takes PATCH too, which tus needs
         if (useLocal) PinnedTls.pin(conn as HttpsURLConnection, config.pins)
         conn.connectTimeout = if (useLocal) 3_000 else 15_000
         conn.readTimeout = readTimeoutMs

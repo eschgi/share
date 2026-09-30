@@ -36,6 +36,14 @@ class FakePlatform implements Platform {
   @override
   Future<ServerConfig?> loadServer() async => server;
 
+  ServerConfig? pinServer;
+
+  @override
+  Future<ServerConfig?> loadPinServer() async => pinServer;
+
+  @override
+  Future<void> savePinServer(ServerConfig? config) async => pinServer = config;
+
   @override
   Future<void> saveServer(ServerConfig? config) async => server = config;
 
@@ -66,6 +74,11 @@ class FakePlatform implements Platform {
   @override
   Future<void> openUrl(String url) async => opened.add(url);
 
+  final sharedTexts = <String>[];
+
+  @override
+  Future<void> shareText(String text) async => sharedTexts.add(text);
+
   @override
   Future<String> download(List<FileInfo> files) async {
     downloads.add(files);
@@ -95,4 +108,26 @@ class FakePlatform implements Platform {
 
   @override
   Future<String> cacheDir() async => '';
+
+  /// What pickAndSend gives back, and what was asked.
+  String? nextPick = 'up-1';
+  final picks = <(PickWhat, SendAuth)>[];
+  final cancelledUploads = <String>[];
+  final resumed = <SendAuth>[];
+  final uploadEvents = StreamController<UploadState>.broadcast();
+
+  @override
+  Future<String?> pickAndSend(PickWhat what, {SendAuth auth = SendAuth.device}) async {
+    picks.add((what, auth));
+    return nextPick;
+  }
+
+  @override
+  Future<void> cancelUpload(String batch) async => cancelledUploads.add(batch);
+
+  @override
+  Future<void> resumeUploads(SendAuth auth) async => resumed.add(auth);
+
+  @override
+  Stream<UploadState> get uploads => uploadEvents.stream;
 }

@@ -26,8 +26,8 @@
   "@sendServerTitle": {
     "description": "Asks for the server before opening the website for sending with a PIN."
   },
-  "sendServerLead": "Enter the address you were given. Sending works in the browser, with your PIN.",
-  "sendServerOpen": "Open in the browser",
+  "sendServerLead": "Enter the address you were given. Then your PIN, and you can send.",
+  "sendServerOpen": "Next",
   "signInTitle": "Sign in",
   "signInLead": "To see and download the shared files.",
   "signInServer": "Server",
@@ -349,5 +349,469 @@
     }
   },
   "openNoApp": "No app on this phone can open this file.",
-  "fetchFailed": "Couldn't get the file. Try again later."
+  "fetchFailed": "Couldn't get the file. Try again later.",
+  "settingsPins": "Upload PINs",
+  "settingsPinsSummary": "{permanent} permanent · {day} for 24 hours",
+  "@settingsPinsSummary": {
+    "placeholders": {
+      "permanent": {
+        "type": "int"
+      },
+      "day": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsPinsNone": "None yet",
+  "settingsPeople": "People",
+  "settingsInvite": "Invite",
+  "personYou": "{phones, plural, =0{You} =1{You · 1 phone} other{You · {phones} phones}}",
+  "@personYou": {
+    "placeholders": {
+      "phones": {
+        "type": "int"
+      }
+    }
+  },
+  "personPhoneCount": "{phones, plural, =0{No phone} =1{1 phone} other{{phones} phones}}",
+  "@personPhoneCount": {
+    "placeholders": {
+      "phones": {
+        "type": "int"
+      }
+    }
+  },
+  "activeToday": "active today",
+  "activeYesterday": "active yesterday",
+  "activeDaysAgo": "active {days} days ago",
+  "@activeDaysAgo": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "inviteOpenUntil": "Invite open until {when}",
+  "@inviteOpenUntil": {
+    "description": "when is like \"today, 21:00\".",
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "badgeInvited": "Invited",
+  "settingsStorage": "Storage",
+  "storageSetOnServer": "Set in config.json on the server",
+  "storageFree": "{free} free of {total}",
+  "@storageFree": {
+    "placeholders": {
+      "free": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "storageLibrary": "{files, plural, =1{1 file} other{{files} files}} · {size}",
+  "@storageLibrary": {
+    "placeholders": {
+      "files": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "trashTitle": "Recently deleted",
+  "trashSummary": "{files, plural, =0{Empty} =1{1 file · {size}} other{{files} files · {size}}}",
+  "@trashSummary": {
+    "placeholders": {
+      "files": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "pinsLead": "A PIN only lets people <b>send</b>. Nobody can see or download anything with it.",
+  "pinsPermanent": "Permanent",
+  "pinsDay": "For 24 hours",
+  "pinSince": "Since {date}",
+  "@pinSince": {
+    "description": "date is like \"12 Sep\".",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "pinUsedOn": "{phones, plural, =0{not used yet} =1{used on 1 phone} other{used on {phones} phones}}",
+  "@pinUsedOn": {
+    "placeholders": {
+      "phones": {
+        "type": "int"
+      }
+    }
+  },
+  "pinEnds": "Ends {when}",
+  "@pinEnds": {
+    "description": "when is like \"today, 18:30\".",
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "pinFiles": "{files, plural, =0{Nothing sent yet} =1{1 file} other{{files} files}}",
+  "@pinFiles": {
+    "placeholders": {
+      "files": {
+        "type": "int"
+      }
+    }
+  },
+  "pinFromPhones": "{phones, plural, =1{from 1 phone} other{from {phones} phones}}",
+  "@pinFromPhones": {
+    "placeholders": {
+      "phones": {
+        "type": "int"
+      }
+    }
+  },
+  "pinShare": "Share",
+  "pinNewCode": "New code",
+  "pinQr": "QR code",
+  "pinEndNow": "End now",
+  "pinNew": "New PIN",
+  "pinsNone": "No PINs yet. Make one, and everyone you give it to can send you files.",
+  "pinShareText": "Send me photos and files with Share: {link}",
+  "@pinShareText": {
+    "description": "The text shared with a PIN link.",
+    "placeholders": {
+      "link": {
+        "type": "String"
+      }
+    }
+  },
+  "pinNewCodeTitle": "Replace {code}?",
+  "@pinNewCodeTitle": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "pinNewCodeBody": "The old code stops working at once, also in links you already sent.",
+  "pinEndTitle": "End {code} now?",
+  "@pinEndTitle": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "pinEndBody": "Nobody can send with it any more. What was sent stays in the library.",
+  "pinScanToSend": "Scan to send files",
+  "pinNewTitle": "New upload PIN",
+  "pinHowLong": "How long should it work?",
+  "pinPermanentDetail": "Until you delete it",
+  "pin24h": "24 hours",
+  "pinUntil": "Until {when}",
+  "@pinUntil": {
+    "description": "when is like \"tomorrow, 10:04\".",
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "pinCodeLabel": "PIN",
+  "pinMadeUp": "Made up for you. You can also type your own.",
+  "pinAnother": "Make up another one",
+  "pinCreateShare": "Create & share",
+  "pinTaken": "That PIN was used before. Pick another one.",
+  "pinBadCode": "A PIN has 5 letters or numbers, without 0, O, 1 and I.",
+  "inviteTitle": "Invite someone",
+  "inviteRoleHelp": "Members see, download and send. Admins can also delete files, manage PINs and invite people.",
+  "inviteShowCode": "Show the QR code",
+  "inviteScanThis": "Let {name} scan this with the phone camera",
+  "@inviteScanThis": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "inviteWorksOnce": "Works once · expires in 24 h",
+  "inviteSendLink": "Send as a link instead",
+  "inviteShareText": "{name}, this invite signs you in to Share. It works once, for 24 hours: {link}",
+  "@inviteShareText": {
+    "description": "The text shared with an invite link.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "link": {
+        "type": "String"
+      }
+    }
+  },
+  "inviteAnother": "Invite someone else",
+  "invitePhoneTitle": "A phone for {name}",
+  "@invitePhoneTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "invitePhoneLead": "Scan this with the new phone. It will be signed in as {name}.",
+  "@invitePhoneLead": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "personPhones": "Phones",
+  "personThisPhone": "This phone",
+  "personLastUsed": "Last used {when}",
+  "@personLastUsed": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "personMakeAdmin": "Make admin",
+  "personMakeMember": "Make member",
+  "personAddPhone": "Add a phone",
+  "personSignOutPhone": "Sign out",
+  "personSignOutTitle": "Sign out {phone}?",
+  "@personSignOutTitle": {
+    "placeholders": {
+      "phone": {
+        "type": "String"
+      }
+    }
+  },
+  "personSignOutBody": "To come back it needs a new invite.",
+  "personRemove": "Remove {name}",
+  "@personRemove": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "personRemoveTitle": "Remove {name}?",
+  "@personRemoveTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "personRemoveBody": "Their phones are signed out. The files they sent stay in the library.",
+  "personLastAdmin": "This is the only admin. Make someone else admin first.",
+  "inviteWithdraw": "Withdraw the invite",
+  "inviteForPhone": "For another phone of {name}",
+  "@inviteForPhone": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteSelected": "Delete",
+  "deleteTitle": "{count, plural, =1{Delete 1 file?} other{Delete {count} files?}}",
+  "@deleteTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deleteBody": "They'll be gone for everyone. For {days} days you can still bring them back from <b>Recently deleted</b>.",
+  "@deleteBody": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "deleteButton": "{count, plural, =1{Delete 1 file} other{Delete {count} files}}",
+  "@deleteButton": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deletedSnack": "{count, plural, =1{1 file deleted} other{{count} files deleted}}",
+  "@deletedSnack": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "commonUndo": "Undo",
+  "trashLead": "Deleted files stay here for {days} days. Then they're gone for good.",
+  "@trashLead": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "trashEmpty": "Nothing was deleted.",
+  "trashDaysLeft": "{days, plural, =0{goes today} =1{1 day left} other{{days} days left}}",
+  "@trashDaysLeft": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "trashDeletedBy": "Deleted by {name}",
+  "@trashDeletedBy": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "trashRestore": "{count, plural, =1{Restore} other{Restore {count}}}",
+  "@trashRestore": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "trashPurge": "Delete now",
+  "trashPurgeTitle": "{count, plural, =1{Delete 1 file for good?} other{Delete {count} files for good?}}",
+  "@trashPurgeTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "trashPurgeBody": "This can't be undone.",
+  "trashRestored": "{count, plural, =1{1 file is back} other{{count} files are back}}",
+  "@trashRestored": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "navSend": "Send",
+  "sendTitle": "Send",
+  "sendLeadSignedIn": "No PIN needed while you're signed in.",
+  "sendPhotos": "Photos & videos",
+  "sendOtherFiles": "Other files",
+  "sendingOf": "Sending {current} of {total}",
+  "@sendingOf": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "sendMinutesLeft": "{minutes, plural, =0{Less than a minute left} =1{About 1 min left} other{About {minutes} min left}}",
+  "@sendMinutesLeft": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "sendItemWaiting": "Waiting",
+  "sendItemFailed": "Failed",
+  "sendItemLost": "Pick again",
+  "sendKeepsGoing": "Keeps going in the background, even if you close the app.",
+  "sentCount": "{count, plural, =1{1 file sent} other{{count} files sent}}",
+  "@sentCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sendFailedCount": "{count, plural, =1{1 file couldn't be sent.} other{{count} files couldn't be sent.}}",
+  "@sendFailedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sendLostCount": "{count, plural, =1{Your phone didn't keep 1 file. Pick it again and it goes on where it stopped.} other{Your phone didn't keep {count} files. Pick them again and they go on where they stopped.}}",
+  "@sendLostCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sendPickAgain": "Pick them again",
+  "sendMore": "Send more files",
+  "sendStop": "Stop sending",
+  "sendStopTitle": "Stop sending?",
+  "sendStopBody": "What arrived stays. The rest isn't sent.",
+  "sendPinEnded": "The PIN you used has ended. Enter a new PIN to finish sending.",
+  "sendNewPin": "Enter a new PIN",
+  "sendSignedOut": "This phone was signed out. Sign in again and sending goes on.",
+  "sendPaused": "Sending was stopped. It goes on where it stopped.",
+  "sendGoOn": "Go on",
+  "pinEnterTitle": "Enter your PIN",
+  "pinEnterLead": "The 5-character code you were given. You only need it once on this phone.",
+  "pinEnterHelp": "Letters or numbers. Capital or small doesn't matter.",
+  "pinUnlock": "Unlock",
+  "pinWrong": "{left, plural, =0{That PIN didn't work.} =1{That PIN didn't work. 1 try left.} other{That PIN didn't work. {left} tries left.}}",
+  "@pinWrong": {
+    "placeholders": {
+      "left": {
+        "type": "int"
+      }
+    }
+  },
+  "pinLocked": "Too many wrong tries. Try again in {time}.",
+  "@pinLocked": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "pinEndedCode": "This PIN doesn't work any more. Ask for a new one.",
+  "pinSendLead": "Others with this PIN can't see what you send.",
+  "pinValidUntil": "This PIN works until {when}",
+  "@pinValidUntil": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "pinSendTo": "To {host}",
+  "@pinSendTo": {
+    "placeholders": {
+      "host": {
+        "type": "String"
+      }
+    }
+  },
+  "pinOther": "Use another PIN",
+  "pinSignIn": "Sign in instead"
 }

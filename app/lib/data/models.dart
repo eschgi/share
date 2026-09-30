@@ -209,3 +209,209 @@ class FileIds {
   final List<String> ids;
   final int bytes;
 }
+
+// Admin (screens 17–21): PINs, people, the trash, storage.
+
+enum PinKind {
+  permanent,
+  day;
+
+  static PinKind parse(Object? v) => v == 'day' ? day : permanent;
+  String get wire => this == day ? 'day' : 'permanent';
+}
+
+/// An upload PIN that still works.
+class PinInfo {
+  const PinInfo({
+    required this.id,
+    required this.code,
+    required this.kind,
+    required this.createdAt,
+    this.expiresAt,
+    required this.link,
+    this.files = 0,
+    this.phones = 0,
+  });
+
+  factory PinInfo.fromJson(Json j) => PinInfo(
+        id: _str(j['id']),
+        code: _str(j['code']),
+        kind: PinKind.parse(j['kind']),
+        createdAt: _time(j['created_at']) ?? DateTime.fromMillisecondsSinceEpoch(0),
+        expiresAt: _time(j['expires_at']),
+        link: _str(j['link']),
+        files: _int(j['files']),
+        phones: _int(j['phones']),
+      );
+
+  final String id;
+  final String code;
+  final PinKind kind;
+  final DateTime createdAt;
+  final DateTime? expiresAt; // for a 24-hour PIN
+  final String link; // the website with the PIN filled in
+  final int files; // sent with it, still in the library
+  final int phones; // browsers and phones that unlocked it
+}
+
+/// A signed-in phone of someone.
+class Phone {
+  const Phone({required this.id, required this.name, required this.createdAt, required this.lastSeenAt, this.isThis = false});
+
+  factory Phone.fromJson(Json j) => Phone(
+        id: _str(j['id']),
+        name: _str(j['name']),
+        createdAt: _time(j['created_at']) ?? DateTime.fromMillisecondsSinceEpoch(0),
+        lastSeenAt: _time(j['last_seen_at']) ?? DateTime.fromMillisecondsSinceEpoch(0),
+        isThis: _bool(j['this']),
+      );
+
+  final String id;
+  final String name;
+  final DateTime createdAt;
+  final DateTime lastSeenAt;
+  final bool isThis; // the phone asking
+}
+
+class Person {
+  const Person({
+    required this.id,
+    required this.name,
+    required this.role,
+    this.username,
+    this.hasPassword = false,
+    this.isMe = false,
+    this.lastSeenAt,
+    this.phones = const [],
+  });
+
+  factory Person.fromJson(Json j) => Person(
+        id: _str(j['id']),
+        name: _str(j['name']),
+        role: Role.parse(j['role']),
+        username: j['username'] is String ? j['username'] as String : null,
+        hasPassword: _bool(j['has_password']),
+        isMe: _bool(j['me']),
+        lastSeenAt: _time(j['last_seen_at']),
+        phones: [for (final p in _list(j['phones'])) Phone.fromJson(_obj(p))],
+      );
+
+  final String id;
+  final String name;
+  final Role role;
+  final String? username;
+  final bool hasPassword;
+  final bool isMe;
+  final DateTime? lastSeenAt;
+  final List<Phone> phones;
+
+  bool get isAdmin => role == Role.admin;
+
+  Person copyWith({Role? role, List<Phone>? phones}) => Person(
+        id: id,
+        name: name,
+        role: role ?? this.role,
+        username: username,
+        hasPassword: hasPassword,
+        isMe: isMe,
+        lastSeenAt: lastSeenAt,
+        phones: phones ?? this.phones,
+      );
+}
+
+/// An invite nobody has used yet.
+class OpenInvite {
+  const OpenInvite({required this.id, required this.name, required this.role, this.userId, required this.expiresAt});
+
+  factory OpenInvite.fromJson(Json j) => OpenInvite(
+        id: _str(j['id']),
+        name: _str(j['name']),
+        role: Role.parse(j['role']),
+        userId: j['user_id'] is String ? j['user_id'] as String : null,
+        expiresAt: _time(j['expires_at']) ?? DateTime.fromMillisecondsSinceEpoch(0),
+      );
+
+  final String id;
+  final String name;
+  final Role role;
+  final String? userId; // set: it adds a phone for this person
+  final DateTime expiresAt;
+}
+
+class People {
+  const People({required this.users, required this.invites});
+
+  factory People.fromJson(Json j) => People(
+        users: [for (final u in _list(j['users'])) Person.fromJson(_obj(u))],
+        invites: [for (final i in _list(j['invites'])) OpenInvite.fromJson(_obj(i))],
+      );
+
+  final List<Person> users;
+  final List<OpenInvite> invites;
+}
+
+/// A fresh invite: the link is shown only now.
+class NewInvite {
+  const NewInvite({required this.link, required this.invite});
+
+  factory NewInvite.fromJson(Json j) => NewInvite(link: _str(j['link']), invite: OpenInvite.fromJson(_obj(j['invite'])));
+
+  final String link;
+  final OpenInvite invite;
+}
+
+class TrashedFile {
+  const TrashedFile({required this.file, required this.deletedAt, this.deletedBy, required this.purgeAt});
+
+  factory TrashedFile.fromJson(Json j) => TrashedFile(
+        file: FileInfo.fromJson(j),
+        deletedAt: _time(j['deleted_at']) ?? DateTime.fromMillisecondsSinceEpoch(0),
+        deletedBy: j['deleted_by'] is String ? j['deleted_by'] as String : null,
+        purgeAt: _time(j['purge_at']) ?? DateTime.fromMillisecondsSinceEpoch(0),
+      );
+
+  final FileInfo file;
+  final DateTime deletedAt;
+  final String? deletedBy;
+  final DateTime purgeAt; // when it goes for good
+}
+
+class Trash {
+  const Trash({required this.files, required this.days});
+
+  factory Trash.fromJson(Json j) =>
+      Trash(files: [for (final f in _list(j['files'])) TrashedFile.fromJson(_obj(f))], days: _int(j['trash_days'], 30));
+
+  final List<TrashedFile> files;
+  final int days;
+}
+
+class StorageInfo {
+  const StorageInfo({
+    required this.storageDir,
+    this.totalBytes = 0,
+    this.freeBytes = 0,
+    this.files = 0,
+    this.bytes = 0,
+    this.trashFiles = 0,
+    this.trashBytes = 0,
+    this.trashDays = 30,
+  });
+
+  factory StorageInfo.fromJson(Json j) => StorageInfo(
+        storageDir: _str(j['storage_dir']),
+        totalBytes: _int(j['total_bytes']),
+        freeBytes: _int(j['free_bytes']),
+        files: _int(j['files']),
+        bytes: _int(j['bytes']),
+        trashFiles: _int(j['trash_files']),
+        trashBytes: _int(j['trash_bytes']),
+        trashDays: _int(j['trash_days'], 30),
+      );
+
+  final String storageDir;
+  final int totalBytes, freeBytes; // 0 if the server couldn't ask the drive
+  final int files, bytes; // the library
+  final int trashFiles, trashBytes;
+  final int trashDays;
+}

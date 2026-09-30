@@ -40,4 +40,17 @@ void main() {
     expect([t.media, t.documents], [2, 1]);
     expect(t.running && t.local && !t.noSpace, isTrue);
   });
+
+  test('upload events', () {
+    final u = UploadState.fromMap(fixture['upload_event'] as Map);
+    expect(u.auth, SendAuth.device);
+    expect([u.total, u.done, u.failed, u.lost], [5, 1, 1, 1]);
+    expect([u.bytesTotal, u.bytesDone, u.etaSeconds], [61280000, 36380000, 120]);
+    expect(u.current, 4, reason: 'three are behind it');
+    expect(u.running && u.local && u.paused == null, isTrue);
+    expect(u.items.map((i) => i.state), ['done', 'queued', 'queued', 'lost']);
+    expect(u.items[1].kind, FileKind.video);
+    expect(u.items[1].bytes, 33280000);
+    expect(fixture['upload_paused'], ['pin_ended', 'signed_out', 'user']);
+  });
 }

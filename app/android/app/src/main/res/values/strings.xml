@@ -23,4 +23,25 @@
     <string name="downloads_where_media">In the gallery, album \"Share\"</string>
     <string name="downloads_where_documents">In Files › Downloads › Share</string>
     <string name="downloads_where_both">In the album \"Share\" and in Downloads › Share</string>
+
+    <!-- Sending (TransferNotification.kt) -->
+    <string name="uploads_channel">Sending</string>
+    <string name="uploads_sending">Sending to Share</string>
+    <plurals name="uploads_sent">
+        <item quantity="one">%d file sent</item>
+        <item quantity="other">%d files sent</item>
+    </plurals>
+    <plurals name="uploads_failed">
+        <item quantity="one">%d file couldn\'t be sent.</item>
+        <item quantity="other">%d files couldn\'t be sent.</item>
+    </plurals>
+    <plurals name="uploads_lost">
+        <item quantity="one">%d file has to be picked again.</item>
+        <item quantity="other">%d files have to be picked again.</item>
+    </plurals>
+    <string name="uploads_pin_ended">The PIN has ended</string>
+    <string name="uploads_pin_ended_text">Open Share and enter a new one to go on sending.</string>
+    <string name="uploads_signed_out">This phone was signed out</string>
+    <string name="uploads_signed_out_text">Sign in again to go on sending.</string>
+    <string name="uploads_waiting">Waiting for a connection to go on sending</string>
 </resources>

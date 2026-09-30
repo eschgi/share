@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:qr/qr.dart';
 
 import 'icons.dart';
 import 'theme.dart';
@@ -252,13 +253,23 @@ class SettingsGroup extends StatelessWidget {
 }
 
 class SettingsRow extends StatelessWidget {
-  const SettingsRow({super.key, required this.leading, required this.title, this.subtitle, this.trailing, this.onTap, this.danger = false});
+  const SettingsRow({
+    super.key,
+    required this.leading,
+    required this.title,
+    this.subtitle,
+    this.trailing,
+    this.onTap,
+    this.danger = false,
+    this.monoTitle = false,
+  });
   final Widget leading;
   final String title;
   final String? subtitle;
   final Widget? trailing;
   final VoidCallback? onTap;
   final bool danger;
+  final bool monoTitle; // a path, like the storage folder
 
   /// The square icon of a row, accent-coloured for the most used ones.
   static Widget icon(BuildContext context, IconData icon, {bool accent = false}) {
@@ -277,13 +288,19 @@ class SettingsRow extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
         child: Row(children: [
           leading,
           const SizedBox(width: 14),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(title, style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600, color: danger ? c.danger : c.text)),
+              Text(title,
+                  style: TextStyle(
+                    fontFamily: monoTitle ? mono : null,
+                    fontSize: monoTitle ? 15 : 15.5,
+                    fontWeight: FontWeight.w600,
+                    color: danger ? c.danger : c.text,
+                  )),
               if (subtitle != null) ...[
                 const SizedBox(height: 2),
                 Text(subtitle!, style: TextStyle(fontSize: 13, color: c.text3)),
@@ -298,9 +315,10 @@ class SettingsRow extends StatelessWidget {
 }
 
 class RoleBadge extends StatelessWidget {
-  const RoleBadge({super.key, required this.label, this.admin = false});
+  const RoleBadge({super.key, required this.label, this.admin = false, this.crown = true});
   final String label;
   final bool admin;
+  final bool crown; // the profile card has it; lists of people don't
 
   @override
   Widget build(BuildContext context) {
@@ -309,7 +327,7 @@ class RoleBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(color: admin ? c.accentSoft : c.s3, borderRadius: BorderRadius.circular(8)),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        if (admin) ...[Icon(AppIcons.crown, size: 13, color: c.accentText), const SizedBox(width: 4)],
+        if (admin && crown) ...[Icon(AppIcons.crown, size: 13, color: c.accentText), const SizedBox(width: 4)],
         Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: admin ? c.accentText : c.text2)),
       ]),
     );
@@ -400,4 +418,124 @@ class ShareBackButton extends StatelessWidget {
         icon: Icon(close ? AppIcons.x : AppIcons.back, size: 24),
         onPressed: () => Navigator.maybePop(context),
       );
+}
+
+/// Text whose <b>…</b> parts are bold, as the mockup's strings mark them.
+class Markup extends StatelessWidget {
+  const Markup(this.text, {super.key, this.style, this.textAlign});
+  final String text;
+  final TextStyle? style;
+  final TextAlign? textAlign;
+
+  static final _bold = RegExp(r'<b>(.*?)</b>');
+
+  @override
+  Widget build(BuildContext context) {
+    final spans = <TextSpan>[];
+    var at = 0;
+    for (final m in _bold.allMatches(text)) {
+      if (m.start > at) spans.add(TextSpan(text: text.substring(at, m.start)));
+      spans.add(TextSpan(text: m.group(1), style: TextStyle(fontWeight: FontWeight.w600, color: context.colors.text)));
+      at = m.end;
+    }
+    if (at < text.length) spans.add(TextSpan(text: text.substring(at)));
+    return Text.rich(TextSpan(style: style, children: spans), textAlign: textAlign);
+  }
+}
+
+/// A section's heading in capitals ("PERMANENT", "PEOPLE"), with room for an action.
+class SectionLabel extends StatelessWidget {
+  const SectionLabel(this.text, {super.key, this.action});
+  final String text;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: EdgeInsets.fromLTRB(12, action == null ? 22 : 12, 0, action == null ? 10 : 0),
+        child: Row(children: [
+          Expanded(
+            child: Text(text.toUpperCase(),
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 1.2, color: context.colors.text3)),
+          ),
+          ?action,
+        ]),
+      );
+}
+
+/// The letters of a PIN, each in its own box (screens 18 and 19).
+class CodeBoxes extends StatelessWidget {
+  const CodeBoxes(this.code, {super.key, this.size = 46, this.faded = false, this.active});
+  final String code;
+  final double size;
+  final bool faded;
+  final int? active; // the box being typed into
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Semantics(
+      container: true,
+      label: code.split('').join(' '),
+      excludeSemantics: true,
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        for (var i = 0; i < 5; i++)
+          Container(
+            width: size,
+            height: size * 1.12,
+            margin: EdgeInsets.only(right: i < 4 ? size * 0.17 : 0),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: c.s2,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: i == active ? c.accentText : c.line, width: i == active ? 1.5 : 1),
+            ),
+            child: Text(i < code.length ? code[i] : '',
+                style: TextStyle(fontFamily: mono, fontSize: size * 0.5, fontWeight: FontWeight.w600, color: faded ? c.text3 : c.text)),
+          ),
+      ]),
+    );
+  }
+}
+
+/// A QR code: dark modules on white with a quiet zone, from package:qr, drawn here.
+class QrCodeView extends StatelessWidget {
+  const QrCodeView(this.data, {super.key, this.size = 188, this.label});
+  final String data;
+  final double size;
+  final String? label;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        image: true,
+        label: label,
+        child: Container(
+          padding: EdgeInsets.all(size * 0.075),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)),
+          child: CustomPaint(size: Size.square(size), painter: _QrPainter(data)),
+        ),
+      );
+}
+
+class _QrPainter extends CustomPainter {
+  _QrPainter(this.data) : image = QrImage(QrCode(payload: QrPayload.fromString(data), errorCorrectLevel: QrErrorCorrectLevel.medium));
+  final String data;
+  final QrImage image;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final n = image.moduleCount;
+    final cell = size.width / n;
+    // No anti-aliasing, so neighbouring modules meet without hairline seams.
+    final dark = Paint()
+      ..color = const Color(0xFF111111)
+      ..isAntiAlias = false;
+    for (var row = 0; row < n; row++) {
+      for (var col = 0; col < n; col++) {
+        if (image.isDark(row, col)) canvas.drawRect(Rect.fromLTWH(col * cell, row * cell, cell + 0.4, cell + 0.4), dark);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_QrPainter old) => old.data != data;
 }

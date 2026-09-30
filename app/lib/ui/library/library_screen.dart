@@ -8,6 +8,7 @@ import '../../app.dart';
 import '../../data/library.dart';
 import '../../data/models.dart';
 import '../../l10n/app_localizations.dart';
+import '../admin/delete.dart';
 import '../download_sheet.dart';
 import '../fetch.dart';
 import '../format.dart';
@@ -164,6 +165,32 @@ class _LibraryScreenState extends State<LibraryScreen> with WidgetsBindingObserv
     if (!mounted) return;
     await showDownloadSheet(context, batch: batch, files: files);
     await _c.refreshSaved();
+  }
+
+  /// Admins: into Recently deleted, with a moment to take it back.
+  Future<void> _delete() async {
+    final t = AppLocalizations.of(context);
+    final admin = Services.read(context).admin;
+    final ids = _c.selected.toList();
+    if (ids.isEmpty || !await confirmDelete(context, ids.length, admin.trashDays) || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final n = await admin.deleteFiles(ids);
+      _c.clearSelection();
+      await _c.reload();
+      messenger.showSnackBar(SnackBar(
+        content: Text(t.deletedSnack(n)),
+        action: SnackBarAction(
+          label: t.commonUndo,
+          onPressed: () async {
+            await admin.restore(ids);
+            await _c.reload();
+          },
+        ),
+      ));
+    } on Exception {
+      messenger.showSnackBar(SnackBar(content: Text(t.commonFailed)));
+    }
   }
 
   void _open(int index) {
@@ -338,6 +365,18 @@ class _LibraryScreenState extends State<LibraryScreen> with WidgetsBindingObserv
             child: SizedBox(width: 56, height: 56, child: Icon(AppIcons.share, size: 22, semanticLabel: t.shareSelected)),
           ),
         ),
+        if (widget.user.isAdmin) ...[
+          const SizedBox(width: 10),
+          Material(
+            color: c.dangerSoft,
+            borderRadius: BorderRadius.circular(16),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: _delete,
+              child: SizedBox(width: 56, height: 56, child: Icon(AppIcons.trash, size: 22, color: c.danger, semanticLabel: t.deleteSelected)),
+            ),
+          ),
+        ],
         const SizedBox(width: 10),
         Expanded(
           child: FilledButton(

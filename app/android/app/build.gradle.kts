@@ -102,6 +102,10 @@ dependencies {
     // from 14 on as user-initiated data transfer jobs.
     implementation("androidx.work:work-runtime:2.10.5")
     implementation("androidx.core:core-ktx:1.17.0")
+    // The photo picker, with its fallbacks on older phones, and the document picker.
+    implementation("androidx.activity:activity:1.13.0")
+    // Which way up a photo is, for the thumbnail sent along (HEIF and WebP too).
+    implementation("androidx.exifinterface:exifinterface:1.4.2")
     // Scanning invite QR codes without the camera permission; phones without Google Play
     // services paste the link instead.
     implementation("com.google.android.gms:play-services-code-scanner:16.1.0")

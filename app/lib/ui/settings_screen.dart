@@ -7,13 +7,18 @@ import '../data/api.dart';
 import '../data/models.dart';
 import '../data/platform.dart';
 import '../l10n/app_localizations.dart';
+import 'admin/invite_person_screen.dart';
+import 'admin/people.dart';
+import 'admin/pins_screen.dart';
+import 'admin/trash_screen.dart';
+import 'format.dart';
 import 'icons.dart';
 import 'server_screen.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
-/// Screen 17, what everyone sees: profile, language, server, password, signing out and
-/// deleting the account. (Admins get PINs, people and storage with the next step.)
+/// Screen 17: profile, language, server, password, signing out and deleting the account;
+/// admins also get the upload PINs, the people and the storage.
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key, required this.user, required this.navigation});
   final User user;
@@ -27,12 +32,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
   RouteStatus? _route;
   StreamSubscription<RouteStatus>? _routes;
 
+  // Admins only.
+  List<PinInfo>? _pins;
+  People? _people;
+  StorageInfo? _storage;
+
   @override
   void initState() {
     super.initState();
     final p = Services.read(context).platform;
     p.route().then((r) => mounted ? setState(() => _route = r) : null);
     _routes = p.routes.listen((r) => setState(() => _route = r));
+    _loadAdmin();
+  }
+
+  @override
+  void didUpdateWidget(SettingsScreen old) {
+    super.didUpdateWidget(old);
+    if (old.user.role != widget.user.role) _loadAdmin();
+  }
+
+  Future<void> _loadAdmin() async {
+    if (!widget.user.isAdmin) return;
+    final admin = Services.read(context).admin;
+    // Each part shows up when it arrives; one that fails stays away until the next time.
+    Future<void> load<T>(Future<T> f, void Function(T) keep) => f.then(keep).catchError((Object _) {});
+    await Future.wait([
+      load(admin.pins(), (v) => _pins = v),
+      load(admin.people(), (v) => _people = v),
+      load(admin.storage(), (v) => _storage = v),
+    ]);
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _open(Widget screen) async {
+    await Navigator.push(context, MaterialPageRoute<void>(builder: (_) => screen));
+    await _loadAdmin();
   }
 
   @override
@@ -114,6 +149,59 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  String _pinsSummary(AppLocalizations t) {
+    final pins = _pins;
+    if (pins == null) return '';
+    if (pins.isEmpty) return t.settingsPinsNone;
+    final permanent = pins.where((p) => p.kind == PinKind.permanent).length;
+    return t.settingsPinsSummary(permanent, pins.length - permanent);
+  }
+
+  List<Widget> _adminSections(AppLocalizations t, String locale) {
+    final c = context.colors;
+    final people = _people;
+    final storage = _storage;
+    return [
+      SectionLabel(
+        t.settingsPeople,
+        action: TextButton.icon(
+          style: TextButton.styleFrom(
+            foregroundColor: c.accentText,
+            minimumSize: const Size(0, 40),
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            textStyle: const TextStyle(fontFamily: 'Roboto', fontSize: 16.5, fontWeight: FontWeight.w600),
+          ),
+          onPressed: () => _open(const InvitePersonScreen()),
+          icon: const Icon(AppIcons.userPlus, size: 20),
+          label: Text(t.settingsInvite),
+        ),
+      ),
+      if (people != null) PeopleGroup(people: people, onChanged: _loadAdmin),
+      if (storage != null) ...[
+        SectionLabel(t.settingsStorage),
+        SettingsGroup(children: [
+          SettingsRow(
+            leading: SettingsRow.icon(context, AppIcons.hardDrive),
+            title: storage.storageDir,
+            monoTitle: true,
+            subtitle: [
+              t.storageSetOnServer,
+              if (storage.totalBytes > 0) t.storageFree(formatBytes(storage.freeBytes, locale), formatBytes(storage.totalBytes, locale)),
+            ].join('\n'),
+          ),
+          SettingsRow(
+            leading: SettingsRow.icon(context, AppIcons.trash),
+            title: t.trashTitle,
+            subtitle: t.trashSummary(storage.trashFiles, formatBytes(storage.trashBytes, locale)),
+            onTap: () => _open(const TrashScreen()),
+          ),
+        ]),
+      ],
+      const SizedBox(height: 14),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
@@ -146,6 +234,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         const SizedBox(height: 14),
         SettingsGroup(children: [
+          if (u.isAdmin)
+            SettingsRow(
+              leading: SettingsRow.icon(context, AppIcons.key, accent: true),
+              title: t.settingsPins,
+              subtitle: _pinsSummary(t),
+              onTap: () => _open(const PinsScreen()),
+            ),
           SettingsRow(
             leading: SettingsRow.icon(context, AppIcons.globe),
             title: t.settingsLanguage,
@@ -159,7 +254,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const ServerScreen())),
           ),
         ]),
-        const SizedBox(height: 14),
+        if (u.isAdmin) ..._adminSections(t, phone) else const SizedBox(height: 14),
         SettingsGroup(children: [
           SettingsRow(
             leading: SettingsRow.icon(context, AppIcons.key),

@@ -2,8 +2,6 @@ package com.eschgi.share.transfer
 
 import android.content.Context
 import android.net.Uri
-import android.os.Build
-import android.util.Log
 import androidx.core.net.toUri
 import com.eschgi.share.net.RouteMonitor
 import java.util.UUID
@@ -14,7 +12,6 @@ import java.util.concurrent.CopyOnWriteArraySet
  * which files are on the phone already. Progress goes to [listen]ers as TransferState maps.
  */
 object Downloads {
-    private const val TAG = "Downloads"
     private const val KEEP_MS = 7 * 24 * 3600_000L
 
     /** How long a finished batch is still reported to a new listener. */
@@ -122,16 +119,5 @@ object Downloads {
         return snapshots
     }
 
-    private fun startHost(app: Context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            try {
-                DownloadJobService.schedule(app, TransferDb.get(app).queuedBytes())
-                return
-            } catch (e: RuntimeException) {
-                // Not allowed right now (e.g. the app isn't visible): a foreground worker instead.
-                Log.w(TAG, "can't schedule a user-initiated job", e)
-            }
-        }
-        DownloadWorker.enqueue(app)
-    }
+    private fun startHost(app: Context) = Direction.DOWNLOADS.start(app, TransferDb.get(app).queuedBytes())
 }

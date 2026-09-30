@@ -10,10 +10,13 @@ import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.provider.OpenableColumns
 import android.provider.Settings
 import android.util.Log
-import androidx.core.net.toUri
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityCompat
+import androidx.core.net.toUri
 import com.eschgi.share.BuildConfig
 import com.eschgi.share.MainActivity
 import com.eschgi.share.data.SecretStore
@@ -23,6 +26,9 @@ import com.eschgi.share.net.RouteStatus
 import com.eschgi.share.transfer.Downloads
 import com.eschgi.share.transfer.Fetcher
 import com.eschgi.share.transfer.FileRef
+import com.eschgi.share.transfer.Picked
+import com.eschgi.share.transfer.UploadBatch
+import com.eschgi.share.transfer.Uploads
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
@@ -48,6 +54,7 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
 
     private var sink: EventChannel.EventSink? = null
     private var initialLink: String? = null
+    private var picking: Pair<MethodChannel.Result, String>? = null
 
     private val routeListener: (RouteStatus) -> Unit = { send(it.toMap() + ("type" to "route")) }
     private val transferListener: (Map<String, Any?>) -> Unit = { send(it) }
@@ -56,7 +63,10 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
         methods.setMethodCallHandler(this)
         events.setStreamHandler(this)
         RouteMonitor.init(app)
-        io.execute { Downloads.resumeIfNeeded(app) }
+        io.execute {
+            Downloads.resumeIfNeeded(app)
+            Uploads.resumeIfNeeded(app)
+        }
     }
 
     fun detach() {
@@ -70,6 +80,7 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
     fun onIntent(intent: Intent?, initial: Boolean) {
         if (intent == null) return
         if (intent.action == MainActivity.ACTION_RETRY_DOWNLOADS) io.execute { Downloads.retry(app) }
+        if (intent.action == MainActivity.ACTION_RETRY_UPLOADS) io.execute { Uploads.retry(app) }
         val link = linkOf(intent) ?: return
         if (initial) initialLink = link else send(mapOf("type" to "link", "url" to link))
     }
@@ -81,9 +92,9 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
                 secrets.write(call.argument<String>("key")!!, call.argument<String>("value"))
                 null
             }
-            "server.load" -> background(result) { server.load() }
+            "server.load" -> background(result) { server.load(call.argument<String>("slot") ?: ServerStore.DEVICE) }
             "server.save" -> background(result) {
-                server.save(call.argument<String>("json"))
+                server.save(call.argument<String>("json"), call.argument<String>("slot") ?: ServerStore.DEVICE)
                 RouteMonitor.invalidate()
                 null
             }
@@ -106,6 +117,11 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
                     result.error("no_app", e.message, null)
                 }
             }
+            "text.share" -> {
+                val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, call.argument<String>("text"))
+                activity.startActivity(Intent.createChooser(send, null))
+                result.success(null)
+            }
             "transfer.download" -> {
                 askForNotifications()
                 background(result) { Downloads.enqueue(app, FileRef.parseList(call.argument<String>("files"))) }
@@ -121,6 +137,15 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
                         null
                     }
                 }
+            }
+            "upload.pick" -> pick(call.argument<String>("what"), call.argument<String>("auth") ?: UploadBatch.DEVICE, result)
+            "upload.cancel" -> background(result) {
+                Uploads.cancel(app, call.argument<String>("batch") ?: "")
+                null
+            }
+            "upload.resume" -> background(result) {
+                Uploads.resume(app, call.argument<String>("auth"))
+                null
             }
             "transfer.saved" -> background(result) { Downloads.saved(app, call.argument<List<String>>("ids") ?: emptyList()) }
             "file.share" -> background(result) {
@@ -163,10 +188,12 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
         sink = events
         RouteMonitor.listen(routeListener)
         Downloads.listen(transferListener)
+        Uploads.listen(transferListener)
         io.execute {
             // A new listener starts from where things are, not from the next change.
             send(RouteMonitor.current(app).toMap() + ("type" to "route"))
             Downloads.snapshots(app).forEach { send(it.toMap()) }
+            Uploads.snapshots(app).forEach { send(it.toMap()) }
         }
     }
 
@@ -174,6 +201,73 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
         sink = null
         RouteMonitor.unlisten(routeListener)
         Downloads.unlisten(transferListener)
+        Uploads.unlisten(transferListener)
+    }
+
+    /** What to send: from the photo picker, or any files from the document picker. */
+    private fun pick(what: String?, auth: String, result: MethodChannel.Result) {
+        val intent = if (what == "documents") {
+            ActivityResultContracts.OpenMultipleDocuments().createIntent(activity, arrayOf("*/*"))
+        } else {
+            ActivityResultContracts.PickMultipleVisualMedia()
+                .createIntent(activity, PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
+        }
+        picking?.first?.success(null) // an earlier pick that never came back
+        picking = result to auth
+        try {
+            activity.startActivityForResult(intent, REQUEST_PICK)
+        } catch (e: ActivityNotFoundException) {
+            picking = null
+            result.error("no_app", e.message, null)
+        }
+    }
+
+    /** The picker's answer; true if it was ours. */
+    fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
+        if (requestCode != REQUEST_PICK) return false
+        val (result, auth) = picking ?: return true
+        picking = null
+        val uris = LinkedHashSet<Uri>()
+        if (resultCode == Activity.RESULT_OK && data != null) {
+            data.data?.let { uris += it }
+            data.clipData?.let { clip -> for (i in 0 until clip.itemCount) clip.getItemAt(i).uri?.let { uris += it } }
+        }
+        if (uris.isEmpty()) {
+            result.success(null)
+            return true
+        }
+        io.execute {
+            try {
+                val picked = uris.mapNotNull { describe(it) }
+                val batch = if (picked.isEmpty()) null else Uploads.enqueue(app, auth, picked)
+                main.post { result.success(batch) }
+            } catch (e: Exception) {
+                Log.w(TAG, "sending picked files", e)
+                main.post { result.error("failed", e.message, null) }
+            }
+        }
+        return true
+    }
+
+    /** Name, size and type of a picked file, keeping the permission to read it after a restart. */
+    private fun describe(uri: Uri): Picked? {
+        val resolver = app.contentResolver
+        try {
+            resolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        } catch (e: SecurityException) {
+            // Not every picker allows it; then it only works until the phone restarts.
+        }
+        var name: String? = null
+        var size: Long? = null
+        resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { c ->
+            if (c.moveToFirst()) {
+                name = c.getString(0)
+                if (!c.isNull(1)) size = c.getLong(1)
+            }
+        }
+        if (size == null) size = runCatching { resolver.openAssetFileDescriptor(uri, "r")?.use { it.length.takeIf { n -> n >= 0 } } }.getOrNull()
+        val length = size ?: return null // tus has to know it
+        return Picked(uri.toString(), name ?: uri.lastPathSegment ?: "file", length, resolver.getType(uri) ?: "application/octet-stream")
     }
 
     fun onRequestPermissionsResult(requestCode: Int) {
@@ -239,5 +333,6 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
     companion object {
         private const val TAG = "PlatformChannel"
         private const val REQUEST_NOTIFICATIONS = 7001
+        private const val REQUEST_PICK = 7002
     }
 }

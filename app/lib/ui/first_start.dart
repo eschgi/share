@@ -6,6 +6,7 @@ import '../data/server.dart';
 import '../l10n/app_localizations.dart';
 import 'icons.dart';
 import 'invite.dart';
+import 'send/pin_entry_screen.dart';
 import 'sign_in.dart';
 import 'theme.dart';
 import 'widgets.dart';
@@ -86,7 +87,7 @@ Future<void> scanInvite(BuildContext context) async {
     case final InviteLink link:
       await Navigator.push(context, MaterialPageRoute<void>(builder: (_) => InviteScreen(link: link)));
     case final PinLink link:
-      await services.platform.openUrl('${link.server}/#${link.code}');
+      await Navigator.push(context, MaterialPageRoute<void>(builder: (_) => PinEntryScreen(server: link.server, code: link.code)));
     case null:
       messenger.showSnackBar(SnackBar(content: Text(t.scanNotAnInvite)));
   }
@@ -112,7 +113,7 @@ Future<String?> askForInviteLink(BuildContext context) {
   );
 }
 
-/// Sending without an account works on the website, with a PIN; this only asks where.
+/// Sending without an account, with a PIN: first where to.
 class SendServerScreen extends StatefulWidget {
   const SendServerScreen({super.key});
 
@@ -154,6 +155,6 @@ class _SendServerScreenState extends State<SendServerScreen> {
       setState(() => _error = AppLocalizations.of(context).serverBadAddress);
       return;
     }
-    Services.read(context).platform.openUrl('$server/');
+    Navigator.push(context, MaterialPageRoute<void>(builder: (_) => PinEntryScreen(server: server)));
   }
 }

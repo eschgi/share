@@ -19,4 +19,24 @@
     <string name="downloads_where_media">In der Galerie, Album „Share“</string>
     <string name="downloads_where_documents">In Dateien › Downloads › Share</string>
     <string name="downloads_where_both">Im Album „Share“ und in Downloads › Share</string>
+
+    <string name="uploads_channel">Senden</string>
+    <string name="uploads_sending">Wird an Share gesendet</string>
+    <plurals name="uploads_sent">
+        <item quantity="one">%d Datei gesendet</item>
+        <item quantity="other">%d Dateien gesendet</item>
+    </plurals>
+    <plurals name="uploads_failed">
+        <item quantity="one">%d Datei konnte nicht gesendet werden.</item>
+        <item quantity="other">%d Dateien konnten nicht gesendet werden.</item>
+    </plurals>
+    <plurals name="uploads_lost">
+        <item quantity="one">%d Datei muss nochmal ausgewählt werden.</item>
+        <item quantity="other">%d Dateien müssen nochmal ausgewählt werden.</item>
+    </plurals>
+    <string name="uploads_pin_ended">Die PIN ist abgelaufen</string>
+    <string name="uploads_pin_ended_text">Öffne Share und gib eine neue ein, um weiter zu senden.</string>
+    <string name="uploads_signed_out">Dieses Handy wurde abgemeldet</string>
+    <string name="uploads_signed_out_text">Melde dich wieder an, um weiter zu senden.</string>
+    <string name="uploads_waiting">Wartet auf eine Verbindung, um weiter zu senden</string>
 </resources>

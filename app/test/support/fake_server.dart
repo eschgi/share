@@ -22,7 +22,170 @@ class FakeServer {
         final list = _filtered(req.url.queryParameters);
         return json({'ids': [for (final f in list) f['id']], 'bytes': list.fold<int>(0, (s, f) => s + (f['size'] as int))});
       },
+      ..._adminRoutes(),
+      'POST /api/pin/unlock': (req) {
+        final code = (_body(req)['code'] as String? ?? '').toUpperCase();
+        if (code != pinCode) return json({'error': {'code': 'pin_wrong', 'message': '', 'attempts_left': 4}}, 401);
+        final res = contractResponse('api/pin_unlock_app.json');
+        res['session'] = {...(res['session'] as Map).cast<String, dynamic>(), 'expires_at': DateTime.now().add(const Duration(hours: 20)).toUtc().toIso8601String()};
+        return json(res);
+      },
+      'GET /api/session': (_) => pinEnded
+          ? json({'error': {'code': 'session_ended', 'message': ''}}, 401)
+          : json({'kind': 'pin', 'pin_kind': 'day', 'expires_at': DateTime.now().add(const Duration(hours: 20)).toUtc().toIso8601String()}),
     };
+  }
+
+  /// The PIN that unlocks, and whether the stored session's PIN has ended.
+  String pinCode = 'K7M2Q';
+  bool pinEnded = false;
+
+  /// A signed-in admin, for the admin screens.
+  static Map<String, dynamic> get adminMe => {
+        'user': {'id': 'u1ld5x2k7mbqz4bwdbyj6qsqxa', 'name': 'Stefan', 'role': 'admin', 'username': 'stefan', 'has_password': true},
+        'device': {'id': 'd1ld5x2k7mbqz4bwdbyj6qsqxa', 'name': 'Pixel 9'},
+      };
+
+  // What admins manage, starting from the contract's examples.
+  List<Map<String, dynamic>> pins = [for (final p in contractResponse('api/pins.json')['pins'] as List) (p as Map).cast()];
+  Map<String, dynamic> people = contractResponse('api/people.json');
+  List<Map<String, dynamic>> trash = [];
+  Map<String, dynamic> storage = contractResponse('api/storage.json');
+  final usedCodes = <String>{'K7M2Q', '4HX9T'};
+  var _made = 0;
+
+  List<Map<String, dynamic>> get _users => [for (final u in people['users'] as List) (u as Map).cast()];
+  List<Map<String, dynamic>> get _invites => [for (final i in people['invites'] as List) (i as Map).cast()];
+
+  Map<String, dynamic> _body(http.Request req) => req.body.isEmpty ? {} : (jsonDecode(req.body) as Map).cast();
+
+  http.Response _error(int status, String code) => json({'error': {'code': code, 'message': ''}}, status);
+
+  http.Response get _noContent => http.Response('', 204);
+
+  Map<String, dynamic> _pin(String kind, String code) {
+    _made++;
+    final now = DateTime.now().toUtc();
+    return {
+      'id': 'p${_made}new${'a' * 20}',
+      'code': code,
+      'kind': kind,
+      'created_at': now.toIso8601String(),
+      'expires_at': kind == 'day' ? now.add(const Duration(days: 1)).toIso8601String() : null,
+      'link': 'https://share.example.com/#$code',
+      'files': 0,
+      'phones': 0,
+    };
+  }
+
+  Map<String, http.Response Function(http.Request)> _adminRoutes() => {
+        'GET /api/pins': (_) => json({'pins': pins}),
+        'GET /api/pins/suggest': (_) => json({'code': 'R8D4W'}),
+        'POST /api/pins': (req) {
+          final b = _body(req);
+          final code = (b['code'] as String? ?? 'Z${_made}XYZ').toUpperCase();
+          if (usedCodes.contains(code)) return _error(409, 'pin_taken');
+          usedCodes.add(code);
+          final pin = _pin(b['kind'] as String, code);
+          pins.add(pin);
+          return json(pin, 201);
+        },
+        'GET /api/users': (_) => json(people),
+        'POST /api/invites': (req) {
+          final b = _body(req);
+          return _newInvite(b['name'] as String, b['role'] as String, null);
+        },
+        'POST /api/files/delete': (req) {
+          final ids = (_body(req)['ids'] as List).cast<String>().toSet();
+          final gone = files.where((f) => ids.contains(f['id'])).toList();
+          files.removeWhere((f) => ids.contains(f['id']));
+          final now = DateTime.now().toUtc();
+          trash.insertAll(0, [
+            for (final f in gone)
+              {...f, 'deleted_at': now.toIso8601String(), 'deleted_by': 'Stefan', 'purge_at': now.add(const Duration(days: 30)).toIso8601String()},
+          ]);
+          return json({'changed': gone.length});
+        },
+        'GET /api/trash': (_) => json({'files': trash, 'trash_days': 30}),
+        'POST /api/trash/restore': (req) {
+          final ids = (_body(req)['ids'] as List).cast<String>().toSet();
+          final back = trash.where((f) => ids.contains(f['id'])).toList();
+          trash.removeWhere((f) => ids.contains(f['id']));
+          for (final f in back) {
+            files.add(Map.of(f)..removeWhere((k, _) => k == 'deleted_at' || k == 'deleted_by' || k == 'purge_at'));
+          }
+          files.sort((a, b) => (b['uploaded_at'] as String).compareTo(a['uploaded_at'] as String));
+          return json({'changed': back.length});
+        },
+        'POST /api/trash/purge': (req) {
+          final ids = (_body(req)['ids'] as List).cast<String>().toSet();
+          final before = trash.length;
+          trash.removeWhere((f) => ids.contains(f['id']));
+          return json({'changed': before - trash.length});
+        },
+        'GET /api/admin/storage': (_) => json(storage),
+      };
+
+  http.Response _newInvite(String name, String role, String? userId) {
+    _made++;
+    final token = 'shi_${'x' * 40}$_made';
+    final invite = {
+      'id': 'i${_made}new${'a' * 20}',
+      'name': name,
+      'role': role,
+      'user_id': userId,
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+      'expires_at': DateTime.now().toUtc().add(const Duration(days: 1)).toIso8601String(),
+    };
+    people['invites'] = [..._invites, invite];
+    return json({'token': token, 'link': 'https://share.example.com/join#$token', 'invite': invite}, 201);
+  }
+
+  /// The admin routes with an id in the path.
+  http.Response? _adminPath(http.Request req) {
+    final path = req.url.path;
+    final pinAction = RegExp(r'^/api/pins/([^/]+)/(new-code|end)$').firstMatch(path);
+    if (req.method == 'POST' && pinAction != null) {
+      final i = pins.indexWhere((p) => p['id'] == pinAction.group(1));
+      if (i < 0) return _error(404, 'not_found');
+      final old = pins.removeAt(i);
+      if (pinAction.group(2) == 'end') return _noContent;
+      final pin = _pin(old['kind'] as String, 'N${_made}CDE');
+      pins.insert(i, pin);
+      return json(pin);
+    }
+    final user = RegExp(r'^/api/users/([^/]+)(/invites)?$').firstMatch(path);
+    if (user != null) {
+      final id = user.group(1);
+      final u = _users.where((u) => u['id'] == id).firstOrNull;
+      if (u == null) return _error(404, 'not_found');
+      if (user.group(2) != null && req.method == 'POST') return _newInvite(u['name'] as String, u['role'] as String, id);
+      final admins = _users.where((u) => u['role'] == 'admin').length;
+      if (req.method == 'PATCH') {
+        final role = _body(req)['role'] as String;
+        if (u['role'] == 'admin' && role != 'admin' && admins <= 1) return _error(409, 'last_admin');
+        people['users'] = [for (final x in _users) x['id'] == id ? {...x, 'role': role} : x];
+        return _noContent;
+      }
+      if (req.method == 'DELETE') {
+        if (u['role'] == 'admin' && admins <= 1) return _error(409, 'last_admin');
+        people['users'] = [for (final x in _users) if (x['id'] != id) x];
+        return _noContent;
+      }
+    }
+    final device = RegExp(r'^/api/devices/([^/]+)$').firstMatch(path);
+    if (req.method == 'DELETE' && device != null) {
+      people['users'] = [
+        for (final u in _users) {...u, 'phones': [for (final p in u['phones'] as List) if ((p as Map)['id'] != device.group(1)) p]},
+      ];
+      return _noContent;
+    }
+    final invite = RegExp(r'^/api/invites/([^/]+)$').firstMatch(path);
+    if (req.method == 'DELETE' && invite != null) {
+      people['invites'] = [for (final i in _invites) if (i['id'] != invite.group(1)) i];
+      return _noContent;
+    }
+    return null;
   }
 
   late final Map<String, http.Response Function(http.Request)> routes;
@@ -42,6 +205,8 @@ class FakeServer {
         if (req.method == 'GET' && path.endsWith('/thumb')) return http.Response.bytes(Uint8List(0), 404);
         final handler = routes['${req.method} $path'];
         if (handler != null) return handler(req);
+        final admin = _adminPath(req);
+        if (admin != null) return admin;
         final m = RegExp(r'^/api/files/([a-z2-7]+)$').firstMatch(path);
         if (m != null) return json(files.firstWhere((f) => f['id'] == m.group(1)));
         return json({'error': {'code': 'not_found', 'message': ''}}, 404);

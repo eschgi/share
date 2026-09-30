@@ -81,6 +81,87 @@ class TransferState {
   final bool noSpace;
 }
 
+enum PickWhat { media, documents }
+
+/// How files are sent: with the phone's key (signed in), or with a PIN.
+enum SendAuth { device, pin }
+
+/// One file of an upload batch.
+class UploadItemState {
+  const UploadItemState({required this.seq, required this.name, required this.size, required this.kind, required this.state, this.bytes = 0});
+
+  factory UploadItemState.fromMap(Map<Object?, Object?> m) => UploadItemState(
+        seq: (m['seq'] as num?)?.toInt() ?? 0,
+        name: m['name'] as String? ?? '',
+        size: (m['size'] as num?)?.toInt() ?? 0,
+        kind: FileKind.parse(m['kind']),
+        state: m['state'] as String? ?? 'queued',
+        bytes: (m['bytes'] as num?)?.toInt() ?? 0,
+      );
+
+  final int seq;
+  final String name;
+  final int size;
+  final FileKind kind;
+  final String state; // queued, done, failed, lost, cancelled
+  final int bytes;
+
+  bool get done => state == 'done';
+  bool get queued => state == 'queued';
+}
+
+/// A batch of uploads, as the Kotlin engine reports it; [items] are a few of its files: the
+/// last one sent, the one on its way and the next ones.
+class UploadState {
+  const UploadState({
+    required this.batch,
+    required this.auth,
+    required this.running,
+    this.paused,
+    required this.total,
+    required this.done,
+    this.failed = 0,
+    this.lost = 0,
+    required this.bytesTotal,
+    required this.bytesDone,
+    this.etaSeconds,
+    this.local = false,
+    this.items = const [],
+  });
+
+  factory UploadState.fromMap(Map<Object?, Object?> m) {
+    int n(String k) => (m[k] as num?)?.toInt() ?? 0;
+    return UploadState(
+      batch: m['batch'] as String? ?? '',
+      auth: m['auth'] == 'pin' ? SendAuth.pin : SendAuth.device,
+      running: m['running'] == true,
+      paused: m['paused'] as String?,
+      total: n('total'),
+      done: n('done'),
+      failed: n('failed'),
+      lost: n('lost'),
+      bytesTotal: n('bytes_total'),
+      bytesDone: n('bytes_done'),
+      etaSeconds: (m['eta_seconds'] as num?)?.toInt(),
+      local: m['local'] == true,
+      items: [for (final i in (m['items'] as List? ?? const [])) if (i is Map) UploadItemState.fromMap(i)],
+    );
+  }
+
+  final String batch;
+  final SendAuth auth;
+  final bool running;
+  final String? paused; // pin_ended, signed_out or user
+  final int total, done, failed, lost;
+  final int bytesTotal, bytesDone;
+  final int? etaSeconds;
+  final bool local;
+  final List<UploadItemState> items;
+
+  /// The file on its way, counted from 1, as in "Sending 12 of 40".
+  int get current => (done + failed + lost + 1).clamp(1, total == 0 ? 1 : total);
+}
+
 class ScanUnavailable implements Exception {
   const ScanUnavailable();
 }
@@ -102,6 +183,10 @@ abstract class Platform {
   Future<ServerConfig?> loadServer();
   Future<void> saveServer(ServerConfig? config);
 
+  /// The server this phone sends to with a PIN, apart from the one it may be signed in to.
+  Future<ServerConfig?> loadPinServer();
+  Future<void> savePinServer(ServerConfig? config);
+
   /// The current route; with [check], the local address is probed again first.
   Future<RouteStatus> route({bool check = false});
   Stream<RouteStatus> get routes;
@@ -118,6 +203,9 @@ abstract class Platform {
 
   Future<void> openUrl(String url);
 
+  /// Hands text to another app (a messenger, mail), e.g. an invite link.
+  Future<void> shareText(String text);
+
   /// Starts saving files to the phone and returns the batch id.
   Future<String> download(List<FileInfo> files);
   Future<void> cancelDownloads(String batch);
@@ -132,6 +220,15 @@ abstract class Platform {
   Future<void> openFile(FileInfo file);
 
   Future<String> cacheDir();
+
+  /// Opens the picker and sends what was picked in the background; the batch, or null if
+  /// nothing was picked. Files that had to be picked again go on in their old batch.
+  Future<String?> pickAndSend(PickWhat what, {SendAuth auth = SendAuth.device});
+  Future<void> cancelUpload(String batch);
+
+  /// What waited for a new PIN or a sign-in goes on.
+  Future<void> resumeUploads(SendAuth auth);
+  Stream<UploadState> get uploads;
 }
 
 /// The real platform: MethodChannel com.eschgi.share/platform, and one event channel for
@@ -147,6 +244,10 @@ class ChannelPlatform implements Platform {
           if (e['url'] is String) _links.add(e['url'] as String);
         case 'transfer':
           _transfers.add(TransferState.fromMap(e));
+        case 'upload':
+          final u = UploadState.fromMap(e);
+          _lastUploads[u.batch] = u;
+          _uploads.add(u);
       }
     }, onError: (Object _) {});
   }
@@ -157,6 +258,8 @@ class ChannelPlatform implements Platform {
   final _routes = StreamController<RouteStatus>.broadcast();
   final _links = StreamController<String>.broadcast();
   final _transfers = StreamController<TransferState>.broadcast();
+  final _uploads = StreamController<UploadState>.broadcast();
+  final _lastUploads = <String, UploadState>{};
 
   Future<T?> _invoke<T>(String method, [Object? args]) async {
     try {
@@ -195,6 +298,17 @@ class ChannelPlatform implements Platform {
       _soft('server.save', {'json': config == null ? null : jsonEncode(config.toJson())});
 
   @override
+  Future<ServerConfig?> loadPinServer() async {
+    final raw = await _soft<String>('server.load', {'slot': 'pin'});
+    if (raw == null || raw.isEmpty) return null;
+    return ServerConfig.fromJson(jsonDecode(raw) as Json);
+  }
+
+  @override
+  Future<void> savePinServer(ServerConfig? config) =>
+      _soft('server.save', {'json': config == null ? null : jsonEncode(config.toJson()), 'slot': 'pin'});
+
+  @override
   Future<RouteStatus> route({bool check = false}) async {
     final m = await _soft<Map<Object?, Object?>>('route.get', {'check': check});
     return m == null ? RouteStatus.public : RouteStatus.fromMap(m);
@@ -226,6 +340,9 @@ class ChannelPlatform implements Platform {
 
   @override
   Future<void> openUrl(String url) => _soft('url.open', {'url': url});
+
+  @override
+  Future<void> shareText(String text) => _soft('text.share', {'text': text});
 
   @override
   Future<String> download(List<FileInfo> files) async =>
@@ -260,4 +377,24 @@ class ChannelPlatform implements Platform {
 
   @override
   Future<String> cacheDir() async => await _soft<String>('cache.dir') ?? '';
+
+  @override
+  Future<String?> pickAndSend(PickWhat what, {SendAuth auth = SendAuth.device}) =>
+      _invoke<String>('upload.pick', {'what': what.name, 'auth': auth.name});
+
+  @override
+  Future<void> cancelUpload(String batch) => _soft('upload.cancel', {'batch': batch});
+
+  @override
+  Future<void> resumeUploads(SendAuth auth) => _soft('upload.resume', {'auth': auth.name});
+
+  /// Starts with how each batch stood last: the send screen may open long after the change.
+  @override
+  Stream<UploadState> get uploads => Stream.multi((listener) {
+        for (final u in _lastUploads.values) {
+          listener.add(u);
+        }
+        final sub = _uploads.stream.listen(listener.add, onError: listener.addError);
+        listener.onCancel = sub.cancel;
+      });
 }

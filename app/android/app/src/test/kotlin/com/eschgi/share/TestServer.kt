@@ -19,8 +19,10 @@ import kotlin.concurrent.thread
  */
 class TestServer(tls: SSLContext? = null, private val handle: (Request, Response) -> Unit) : Closeable {
 
-    class Request(val method: String, val path: String, private val headers: Map<String, String>) {
+    class Request(val method: String, val path: String, private val headers: Map<String, String>, val body: InputStream) {
         fun header(name: String): String? = headers[name.lowercase()]
+
+        val contentLength: Long get() = header("Content-Length")?.toLongOrNull() ?: 0
     }
 
     class Response internal constructor(private val out: OutputStream) {
@@ -42,6 +44,8 @@ class TestServer(tls: SSLContext? = null, private val handle: (Request, Response
 
         private fun reason(status: Int) = when (status) {
             200 -> "OK"
+            201 -> "Created"
+            204 -> "No Content"
             206 -> "Partial Content"
             401 -> "Unauthorized"
             404 -> "Not Found"
@@ -77,7 +81,7 @@ class TestServer(tls: SSLContext? = null, private val handle: (Request, Response
                 val headers = lines.drop(1).filter { line -> ':' in line }
                     .associate { line -> line.substringBefore(':').trim().lowercase() to line.substringAfter(':').trim() }
                 val response = Response(it.getOutputStream())
-                handle(Request(method, path, headers), response)
+                handle(Request(method, path, headers, input), response)
                 if (!response.sent) response.send(500)
             } catch (e: IOException) {
                 // e.g. the client refused the certificate

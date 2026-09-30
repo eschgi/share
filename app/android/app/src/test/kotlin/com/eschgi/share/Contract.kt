@@ -1,5 +1,6 @@
 package com.eschgi.share
 
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
@@ -11,7 +12,19 @@ fun contract(name: String): JSONObject {
     return JSONObject(File(dir, "contract/$name").readText())
 }
 
-fun JSONObject.toMap(): Map<String, Any?> = keys().asSequence().associateWith { k -> get(k).takeIf { it != JSONObject.NULL } }.numbersAsLong()
+fun JSONObject.toMap(): Map<String, Any?> = plain(this) as Map<String, Any?>
 
 /** Ints and Longs compare equal: the channel's codec doesn't keep them apart either. */
-fun Map<String, Any?>.numbersAsLong(): Map<String, Any?> = mapValues { (_, v) -> if (v is Int) v.toLong() else v }
+@Suppress("UNCHECKED_CAST")
+fun Map<String, Any?>.numbersAsLong(): Map<String, Any?> = plain(this) as Map<String, Any?>
+
+/** JSON and Kotlin values as the same plain maps, lists and longs. */
+private fun plain(v: Any?): Any? = when (v) {
+    JSONObject.NULL, null -> null
+    is JSONObject -> v.keys().asSequence().associateWith { plain(v.get(it)) }
+    is JSONArray -> List(v.length()) { plain(v.get(it)) }
+    is Map<*, *> -> v.entries.associate { (k, x) -> k as String to plain(x) }
+    is List<*> -> v.map(::plain)
+    is Int -> v.toLong()
+    else -> v
+}

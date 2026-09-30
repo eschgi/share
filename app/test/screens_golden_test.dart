@@ -3,9 +3,12 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:share_app/data/models.dart';
 import 'package:share_app/data/platform.dart';
+import 'package:share_app/ui/settings_screen.dart';
 
 import 'app_test.dart' show daysAgo, inviteToken, signedInPhone, startApp, today;
+import 'support/contract.dart';
 import 'support/fake_platform.dart';
 import 'support/fake_server.dart';
 import 'support/fonts.dart';
@@ -85,9 +88,139 @@ void main() {
     await shot(tester, 'en/16-server');
   });
 
+  // The admin screens, with the mockups' people and PINs, at times that read the same every day.
+  FakeServer admin() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    String at(DateTime t) => t.toUtc().toIso8601String();
+    final server = FakeServer()..me = FakeServer.adminMe;
+    final users = [for (final u in server.people['users'] as List) (u as Map).cast<String, dynamic>()];
+    for (final u in users) {
+      for (final p in u['phones'] as List) {
+        (p as Map)['last_seen_at'] = at(now.subtract(const Duration(minutes: 5)));
+      }
+      u['last_seen_at'] = at(now.subtract(const Duration(minutes: 5)));
+    }
+    users.first['phones'] = [(users.first['phones'] as List).first];
+    users.add({
+      'id': 'u9ld5x2k7mbqz4bwdbyj6qsqxa', 'name': 'Peter', 'role': 'member', 'username': null, 'has_password': false, 'me': false,
+      'created_at': at(today), 'last_seen_at': at(now),
+      'phones': [
+        {'id': 'd9ld5x2k7mbqz4bwdbyj6qsqxa', 'name': 'Moto g', 'created_at': at(today), 'last_seen_at': at(now), 'this': false},
+      ],
+    });
+    server.people = {
+      'users': users,
+      'invites': [
+        {...((server.people['invites'] as List).first as Map).cast<String, dynamic>(), 'expires_at': at(today.add(const Duration(hours: 21)))},
+      ],
+    };
+    server.pins[0]['created_at'] = at(DateTime(now.year, 9, 12, 10));
+    server.pins[1]['expires_at'] = at(today.add(const Duration(hours: 23, minutes: 30)));
+    return server;
+  }
+
   testWidgets('settings', (tester) async {
-    await startApp(tester, signedInPhone()..current = const RouteStatus(ServerRoute.local, millis: 12), FakeServer());
+    await startApp(tester, signedInPhone()..current = const RouteStatus(ServerRoute.local, millis: 12), admin());
     await tester.tap(find.text('Settings').last);
     await shot(tester, 'en/17-settings');
+  });
+
+  testWidgets('upload PINs', (tester) async {
+    await startApp(tester, signedInPhone(), admin());
+    await tester.tap(find.text('Settings').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Upload PINs'));
+    await shot(tester, 'en/18-pins');
+    await tester.tap(find.text('New PIN'));
+    await shot(tester, 'en/19-new-pin');
+  });
+
+  testWidgets('invite someone', (tester) async {
+    await startApp(tester, signedInPhone(), admin());
+    await tester.tap(find.text('Settings').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Invite'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Oma Rosa');
+    await tester.pump();
+    await tester.tap(find.text('Show the QR code'));
+    await tester.pumpAndSettle();
+    FocusManager.instance.primaryFocus?.unfocus();
+    await shot(tester, 'en/20-invite');
+  });
+
+  testWidgets('deleting', (tester) async {
+    await startApp(tester, signedInPhone(), library()..me = FakeServer.adminMe);
+    await tester.longPress(find.byType(GestureDetector).at(8));
+    await tester.pumpAndSettle();
+    for (final i in [9, 10, 12, 13]) {
+      await tester.tap(find.byType(GestureDetector).at(i));
+      await tester.pump();
+    }
+    await tester.tap(find.bySemanticsLabel('Delete'));
+    await shot(tester, 'en/21-delete');
+  });
+
+  testWidgets('recently deleted', (tester) async {
+    final server = admin();
+    final now = DateTime.now().toUtc();
+    final example = ((contractResponse('api/trash.json')['files'] as List).first as Map).cast<String, dynamic>();
+    server.trash = [
+      for (final (i, name) in ['IMG_2041.jpg', 'IMG_2042.jpg', 'Car_insurance.pdf'].indexed)
+        {
+          ...example,
+          'id': 'abc'[i] * 26,
+          'name': name,
+          'kind': name.endsWith('.pdf') ? 'document' : 'photo',
+          'mime': name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg',
+          'has_thumb': false,
+          'deleted_at': now.subtract(Duration(days: i * 4)).toIso8601String(),
+          'purge_at': now.add(Duration(days: 30 - i * 4, hours: 1)).toIso8601String(),
+        },
+    ];
+    await startApp(tester, signedInPhone(), server);
+    await tester.tap(find.text('Settings').last);
+    await tester.pumpAndSettle();
+    final list = find.descendant(of: find.byType(SettingsScreen), matching: find.byType(Scrollable)).first;
+    await tester.scrollUntilVisible(find.text('Recently deleted'), 200, scrollable: list);
+    await tester.ensureVisible(find.text('Recently deleted'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Recently deleted'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('IMG_2042.jpg'));
+    await shot(tester, 'en/22-recently-deleted');
+  });
+
+  testWidgets('sending', (tester) async {
+    final platform = signedInPhone()..current = const RouteStatus(ServerRoute.local, millis: 12);
+    await startApp(tester, platform, FakeServer());
+    await tester.tap(find.text('Send').last);
+    await tester.pumpAndSettle();
+    platform.uploadEvents.add(const UploadState(
+      batch: 'up-1', auth: SendAuth.device, running: true, total: 40, done: 11,
+      bytesTotal: 180000000, bytesDone: 54000000, etaSeconds: 130, local: true,
+      items: [
+        UploadItemState(seq: 10, name: '20260930_094512.jpg', size: 3100000, kind: FileKind.photo, state: 'done', bytes: 3100000),
+        UploadItemState(seq: 11, name: '20260930_094530.mp4', size: 52000000, kind: FileKind.video, state: 'queued', bytes: 33280000),
+        UploadItemState(seq: 12, name: 'Kindergarten_form.pdf', size: 480000, kind: FileKind.document, state: 'queued'),
+        UploadItemState(seq: 13, name: '20260930_094602.jpg', size: 2800000, kind: FileKind.photo, state: 'queued'),
+      ],
+    ));
+    await shot(tester, 'en/15-send');
+  });
+
+  testWidgets('a PIN, without an account', (tester) async {
+    await startApp(tester, FakePlatform(), FakeServer());
+    await tester.tap(find.text('Send files'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'share.example.com');
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'K7M2');
+    await shot(tester, 'en/23-pin');
+    await tester.enterText(find.byType(TextField), 'K7M2Q');
+    await tester.tap(find.text('Unlock'));
+    await shot(tester, 'en/24-pin-send');
   });
 }

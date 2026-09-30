@@ -6,7 +6,11 @@ import com.eschgi.share.net.RouteReason
 import com.eschgi.share.net.RouteStatus
 import com.eschgi.share.transfer.BatchSnapshot
 import com.eschgi.share.transfer.FileRef
+import com.eschgi.share.transfer.Picked
 import com.eschgi.share.transfer.TransferItem
+import com.eschgi.share.transfer.UploadBatch
+import com.eschgi.share.transfer.UploadRow
+import com.eschgi.share.transfer.UploadSnapshot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -73,5 +77,31 @@ class PlatformContractTest {
         assertEquals(400, BatchSnapshot.of("b", true, false, listOf(item), mapOf("a" to 400L)).bytesDone)
         // Never more than the file, whatever a sink reports.
         assertEquals(1000, BatchSnapshot.of("b", true, false, listOf(item), mapOf("a" to 5000L)).bytesDone)
+    }
+
+    @Test
+    fun uploadEventIsWhatDartReads() {
+        val rows = fixture.getJSONArray("upload_rows")
+        val expected = fixture.getJSONObject("upload_event")
+        val batch = UploadBatch(expected.getString("batch"), UploadBatch.DEVICE, "active", null, 0)
+        val items = List(rows.length()) { i ->
+            val r = rows.getJSONObject(i)
+            val file = Picked("content://picked/$i", r.getString("name"), r.getLong("size"), r.getString("mime"))
+            UploadRow(batch.id, r.getInt("seq"), file, r.getString("state"), null, r.getLong("bytes"))
+        }
+        val snapshot = UploadSnapshot.of(batch, items, etaSeconds = 120, local = true)
+        assertEquals(expected.toMap(), snapshot.toMap().numbersAsLong())
+        val paused = fixture.getJSONArray("upload_paused")
+        assertEquals(listOf("pin_ended", "signed_out", "user"), List(paused.length()) { paused.getString(it) })
+    }
+
+    @Test
+    fun aPausedBatchSaysWhy() {
+        val batch = UploadBatch("b", UploadBatch.PIN, "paused", "pin_ended", 0)
+        val row = UploadRow("b", 0, Picked("content://x", "a.jpg", 10, "image/jpeg"), UploadRow.QUEUED, "u1", 4)
+        val s = UploadSnapshot.of(batch, listOf(row))
+        assertEquals(false, s.running)
+        assertEquals("pin_ended", s.paused)
+        assertEquals(4L, s.bytesDone)
     }
 }

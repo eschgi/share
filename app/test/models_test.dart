@@ -43,4 +43,34 @@ void main() {
     expect(f.size, 0);
     expect(f.kind, FileKind.document);
   });
+
+  test('the admin screens\' shapes', () {
+    final pins = [for (final p in contractResponse('api/pins.json')['pins'] as List) PinInfo.fromJson((p as Map).cast())];
+    expect(pins.map((p) => p.kind), [PinKind.permanent, PinKind.day]);
+    expect(pins.first.expiresAt, isNull);
+    expect(pins.last.expiresAt, isNotNull);
+    expect(pins.last.link, 'https://share.example.com/#4HX9T');
+    expect([pins.last.files, pins.last.phones], [45, 7]);
+
+    final people = People.fromJson(contractResponse('api/people.json'));
+    expect(people.users.first.isMe, isTrue);
+    expect(people.users.first.phones.single.isThis, isTrue);
+    expect(people.users.last.phones, hasLength(2));
+    expect(people.invites.single.userId, isNull);
+
+    final invite = NewInvite.fromJson(contractResponse('api/invite_create.json'));
+    expect(invite.link, endsWith('#shi_0123456789abcdefghijklmnopqrstuvwxyzABCDEFG'));
+    expect(invite.invite.role, Role.member);
+
+    final trash = Trash.fromJson(contractResponse('api/trash.json'));
+    expect(trash.days, 30);
+    expect(trash.files.single.file.name, 'IMG_2041.jpg');
+    expect(trash.files.single.deletedBy, 'Stefan');
+    expect(trash.files.single.purgeAt.difference(trash.files.single.deletedAt).inDays, 30);
+
+    final storage = StorageInfo.fromJson(contractResponse('api/storage.json'));
+    expect(storage.storageDir, '/mnt/usb/share');
+    expect(storage.freeBytes, lessThan(storage.totalBytes));
+    expect(storage.trashFiles, 12);
+  });
 }

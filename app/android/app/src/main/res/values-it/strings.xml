@@ -21,4 +21,27 @@
     <string name="downloads_where_media">Nella galleria, album “Share”</string>
     <string name="downloads_where_documents">In File › Download › Share</string>
     <string name="downloads_where_both">Nell’album “Share” e in Download › Share</string>
+
+    <string name="uploads_channel">Invio</string>
+    <string name="uploads_sending">Invio a Share in corso</string>
+    <plurals name="uploads_sent">
+        <item quantity="one">%d file inviato</item>
+        <item quantity="many">%d file inviati</item>
+        <item quantity="other">%d file inviati</item>
+    </plurals>
+    <plurals name="uploads_failed">
+        <item quantity="one">%d file non è stato inviato.</item>
+        <item quantity="many">%d file non sono stati inviati.</item>
+        <item quantity="other">%d file non sono stati inviati.</item>
+    </plurals>
+    <plurals name="uploads_lost">
+        <item quantity="one">%d file va scelto di nuovo.</item>
+        <item quantity="many">%d file vanno scelti di nuovo.</item>
+        <item quantity="other">%d file vanno scelti di nuovo.</item>
+    </plurals>
+    <string name="uploads_pin_ended">Il PIN è scaduto</string>
+    <string name="uploads_pin_ended_text">Apri Share e inserisci un nuovo PIN per continuare l\'invio.</string>
+    <string name="uploads_signed_out">Questo telefono è stato disconnesso</string>
+    <string name="uploads_signed_out_text">Accedi di nuovo per continuare l\'invio.</string>
+    <string name="uploads_waiting">In attesa di una connessione per continuare l\'invio</string>
 </resources>

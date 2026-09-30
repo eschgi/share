@@ -21,6 +21,12 @@ class MainActivity : FlutterActivity() {
         platform?.onIntent(intent, initial = false)
     }
 
+    // The pickers of the send screen answer here.
+    @Deprecated("Flutter's embedding still uses it")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (platform?.onActivityResult(requestCode, resultCode, data) != true) super.onActivityResult(requestCode, resultCode, data)
+    }
+
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         platform?.onRequestPermissionsResult(requestCode)
@@ -35,5 +41,6 @@ class MainActivity : FlutterActivity() {
     companion object {
         /** From the downloads' notification: the app opens and starts them again. */
         const val ACTION_RETRY_DOWNLOADS = "com.eschgi.share.RETRY_DOWNLOADS"
+        const val ACTION_RETRY_UPLOADS = "com.eschgi.share.RETRY_UPLOADS"
     }
 }

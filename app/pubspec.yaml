@@ -19,10 +19,12 @@ dependencies:
   # clock  - makes time controllable in tests (fake_async installs it).
   # crypto - the SHA-256 of the local certificate, inside the synchronous TLS callback.
   # intl   - dates, numbers and plurals in three languages.
+  # qr     - the QR codes of invites and PINs, drawn by our own painter.
   http: ^1.6.0
   clock: ^1.1.2
   crypto: ^3.0.6
   intl: any
+  qr: ^4.0.0
 
 dev_dependencies:
   flutter_test:
