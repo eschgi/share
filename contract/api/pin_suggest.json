@@ -1,0 +1,10 @@
+{
+  "method": "GET",
+  "path": "/api/pins/suggest",
+  "auth": "admin",
+  "status": 200,
+  "response": {
+    "code": "R8D4W"
+  },
+  "notes": "A random code that no PIN has had yet, for the new-PIN screen. It isn't reserved."
+}

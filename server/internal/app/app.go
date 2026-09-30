@@ -109,6 +109,7 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 		return nil, err
 	}
 	th := &thumbs.Store{DB: d, Dir: layout.ThumbsDir(), Root: lib.Root(), Now: now, Logf: log.Printf}
+	lib.OnPurged = th.Remove
 	ui := webui.New(cfg)
 	if !ui.Built() {
 		log.Printf("webui: the website isn't built into this binary; serving a placeholder")
@@ -164,6 +165,13 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 				return err
 			}
 			_, err := d.DeleteOldInvites(ctx, now().Add(-30*24*time.Hour))
+			return err
+		}},
+		{Name: "empty the trash", Every: 24 * time.Hour, Run: func(ctx context.Context) error {
+			n, err := lib.PurgeOld(ctx, cfg.TrashDays)
+			if n > 0 {
+				log.Printf("storage: removed %d files deleted more than %d days ago", n, cfg.TrashDays)
+			}
 			return err
 		}},
 	}}

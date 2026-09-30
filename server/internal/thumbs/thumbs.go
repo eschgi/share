@@ -218,6 +218,14 @@ func (s *Store) retry(id string) bool {
 	return false
 }
 
+// Remove deletes a file's thumbnail, when the file is gone for good.
+func (s *Store) Remove(id string) {
+	if err := os.Remove(s.Path(id)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		s.Logf("thumbs: removing %s: %v", id, err)
+	}
+	s.forget(id)
+}
+
 func (s *Store) forget(id string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -1,0 +1,17 @@
+{
+  "method": "POST",
+  "path": "/api/pins/p3ld5x2k7mbqz4bwdbyj6qsqxa/new-code",
+  "auth": "admin",
+  "status": 200,
+  "response": {
+    "id": "p6ld5x2k7mbqz4bwdbyj6qsqxa",
+    "code": "M9CQ3",
+    "kind": "permanent",
+    "created_at": "2026-09-30T08:05:00Z",
+    "expires_at": null,
+    "link": "https://share.example.com/#M9CQ3",
+    "files": 0,
+    "phones": 0
+  },
+  "notes": "Replaces a PIN's code: the old PIN ends (its links and sessions stop working) and a new one of the same kind takes its place. Also: POST /api/pins/{id}/end (204) ends a PIN now. Both: not_found (404) for a PIN that has ended."
+}

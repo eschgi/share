@@ -27,6 +27,8 @@ type Library struct {
 	Logf   func(string, ...any)
 	// OnReady is called after a file reaches the library (the thumbnail worker listens).
 	OnReady func(id string)
+	// OnPurged is called after a file is removed for good (its thumbnail goes too).
+	OnPurged func(id string)
 
 	root *os.Root // the storage folder; every library path is opened through it
 	mu   sync.Mutex
@@ -210,7 +212,8 @@ func (lib *Library) Terminate(ctx context.Context, id string) error {
 //   - uploads stuck halfway through finalizing are finished;
 //   - receiving uploads whose bytes are all there are finalized (the response was lost);
 //   - receiving uploads idle for longer than ttl are dropped;
-//   - files in .uploads without a row, and rows without files, are removed after an hour.
+//   - files in .uploads without a row, and rows without files, are removed after an hour;
+//   - a trash, restore or purge that was cut short is finished.
 func (lib *Library) Reconcile(ctx context.Context, ttl time.Duration) error {
 	now := lib.Now()
 	rows, err := lib.DB.FilesInStates(ctx, db.StateFinalizing, db.StateReceiving)
@@ -241,7 +244,10 @@ func (lib *Library) Reconcile(ctx context.Context, ttl time.Duration) error {
 			}
 		}
 	}
-	return lib.removeOrphans(ctx, now)
+	if err := lib.removeOrphans(ctx, now); err != nil {
+		return err
+	}
+	return lib.reconcileTrash(ctx)
 }
 
 func (lib *Library) removeOrphans(ctx context.Context, now time.Time) error {

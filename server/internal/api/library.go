@@ -222,7 +222,14 @@ func (a *API) fileIDs(w http.ResponseWriter, r *http.Request) {
 // readyFile finds a file in the library for a signed-in phone, answering the request if it
 // can't.
 func (a *API) readyFile(w http.ResponseWriter, r *http.Request) (db.File, bool) {
-	if _, ok := a.device(w, r); !ok {
+	return a.libraryFile(w, r, false)
+}
+
+// libraryFile loads the file a request is about. With trash, admins also get deleted files:
+// Recently deleted shows their thumbnails.
+func (a *API) libraryFile(w http.ResponseWriter, r *http.Request, trash bool) (db.File, bool) {
+	p, ok := a.device(w, r)
+	if !ok {
 		return db.File{}, false
 	}
 	id := r.PathValue("id")
@@ -231,7 +238,8 @@ func (a *API) readyFile(w http.ResponseWriter, r *http.Request) (db.File, bool) 
 		return db.File{}, false
 	}
 	f, err := a.Auth.DB.FileByID(r.Context(), id)
-	if errors.Is(err, db.ErrNotFound) || (err == nil && f.State != db.StateReady) {
+	visible := f.State == db.StateReady || (trash && f.State == db.StateTrashed && p.Role == db.RoleAdmin)
+	if errors.Is(err, db.ErrNotFound) || (err == nil && !visible) {
 		httpx.WriteError(w, http.StatusNotFound, "not_found", "No such file.")
 		return f, false
 	}
@@ -291,7 +299,7 @@ func (a *API) content(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) thumb(w http.ResponseWriter, r *http.Request) {
-	f, ok := a.readyFile(w, r)
+	f, ok := a.libraryFile(w, r, true)
 	if !ok {
 		return
 	}

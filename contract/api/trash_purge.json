@@ -1,0 +1,16 @@
+{
+  "method": "POST",
+  "path": "/api/trash/purge",
+  "auth": "admin",
+  "request": {
+    "ids": [
+      "q3ld5x2k7mbqz4bwdbyj6qsqxa",
+      "q4ld5x2k7mbqz4bwdbyj6qsqxa"
+    ]
+  },
+  "status": 200,
+  "response": {
+    "changed": 2
+  },
+  "notes": "Removes deleted files for good, before their time is up. changed counts the files that were in the trash. At most 1000 ids per request (bad_request); send more in parts."
+}

@@ -1,0 +1,16 @@
+{
+  "method": "POST",
+  "path": "/api/files/delete",
+  "auth": "admin",
+  "request": {
+    "ids": [
+      "q3ld5x2k7mbqz4bwdbyj6qsqxa",
+      "q4ld5x2k7mbqz4bwdbyj6qsqxa"
+    ]
+  },
+  "status": 200,
+  "response": {
+    "changed": 2
+  },
+  "notes": "Moves files from the library to Recently deleted. They are gone for everyone and come back with /api/trash/restore. changed counts the files that were in the library. At most 1000 ids per request (bad_request); send more in parts."
+}

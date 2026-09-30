@@ -61,6 +61,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/files/{id}/content", a.content)
 	mux.HandleFunc("GET /api/files/{id}/thumb", a.thumb)
 	mux.HandleFunc("PUT /api/files/{id}/thumb", a.putThumb)
+	a.registerAdmin(mux)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusNotFound, "not_found", "No such API endpoint.")
 	})

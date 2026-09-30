@@ -1,0 +1,30 @@
+{
+  "method": "GET",
+  "path": "/api/trash",
+  "auth": "admin",
+  "status": 200,
+  "response": {
+    "files": [
+      {
+        "id": "q3ld5x2k7mbqz4bwdbyj6qsqxa",
+        "name": "IMG_2041.jpg",
+        "size": 3145728,
+        "mime": "image/jpeg",
+        "kind": "photo",
+        "day": "2026-09-27",
+        "uploaded_at": "2026-09-27T09:45:12Z",
+        "updated_at": "2026-09-30T08:10:00Z",
+        "width": 4032,
+        "height": 3024,
+        "duration_ms": null,
+        "has_thumb": true,
+        "from": null,
+        "deleted_at": "2026-09-30T08:10:00Z",
+        "deleted_by": "Stefan",
+        "purge_at": "2026-10-30T08:10:00Z"
+      }
+    ],
+    "trash_days": 30
+  },
+  "notes": "Recently deleted, the most recently deleted first: the file as in /api/files, plus when and by whom it was deleted (null if that admin is gone) and when it goes for good. Admins can still fetch the thumbnails of deleted files."
+}

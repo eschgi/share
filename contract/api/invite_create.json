@@ -1,0 +1,23 @@
+{
+  "method": "POST",
+  "path": "/api/invites",
+  "auth": "admin",
+  "request": {
+    "name": "Oma Rosa",
+    "role": "member"
+  },
+  "status": 201,
+  "response": {
+    "token": "shi_0123456789abcdefghijklmnopqrstuvwxyzABCDEFG",
+    "link": "https://share.example.com/join#shi_0123456789abcdefghijklmnopqrstuvwxyzABCDEFG",
+    "invite": {
+      "id": "i2ld5x2k7mbqz4bwdbyj6qsqxa",
+      "name": "Oma Rosa",
+      "role": "member",
+      "user_id": null,
+      "created_at": "2026-09-30T08:06:00Z",
+      "expires_at": "2026-10-01T08:06:00Z"
+    }
+  },
+  "notes": "An invite for a new person; it works once, for 24 hours. The token and link are shown only in this answer: the server keeps a hash. The link is for the QR code and for sending. POST /api/users/{id}/invites (no body) makes one that adds a phone for someone with an account, with their name and role. Errors: bad_request (400) for a missing name or an unknown role, not_found (404)."
+}

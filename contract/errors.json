@@ -19,6 +19,7 @@
     "method_not_allowed":     {"status": 405, "meaning": "Wrong HTTP method."},
     "last_admin":             {"status": 409, "meaning": "The change would leave nobody who can manage the server."},
     "offset_mismatch":        {"status": 409, "meaning": "tus: the upload is at a different offset; HEAD and continue from there."},
+    "pin_taken":              {"status": 409, "meaning": "A PIN had this code before; codes are never used twice. Pick another one."},
     "username_taken":         {"status": 409, "meaning": "Someone else has that username."},
     "invite_expired":         {"status": 410, "meaning": "The invite has expired."},
     "invite_revoked":         {"status": 410, "meaning": "The invite was withdrawn, or the person it was for was removed."},
