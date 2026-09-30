@@ -47,3 +47,33 @@ describe('screen flow', () => {
     expect(s).toMatchObject({ screen: 'sending', waitingForPin: false });
   });
 });
+
+describe('an upload that came back after the page closed', () => {
+  it('shows screen 5, whether the restore or the session check finishes first', () => {
+    expect(run({ type: 'restored' }, { type: 'booted', session, sessionEnded: false }).screen).toBe('welcome');
+    expect(run({ type: 'booted', session, sessionEnded: false }, { type: 'restored' }).screen).toBe('welcome');
+  });
+
+  it('asks for a new PIN first when the old one has ended', () => {
+    let s = run({ type: 'restored' }, { type: 'booted', session: null, sessionEnded: true });
+    expect(s).toMatchObject({ screen: 'pin', problem: { kind: 'sessionEnded' } });
+    s = reduce(s, { type: 'unlocked', session });
+    expect(s.screen).toBe('welcome');
+  });
+
+  it('continues on the sending screen, or starts over on the ready screen', () => {
+    const s = run({ type: 'booted', session, sessionEnded: false }, { type: 'restored' });
+    expect(reduce(s, { type: 'continued' })).toMatchObject({ screen: 'sending', restored: false });
+    expect(reduce(s, { type: 'startedOver' })).toMatchObject({ screen: 'ready', restored: false });
+  });
+
+  it('stays on screen 5 while files are picked again there', () => {
+    const s = run({ type: 'booted', session, sessionEnded: false }, { type: 'restored' }, { type: 'filesAdded' });
+    expect(s.screen).toBe('welcome');
+  });
+
+  it('changes nothing once sending runs', () => {
+    const s = run({ type: 'booted', session, sessionEnded: false }, { type: 'filesAdded' }, { type: 'restored' });
+    expect(s).toMatchObject({ screen: 'sending', restored: false });
+  });
+});

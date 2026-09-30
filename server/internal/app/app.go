@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/eschgi/share/server/internal/api"
@@ -17,6 +18,7 @@ import (
 	"github.com/eschgi/share/server/internal/db"
 	"github.com/eschgi/share/server/internal/jobs"
 	"github.com/eschgi/share/server/internal/storage"
+	"github.com/eschgi/share/server/internal/thumbs"
 	"github.com/eschgi/share/server/internal/upload"
 	"github.com/eschgi/share/server/internal/webui"
 )
@@ -35,6 +37,7 @@ type App struct {
 	Lib     *storage.Library
 	Auth    *auth.Service
 	Upload  *upload.Handler
+	Thumbs  *thumbs.Store
 	UI      *webui.UI
 	Handler http.Handler
 
@@ -99,6 +102,7 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 		d.Close()
 		return nil, err
 	}
+	th := &thumbs.Store{DB: d, Dir: layout.ThumbsDir(), Root: lib.Root(), Now: now, Logf: log.Printf}
 	ui := webui.New(cfg)
 	if !ui.Built() {
 		log.Printf("webui: the website isn't built into this binary; serving a placeholder")
@@ -106,11 +110,11 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 
 	mux := http.NewServeMux()
 	mux.Handle(upload.BasePath, up)
-	(&api.API{Cfg: cfg, Auth: authSvc, ServerID: serverID, MaxFileSize: maxFile, Now: now}).Register(mux)
+	(&api.API{Cfg: cfg, Auth: authSvc, ServerID: serverID, MaxFileSize: maxFile, Thumbs: th, Now: now}).Register(mux)
 	mux.Handle("/", ui)
 
 	a := &App{
-		Cfg: cfg, DB: d, Lib: lib, Auth: authSvc, Upload: up, UI: ui,
+		Cfg: cfg, DB: d, Lib: lib, Auth: authSvc, Upload: up, Thumbs: th, UI: ui,
 		// Browsers may only change state from this site itself; the app sends no Origin.
 		Handler: http.NewCrossOriginProtection().Handler(mux),
 		now:     now,
@@ -150,9 +154,16 @@ func (a *App) Serve(ctx context.Context) error {
 		IdleTimeout:       120 * time.Second,
 		MaxHeaderBytes:    64 << 10,
 	}
+	// The background jobs stop with the server, and Serve waits for them, so none of them is
+	// still using the database when the caller closes it.
 	jobsCtx, stopJobs := context.WithCancel(ctx)
-	defer stopJobs()
-	go a.sched.Run(jobsCtx)
+	var workers sync.WaitGroup
+	defer func() {
+		stopJobs()
+		workers.Wait()
+	}()
+	workers.Go(func() { a.sched.Run(jobsCtx) })
+	workers.Go(func() { a.Thumbs.Run(jobsCtx) })
 
 	errCh := make(chan error, 1)
 	go func() {

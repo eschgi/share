@@ -7,8 +7,9 @@ import { DoneScreen } from './screens/DoneScreen';
 import { PinScreen } from './screens/PinScreen';
 import { ReadyScreen } from './screens/ReadyScreen';
 import { SendingScreen } from './screens/SendingScreen';
+import { WelcomeScreen } from './screens/WelcomeScreen';
 import { initialState, reduce, type PinProblem } from './state';
-import { Uploader } from './uploader';
+import { Uploader, holdQueueLock } from './uploader';
 
 function problemOf(e: unknown): PinProblem {
   if (e instanceof ApiError) {
@@ -73,7 +74,7 @@ export function App() {
     if (location.hash) history.replaceState(null, '', location.pathname + location.search);
     (async () => {
       try {
-        const i = await getInfo();
+        const [i, keepQueue] = await Promise.all([getInfo(), holdQueueLock()]);
         setInfo(i);
         setLang(pickLanguage(i.languages, storedLanguage(), navigator.languages, i.default_language));
         uploader.current = new Uploader(i, {
@@ -81,7 +82,8 @@ export function App() {
           onAllDone: (files, bytes) => dispatch({ type: 'allDone', files, bytes }),
           onSessionEnded: () => dispatch({ type: 'sessionEnded' }),
           onRejected: (name) => setRejected((r) => (r.includes(name) ? r : [...r, name])),
-        });
+          onRestored: () => dispatch({ type: 'restored' }),
+        }, keepQueue);
         if (hashPin) {
           await doUnlock(hashPin);
           return;
@@ -109,6 +111,10 @@ export function App() {
     uploader.current?.add(files);
     dispatch({ type: 'filesAdded' });
   };
+  const onSkipGhosts = () => {
+    uploader.current?.skipGhosts();
+    if (uploader.current?.snapshot().total === 0) dispatch({ type: 'startedOver' }); // nothing left
+  };
 
   let screen;
   switch (state.screen) {
@@ -126,6 +132,24 @@ export function App() {
     case 'ready':
       screen = <ReadyScreen name={name} session={state.session!} onFiles={onFiles} />;
       break;
+    case 'welcome':
+      screen = (
+        <WelcomeScreen
+          name={name}
+          snapshot={uploader.current!.snapshot()}
+          onFiles={onFiles}
+          onSkipGhosts={onSkipGhosts}
+          onContinue={() => {
+            uploader.current?.continue();
+            dispatch({ type: 'continued' });
+          }}
+          onStartOver={() => {
+            uploader.current?.startOver();
+            dispatch({ type: 'startedOver' });
+          }}
+        />
+      );
+      break;
     case 'sending':
       screen = (
         <SendingScreen
@@ -134,6 +158,7 @@ export function App() {
           online={online}
           rejected={rejected}
           onFiles={onFiles}
+          onSkipGhosts={onSkipGhosts}
           onRetry={() => uploader.current?.retryFailed()}
         />
       );
@@ -144,6 +169,7 @@ export function App() {
           name={name}
           files={state.done!.files}
           bytes={state.done!.bytes}
+          offerInstall={state.session?.pin_kind === 'permanent'}
           onMore={() => {
             uploader.current?.clear();
             dispatch({ type: 'sendMore' });

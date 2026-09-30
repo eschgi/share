@@ -1,7 +1,9 @@
 import { useEffect, useRef } from 'preact/hooks';
 import { Bold, Note, Tile } from '../components/Bits';
 import { Brand } from '../components/Brand';
+import { GhostCard } from '../components/GhostCard';
 import { Icon } from '../components/Icon';
+import { useOnWifi, useWakeLock } from '../device';
 import { RateMeter, formatBytes, formatCount, formatETA } from '../format';
 import { useI18n } from '../i18n';
 import type { Snapshot } from '../uploader';
@@ -13,14 +15,17 @@ interface Props {
   online: boolean;
   rejected: string[];
   onFiles: (f: File[]) => void;
+  onSkipGhosts: () => void;
   onRetry: () => void;
 }
 
 /** Screen 4: progress in files and bytes, and every file as a tile. */
-export function SendingScreen({ name, snapshot: s, online, rejected, onFiles, onRetry }: Props) {
+export function SendingScreen({ name, snapshot: s, online, rejected, onFiles, onSkipGhosts, onRetry }: Props) {
   const { t, tn, lang } = useI18n();
   const meter = useRef(new RateMeter());
   useEffect(() => meter.current.add(Date.now(), s.bytesDone), [s.bytesDone]);
+  const wifi = useOnWifi();
+  useWakeLock(s.done + s.failed + s.ghosts.length < s.total);
 
   const pct = s.bytesTotal > 0 ? (s.bytesDone / s.bytesTotal) * 100 : 0;
   const eta = online ? meter.current.eta(s.bytesTotal - s.bytesDone) : null;
@@ -38,6 +43,7 @@ export function SendingScreen({ name, snapshot: s, online, rejected, onFiles, on
       </div>
       <div class="bytes">
         <span>{t('sending.bytes', { done: formatBytes(s.bytesDone, lang), total: formatBytes(s.bytesTotal, lang) })}</span>
+        {wifi && online && <span>{t('sending.onWifi')}</span>}
       </div>
       {online ? (
         <Note icon="smartphone">
@@ -55,6 +61,7 @@ export function SendingScreen({ name, snapshot: s, online, rejected, onFiles, on
           </button>
         </div>
       )}
+      {s.ghosts.length > 0 && <GhostCard ghosts={s.ghosts} onFiles={onFiles} onSkip={onSkipGhosts} />}
       {rejected.map((n) => (
         <p key={n} class="help err">
           <Icon name="alert" />

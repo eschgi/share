@@ -1,11 +1,22 @@
 import { Brand } from '../components/Brand';
 import { Icon } from '../components/Icon';
+import { useInstall } from '../device';
 import { formatBytes, formatCount } from '../format';
 import { useI18n } from '../i18n';
 
+interface Props {
+  name: string;
+  files: number;
+  bytes: number;
+  /** Offer to install the site as an app: only with a permanent PIN, which lasts. */
+  offerInstall: boolean;
+  onMore: () => void;
+}
+
 /** Screen 6: a clear end, with totals. */
-export function DoneScreen({ name, files, bytes, onMore }: { name: string; files: number; bytes: number; onMore: () => void }) {
+export function DoneScreen({ name, files, bytes, offerInstall, onMore }: Props) {
   const { t, tn, lang } = useI18n();
+  const install = useInstall();
   return (
     <main class="screen">
       <Brand name={name} />
@@ -24,6 +35,20 @@ export function DoneScreen({ name, files, bytes, onMore }: { name: string; files
           <span>{t('done.total')}</span>
         </div>
       </div>
+      {offerInstall && install && (
+        <div class="install">
+          <div class="appico">
+            <Icon name="images" />
+          </div>
+          <div class="it">
+            <b>{t('install.title', { name })}</b>
+            <span>{t('install.lead')}</span>
+            <button type="button" class="btn tonal xs" onClick={() => void install()}>
+              {t('install.button')}
+            </button>
+          </div>
+        </div>
+      )}
       <div class="grow" />
       <button type="button" class="btn primary" onClick={onMore}>
         {t('done.more')}

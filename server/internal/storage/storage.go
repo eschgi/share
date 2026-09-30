@@ -36,6 +36,9 @@ func (l Layout) DBPath() string { return filepath.Join(l.DataDir, "share.db") }
 // BackupDir holds database copies taken before migrations.
 func (l Layout) BackupDir() string { return filepath.Join(l.DataDir, "backups") }
 
+// ThumbsDir holds one small JPEG per file that has a thumbnail, as ab/<id>.jpg.
+func (l Layout) ThumbsDir() string { return filepath.Join(l.DataDir, "thumbs") }
+
 // FSInfo describes the drive a folder is on.
 type FSInfo struct {
 	Type   string

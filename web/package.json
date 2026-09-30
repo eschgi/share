@@ -5,8 +5,8 @@
   "description": "The Share website: sending files with a PIN. Built into the Go server.",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/clean-dist.mjs && vite build",
-    "typecheck": "tsc --noEmit",
+    "build": "node scripts/clean-dist.mjs && vite build && vite build -c vite.sw.config.ts",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.sw.json",
     "test": "vitest run"
   },
   "dependencies": {
@@ -14,6 +14,7 @@
     "@fontsource/roboto": "^5.3.0",
     "@fontsource/roboto-mono": "^5.3.0",
     "@uppy/core": "^6.2.0",
+    "@uppy/golden-retriever": "^6.0.0",
     "@uppy/tus": "^6.0.0",
     "preact": "^10.29.8"
   },

@@ -1,0 +1,12 @@
+{
+  "method": "PUT",
+  "path": "/api/files/q3ld5x2k7mbqz4bwdbyj6qsqxa/thumb?width=4032&height=3024&duration_ms=0",
+  "auth": "pin",
+  "request": {
+    "content_type": "image/jpeg",
+    "body": "a JPEG of at most 1024×1024 pixels and 512 KiB; 512 pixels on the long side is plenty"
+  },
+  "status": 204,
+  "response": null,
+  "notes": "For the uploader, within 24 hours of the upload, or an admin. width, height (pixels) and duration_ms describe the original file; each is optional. Replaces any thumbnail the file has. Photos that get none within 2 minutes get one from the server, if it can read them (JPEG, PNG, GIF). Errors: bad_thumbnail, bad_request, forbidden (too late), not_found (no such file in the library, or not the caller's), too_large, unsupported_media_type."
+}

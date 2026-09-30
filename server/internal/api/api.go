@@ -4,13 +4,17 @@ package api
 
 import (
 	"errors"
+	"io"
 	"log"
+	"mime"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/eschgi/share/server/internal/auth"
 	"github.com/eschgi/share/server/internal/config"
 	"github.com/eschgi/share/server/internal/httpx"
+	"github.com/eschgi/share/server/internal/thumbs"
 )
 
 // Version is the API version, sent in /api/info so apps can tell what the server speaks.
@@ -22,6 +26,7 @@ type API struct {
 	Auth        *auth.Service
 	ServerID    string
 	MaxFileSize int64 // the effective limit: config and drive together; 0 = none
+	Thumbs      *thumbs.Store
 	Now         func() time.Time
 }
 
@@ -31,6 +36,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/pin/unlock", a.unlock)
 	mux.HandleFunc("GET /api/session", a.session)
 	mux.HandleFunc("POST /api/session/end", a.endSession)
+	mux.HandleFunc("PUT /api/files/{id}/thumb", a.putThumb)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusNotFound, "not_found", "No such API endpoint.")
 	})
@@ -155,4 +161,69 @@ func (a *API) endSession(w http.ResponseWriter, r *http.Request) {
 	}
 	auth.ClearSessionCookie(w)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// putThumb stores the thumbnail the uploader made of a file it just sent. The query may say
+// what the uploader measured on the original: width, height (pixels) and duration_ms.
+func (a *API) putThumb(w http.ResponseWriter, r *http.Request) {
+	p, err := a.Auth.Authenticate(r.Context(), r)
+	if err != nil {
+		httpx.WriteAuthError(w, err)
+		return
+	}
+	if mt, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); mt != "image/jpeg" {
+		httpx.WriteError(w, http.StatusUnsupportedMediaType, "unsupported_media_type", "Send the thumbnail as image/jpeg.")
+		return
+	}
+	var m thumbs.Meta
+	q := r.URL.Query()
+	for _, f := range []struct {
+		name string
+		max  int64
+		dst  **int64
+	}{
+		{"width", 1 << 20, &m.Width},
+		{"height", 1 << 20, &m.Height},
+		{"duration_ms", 1 << 40, &m.DurationMS},
+	} {
+		v := q.Get(f.name)
+		if v == "" {
+			continue
+		}
+		n, err := strconv.ParseInt(v, 10, 64)
+		if err != nil || n < 0 || n > f.max {
+			httpx.WriteError(w, http.StatusBadRequest, "bad_request", f.name+" must be a whole number, 0 or more.")
+			return
+		}
+		*f.dst = &n
+	}
+	id := r.PathValue("id")
+	// Who may send it is clear before the picture is read.
+	err = a.Thumbs.CanSend(r.Context(), p, id)
+	if err == nil {
+		var data []byte
+		data, err = io.ReadAll(http.MaxBytesReader(w, r.Body, thumbs.MaxBytes))
+		if tooBig := (*http.MaxBytesError)(nil); errors.As(err, &tooBig) {
+			httpx.WriteError(w, http.StatusRequestEntityTooLarge, "too_large", "A thumbnail can be at most 512 KiB.")
+			return
+		}
+		if err != nil {
+			httpx.WriteError(w, http.StatusBadRequest, "bad_request", "The thumbnail didn't arrive in full.")
+			return
+		}
+		err = a.Thumbs.PutSent(r.Context(), p, id, data, m)
+	}
+	switch {
+	case err == nil:
+		w.WriteHeader(http.StatusNoContent)
+	case errors.Is(err, thumbs.ErrNotFound):
+		httpx.WriteError(w, http.StatusNotFound, "not_found", "No such file.")
+	case errors.Is(err, thumbs.ErrTooLate):
+		httpx.WriteError(w, http.StatusForbidden, "forbidden", "Thumbnails can only be sent within a day of the upload.")
+	case errors.Is(err, thumbs.ErrInvalid):
+		httpx.WriteError(w, http.StatusBadRequest, "bad_thumbnail", "The thumbnail must be a JPEG of at most 1024×1024 pixels.")
+	default:
+		log.Printf("api: thumbnail: %v", err)
+		httpx.WriteError(w, http.StatusInternalServerError, "internal", "The thumbnail couldn't be stored.")
+	}
 }

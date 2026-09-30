@@ -77,7 +77,7 @@ const MaxJSONBody = 64 << 10
 func DecodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 	mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	if err != nil || mt != "application/json" {
-		WriteError(w, http.StatusUnsupportedMediaType, "bad_request", "Send the request body as application/json.")
+		WriteError(w, http.StatusUnsupportedMediaType, "unsupported_media_type", "Send the request body as application/json.")
 		return false
 	}
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, MaxJSONBody))

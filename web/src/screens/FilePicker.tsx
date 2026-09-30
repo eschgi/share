@@ -1,8 +1,17 @@
 import { useRef } from 'preact/hooks';
 import { Icon } from '../components/Icon';
 
-/** A button that opens the phone's picker for any number of files of any kind. */
-export function FilePicker({ label, primary, onFiles }: { label: string; primary?: boolean; onFiles: (files: File[]) => void }) {
+interface Props {
+  label: string;
+  /** The button's look: 'primary' (with a plus), 'outline', or e.g. 'tonal sm'. */
+  look?: string;
+  /** File types to offer first, e.g. "video/mp4"; any kind if empty. */
+  accept?: string;
+  onFiles: (files: File[]) => void;
+}
+
+/** A button that opens the phone's picker for any number of files. */
+export function FilePicker({ label, look = 'outline', accept, onFiles }: Props) {
   const input = useRef<HTMLInputElement>(null);
   return (
     <>
@@ -11,14 +20,15 @@ export function FilePicker({ label, primary, onFiles }: { label: string; primary
         type="file"
         multiple
         hidden
+        accept={accept || undefined}
         onChange={(e) => {
           const files = Array.from(e.currentTarget.files ?? []);
           e.currentTarget.value = ''; // the same files can be picked again later
           if (files.length) onFiles(files);
         }}
       />
-      <button type="button" class={`btn ${primary ? 'primary' : 'outline'}`} onClick={() => input.current?.click()}>
-        {primary && <Icon name="plus" />}
+      <button type="button" class={`btn ${look}`} onClick={() => input.current?.click()}>
+        {look === 'primary' && <Icon name="plus" />}
         {label}
       </button>
     </>

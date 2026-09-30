@@ -16,10 +16,10 @@ small Linux machine with a USB drive, or on a VPS. The website is embedded in it
 
 | Part | State |
 |------|-------|
-| Server: PINs, uploads, storage | works |
+| Server: PINs, uploads, storage, thumbnails | works |
 | Website: sending with a PIN (English, German, Italian) | works |
-| Website: continuing after the tab was closed, install as an app | next |
-| Android app: see and download, then send and manage | planned |
+| Website: continuing after the page was closed, install as an app | works |
+| Android app: see and download, then send and manage | next |
 
 The plan and the screens are in [`docs/`](docs/).
 

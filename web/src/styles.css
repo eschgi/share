@@ -637,3 +637,182 @@ button {
     animation: none;
   }
 }
+
+/* Screen 5: the upload that came back, and files to pick again. */
+.roundico.sm {
+  width: 56px;
+  height: 56px;
+  margin: 18px 0;
+}
+.roundico.sm .ic {
+  width: 26px;
+  height: 26px;
+}
+.btn.sm {
+  height: 46px;
+  border-radius: 14px;
+  font-size: 16px;
+}
+button.small {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-family: inherit;
+  align-self: center;
+  cursor: pointer;
+}
+.small.link {
+  color: var(--text-2);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.card {
+  background: var(--s1);
+  border: 1px solid var(--line-soft);
+  border-radius: 18px;
+  padding: 16px;
+  flex: none;
+}
+.card.prog {
+  margin-top: 18px;
+}
+.card .bar {
+  margin-top: 12px;
+  height: 8px;
+}
+.prow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 14px;
+  color: var(--text-2);
+}
+.prow b {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+.ghostcard {
+  background: var(--warn-soft);
+  border: 1.5px dashed rgba(233, 187, 104, 0.42);
+  border-radius: 18px;
+  padding: 16px;
+  margin-top: 12px;
+  flex: none;
+}
+.gh-t {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15.5px;
+  font-weight: 600;
+  color: var(--warn);
+}
+.gh-t .ic {
+  width: 19px;
+  height: 19px;
+  flex: none;
+}
+.ghostcard p {
+  margin: 6px 0 8px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-2);
+  text-wrap: pretty;
+}
+.ghrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+}
+.ghrow > div:last-child {
+  min-width: 0;
+}
+.ghthumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  border: 1.5px dashed var(--text-3);
+  display: grid;
+  place-items: center;
+  color: var(--text-3);
+  flex: none;
+}
+.ghthumb .ic {
+  width: 22px;
+  height: 22px;
+}
+.ghrow b {
+  display: block;
+  font-size: 14.5px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ghrow span {
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+.ghostcard .btn {
+  margin-top: 10px;
+}
+.ghostcard .small.link {
+  display: block;
+  margin: 12px auto 0;
+}
+.tile.ghost {
+  opacity: 0.45;
+  outline: 1.5px dashed var(--warn);
+  outline-offset: -1.5px;
+}
+
+/* Screen 6: installing the site as an app. */
+.install {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 18px;
+  background: var(--s1);
+  border: 1px solid var(--line-soft);
+  flex: none;
+}
+.appico {
+  width: 48px;
+  height: 48px;
+  border-radius: 13px;
+  background: var(--accent);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.appico .ic {
+  width: 26px;
+  height: 26px;
+}
+.install .it {
+  flex: 1;
+  min-width: 0;
+}
+.install .it b {
+  display: block;
+  font-size: 14.5px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.install .it span {
+  display: block;
+  margin-top: 2px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--text-3);
+  text-wrap: balance;
+}
+.install .btn {
+  margin: 10px 0 0;
+}

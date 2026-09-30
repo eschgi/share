@@ -23,7 +23,7 @@ export function ReadyScreen({ name, session, onFiles }: { name: string; session:
         </div>
       )}
       <div class="grow" />
-      <FilePicker label={t('ready.choose')} primary onFiles={onFiles} />
+      <FilePicker label={t('ready.choose')} look="primary" onFiles={onFiles} />
       <p class="small">{t(until ? 'ready.private' : 'ready.tip')}</p>
     </main>
   );

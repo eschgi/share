@@ -130,8 +130,43 @@ func (e *env) do(client *http.Client, method, path, token string, body io.Reader
 	}
 	defer res.Body.Close()
 	b, _ := io.ReadAll(res.Body)
-	return response{res.StatusCode, res.Header, b}
+	r := response{res.StatusCode, res.Header, b}
+	if code := r.errorCode(); code != "" {
+		if want, ok := errorStatuses(e.t)[code]; !ok {
+			e.t.Errorf("%s %s: error code %q is not in contract/errors.json", method, path, code)
+		} else if want != r.status {
+			e.t.Errorf("%s %s: %q came with status %d; contract/errors.json says %d", method, path, code, r.status, want)
+		}
+	}
+	return r
 }
+
+// errorStatuses maps every error code in contract/errors.json to its HTTP status.
+func errorStatuses(t *testing.T) map[string]int {
+	t.Helper()
+	errorStatusesOnce.Do(func() {
+		var v struct {
+			Codes map[string]struct{ Status int }
+		}
+		b, err := os.ReadFile(filepath.Join("..", "..", "..", "contract", "errors.json"))
+		if err == nil {
+			err = json.Unmarshal(b, &v)
+		}
+		if err != nil {
+			t.Fatalf("contract/errors.json: %v", err)
+		}
+		errorStatusesMap = make(map[string]int, len(v.Codes))
+		for code, c := range v.Codes {
+			errorStatusesMap[code] = c.Status
+		}
+	})
+	return errorStatusesMap
+}
+
+var (
+	errorStatusesOnce sync.Once
+	errorStatusesMap  map[string]int
+)
 
 func (e *env) postJSON(client *http.Client, path, token string, v any, headers map[string]string) response {
 	e.t.Helper()
