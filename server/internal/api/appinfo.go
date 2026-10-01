@@ -31,8 +31,8 @@ type APKInfo struct {
 }
 
 // APK is the app file from app.apk_file. Its size and hash are worked out once and again
-// whenever the file changes; the version comes from <apk_file>.json, which the build script
-// writes next to it.
+// whenever the file changes; the version comes from <apk_file>.json next to it, which CI
+// makes along with the APK (app/README.md).
 type APK struct {
 	Path string
 

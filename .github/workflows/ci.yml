@@ -1,8 +1,11 @@
 name: CI
 
+# Every push to main leaves the server for Linux and Windows, and the signed APK, as artifacts
+# for a day. A tag such as v0.1.0 also publishes them as a GitHub release.
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
 
 permissions:
@@ -31,7 +34,7 @@ jobs:
           name: webui-dist
           path: server/internal/webui/dist/
           include-hidden-files: true
-          retention-days: 7
+          retention-days: 1
 
   server:
     name: Server
@@ -42,6 +45,8 @@ jobs:
         working-directory: server
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the tags, for the version in the binaries
       - uses: actions/download-artifact@v8
         with:
           name: webui-dist
@@ -55,12 +60,21 @@ jobs:
       - name: Test (with the race detector and the 120 MiB upload)
         run: go test -race ./...
       - name: Build for the router, a VPS and Windows
+        # As scripts/build-linux.sh and scripts/build-windows.sh do, with the website from above.
         run: |
+          version=$(git describe --tags --always)
+          mkdir -p ../dist
           for arch in arm64 amd64; do
-            CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -ldflags "-s -w" -o /tmp/share-linux-$arch ./cmd/share
-            CGO_ENABLED=0 GOOS=windows GOARCH=$arch go build -trimpath -ldflags "-s -w" -o /tmp/share-windows-$arch.exe ./cmd/share
+            CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -ldflags "-s -w -X main.version=$version" -o ../dist/share-linux-$arch ./cmd/share
+            CGO_ENABLED=0 GOOS=windows GOARCH=$arch go build -trimpath -ldflags "-s -w -X main.version=$version" -o ../dist/share-windows-$arch.exe ./cmd/share
           done
-          ls -l /tmp/share-*
+          (cd ../dist && sha256sum share-* > SHA256SUMS)
+          ls -l ../dist
+      - uses: actions/upload-artifact@v7
+        with:
+          name: share-server
+          path: dist/
+          retention-days: 1
       - name: Known vulnerabilities
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
@@ -90,3 +104,75 @@ jobs:
           flutter build apk --config-only
           cd android
           ./gradlew --console=plain testDirectDebugUnitTest testPlayDebugUnitTest lintDirectDebug
+      # The APK the server hands out, signed with the release key from the repository's secrets
+      # (app/README.md says which). Only for pushes to this repository, never for pull requests.
+      - name: Release key
+        id: key
+        if: github.event_name == 'push'
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          elif [ "$GITHUB_REF_TYPE" = tag ]; then
+            echo "::error::A release needs the signed APK: add the ANDROID_* secrets (app/README.md)."
+            exit 1
+          else
+            echo "::notice::No APK: the ANDROID_* secrets for signing it aren't set (app/README.md)."
+          fi
+      - name: Signed APK for the server
+        if: steps.key.outputs.present == 'true'
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          printf '%s' "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/share-release.jks"
+          # key.properties is read as Java properties, where a backslash escapes.
+          esc() { printf '%s' "$1" | sed 's/\\/\\\\/g'; }
+          {
+            echo "storeFile=$RUNNER_TEMP/share-release.jks"
+            echo "storePassword=$(esc "$STORE_PASSWORD")"
+            echo "keyAlias=$(esc "$KEY_ALIAS")"
+            echo "keyPassword=$(esc "$KEY_PASSWORD")"
+          } > android/key.properties
+          flutter build apk --flavor direct --release
+          mkdir -p ../dist
+          cp build/app/outputs/flutter-apk/app-direct-release.apk ../dist/share.apk
+          # The server takes the version from share.apk.json next to the APK (pubspec: name+code).
+          version=$(sed -n 's/^version: *//p' pubspec.yaml)
+          printf '{"version_code": %s, "version_name": "%s"}\n' "${version#*+}" "${version%+*}" > ../dist/share.apk.json
+          cat ../dist/share.apk.json
+      - name: Forget the release key
+        if: always() && steps.key.outputs.present == 'true'
+        run: rm -f android/key.properties "$RUNNER_TEMP/share-release.jks"
+      - uses: actions/upload-artifact@v7
+        if: steps.key.outputs.present == 'true'
+        with:
+          name: share-apk
+          path: dist/
+          retention-days: 1
+
+  release:
+    name: Release
+    if: github.ref_type == 'tag'
+    needs: [server, app]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: share-*
+          path: dist
+          merge-multiple: true
+      - name: Publish
+        working-directory: dist
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha256sum share* > SHA256SUMS
+          # v0.2.0-rc1 and the like are marked as pre-releases.
+          case "$GITHUB_REF_NAME" in *-*) pre=--prerelease ;; *) pre= ;; esac
+          gh release create "$GITHUB_REF_NAME" ./* --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --generate-notes --verify-tag $pre

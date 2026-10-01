@@ -33,6 +33,36 @@ keyPassword=…
 
 Then `flutter build apk --flavor direct --release` makes
 `build/app/outputs/flutter-apk/app-direct-release.apk`, the file for the server's `app.apk_file`.
+Next to it, as `share.apk.json`, the server wants its version, the two parts of `version:` in
+`pubspec.yaml`: `{"version_code": 3, "version_name": "0.3.0"}`.
+
+### Signed by GitHub Actions
+
+CI builds the same APK with the same key, if the repository has these four secrets (Settings →
+Secrets and variables → Actions):
+
+| Secret | What it is |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | `share-release.jks`, base64-encoded |
+| `ANDROID_KEYSTORE_PASSWORD` | `storePassword` |
+| `ANDROID_KEY_ALIAS` | `keyAlias` |
+| `ANDROID_KEY_PASSWORD` | `keyPassword` |
+
+With the [GitHub CLI](https://cli.github.com), on Windows in PowerShell:
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\path\to\share-release.jks")) | gh secret set ANDROID_KEYSTORE_BASE64
+gh secret set ANDROID_KEYSTORE_PASSWORD   # each of these asks for the value
+gh secret set ANDROID_KEY_ALIAS
+gh secret set ANDROID_KEY_PASSWORD
+```
+
+On Linux or macOS the first line is `base64 < share-release.jks | gh secret set ANDROID_KEYSTORE_BASE64`.
+
+Every push to `main` then leaves `share.apk` and `share.apk.json` as the artifact `share-apk` for
+a day, and a version tag puts them in the release. The key is only used for pushes to this
+repository, never for pull requests. Without the secrets, pushes still pass without an APK, and a
+tag fails rather than making a release without it.
 
 ## Tests
 

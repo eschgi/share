@@ -145,10 +145,12 @@ phone on USB, run `adb reverse tcp:5173 tcp:5173` (`tcp:8080` for `share serve`)
 
 ## Running it
 
-1. `scripts/build-linux.sh` builds `dist/share-linux-arm64` and `dist/share-linux-amd64`;
-   `scripts/build-windows.sh` builds `dist/share-windows-amd64.exe` and
-   `dist/share-windows-arm64.exe`. On Windows, the PowerShell scripts `scripts\build-linux.ps1` and
-   `scripts\build-windows.ps1` do the same. Copy the one for the machine.
+1. Take the server for the machine from the [latest release](https://github.com/eschgi/share/releases/latest):
+   `share-linux-arm64` for the router, `share-linux-amd64` for a VPS, `share-windows-amd64.exe` or
+   `share-windows-arm64.exe` for a PC, checked against `SHA256SUMS`. Or build them:
+   `scripts/build-linux.sh` makes the Linux ones in `dist/`, `scripts/build-windows.sh` the Windows
+   ones, and on Windows the PowerShell scripts `scripts\build-linux.ps1` and
+   `scripts\build-windows.ps1` do the same.
 2. Write `config.json` from `config.example.json`, with at least `public_url` and `storage_dir`.
 3. With the drive mounted, run `share init` once. `share check` says whether the drive suits: ext4
    is best, FAT32 can't hold files over 4 GiB.
@@ -170,7 +172,8 @@ On Windows:
 certificate.
 
 People get the app from the invite page, which offers the APK set in `app.apk_file` and then hands
-the invite to the app. How to build the APK is in [`app/README.md`](app/README.md).
+the invite to the app. Each release has it as `share.apk`, with `share.apk.json` (its version) to put
+next to it. How to build the APK yourself is in [`app/README.md`](app/README.md).
 
 ## Configuration
 
@@ -185,8 +188,8 @@ For the app, two settings matter:
 - `local`: a second address on the home network, over HTTPS with a certificate the server makes
   itself (`share cert` shows it). The app trusts it only because it learned the certificate's
   fingerprint over the public address, and uses it whenever the phone can reach it.
-- `app.apk_file`: the APK the invite page offers for download. Without it, the page only offers
-  `app.play_store_url`, once there is one.
+- `app.apk_file`: the APK the invite page offers for download, with `share.apk.json` next to it for
+  its version. Without it, the page only offers `app.play_store_url`, once there is one.
 
 ## Repository
 
@@ -209,6 +212,15 @@ For the app, two settings matter:
 (cd app/android && ./gradlew testDirectDebugUnitTest testPlayDebugUnitTest)
 scripts/build-linux.sh                         # dist/share-linux-arm64, dist/share-linux-amd64
 scripts/build-windows.sh                       # dist/share-windows-{amd64,arm64}.exe
+```
+
+CI checks every push and pull request. A push to `main` also leaves the server for Linux and
+Windows as the artifact `share-server` for a day, and the signed APK as `share-apk` once the
+signing secrets are set ([`app/README.md`](app/README.md)). A version tag makes a release with all of
+them and `SHA256SUMS`:
+
+```sh
+git tag v0.4.0 && git push origin v0.4.0      # a tag with a dash (v0.4.0-rc1) is a pre-release
 ```
 
 ## License
