@@ -1,4 +1,5 @@
-// Lucide-style line icons on a 24px grid, as in the mockups.
+// Line icons on a 24px grid, as in the mockups. The paths are Lucide's (https://lucide.dev),
+// under the ISC License: app/assets/fonts/LICENSE-Lucide.txt.
 const paths = {
   images: (
     <>

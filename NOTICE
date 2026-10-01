@@ -1,0 +1,21 @@
+Share
+Copyright 2026 Stefan Eschgfäller
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Share includes fonts and icons made by others, under their own licenses:
+
+- Lucide icons (https://lucide.dev): ISC License, Copyright (c) 2026 Lucide Icons and
+  Contributors. The icons Lucide took over from Feather are under the MIT License,
+  Copyright (c) 2013-present Cole Bemis. The app has a subset as a font
+  (app/assets/fonts/Lucide.ttf), the website copies the paths of the ones it uses
+  (web/src/components/Icon.tsx). License: app/assets/fonts/LICENSE-Lucide.txt.
+
+- Noto Serif: SIL Open Font License 1.1, Copyright 2022 The Noto Project Authors.
+  License: app/assets/fonts/OFL-NotoSerif.txt.
+
+- Roboto Mono: SIL Open Font License 1.1, Copyright 2015 The Roboto Mono Project Authors.
+  License: app/assets/fonts/OFL-RobotoMono.txt.
+
+- Roboto: SIL Open Font License 1.1, Copyright 2011 The Roboto Project Authors. The website
+  bundles it, with Noto Serif and Roboto Mono, from the @fontsource packages.

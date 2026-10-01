@@ -95,4 +95,5 @@ scripts/build.sh                               # dist/share-linux-arm64, dist/sh
 
 ## License
 
-Not decided yet. Until there is a license file, all rights are reserved.
+Share is under the [Apache License 2.0](LICENSE). The fonts and icons it includes keep their own
+licenses (SIL Open Font License 1.1, ISC); [`NOTICE`](NOTICE) lists them.

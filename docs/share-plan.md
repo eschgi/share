@@ -5,8 +5,8 @@ Status: planning. Screens: [share-mockup.html](share-mockup.html) (numbers below
 Share is a self-hosted place to collect files. Anyone with a PIN sends photos, videos and documents
 through a website, without an account. People with an account see and download everything in an
 Android app, and admins run it from there. Nothing is family-specific: friends and anyone else with a
-PIN or an invite use the same screens. The project will be open source, and the app will go on Google
-Play later.
+PIN or an invite use the same screens. The project is open source, and the app will go on Google Play
+later.
 
 ## Parts
 
@@ -88,12 +88,12 @@ app, JSON on the website), so others can add languages.
 
 ## Open source
 
-- Its own repository, `eschgi/share` (private for now), apart from `eschgi/home`, whose history contains
-  TrueNAS API keys.
+- Its own public repository, `eschgi/share`.
 - No secrets in the repository: commit `config.example.json`, keep the real `config.json` out of git.
 - Nothing hard-coded: addresses, storage folder, ports, languages and the optional Play link come from
   configuration.
 - The server stays pure Go (no cgo), so it cross-compiles for the router and the VPS; for a database,
   e.g. SQLite through `modernc.org/sqlite`. CI builds release binaries for those platforms.
-- Pick the license before the first outside contribution. For example, AGPL-3.0 keeps hosted forks
-  open; Apache-2.0 or MIT allow the widest reuse.
+- Apache-2.0 ([`LICENSE`](../LICENSE)): anyone may use, change and host it, also commercially, as long
+  as they keep the notices. The fonts and icons keep their own licenses, listed in
+  [`NOTICE`](../NOTICE).
