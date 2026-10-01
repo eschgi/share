@@ -86,7 +86,7 @@ object Fetcher {
     ): Boolean {
         var attempt = 0
         while (true) {
-            val route = RouteMonitor.current(app)
+            val route = RouteMonitor.settled(app)
             when (val outcome = downloader.fetch(file.id, file.size, sink, open = { server.open(it, route.isLocal) }, abort = abort, onBytes = onBytes)) {
                 Downloader.Outcome.Done -> {
                     sink.commit()

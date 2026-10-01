@@ -55,13 +55,25 @@ object RouteMonitor {
 
     fun unlisten(listener: (RouteStatus) -> Unit) = listeners.remove(listener)
 
-    /** The route now, without waiting; starts a probe in the background when it's due. */
+    /**
+     * The route now, without waiting; starts a probe in the background when it's due. Until
+     * there is an answer for these addresses on this network it says checking, so that a
+     * caller can wait for it ([settled]) instead of taking the public address for granted.
+     */
     fun current(context: Context): RouteStatus {
         init(context)
         val config = ServerStore(app).config()
         if (config == null || !config.needsProbe) return set(RouteStatus.NO_LOCAL)
-        if (due(config.toString())) checkLater()
+        val key = config.toString()
+        if (due(key)) checkLater()
+        if (probedAt == 0L || probedFor != key) return set(status.copy(checking = true))
         return status
+    }
+
+    /** The route for these addresses on this network: [current], or the probe's answer when there is none yet. */
+    fun settled(context: Context): RouteStatus {
+        val now = current(context)
+        return if (now.checking) check(context) else now
     }
 
     /**

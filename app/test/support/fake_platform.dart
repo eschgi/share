@@ -11,6 +11,9 @@ class FakePlatform implements Platform {
   ServerConfig? server;
   RouteStatus current = RouteStatus.public;
   int routeChecks = 0;
+
+  /// What a check finds, e.g. the local address after "checking"; without it, [current].
+  RouteStatus? afterCheck;
   final opened = <String>[];
   final downloads = <List<FileInfo>>[];
   final shared = <List<FileInfo>>[];
@@ -49,7 +52,10 @@ class FakePlatform implements Platform {
 
   @override
   Future<RouteStatus> route({bool check = false}) async {
-    if (check) routeChecks++;
+    if (check) {
+      routeChecks++;
+      if (afterCheck != null) current = afterCheck!;
+    }
     return current;
   }
 

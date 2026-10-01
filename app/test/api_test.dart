@@ -43,6 +43,17 @@ void main() {
     ]);
   });
 
+  test('while the route is being checked, a request waits for it instead of going public', () async {
+    // Right after signing in: the check of the address at home is still running.
+    platform
+      ..current = const RouteStatus(ServerRoute.public, checking: true)
+      ..afterCheck = const RouteStatus(ServerRoute.local);
+    final api = Api(platform: platform, publicClient: client('public'), localClient: (_) => client('local'))..config = config;
+    await api.get('/api/library');
+    expect(calls, ['local GET https://192.168.8.1:8443/api/library']);
+    expect(platform.routeChecks, 1);
+  });
+
   test('a read that fails over the local address is tried over the public one', () async {
     platform.current = const RouteStatus(ServerRoute.local);
     final api = Api(platform: platform, publicClient: client('public'), localClient: (_) => client('local', fail: true))

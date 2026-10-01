@@ -95,7 +95,7 @@ object UploadEngine {
                 }
                 val (token, config) = credentials
                 val server = ServerConnection(config, token)
-                val local = batch.auth == UploadBatch.DEVICE && RouteMonitor.current(app).isLocal
+                val local = batch.auth == UploadBatch.DEVICE && RouteMonitor.settled(app).isLocal
                 val chunk = chunks.getOrPut("${config.publicUrl}/$local") { chunkSize(server, local) }
                 val abort = Abort()
                 current = key to abort

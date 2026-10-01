@@ -108,8 +108,10 @@ class Api {
     final c = _config;
     if (c == null) throw const NetworkException('no server');
     var route = c.hasLocal || c.publicIsHttp ? await platform.route() : RouteStatus.public;
-    // A server only at home: on a network it wasn't checked on yet, wait for the check.
-    if (c.publicIsHttp && !route.isLocal && !route.publicVerified) route = await platform.route(check: true);
+    // Right after signing in, at the start or on a new network the route isn't known yet: wait
+    // for the check rather than take the public address, which may not answer at home. The same
+    // for a server only at home on a network it wasn't checked on.
+    if (route.checking || (c.publicIsHttp && !route.isLocal && !route.publicVerified)) route = await platform.route(check: true);
     if (route.isLocal) {
       try {
         return await _request(_local ??= _makeLocal(c), c.localUrl!, method, path, query: query, body: body);

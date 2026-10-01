@@ -168,7 +168,7 @@ object DownloadEngine {
                         target = it.uri.toString()
                         db.setTarget(item.batch, file.id, target)
                     }
-                val route = RouteMonitor.current(app)
+                val route = RouteMonitor.settled(app)
                 val outcome = downloader.fetch(file.id, file.size, sink, open = { server.open(it, route.isLocal) }, abort = abort) {
                     live[file.id] = it
                 }
