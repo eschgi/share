@@ -18,6 +18,9 @@
   "pin.locked": "Zu viele falsche Versuche. Versuch es in {time} wieder.",
   "pin.ended": "Diese PIN funktioniert nicht mehr. Frag nach einer neuen.",
   "pin.sessionEnded": "Die PIN, die du benutzt hast, gilt nicht mehr. Gib eine neue PIN ein, um fertig zu senden.",
+  "pin.sessionLost": "Dieser Browser hat deine PIN vergessen. Gib sie nochmal ein, um fertig zu senden.",
+  "pin.noCookie": "Dieser Browser hat deine PIN nicht behalten. Erlaube Cookies für diese Seite und versuch es nochmal.",
+  "pin.insecure": "Diese Adresse beginnt mit http://, deshalb kann sich der Browser deine PIN nicht merken. Öffne sie stattdessen mit https://.",
   "pin.network": "Der Server ist nicht erreichbar. Prüf dein Internet und versuch es nochmal.",
 
   "ready.title": "Schick deine Dateien",

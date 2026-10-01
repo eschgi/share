@@ -32,6 +32,16 @@ interface ErrorBody {
   error?: { code?: string; message?: string; retry_after_seconds?: number; attempts_left?: number };
 }
 
+/** The code in an error body such as tus answers with ({"error": {"code": …}}), if there is one. */
+export function errorCode(body: string | undefined): string | undefined {
+  try {
+    const code = (JSON.parse(body ?? '') as ErrorBody | null)?.error?.code;
+    return typeof code === 'string' ? code : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   let res: Response;
   try {

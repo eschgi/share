@@ -56,6 +56,12 @@ export function App() {
     dispatch({ type: 'unlockStarted' });
     try {
       const res = await unlock(code);
+      // The answer carries the session cookie, but a browser that blocks cookies drops it
+      // silently, and every upload would then be refused.
+      if (!(await getSession()).session) {
+        dispatch({ type: 'unlockFailed', problem: { kind: 'noCookie' } });
+        return;
+      }
       if (!uploader.current) {
         location.reload(); // the first load failed; start clean with the new session
         return;
@@ -77,10 +83,16 @@ export function App() {
         const [i, keepQueue] = await Promise.all([getInfo(), holdQueueLock()]);
         setInfo(i);
         setLang(pickLanguage(i.languages, storedLanguage(), navigator.languages, i.default_language));
+        // Over plain http (other than localhost) browsers refuse the session cookie, which is
+        // Secure, so a PIN would seem to work and every upload would then be refused.
+        if (!isSecureContext) {
+          dispatch({ type: 'insecure' });
+          return;
+        }
         uploader.current = new Uploader(i, {
           onChange: redraw,
           onAllDone: (files, bytes) => dispatch({ type: 'allDone', files, bytes }),
-          onSessionEnded: () => dispatch({ type: 'sessionEnded' }),
+          onSessionEnded: (lost) => dispatch({ type: 'sessionEnded', lost }),
           onRejected: (name) => setRejected((r) => (r.includes(name) ? r : [...r, name])),
           onRestored: () => dispatch({ type: 'restored' }),
         }, keepQueue);

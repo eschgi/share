@@ -121,6 +121,12 @@ Plain `http://` is accepted only for `localhost`.
 For work on the website, `cd web && npm run dev` serves it with hot reload and forwards the API to
 the server on `127.0.0.1:8080`.
 
+To try it on a phone or tablet, the page has to come over https or from `localhost`. Browsers keep
+the PIN's cookie only there, so with the PC's address (`http://192.168.1.20:8080`) every upload is
+refused. Go through the public address (a Cloudflare Tunnel works for a PC too), or, with an Android
+phone on USB, run `adb reverse tcp:5173 tcp:5173` (`tcp:8080` for `share serve`) and open
+`http://localhost:5173` on the phone.
+
 ## Running it
 
 1. `scripts/build-linux.sh` builds `dist/share-linux-arm64` and `dist/share-linux-amd64`;

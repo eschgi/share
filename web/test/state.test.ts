@@ -38,6 +38,16 @@ describe('screen flow', () => {
     expect(s).toMatchObject({ screen: 'pin', unlocking: false, problem: { kind: 'wrong', attemptsLeft: 4 } });
   });
 
+  it('says so when the page is plain http, where the session cookie can never stick', () => {
+    expect(run({ type: 'insecure' })).toMatchObject({ screen: 'pin', problem: { kind: 'insecure' } });
+  });
+
+  it('tells a lost session apart from one whose PIN ended', () => {
+    const s = run({ type: 'booted', session, sessionEnded: false }, { type: 'filesAdded' }, { type: 'sessionEnded', lost: true });
+    expect(s).toMatchObject({ screen: 'pin', waitingForPin: true, problem: { kind: 'sessionLost' } });
+    expect(reduce(s, { type: 'unlocked', session }).screen).toBe('sending');
+  });
+
   it('returns to sending after a new PIN when the old one ended mid-upload', () => {
     let s = run({ type: 'booted', session, sessionEnded: false }, { type: 'filesAdded' }, { type: 'sessionEnded' });
     expect(s).toMatchObject({ screen: 'pin', waitingForPin: true, problem: { kind: 'sessionEnded' } });

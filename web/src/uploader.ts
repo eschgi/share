@@ -4,7 +4,7 @@
 import Uppy, { type Body, type Meta, type UppyFile } from '@uppy/core';
 import GoldenRetriever, { type GoldenRetrieverOptions } from '@uppy/golden-retriever';
 import Tus from '@uppy/tus';
-import type { Info } from './api';
+import { errorCode, type Info } from './api';
 import { dedupeBatches, matchGhosts, unbatched } from './restore';
 import { ThumbQueue } from './thumbs';
 
@@ -36,8 +36,11 @@ export interface Snapshot {
 export interface UploaderEvents {
   onChange(): void;
   onAllDone(files: number, bytes: number): void;
-  /** The PIN session ended (401): everything is paused until a new unlock. */
-  onSessionEnded(): void;
+  /**
+   * The PIN session ended (401): everything is paused until a new unlock. lost: the server
+   * got no session at all (the browser lost or never kept its cookie), not one whose PIN ended.
+   */
+  onSessionEnded(lost: boolean): void;
   onRejected(name: string): void;
   /** A queue the closed page interrupted came back and waits for continue(). */
   onRestored(): void;
@@ -113,7 +116,7 @@ export class Uploader {
       onShouldRetry: (err, _attempt, _opts, next) => {
         const status = err.originalResponse?.getStatus() ?? 0;
         if (status === 401) {
-          this.endSession();
+          this.endSession(errorCode(err.originalResponse?.getBody()) !== 'session_ended');
           return false;
         }
         // Full drive, too large, too many: retrying won't help.
@@ -309,11 +312,11 @@ export class Uploader {
     if ((kind === 'photo' || kind === 'video') && id && file.data instanceof Blob) this.thumbs.add(id, file.data, kind);
   }
 
-  private endSession(): void {
+  private endSession(lost: boolean): void {
     if (this.sessionEnded) return;
     this.sessionEnded = true;
     this.uppy.pauseAll();
-    this.events.onSessionEnded();
+    this.events.onSessionEnded(lost);
   }
 
   private changed(): void {

@@ -13,6 +13,19 @@ interface Props {
   onSubmit: (code: string) => void;
 }
 
+/** The boxes turn red only when the PIN itself didn't work, not when the browser or the session is the problem. */
+function pinWasWrong(problem: PinProblem | null): boolean {
+  switch (problem?.kind) {
+    case 'wrong':
+    case 'locked':
+    case 'ended':
+    case 'network':
+      return true;
+    default:
+      return false;
+  }
+}
+
 /** Screen 1: five boxes, not case-sensitive, unlocks as soon as the fifth character is in. */
 export function PinScreen({ name, problem, unlocking, onSubmit }: Props) {
   const { t, tn, lang } = useI18n();
@@ -25,6 +38,8 @@ export function PinScreen({ name, problem, unlocking, onSubmit }: Props) {
   const now = Date.now();
   const lockedUntil = problem?.kind === 'locked' ? problem.until : 0;
   const locked = lockedUntil > now;
+  // On a plain-http page no PIN can work; trying would only count as tries.
+  const blocked = locked || problem?.kind === 'insecure';
 
   useEffect(() => {
     if (!lockedUntil) return;
@@ -37,7 +52,7 @@ export function PinScreen({ name, problem, unlocking, onSubmit }: Props) {
 
   // After a wrong try, start over with empty boxes.
   useEffect(() => {
-    if (problem?.kind === 'wrong' || problem?.kind === 'ended' || problem?.kind === 'locked') {
+    if (problem?.kind === 'wrong' || problem?.kind === 'ended' || problem?.kind === 'locked' || problem?.kind === 'noCookie') {
       setValue('');
       if (input.current) input.current.value = '';
       input.current?.focus();
@@ -45,7 +60,7 @@ export function PinScreen({ name, problem, unlocking, onSubmit }: Props) {
   }, [problem]);
 
   const submit = (code: string) => {
-    if (code.length === pinLength && !unlocking && !locked) onSubmit(code);
+    if (code.length === pinLength && !unlocking && !blocked) onSubmit(code);
   };
 
   let message: string | null = null;
@@ -62,6 +77,15 @@ export function PinScreen({ name, problem, unlocking, onSubmit }: Props) {
     case 'sessionEnded':
       message = t('pin.sessionEnded');
       break;
+    case 'sessionLost':
+      message = t('pin.sessionLost');
+      break;
+    case 'noCookie':
+      message = t('pin.noCookie');
+      break;
+    case 'insecure':
+      message = t('pin.insecure');
+      break;
     case 'network':
       message = t('pin.network');
       break;
@@ -75,7 +99,7 @@ export function PinScreen({ name, problem, unlocking, onSubmit }: Props) {
       </div>
       <h1 class="hero">{t('pin.title')}</h1>
       <p class="lead">{t('pin.lead')}</p>
-      <label class={`pin ${message && problem?.kind !== 'sessionEnded' ? 'err' : ''}`}>
+      <label class={`pin ${message && pinWasWrong(problem) ? 'err' : ''}`}>
         <input
           ref={input}
           class="pin-input"
@@ -96,7 +120,7 @@ export function PinScreen({ name, problem, unlocking, onSubmit }: Props) {
           enterKeyHint="go"
           maxLength={12}
           aria-label={t('pin.title')}
-          disabled={unlocking || locked}
+          disabled={unlocking || blocked}
           autoFocus
         />
         {Array.from({ length: pinLength }, (_, i) => (
@@ -114,7 +138,7 @@ export function PinScreen({ name, problem, unlocking, onSubmit }: Props) {
         <p class="help">{t('pin.help')}</p>
       )}
       <div class="grow" />
-      <button type="button" class="btn primary" disabled={value.length !== pinLength || unlocking || locked} onClick={() => submit(value)}>
+      <button type="button" class="btn primary" disabled={value.length !== pinLength || unlocking || blocked} onClick={() => submit(value)}>
         <Icon name="lock-open" />
         {t('pin.unlock')}
       </button>

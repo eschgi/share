@@ -9,6 +9,12 @@ export type PinProblem =
   | { kind: 'locked'; until: number } // epoch ms
   | { kind: 'ended' }
   | { kind: 'sessionEnded' }
+  /** Uploads came back unauthorized: the browser no longer sends a session, e.g. after clearing cookies. */
+  | { kind: 'sessionLost' }
+  /** The PIN was right, but the browser didn't keep the session cookie. */
+  | { kind: 'noCookie' }
+  /** A plain-http page (not localhost): browsers keep no secure cookies there, so no PIN can work. */
+  | { kind: 'insecure' }
   | { kind: 'network' };
 
 export interface State {
@@ -26,6 +32,7 @@ export interface State {
 export type Action =
   | { type: 'booted'; session: Session | null; sessionEnded: boolean }
   | { type: 'bootFailed' }
+  | { type: 'insecure' }
   | { type: 'restored' }
   | { type: 'unlockStarted' }
   | { type: 'unlocked'; session: Session }
@@ -34,7 +41,8 @@ export type Action =
   | { type: 'startedOver' }
   | { type: 'filesAdded' }
   | { type: 'allDone'; files: number; bytes: number }
-  | { type: 'sessionEnded' }
+  /** lost: the server got no session at all, rather than one whose PIN ended. */
+  | { type: 'sessionEnded'; lost?: boolean }
   | { type: 'sendMore' };
 
 export const initialState: State = {
@@ -54,6 +62,8 @@ export function reduce(s: State, a: Action): State {
       return { ...s, screen: 'pin', problem: a.sessionEnded ? { kind: 'sessionEnded' } : null };
     case 'bootFailed':
       return { ...s, screen: 'pin', problem: { kind: 'network' } };
+    case 'insecure':
+      return { ...s, screen: 'pin', problem: { kind: 'insecure' } };
     case 'restored':
       // The restore can finish before or after the session check. Before sending starts it
       // leads to screen 5, now or right after the PIN; once sending runs it changes nothing.
@@ -81,7 +91,13 @@ export function reduce(s: State, a: Action): State {
     case 'allDone':
       return s.waitingForPin ? s : { ...s, screen: 'done', restored: false, done: { files: a.files, bytes: a.bytes } };
     case 'sessionEnded':
-      return { ...s, screen: 'pin', session: null, waitingForPin: s.screen === 'sending' || s.waitingForPin, problem: { kind: 'sessionEnded' } };
+      return {
+        ...s,
+        screen: 'pin',
+        session: null,
+        waitingForPin: s.screen === 'sending' || s.waitingForPin,
+        problem: { kind: a.lost ? 'sessionLost' : 'sessionEnded' },
+      };
     case 'sendMore':
       return { ...s, screen: 'ready', done: null };
   }
