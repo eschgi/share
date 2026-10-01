@@ -29,7 +29,7 @@ func openDB(ctx context.Context, cfg *config.Config) (*db.DB, *auth.Service, err
 		d.Close()
 		return nil, nil, err
 	}
-	return d, auth.NewService(d, time.Now, cfg.Proxies, cfg.ClientIPHeader), nil
+	return d, auth.NewService(d, time.Now, cfg.Proxies, cfg.ClientIPHeader()), nil
 }
 
 func invite(args []string) error {
@@ -208,18 +208,18 @@ func cert(args []string) error {
 	if err != nil {
 		return err
 	}
-	if cfg.Local.URL == "" {
-		return errors.New("there is no local address: set local.listen and local.url in the config")
+	if !cfg.SelfSigned() {
+		return errors.New(`there is no https port with Share's own certificate: set "https": {"listen": ":8443"} in the config`)
 	}
 	switch {
 	case len(positional) == 1 && positional[0] == "regenerate":
-		if err := localtls.Regenerate(cfg.DataDir, cfg.Local.URLHost()); err != nil {
+		if err := localtls.Regenerate(cfg.DataDir, cfg.CertificateHost()); err != nil {
 			return err
 		}
-		fmt.Println("New certificate for the local address. Phones fall back to the public address once,")
-		fmt.Println("learn the new certificate there, and then use the local address again.")
+		fmt.Println("New certificate for the https port. Phones fall back to the public address once,")
+		fmt.Println("learn the new certificate there, and then use the address at home again.")
 	case len(positional) == 0:
-		if err := localtls.Ensure(cfg.DataDir, cfg.Local.URLHost()); err != nil {
+		if err := localtls.Ensure(cfg.DataDir, cfg.CertificateHost()); err != nil {
 			return err
 		}
 	default:
@@ -229,6 +229,9 @@ func cert(args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Local address: %s\nSHA-256:       %s\n", cfg.Local.URL, l.Fingerprint())
+	fmt.Printf("https port:  %s\nCertificate: %s\nSHA-256:     %s\n", cfg.HTTPS.Listen, cfg.CertificateHost(), l.Fingerprint())
+	if cfg.Home != nil && cfg.Home.Scheme == "https" {
+		fmt.Printf("The app at home uses %s and pins this certificate.\n", cfg.HomeURL)
+	}
 	return nil
 }

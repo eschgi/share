@@ -1,7 +1,9 @@
 # Share behind a Cloudflare Tunnel
 
-Share listens on plain HTTP on `127.0.0.1:8080`. Cloudflare handles HTTPS, and `cloudflared`
-forwards the requests. Nothing needs to be opened on the router.
+`cloudflared` forwards the requests to Share's http port (`http.listen`, `:8080` unless set
+otherwise). Cloudflare handles HTTPS, and nothing needs to be opened on the router. Share knows
+these requests from the tunnel by `CF-Connecting-IP`, so its cookies stay secure; plain http from
+the internet, through the tunnel or not, is turned away.
 
 ## Public hostname
 
@@ -22,12 +24,15 @@ ingress:
   - service: http_status:404
 ```
 
-If `cloudflared` runs on another machine than Share:
-- set `listen` in `config.json` to the LAN address, e.g. `192.168.8.1:8080`;
-- add that machine to `trusted_proxies`, e.g. `["127.0.0.1/32", "::1/128", "192.168.8.20/32"]`.
+If `cloudflared` runs on another machine than Share, point the service at Share's address at home
+(e.g. `http://192.168.8.1:8080`) and say where `cloudflared` connects from:
 
-Share takes the visitor's address from `CF-Connecting-IP`, and only from `trusted_proxies`. It
-needs the address to limit wrong PIN tries per visitor.
+```json
+"cloudflare": {"trusted_proxies": ["192.168.8.20"]}
+```
+
+Share takes the visitor's address from `CF-Connecting-IP`, and only from those addresses (by
+default this machine). It needs the address to limit wrong PIN tries per visitor.
 
 ## No Cloudflare Access
 
@@ -56,8 +61,9 @@ In the Cloudflare dashboard for your domain:
   gets through well within that on uplinks faster than about 2 Mbit/s. If people send from
   slower connections, lower `chunk_size_mib`.
 - Cloudflare's terms don't want the CDN to serve large amounts of video. Downloads through the app
-  use the local address when the phone is at home. On a VPS, set the hostname to *DNS only* and let
-  Share serve HTTPS itself (`tls_cert_file`, `tls_key_file`).
+  use the address at home (`home_url`) when the phone is there. On a VPS, set the hostname to *DNS
+  only* and let Share serve HTTPS itself:
+  `"https": {"listen": ":443", "certificate": {"cert_file": "…", "key_file": "…"}}`.
 
 ## Checking
 

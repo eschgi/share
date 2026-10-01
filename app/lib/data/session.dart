@@ -82,6 +82,13 @@ class SessionRepository {
     try {
       final me = await api.get('/api/me');
       final user = User.fromJson(me['user'] as Json? ?? const {});
+      // Phones signed in before the id was kept: it's needed for the proof over plain http.
+      final device = (me['device'] as Json?)?['id'];
+      if (device is String && config.deviceId != device) {
+        final updated = config.copyWith(deviceId: device);
+        await platform.saveServer(updated);
+        api.config = updated;
+      }
       await platform.writeSecret(_userKey, jsonEncode(_userJson(user)));
       _set(SignedInState(user));
       unawaited(refreshServer());
@@ -129,7 +136,7 @@ class SessionRepository {
   }
 
   Future<void> _signedIn(Uri server, ServerIdentity identity, SignedIn s) async {
-    final config = ServerConfig(publicUrl: server, serverId: identity.serverId).withInfo(s.server);
+    final config = ServerConfig(publicUrl: server, serverId: identity.serverId, deviceId: s.deviceId).withInfo(s.server);
     await platform.writeSecret(_tokenKey, s.token);
     await platform.writeSecret(_userKey, jsonEncode(_userJson(s.user)));
     await platform.saveServer(config);

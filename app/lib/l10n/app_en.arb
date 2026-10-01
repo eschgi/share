@@ -56,7 +56,7 @@
       }
     }
   },
-  "serverBadAddress": "That doesn't look like an address. Enter it like share.example.com.",
+  "serverBadAddress": "That doesn't look like an address. Enter it like share.example.com, or at home like 192.168.1.20:8080.",
   "serverNotShare": "There is no Share server at this address.",
   "joinInvitedBy": "{inviter} invited you",
   "@joinInvitedBy": {
@@ -296,7 +296,7 @@
   "routeChecking": "Checking…",
   "serverCheckAgain": "Check again",
   "serverInviteFills": "An invite fills in both addresses.",
-  "serverLocalMustBeHttps": "The local address needs https:// and usually a port, like https://192.168.8.1:8443.",
+  "serverLocalBadAddress": "Enter it like http://192.168.8.1:8080. Plain http only works for an address at home.",
   "settingsTitle": "Settings",
   "settingsSignedInHere": "Signed in on this phone",
   "roleAdmin": "Admin",

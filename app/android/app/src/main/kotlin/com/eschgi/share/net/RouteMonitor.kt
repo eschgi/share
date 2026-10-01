@@ -6,6 +6,8 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.os.Handler
 import android.os.Looper
+import com.eschgi.share.data.SecretStore
+import com.eschgi.share.data.ServerConfig
 import com.eschgi.share.data.ServerStore
 import java.util.concurrent.CopyOnWriteArraySet
 import java.util.concurrent.Executors
@@ -16,7 +18,9 @@ import java.util.concurrent.Executors
  *
  * The local address is probed when something asks and the last answer is older than five
  * minutes, a second after the phone's network changes, and whenever a caller saw it fail.
- * With only a public address nothing is probed.
+ * With only a public address nothing is probed, unless that address is plain http (a server
+ * only at home): then the probe asks it too, and the phone's key goes there only after it
+ * passed on this network ([httpAllowed]).
  */
 @SuppressLint("StaticFieldLeak") // holds only the application context
 object RouteMonitor {
@@ -55,7 +59,7 @@ object RouteMonitor {
     fun current(context: Context): RouteStatus {
         init(context)
         val config = ServerStore(app).config()
-        if (config == null || !config.hasLocal) return set(RouteStatus.NO_LOCAL)
+        if (config == null || !config.needsProbe) return set(RouteStatus.NO_LOCAL)
         if (due(config.toString())) checkLater()
         return status
     }
@@ -69,11 +73,11 @@ object RouteMonitor {
         val asked = System.nanoTime()
         synchronized(probing) {
             val config = ServerStore(app).config()
-            if (config == null || !config.hasLocal) return set(RouteStatus.NO_LOCAL)
+            if (config == null || !config.needsProbe) return set(RouteStatus.NO_LOCAL)
             val key = config.toString()
             if (probedAt > asked && probedFor == key) return status
             set(status.copy(checking = true))
-            val result = LocalProbe.probe(config)
+            val result = LocalProbe.probe(config, SecretStore(app).read(SecretStore.DEVICE_TOKEN))
             probedFor = key
             probedAt = System.nanoTime()
             return set(result)
@@ -83,13 +87,26 @@ object RouteMonitor {
     /** Probes in the background, unless another probe got there first. */
     fun checkLater() = background.execute {
         val config = ServerStore(app).config()
-        if (config != null && config.hasLocal && due(config.toString())) check(app)
+        if (config != null && config.needsProbe && due(config.toString())) check(app)
     }
 
-    /** The addresses changed: the last answer was about other ones. */
+    /**
+     * The addresses or the network changed: the last answer was about other ones. Until the new
+     * ones are probed, nothing local, and nothing to a public address over plain http.
+     */
     fun invalidate() {
         probedAt = 0
         probedFor = null
+        if (::app.isInitialized && ServerStore(app).config()?.needsProbe == true) set(RouteStatus.UNKNOWN.copy(checking = true))
+    }
+
+    /**
+     * Whether the phone's key may go to [config]'s local ([local]) or public address over plain
+     * http: only after this network's probe found the phone's own server there.
+     */
+    fun httpAllowed(config: ServerConfig, local: Boolean): Boolean {
+        if (probedAt == 0L || probedFor != config.toString()) return false
+        return if (local) status.isLocal else status.publicVerified
     }
 
     private fun due(key: String) =

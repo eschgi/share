@@ -1,0 +1,29 @@
+{
+  "description": "Where plain http is allowed: the host of a server address, and whether it is on a home network or this machine. The server (config, homenet) and the app (lib/data/server.dart) both test against this list.",
+  "hosts": [
+    {"host": "localhost", "home": true},
+    {"host": "127.0.0.1", "home": true},
+    {"host": "::1", "home": true},
+    {"host": "192.168.8.52", "home": true},
+    {"host": "10.0.0.2", "home": true},
+    {"host": "172.16.0.1", "home": true},
+    {"host": "172.31.255.254", "home": true},
+    {"host": "169.254.10.20", "home": true},
+    {"host": "fd12:3456:789a::1", "home": true},
+    {"host": "fe80::1", "home": true},
+    {"host": "share.local", "home": true},
+    {"host": "nas.home.arpa", "home": true},
+    {"host": "router.internal", "home": true},
+    {"host": "SHARE.LOCAL", "home": true},
+    {"host": "share.eschgi.com", "home": false},
+    {"host": "share.example.com", "home": false},
+    {"host": "8.8.8.8", "home": false},
+    {"host": "172.32.0.1", "home": false},
+    {"host": "100.64.0.1", "home": false},
+    {"host": "2001:db8::1", "home": false},
+    {"host": "local", "home": false},
+    {"host": "mylocal", "home": false},
+    {"host": "share.local.example.com", "home": false},
+    {"host": "router", "home": false}
+  ]
+}

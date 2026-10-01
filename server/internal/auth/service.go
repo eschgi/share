@@ -17,12 +17,38 @@ import (
 	"github.com/eschgi/share/server/internal/ratelimit"
 )
 
-// Cookie and header names.
+// Cookie and header names. Browsers keep __Host- cookies only from secure pages; over plain
+// http at home (PlainHTTP) the cookies have the same names without the prefix.
 const (
 	CookiePin    = "__Host-share_pin" // the PIN session of the website
 	CookieClient = "__Host-share_cid" // a random browser id, used only to count wrong PINs
 	HeaderClient = "Share-Client"     // the same id, sent by the app
 )
+
+// plainName is a cookie's name over plain http: secure cookies can't be set there.
+func plainName(name string) string { return strings.TrimPrefix(name, "__Host-") }
+
+// cookieName is the name a cookie has on this request's connection.
+func cookieName(r *http.Request, name string) string {
+	if PlainHTTP(r) {
+		return plainName(name)
+	}
+	return name
+}
+
+type plainKey struct{}
+
+// WithPlainHTTP marks a request that came over plain http, from a home network or this
+// machine, so that its cookies are set without Secure.
+func WithPlainHTTP(r *http.Request) *http.Request {
+	return r.WithContext(context.WithValue(r.Context(), plainKey{}, true))
+}
+
+// PlainHTTP reports whether a request came over plain http (see WithPlainHTTP).
+func PlainHTTP(r *http.Request) bool {
+	plain, _ := r.Context().Value(plainKey{}).(bool)
+	return plain
+}
 
 const (
 	// DayPinLifetime is how long a 24-hour PIN works.
@@ -205,7 +231,7 @@ func (s *Service) clientKey(r *http.Request) string {
 func ClientID(r *http.Request) string {
 	v := r.Header.Get(HeaderClient)
 	if v == "" {
-		if c, err := r.Cookie(CookieClient); err == nil {
+		if c, err := r.Cookie(cookieName(r, CookieClient)); err == nil {
 			v = c.Value
 		}
 	}
@@ -284,40 +310,39 @@ func bearerOrCookie(r *http.Request) string {
 		}
 		return ""
 	}
-	if c, err := r.Cookie(CookiePin); err == nil {
+	if c, err := r.Cookie(cookieName(r, CookiePin)); err == nil {
 		return c.Value
 	}
 	return ""
 }
 
 // SetSessionCookie stores a website PIN session. It lasts as long as the session can.
-func SetSessionCookie(w http.ResponseWriter, token string, expiresAt *time.Time, now time.Time) {
+func SetSessionCookie(w http.ResponseWriter, r *http.Request, token string, expiresAt *time.Time, now time.Time) {
 	maxAge := int(permanentSessionIdle / time.Second)
 	if expiresAt != nil {
 		maxAge = max(int(expiresAt.Sub(now)/time.Second), 1)
 	}
-	http.SetCookie(w, &http.Cookie{
-		Name: CookiePin, Value: token, Path: "/", MaxAge: maxAge,
-		HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode,
-	})
+	http.SetCookie(w, cookie(r, CookiePin, token, maxAge))
 }
 
 // ClearSessionCookie removes the website PIN session.
-func ClearSessionCookie(w http.ResponseWriter) {
-	http.SetCookie(w, &http.Cookie{
-		Name: CookiePin, Value: "", Path: "/", MaxAge: -1,
-		HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode,
-	})
+func ClearSessionCookie(w http.ResponseWriter, r *http.Request) {
+	http.SetCookie(w, cookie(r, CookiePin, "", -1))
 }
 
 // EnsureClientCookie gives a browser its random id for the wrong-PIN limit, once.
 func EnsureClientCookie(w http.ResponseWriter, r *http.Request) {
-	if c, err := r.Cookie(CookieClient); err == nil && validClientID(c.Value) {
+	if c, err := r.Cookie(cookieName(r, CookieClient)); err == nil && validClientID(c.Value) {
 		return
 	}
 	random, _ := ids.NewToken("")
-	http.SetCookie(w, &http.Cookie{
-		Name: CookieClient, Value: random[:22], Path: "/", MaxAge: int(permanentSessionIdle / time.Second),
-		HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode,
-	})
+	http.SetCookie(w, cookie(r, CookieClient, random[:22], int(permanentSessionIdle/time.Second)))
+}
+
+// cookie is one of the website's cookies, Secure unless the request came over plain http.
+func cookie(r *http.Request, name, value string, maxAge int) *http.Cookie {
+	return &http.Cookie{
+		Name: cookieName(r, name), Value: value, Path: "/", MaxAge: maxAge,
+		HttpOnly: true, Secure: !PlainHTTP(r), SameSite: http.SameSiteStrictMode,
+	}
 }

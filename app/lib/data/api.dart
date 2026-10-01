@@ -107,7 +107,9 @@ class Api {
   Future<http.Response> _send(String method, String path, {Map<String, String>? query, Object? body, bool raw = false}) async {
     final c = _config;
     if (c == null) throw const NetworkException('no server');
-    final route = c.hasLocal ? await platform.route() : RouteStatus.public;
+    var route = c.hasLocal || c.publicIsHttp ? await platform.route() : RouteStatus.public;
+    // A server only at home: on a network it wasn't checked on yet, wait for the check.
+    if (c.publicIsHttp && !route.isLocal && !route.publicVerified) route = await platform.route(check: true);
     if (route.isLocal) {
       try {
         return await _request(_local ??= _makeLocal(c), c.localUrl!, method, path, query: query, body: body);
@@ -116,6 +118,8 @@ class Api {
         if (method != 'GET') rethrow; // it may have arrived; don't do it twice
       }
     }
+    // Over plain http the phone's key goes only to a server that proved here to be its own.
+    if (c.publicIsHttp && token != null && !route.publicVerified) throw const NetworkException('not this phone\'s server here');
     return _request(_public, c.publicUrl, method, path, query: query, body: body);
   }
 

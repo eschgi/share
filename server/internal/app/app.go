@@ -35,17 +35,16 @@ type Options struct {
 
 // App is a running server's parts.
 type App struct {
-	Cfg     *config.Config
-	DB      *db.DB
-	Lib     *storage.Library
-	Auth    *auth.Service
-	Upload  *upload.Handler
-	Thumbs  *thumbs.Store
-	UI      *webui.UI
-	Local   *localtls.Loader // nil without a local address
+	Cfg    *config.Config
+	DB     *db.DB
+	Lib    *storage.Library
+	Auth   *auth.Service
+	Upload *upload.Handler
+	Thumbs *thumbs.Store
+	UI     *webui.UI
+	Local  *localtls.Loader // Share's own certificate on the https port; nil without one
+	// Handler answers on both ports, http and https.
 	Handler http.Handler
-	// LocalHandler answers on the local address; nil without one.
-	LocalHandler http.Handler
 
 	now   func() time.Time
 	sched *jobs.Scheduler
@@ -92,7 +91,7 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 		return nil, err
 	}
 
-	authSvc := auth.NewService(d, now, cfg.Proxies, cfg.ClientIPHeader)
+	authSvc := auth.NewService(d, now, cfg.Proxies, cfg.ClientIPHeader())
 	maxFile := cfg.MaxFileSize()
 	if report.MaxFileSize > 0 && (maxFile == 0 || report.MaxFileSize < maxFile) {
 		maxFile = report.MaxFileSize
@@ -115,17 +114,16 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 		log.Printf("webui: the website isn't built into this binary; serving a placeholder")
 	}
 	var local *localtls.Loader
-	if cfg.Local.Listen != "" {
-		host := cfg.Local.URLHost()
-		if err := localtls.Ensure(cfg.DataDir, host); err != nil {
+	if cfg.SelfSigned() {
+		if err := localtls.Ensure(cfg.DataDir, cfg.CertificateHost()); err != nil {
 			lib.Close()
 			d.Close()
-			return nil, fmt.Errorf("local address certificate: %w", err)
+			return nil, fmt.Errorf("https certificate: %w", err)
 		}
 		if local, err = localtls.NewLoader(cfg.DataDir); err != nil {
 			lib.Close()
 			d.Close()
-			return nil, fmt.Errorf("local address certificate: %w", err)
+			return nil, fmt.Errorf("https certificate: %w", err)
 		}
 	}
 	apiHandlers := &api.API{
@@ -138,19 +136,9 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 	apiHandlers.Register(mux)
 	mux.Handle("/", ui)
 
-	a := &App{
-		Cfg: cfg, DB: d, Lib: lib, Auth: authSvc, Upload: up, Thumbs: th, UI: ui, Local: local,
-		// Browsers may only change state from this site itself; the app sends no Origin.
-		Handler: http.NewCrossOriginProtection().Handler(mux),
-		now:     now,
-	}
-	if local != nil {
-		// The local address is for the app: the API and uploads, not the website.
-		localMux := http.NewServeMux()
-		localMux.Handle(upload.BasePath, up)
-		apiHandlers.Register(localMux)
-		a.LocalHandler = http.NewCrossOriginProtection().Handler(localMux)
-	}
+	a := &App{Cfg: cfg, DB: d, Lib: lib, Auth: authSvc, Upload: up, Thumbs: th, UI: ui, Local: local, now: now}
+	// Browsers may only change state from this site itself; the app sends no Origin.
+	a.Handler = a.guard(http.NewCrossOriginProtection().Handler(mux))
 	a.sched = &jobs.Scheduler{Now: now, Logf: log.Printf, Tasks: []jobs.Task{
 		{Name: "reconcile uploads", Every: 5 * time.Minute, Run: func(ctx context.Context) error {
 			authSvc.PruneLimits()
@@ -197,13 +185,33 @@ func (a *App) Serve(ctx context.Context) error {
 		log.Printf("share: or make an invite with your name: share invite --admin --name YOURNAME")
 	}
 
-	main := newServer(a.Cfg.Listen, a.Handler)
-	servers := []*http.Server{main}
-	var local *http.Server
-	if a.LocalHandler != nil {
-		local = newServer(a.Cfg.Local.Listen, a.LocalHandler)
-		local.TLSConfig = &tls.Config{GetCertificate: a.Local.GetCertificate, MinVersion: tls.VersionTLS12}
-		servers = append(servers, local)
+	var servers []*http.Server
+	var starts []func() error
+	if c := a.Cfg.HTTP; c != nil {
+		s := newServer(c.Listen, a.Handler)
+		servers, starts = append(servers, s), append(starts, s.ListenAndServe)
+		log.Printf("share: http on %s", c.Listen)
+	}
+	if c := a.Cfg.HTTPS; c != nil {
+		s := newServer(c.Listen, a.Handler)
+		start := func() error { return s.ListenAndServeTLS(c.Certificate.CertFile, c.Certificate.KeyFile) }
+		if a.Local != nil {
+			s.TLSConfig = &tls.Config{GetCertificate: a.Local.GetCertificate, MinVersion: tls.VersionTLS12}
+			start = func() error { return s.ListenAndServeTLS("", "") }
+			log.Printf("share: https on %s, with its own certificate %s", c.Listen, a.Local.Fingerprint())
+		} else {
+			log.Printf("share: https on %s, with %s", c.Listen, c.Certificate.CertFile)
+		}
+		servers, starts = append(servers, s), append(starts, start)
+	}
+	log.Printf("share: public address %s", a.Cfg.PublicURL)
+	if a.Cfg.Home != nil {
+		log.Printf("share: the app at home uses %s", a.Cfg.HomeURL)
+	}
+	if c := a.Cfg.HTTP; c != nil {
+		for _, u := range homeURLs(c.Listen) {
+			log.Printf("share: on this network, also %s", u)
+		}
 	}
 
 	// The background jobs stop with the server, and Serve waits for them, so none of them is
@@ -218,19 +226,8 @@ func (a *App) Serve(ctx context.Context) error {
 	workers.Go(func() { a.Thumbs.Run(jobsCtx) })
 
 	errCh := make(chan error, len(servers))
-	go func() {
-		log.Printf("share: listening on %s for %s", a.Cfg.Listen, a.Cfg.PublicURL)
-		if a.Cfg.TLSCertFile != "" {
-			errCh <- main.ListenAndServeTLS(a.Cfg.TLSCertFile, a.Cfg.TLSKeyFile)
-		} else {
-			errCh <- main.ListenAndServe()
-		}
-	}()
-	if local != nil {
-		go func() {
-			log.Printf("share: local address %s on %s, certificate %s", a.Cfg.Local.URL, a.Cfg.Local.Listen, a.Local.Fingerprint())
-			errCh <- local.ListenAndServeTLS("", "")
-		}()
+	for _, start := range starts {
+		go func() { errCh <- start() }()
 	}
 	var err error
 	select {

@@ -49,7 +49,7 @@ class _ServerScreenState extends State<ServerScreen> {
     final text = _local.text.trim();
     final local = text.isEmpty ? null : normalizeLocalAddress(text);
     if (text.isNotEmpty && local == null) {
-      setState(() => _localError = t.serverLocalMustBeHttps);
+      setState(() => _localError = t.serverLocalBadAddress);
       return;
     }
     setState(() {
@@ -101,7 +101,7 @@ class _ServerScreenState extends State<ServerScreen> {
             controller: _local,
             keyboardType: TextInputType.url,
             autocorrect: false,
-            decoration: InputDecoration(hintText: 'https://192.168.8.1:8443', errorText: _localError, errorMaxLines: 3),
+            decoration: InputDecoration(hintText: 'http://192.168.8.1:8080', errorText: _localError, errorMaxLines: 3),
             onSubmitted: (_) => _check(),
           ),
           Help(t.serverLocalHelp),

@@ -18,13 +18,14 @@ enum ServerRoute { local, public }
 enum RouteReason { none, noLocal, unreachable, wrongCertificate, otherServer }
 
 class RouteStatus {
-  const RouteStatus(this.route, {this.reason = RouteReason.none, this.millis, this.checking = false});
+  const RouteStatus(this.route, {this.reason = RouteReason.none, this.millis, this.checking = false, this.publicVerified = false});
 
   factory RouteStatus.fromMap(Map<Object?, Object?> m) => RouteStatus(
         m['route'] == 'local' ? ServerRoute.local : ServerRoute.public,
         reason: RouteReason.values.asNameMap()[m['reason']] ?? RouteReason.none,
         millis: (m['millis'] as num?)?.toInt(),
         checking: m['checking'] == true,
+        publicVerified: m['public_verified'] == true,
       );
 
   static const public = RouteStatus(ServerRoute.public, reason: RouteReason.noLocal);
@@ -33,6 +34,10 @@ class RouteStatus {
   final RouteReason reason;
   final int? millis; // how long the local address took to answer
   final bool checking;
+
+  /// For a server only at home, whose public address is plain http: whether the server there
+  /// proved to be this phone's, on this network. Until it did, the phone's key doesn't go there.
+  final bool publicVerified;
 
   bool get isLocal => route == ServerRoute.local;
 }

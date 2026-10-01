@@ -193,6 +193,17 @@ func (d *DB) DeviceByToken(ctx context.Context, tokenHash []byte) (Device, User,
 	return dv, u, nil
 }
 
+// DeviceTokenHash is the stored hash of a signed-in phone's key, for the proof that a server
+// at home is that phone's own (auth.HomeProof). ErrNotFound for unknown or signed-out phones.
+func (d *DB) DeviceTokenHash(ctx context.Context, id string) ([]byte, error) {
+	var hash []byte
+	err := d.QueryRowContext(ctx, "SELECT token_hash FROM devices WHERE id = ? AND revoked_at IS NULL", id).Scan(&hash)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	return hash, err
+}
+
 // DevicesOf lists a person's phones that are still signed in, most recently used first.
 func (d *DB) DevicesOf(ctx context.Context, userID string) ([]Device, error) {
 	rows, err := d.QueryContext(ctx, "SELECT "+deviceColumns+` FROM devices

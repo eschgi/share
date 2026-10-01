@@ -11,8 +11,9 @@ import (
 	"github.com/eschgi/share/server/internal/httpx"
 )
 
-// Server tells an app where the server can be reached. The local address is optional; its
-// certificate is self-signed, so the app pins one of the listed fingerprints.
+// Server tells an app where the server can be reached. The address at home (home_url, which
+// the app calls local_url) is optional: plain http, or https with Share's own certificate,
+// whose fingerprints the app pins.
 type Server struct {
 	PublicURL       string   `json:"public_url"`
 	LocalURL        *string  `json:"local_url"`
@@ -21,9 +22,11 @@ type Server struct {
 
 func (a *API) server() Server {
 	s := Server{PublicURL: a.Cfg.PublicURL, LocalCertSHA256: []string{}}
-	if a.Local != nil {
-		s.LocalURL = &a.Cfg.Local.URL
-		s.LocalCertSHA256 = []string{a.Local.Fingerprint()}
+	if a.Cfg.Home != nil {
+		s.LocalURL = &a.Cfg.HomeURL
+		if a.Cfg.Home.Scheme == "https" && a.Local != nil {
+			s.LocalCertSHA256 = []string{a.Local.Fingerprint()}
+		}
 	}
 	return s
 }

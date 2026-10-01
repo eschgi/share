@@ -284,8 +284,8 @@ func TestPhonesSeeTheLibraryAndPINsDont(t *testing.T) {
 	}
 }
 
-func TestLocalAddressWithPinnedCertificate(t *testing.T) {
-	e := newEnvWith(t, `"local": {"listen": "127.0.0.1:0", "url": "https://127.0.0.1:8443"}`)
+func TestHomeAddressWithPinnedCertificate(t *testing.T) {
+	e := newEnvWith(t, `"https": {"listen": "127.0.0.1:0"}, "home_url": "https://127.0.0.1:8443"`)
 	admin := e.admin()
 	srv := e.do(nil, "GET", "/api/server", admin.token, nil, nil).json(t)
 	assertShape(t, "server", readFixture(t, "api/server.json")["response"], srv)
@@ -298,11 +298,11 @@ func TestLocalAddressWithPinnedCertificate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	local := &http.Server{Handler: e.app.LocalHandler, TLSConfig: &tls.Config{GetCertificate: e.app.Local.GetCertificate}}
+	local := &http.Server{Handler: e.app.Handler, TLSConfig: &tls.Config{GetCertificate: e.app.Local.GetCertificate}}
 	go local.ServeTLS(ln, "", "")
 	t.Cleanup(func() { local.Close() })
 
-	// How the app trusts the local address: not through a CA, only by the pinned fingerprint.
+	// How the app trusts the address at home: not through a CA, only by the pinned fingerprint.
 	pinned := func(want string) *http.Client {
 		return &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: true,
@@ -322,7 +322,7 @@ func TestLocalAddressWithPinnedCertificate(t *testing.T) {
 	}
 	res.Body.Close()
 	if res.StatusCode != http.StatusOK {
-		t.Errorf("info over the local address: %d", res.StatusCode)
+		t.Errorf("info over the address at home: %d", res.StatusCode)
 	}
 	if _, err := pinned(strings.Repeat("0", 64)).Get(base + "/api/info"); err == nil {
 		t.Error("a wrong pin was accepted")
@@ -333,11 +333,11 @@ func TestLocalAddressWithPinnedCertificate(t *testing.T) {
 	}
 	io.Copy(io.Discard, res.Body)
 	res.Body.Close()
-	if res.StatusCode != http.StatusNotFound {
-		t.Errorf("the website over the local address: %d, want 404", res.StatusCode)
+	if res.StatusCode != http.StatusOK {
+		t.Errorf("the website over the https port: %d", res.StatusCode)
 	}
 
-	// A PIN session learns the local address too, when it unlocks in the app.
+	// A PIN session learns the address at home too, when it unlocks in the app.
 	pin := e.newPin(db.PinDay)
 	_, unlocked := e.unlockApp(pin.Code, "")
 	if s := unlocked["server"].(map[string]any); s["local_url"] != "https://127.0.0.1:8443" {

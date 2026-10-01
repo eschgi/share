@@ -60,6 +60,38 @@ void main() {
     expect(calls, hasLength(1));
   });
 
+  group('a server only at home, over plain http', () {
+    final home = ServerConfig(publicUrl: Uri.parse('http://192.168.8.52:8080'), serverId: 'srv', deviceId: 'dv1');
+
+    test('the key goes there once the server proved here to be this phone\'s', () async {
+      platform.current = const RouteStatus(ServerRoute.public, reason: RouteReason.noLocal, publicVerified: true);
+      final api = Api(platform: platform, publicClient: client('public'))
+        ..config = home
+        ..token = 'shd_x';
+      await api.get('/api/library');
+      expect(calls, ['public GET http://192.168.8.52:8080/api/library']);
+    });
+
+    test('on a network it wasn\'t checked on, the check comes first; without the proof nothing goes', () async {
+      platform.current = const RouteStatus(ServerRoute.public, reason: RouteReason.noLocal, checking: true);
+      final api = Api(platform: platform, publicClient: client('public'))
+        ..config = home
+        ..token = 'shd_x';
+      await expectLater(api.get('/api/library'), throwsA(isA<NetworkException>()));
+      expect(platform.routeChecks, 1, reason: 'it waited for the check');
+      expect(calls, isEmpty, reason: 'the key went nowhere');
+    });
+
+    test('an address at home over http is used like a pinned one, by the route', () async {
+      platform.current = const RouteStatus(ServerRoute.local);
+      final api = Api(platform: platform, publicClient: client('public'), localClient: (_) => client('local'))
+        ..config = ServerConfig(publicUrl: Uri.parse('https://share.example.com'), localUrl: Uri.parse('http://192.168.8.52:8080'), deviceId: 'dv1')
+        ..token = 'shd_x';
+      await api.get('/api/library');
+      expect(calls, ['local GET http://192.168.8.52:8080/api/library']);
+    });
+  });
+
   test('the bearer token goes along, and signed_out ends the session', () async {
     var signedOut = 0;
     late http.Request seen;

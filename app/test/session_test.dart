@@ -51,6 +51,8 @@ void main() {
     expect(platform.server!.localUrl.toString(), 'https://192.168.8.1:8443');
     expect(platform.server!.pins.single, hasLength(64));
     expect(platform.server!.serverId, contractResponse('api/info.json')['server_id']);
+    expect(platform.server!.deviceId, (contractResponse('api/invite_accept.json')['device'] as Map)['id'],
+        reason: 'for the proof a server gives over plain http');
     expect(platform.routeChecks, 1, reason: 'the local address is tried right away');
   });
 

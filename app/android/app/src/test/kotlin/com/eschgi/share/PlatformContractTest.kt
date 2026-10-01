@@ -26,7 +26,21 @@ class PlatformContractTest {
         assertEquals("https://192.168.8.1:8443", c.localUrl)
         assertEquals(listOf("3f1c9e0a5b7d2c4e6f8091a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6"), c.pins)
         assertEquals("q3m7k2x9w4t8r5n6p2j7h3c9d4", c.serverId)
+        assertEquals("dv6kq3zt7wbxl2m4nf5yh8rc", c.deviceId)
         assertEquals(true, c.hasLocal)
+        assertEquals(false, c.publicIsHttp)
+    }
+
+    @Test
+    fun aServerAtHomeOverPlainHttp() {
+        // No pins: nothing to pin over plain http; the probe asks for the proof instead.
+        val home = ServerConfig.parse("""{"public_url":"https://share.example.com","local_url":"http://192.168.8.1:8080","pins":[],"server_id":"s"}""")!!
+        assertEquals(true, home.hasLocal)
+        assertEquals(true, home.needsProbe)
+        val onlyHome = ServerConfig.parse("""{"public_url":"http://192.168.8.1:8080","local_url":"","pins":[],"server_id":"s"}""")!!
+        assertEquals(false, onlyHome.hasLocal)
+        assertEquals(true, onlyHome.publicIsHttp)
+        assertEquals(true, onlyHome.needsProbe)
     }
 
     @Test

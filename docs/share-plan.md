@@ -46,9 +46,14 @@ later.
   local address is optional and is preferred whenever it answers. The app checks when the network changes
   and before each batch, with a short timeout. Without a local address everything uses the public one,
   e.g. on a VPS. Both addresses come with an invite; nothing changes on the router.
-- **Is the local address really this server?** Many homes use 192.168.8.x, so the server uses its own
-  self-signed certificate there, and the app pins that certificate's fingerprint, which it learns over
-  the public address.
+- **Is the local address really this server?** Many homes use 192.168.8.x, so over https the server uses
+  its own self-signed certificate there, and the app pins that certificate's fingerprint, which it learns
+  over the public address. Over plain http there is no certificate: before the app sends its key there,
+  the server proves it keeps the hash of that key, with an HMAC of a nonce the app picked. It gives that
+  proof only to the home network, so it can't be fetched through the tunnel and passed on.
+- **Plain http only at home.** The server speaks plain http to home networks and to itself, so trying
+  Share needs no certificate; from anywhere else pages go to the public https address and the API turns
+  requests away.
 - **The website always uses the public address.** Browsers don't let a public page switch to a local one.
 - **Uploads** use tus in chunks below Cloudflare's 100 MB request limit (Free and Pro plans), e.g. 50 MB.
   A running upload can switch between the two addresses, because both reach the same tus upload.

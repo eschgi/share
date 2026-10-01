@@ -64,7 +64,8 @@ Both speak English, German and Italian.
 | Part | State |
 |------|-------|
 | Server: PINs, uploads, storage, thumbnails | works |
-| Server: accounts and invites, library and downloads, a local address for the app | works |
+| Server: accounts and invites, library and downloads, an address at home for the app | works |
+| Plain http at home for the website and the app, https everywhere else | works |
 | Server: managing PINs and people, deleting and restoring files | works |
 | Website: sending with a PIN, the invite page (English, German, Italian) | works |
 | Website: continuing after the page was closed, install as an app | works |
@@ -89,7 +90,8 @@ The plan and the screens are in [`docs/`](docs/).
 - The app shows the library by day. It saves photos and videos into the gallery, in the album
   "Share", and documents into Downloads. It sends the same way as the website. Transfers keep going
   when the app is closed, and continue where they stopped after an interruption.
-- At home the app reaches the server on its local address, without Cloudflare and the internet.
+- At home the app reaches the server on its address at home (`home_url`), plain http or https,
+  without Cloudflare and the internet.
 - Deleted files stay in Recently deleted for 30 days (`trash_days`), and admins can bring them back.
 
 ## Security
@@ -103,12 +105,20 @@ The plan and the screens are in [`docs/`](docs/).
 - Each phone has its own key. The server keeps only its SHA-256 hash, as for every token. On the
   phone it's encrypted with a key in the Android KeyStore and left out of backups. Admins can sign
   a phone out.
-- The local address uses HTTPS with a certificate the server makes itself. The app trusts it only
-  because it learned the fingerprint over the public address.
+- Plain http works only on a home network and on the server itself; from anywhere else pages are
+  sent to the https address and the API turns requests away. At home it is unencrypted, so anyone
+  on the same Wi-Fi could read along; an https port avoids that.
+- Before the app sends its key to an address over plain http, the server there has to prove it is
+  the phone's own: an HMAC of a nonce the phone picked, keyed with the hash of the phone's key, which
+  only that server keeps. So at someone else's home, with the same 192.168.x addresses, the app
+  doesn't hand its key to another device. The server gives the proof only to the home network.
+- An https port at home uses a certificate the server makes itself. The app trusts it only because
+  it learned the fingerprint over the public address.
 - PINs and invites in links come after the `#`, which browsers don't send to the server or to
   Cloudflare, and the pages remove them from the address bar.
 - The website loads nothing from elsewhere, fonts included, and has a strict Content Security
-  Policy. Its cookies are `__Host-`, HttpOnly and SameSite=Strict. Downloads are marked so that
+  Policy. Its cookies are HttpOnly and SameSite=Strict, and `__Host-` except over plain http at
+  home, where browsers keep no secure ones. Downloads are marked so that
   Cloudflare neither caches nor changes them.
 
 ## Try it locally
@@ -132,16 +142,14 @@ server/share pin create --day      # prints a PIN and a link
 server/share serve                 # http://localhost:8080; also prints an invite for the first admin
 ```
 
-Plain `http://` is accepted only for `localhost`.
+Plain `http://` works on the server itself and from the home network; from anywhere else Share
+wants https. `share serve` also prints the address on your network, e.g. `http://192.168.1.20:8080`:
+open that on a phone or tablet. To have links and invites point there too, use it as
+`public_url`.
 
 For work on the website, `cd web && npm run dev` serves it with hot reload and forwards the API to
-the server on `127.0.0.1:8080`.
-
-To try it on a phone or tablet, the page has to come over https or from `localhost`. Browsers keep
-the PIN's cookie only there, so with the PC's address (`http://192.168.1.20:8080`) every upload is
-refused. Go through the public address (a Cloudflare Tunnel works for a PC too), or, with an Android
-phone on USB, run `adb reverse tcp:5173 tcp:5173` (`tcp:8080` for `share serve`) and open
-`http://localhost:5173` on the phone.
+the server on `127.0.0.1:8080`; `npm run dev -- --host` makes it reachable from phones at home
+(`http://192.168.1.20:5173`).
 
 ## Running it
 
@@ -157,7 +165,7 @@ phone on USB, run `adb reverse tcp:5173 tcp:5173` (`tcp:8080` for `share serve`)
 4. Run `share serve` as a service. The first start prints an invite for the first admin, who opens
    it on their phone.
 5. Put it behind a Cloudflare Tunnel ([`deploy/cloudflared`](deploy/cloudflared/README.md)), or let
-   it serve HTTPS itself with `tls_cert_file` and `tls_key_file`.
+   it serve HTTPS itself: `"https": {"listen": ":443", "certificate": {"cert_file": "…", "key_file": "…"}}`.
 
 On Windows:
 
@@ -168,8 +176,8 @@ On Windows:
 - If PowerShell refuses to run the scripts, start them with
   `powershell -ExecutionPolicy Bypass -File scripts\build-windows.ps1`.
 
-`share` without arguments lists the other commands: PINs, invites, people, passwords and the local
-certificate.
+`share` without arguments lists the other commands: PINs, invites, people, passwords and the https
+port's own certificate.
 
 People get the app from the invite page, which offers the APK set in `app.apk_file` and then hands
 the invite to the app. Each release has it as `share.apk`, with `share.apk.json` (its version) to put
@@ -178,16 +186,30 @@ next to it. How to build the APK yourself is in [`app/README.md`](app/README.md)
 ## Configuration
 
 `config.example.json` has the common settings. Everything except `public_url` and `storage_dir`
-has a default. Unknown or misspelled fields stop the server with a message saying which one.
+has a default. Unknown or misspelled fields stop the server with a message saying which one, and
+settings of earlier versions with where they went.
+
+The ports:
+
+- `http`, `{"listen": ":8080"}` unless set otherwise: the website, the API and uploads over plain
+  http. Cloudflare's tunnel comes in here. Browsers and the app may use it directly only from a home
+  network (`192.168.…`, `10.…`, `172.16–31.…`, `fd…`) or the server itself; pages from anywhere
+  else go to `public_url`, and the API turns them away. `"http": null` switches it off.
+- `https`, off unless set, e.g. `{"listen": ":8443"}`: the same over https, with a certificate the
+  server makes itself (`share cert` shows it), or with
+  `"certificate": {"cert_file": "…", "key_file": "…"}`.
+- `cloudflare`, `true` unless set: requests from `cloudflared` on this machine carry the visitor's
+  address. `{"trusted_proxies": ["192.168.8.20"]}` when `cloudflared` runs elsewhere, `false`
+  without a tunnel.
 
 Behind a Cloudflare Tunnel, [`deploy/cloudflared`](deploy/cloudflared/README.md) lists the
 hostname and the Cloudflare settings Share needs.
 
 For the app, two settings matter:
 
-- `local`: a second address on the home network, over HTTPS with a certificate the server makes
-  itself (`share cert` shows it). The app trusts it only because it learned the certificate's
-  fingerprint over the public address, and uses it whenever the phone can reach it.
+- `home_url`: the address the app uses whenever the phone reaches it, at home: plain http, e.g.
+  `http://192.168.8.1:8080`, or the https port, e.g. `https://192.168.8.1:8443`. The app trusts
+  the https port's own certificate only because it learned the fingerprint over the public address.
 - `app.apk_file`: the APK the invite page offers for download, with `share.apk.json` next to it for
   its version. Without it, the page only offers `app.play_store_url`, once there is one.
 

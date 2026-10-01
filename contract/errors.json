@@ -12,6 +12,7 @@
     "signed_out":             {"status": 401, "meaning": "This phone's token was revoked, or its account deleted. Sign in again."},
     "unauthorized":           {"status": 401, "meaning": "No valid PIN session or device token."},
     "forbidden":              {"status": 403, "meaning": "Not allowed, e.g. deleting a finished upload over tus, or sending a thumbnail more than a day after the upload."},
+    "https_required":         {"status": 403, "meaning": "Plain http from outside a home network. Use the public address, which is https."},
     "password_wrong":         {"status": 403, "meaning": "The current password is wrong."},
     "too_many_uploads":       {"status": 403, "meaning": "tus: too many unfinished uploads for this session; let some finish."},
     "invite_unknown":         {"status": 404, "meaning": "No such invite; the link is wrong or incomplete."},

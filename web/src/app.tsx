@@ -86,12 +86,6 @@ export function App() {
         const [i, keepQueue] = await Promise.all([getInfo(), holdQueueLock()]);
         setInfo(i);
         setLang(pickLanguage(i.languages, storedLanguage(), navigator.languages, i.default_language));
-        // Over plain http (other than localhost) browsers refuse the session cookie, which is
-        // Secure, so a PIN would seem to work and every upload would then be refused.
-        if (!isSecureContext) {
-          dispatch({ type: 'insecure' });
-          return;
-        }
         uploader.current = new Uploader(i, {
           onChange: redraw,
           onAllDone: (files, bytes) => dispatch({ type: 'allDone', files, bytes }),

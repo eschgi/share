@@ -38,8 +38,6 @@ export function PinScreen({ name, problem, unlocking, onSubmit }: Props) {
   const now = Date.now();
   const lockedUntil = problem?.kind === 'locked' ? problem.until : 0;
   const locked = lockedUntil > now;
-  // On a plain-http page no PIN can work; trying would only count as tries.
-  const blocked = locked || problem?.kind === 'insecure';
 
   useEffect(() => {
     if (!lockedUntil) return;
@@ -60,7 +58,7 @@ export function PinScreen({ name, problem, unlocking, onSubmit }: Props) {
   }, [problem]);
 
   const submit = (code: string) => {
-    if (code.length === pinLength && !unlocking && !blocked) onSubmit(code);
+    if (code.length === pinLength && !unlocking && !locked) onSubmit(code);
   };
 
   let message: string | null = null;
@@ -82,9 +80,6 @@ export function PinScreen({ name, problem, unlocking, onSubmit }: Props) {
       break;
     case 'noCookie':
       message = t('pin.noCookie');
-      break;
-    case 'insecure':
-      message = t('pin.insecure');
       break;
     case 'network':
       message = t('pin.network');
@@ -119,7 +114,7 @@ export function PinScreen({ name, problem, unlocking, onSubmit }: Props) {
           enterKeyHint="go"
           maxLength={12}
           aria-label={t('pin.title')}
-          disabled={unlocking || blocked}
+          disabled={unlocking || locked}
           autoFocus
         />
         {Array.from({ length: pinLength }, (_, i) => (
@@ -137,7 +132,7 @@ export function PinScreen({ name, problem, unlocking, onSubmit }: Props) {
         <p class="help">{t('pin.help')}</p>
       )}
       <div class="grow" />
-      <button type="button" class="btn primary" disabled={value.length !== pinLength || unlocking || blocked} onClick={() => submit(value)}>
+      <button type="button" class="btn primary" disabled={value.length !== pinLength || unlocking || locked} onClick={() => submit(value)}>
         <Icon name="lock-open" />
         {t('pin.unlock')}
       </button>

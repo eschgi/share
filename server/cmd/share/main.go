@@ -41,7 +41,7 @@ Usage:
   share users                 list the people with an account and their phones
   share password USERNAME [--name NAME] [--admin]
                               give USERNAME a new password (making the account if needed)
-  share cert                  show the local address's certificate
+  share cert                  show the https port's own certificate
   share cert regenerate       replace it; phones learn the new one by themselves
   share version               print the version
 
@@ -219,7 +219,7 @@ func pin(args []string) error {
 	if err := d.Migrate(ctx, storage.Layout{DataDir: cfg.DataDir}.BackupDir()); err != nil {
 		return err
 	}
-	svc := auth.NewService(d, time.Now, cfg.Proxies, cfg.ClientIPHeader)
+	svc := auth.NewService(d, time.Now, cfg.Proxies, cfg.ClientIPHeader())
 
 	switch sub {
 	case "create":

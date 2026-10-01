@@ -30,7 +30,7 @@ type API struct {
 	MaxFileSize int64 // the effective limit: config and drive together; 0 = none
 	Lib         *storage.Library
 	Thumbs      *thumbs.Store
-	Local       *localtls.Loader // nil without a local address
+	Local       *localtls.Loader // Share's own certificate on the https port; nil without one
 	APK         *APK
 	Now         func() time.Time
 }
@@ -40,6 +40,8 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/info", a.info)
 	mux.HandleFunc("GET /api/app", a.appInfo)
 	mux.HandleFunc("GET /download/share.apk", a.downloadAPK)
+
+	mux.HandleFunc("POST /api/home/proof", a.homeProof)
 
 	mux.HandleFunc("POST /api/pin/unlock", a.unlock)
 	mux.HandleFunc("GET /api/session", a.session)
@@ -161,7 +163,7 @@ func (a *API) unlock(w http.ResponseWriter, r *http.Request) {
 		srv := a.server()
 		resp.Token, resp.Server = res.Token, &srv
 	} else {
-		auth.SetSessionCookie(w, res.Token, res.ExpiresAt, a.Now())
+		auth.SetSessionCookie(w, r, res.Token, res.ExpiresAt, a.Now())
 	}
 	httpx.WriteJSON(w, http.StatusOK, resp)
 }
@@ -186,7 +188,7 @@ func (a *API) endSession(w http.ResponseWriter, r *http.Request) {
 			log.Printf("api: ending session: %v", err)
 		}
 	}
-	auth.ClearSessionCookie(w)
+	auth.ClearSessionCookie(w, r)
 	w.WriteHeader(http.StatusNoContent)
 }
 

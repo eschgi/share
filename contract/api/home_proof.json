@@ -1,0 +1,19 @@
+{
+  "method": "POST",
+  "path": "/api/home/proof",
+  "auth": "none; answered only over plain http from a home network",
+  "status": 200,
+  "request": {
+    "device": "dv6kq3zt7wbxl2m4nf5yh8rc",
+    "nonce": "q7Zt2Wb9Xc4Vn1Mk8Lp3Rs6Tu0Yh5Gf2"
+  },
+  "response": {
+    "proof": "f641e1fe504b6331bcce118a84e58ec29832a32e8435b1da9e003855045e364b"
+  },
+  "example": {
+    "token": "shd_9xQe3vR2mK7pL1sT8wY4zA6bC0dF5gH2jN3kM8qR1sT",
+    "nonce": "q7Zt2Wb9Xc4Vn1Mk8Lp3Rs6Tu0Yh5Gf2",
+    "proof": "f641e1fe504b6331bcce118a84e58ec29832a32e8435b1da9e003855045e364b"
+  },
+  "notes": "Before a phone sends its key to an address over plain http, it asks this with a nonce it picked (16 to 128 characters). proof is the lowercase hex HMAC-SHA256, keyed with the SHA-256 of the phone's token, of \"share-home-proof:\" followed by the nonce: only the phone's own server keeps that hash. Over https or through Cloudflare's tunnel the answer is 404 not_found, so an impostor elsewhere can't fetch one from the real server and pass it on. An unknown or signed-out device is 404 too. example is a worked case for the tests."
+}

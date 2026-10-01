@@ -17,6 +17,8 @@ import (
 	"strings"
 	"time"
 	_ "time/tzdata" // routers often ship without zoneinfo; without this every time zone would be UTC
+
+	"github.com/eschgi/share/server/internal/homenet"
 )
 
 // SupportedLanguages are the languages the website and the app are translated into.
@@ -24,43 +26,128 @@ var SupportedLanguages = []string{"en", "de", "it"}
 
 // Config is config.json. Field names follow the snake_case of the API.
 type Config struct {
-	Name            string   `json:"name"`
-	PublicURL       string   `json:"public_url"`
-	Listen          string   `json:"listen"`
-	TrustedProxies  []string `json:"trusted_proxies"`
-	ClientIPHeader  string   `json:"client_ip_header"`
-	TLSCertFile     string   `json:"tls_cert_file"`
-	TLSKeyFile      string   `json:"tls_key_file"`
-	Local           Local    `json:"local"`
-	StorageDir      string   `json:"storage_dir"`
-	DataDir         string   `json:"data_dir"`
-	TimeZone        string   `json:"time_zone"`
-	Languages       []string `json:"languages"`
-	DefaultLanguage string   `json:"default_language"`
-	Upload          Upload   `json:"upload"`
-	TrashDays       int      `json:"trash_days"`
-	App             App      `json:"app"`
+	Name            string     `json:"name"`
+	PublicURL       string     `json:"public_url"`
+	HomeURL         string     `json:"home_url"`
+	HTTP            *HTTP      `json:"http"`
+	HTTPS           *HTTPS     `json:"https"`
+	Cloudflare      Cloudflare `json:"cloudflare"`
+	StorageDir      string     `json:"storage_dir"`
+	DataDir         string     `json:"data_dir"`
+	TimeZone        string     `json:"time_zone"`
+	Languages       []string   `json:"languages"`
+	DefaultLanguage string     `json:"default_language"`
+	Upload          Upload     `json:"upload"`
+	TrashDays       int        `json:"trash_days"`
+	App             App        `json:"app"`
 
 	// Filled in by Load from the fields above.
 	Location *time.Location `json:"-"`
 	Proxies  []netip.Prefix `json:"-"`
 	Public   *url.URL       `json:"-"`
+	Home     *url.URL       `json:"-"` // nil without home_url
 }
 
-// Local is the optional second address the Android app prefers when it can reach it.
-type Local struct {
+// HTTP is the plain-http port: the website, the API and uploads. Cloudflare's tunnel comes in
+// here; browsers and the app may use it directly only from a home network or this machine.
+// "http": null switches it off.
+type HTTP struct {
 	Listen string `json:"listen"`
-	URL    string `json:"url"`
 }
 
-// URLHost is the host of the local address, for its certificate.
-func (l Local) URLHost() string {
-	u, err := url.Parse(l.URL)
-	if err != nil {
-		return ""
-	}
-	return u.Hostname()
+// HTTPS is the encrypted port, with the same website, API and uploads.
+type HTTPS struct {
+	Listen      string      `json:"listen"`
+	Certificate Certificate `json:"certificate"`
 }
+
+// Certificate is "self-signed", which Share makes itself and the app pins, or a certificate
+// from files: {"cert_file": "…", "key_file": "…"}. Self-signed when left out.
+type Certificate struct {
+	CertFile string `json:"cert_file"`
+	KeyFile  string `json:"key_file"`
+}
+
+// SelfSigned reports whether Share makes the certificate itself.
+func (c Certificate) SelfSigned() bool { return c.CertFile == "" }
+
+func (c *Certificate) UnmarshalJSON(b []byte) error {
+	var name string
+	if json.Unmarshal(b, &name) == nil {
+		if name != "self-signed" {
+			return fmt.Errorf(`https.certificate: %q is not known; use "self-signed" or {"cert_file": …, "key_file": …}`, name)
+		}
+		*c = Certificate{}
+		return nil
+	}
+	type files Certificate // without this method
+	var f files
+	dec := json.NewDecoder(bytes.NewReader(b))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&f); err != nil {
+		return fmt.Errorf(`https.certificate: %w; use "self-signed" or {"cert_file": …, "key_file": …}`, err)
+	}
+	if f.CertFile == "" || f.KeyFile == "" {
+		return errors.New("https.certificate: set both cert_file and key_file")
+	}
+	*c = Certificate(f)
+	return nil
+}
+
+// Cloudflare says whether requests come through a Cloudflare Tunnel: true when cloudflared
+// runs on this machine, {"trusted_proxies": […]} when it runs elsewhere, false without one.
+// Requests from those addresses carry the visitor's address in CF-Connecting-IP.
+type Cloudflare struct {
+	Enabled        bool
+	TrustedProxies []string
+}
+
+func (c *Cloudflare) UnmarshalJSON(b []byte) error {
+	var on bool
+	if json.Unmarshal(b, &on) == nil {
+		*c = Cloudflare{Enabled: on}
+		if on {
+			c.TrustedProxies = slices.Clone(thisMachine)
+		}
+		return nil
+	}
+	var v struct {
+		TrustedProxies []string `json:"trusted_proxies"`
+	}
+	dec := json.NewDecoder(bytes.NewReader(b))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&v); err != nil {
+		return fmt.Errorf(`cloudflare: %w; use true, false or {"trusted_proxies": […]}`, err)
+	}
+	*c = Cloudflare{Enabled: true, TrustedProxies: v.TrustedProxies}
+	return nil
+}
+
+// thisMachine is where cloudflared connects from when it runs next to Share.
+var thisMachine = []string{"127.0.0.1/32", "::1/128"}
+
+// CloudflareHeader carries the visitor's address in requests from Cloudflare's tunnel.
+const CloudflareHeader = "CF-Connecting-IP"
+
+// ClientIPHeader is the header with the visitor's address from trusted proxies, or "" without.
+func (c *Config) ClientIPHeader() string {
+	if c.Cloudflare.Enabled {
+		return CloudflareHeader
+	}
+	return ""
+}
+
+// CertificateHost is the name or address Share's own certificate is made for.
+func (c *Config) CertificateHost() string {
+	if c.Home != nil && c.Home.Scheme == "https" {
+		return c.Home.Hostname()
+	}
+	return "localhost"
+}
+
+// SelfSigned reports whether there is an https port with Share's own certificate, which the
+// app pins on the home address.
+func (c *Config) SelfSigned() bool { return c.HTTPS != nil && c.HTTPS.Certificate.SelfSigned() }
 
 // Upload holds the limits for tus uploads.
 type Upload struct {
@@ -81,10 +168,11 @@ type App struct {
 // Default returns the configuration used for every field config.json leaves out.
 func Default() Config {
 	return Config{
-		Name:            "Share",
-		Listen:          "127.0.0.1:8080",
-		TrustedProxies:  []string{"127.0.0.1/32", "::1/128"},
-		ClientIPHeader:  "CF-Connecting-IP",
+		Name: "Share",
+		// On every interface, so phones at home reach it; plain http from outside a home
+		// network is refused there anyway.
+		HTTP:            &HTTP{Listen: ":8080"},
+		Cloudflare:      Cloudflare{Enabled: true, TrustedProxies: slices.Clone(thisMachine)},
 		Languages:       slices.Clone(SupportedLanguages),
 		DefaultLanguage: "en",
 		Upload: Upload{
@@ -126,6 +214,9 @@ func Load(path string) (*Config, error) {
 // Parse decodes config.json content on top of Default and checks it. Unknown fields are
 // errors, so a typo never silently falls back to a default.
 func Parse(data []byte) (*Config, error) {
+	if moved := movedSettings(data); len(moved) > 0 {
+		return nil, errors.New("config:\n  " + strings.Join(moved, "\n  "))
+	}
 	cfg := Default()
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
@@ -139,6 +230,29 @@ func Parse(data []byte) (*Config, error) {
 		return nil, err
 	}
 	return &cfg, nil
+}
+
+// movedSettings explains the settings of earlier versions instead of calling them unknown.
+func movedSettings(data []byte) []string {
+	var top map[string]json.RawMessage
+	if json.Unmarshal(data, &top) != nil {
+		return nil // the decoder reports what is wrong with it
+	}
+	hints := []struct{ key, hint string }{
+		{"listen", `moved into "http": {"listen": "…"}`},
+		{"tls_cert_file", `moved: "https": {"listen": ":443", "certificate": {"cert_file": "…", "key_file": "…"}}`},
+		{"tls_key_file", `moved: "https": {"listen": ":443", "certificate": {"cert_file": "…", "key_file": "…"}}`},
+		{"local", `replaced: "https": {"listen": "…"} for the port, and "home_url" for the address the app uses at home`},
+		{"trusted_proxies", `moved: "cloudflare": {"trusted_proxies": […]}`},
+		{"client_ip_header", `is gone: behind Cloudflare the visitor's address is in CF-Connecting-IP`},
+	}
+	var moved []string
+	for _, h := range hints {
+		if _, ok := top[h.key]; ok {
+			moved = append(moved, h.key+": "+h.hint)
+		}
+	}
+	return moved
 }
 
 var (
@@ -160,48 +274,63 @@ func (c *Config) complete() error {
 
 	if c.PublicURL == "" {
 		bad("public_url", "is required, e.g. https://share.example.com")
-	} else if u, err := parseOrigin(c.PublicURL, true); err != nil {
+	} else if u, err := parseOrigin(c.PublicURL); err != nil {
 		bad("public_url", "%v", err)
 	} else {
 		c.Public = u
 		c.PublicURL = u.String()
 	}
 
-	if _, _, err := net.SplitHostPort(c.Listen); err != nil {
-		bad("listen", "must be host:port, e.g. 127.0.0.1:8080")
+	if c.HTTP == nil && c.HTTPS == nil {
+		bad("http", `switch on "http", "https" or both; without a port nobody can reach Share`)
+	}
+	if c.HTTP != nil {
+		if c.HTTP.Listen == "" {
+			c.HTTP.Listen = ":8080"
+		}
+		if _, _, err := net.SplitHostPort(c.HTTP.Listen); err != nil {
+			bad("http.listen", "must be host:port or :port, e.g. :8080")
+		}
+	}
+	if c.HTTPS != nil {
+		if c.HTTPS.Listen == "" {
+			c.HTTPS.Listen = ":8443"
+		}
+		if _, _, err := net.SplitHostPort(c.HTTPS.Listen); err != nil {
+			bad("https.listen", "must be host:port or :port, e.g. :8443")
+		} else if c.HTTP != nil && samePort(c.HTTP.Listen, c.HTTPS.Listen) {
+			bad("https.listen", "is the same port as http.listen")
+		}
+	}
+
+	if c.HomeURL != "" {
+		if u, err := parseOrigin(c.HomeURL); err != nil {
+			bad("home_url", "%v", err)
+		} else if u.Scheme == "http" && c.HTTP == nil {
+			bad("home_url", "is an http address, but the http port is switched off")
+		} else if u.Scheme == "https" && c.HTTPS == nil {
+			bad("home_url", `is an https address: switch on "https" for it`)
+		} else {
+			c.Home = u
+			c.HomeURL = u.String()
+		}
 	}
 
 	c.Proxies = nil
-	for _, p := range c.TrustedProxies {
+	if c.Cloudflare.Enabled && len(c.Cloudflare.TrustedProxies) == 0 {
+		bad("cloudflare.trusted_proxies", "needs the address cloudflared connects from, e.g. 192.168.8.20")
+	}
+	for _, p := range c.Cloudflare.TrustedProxies {
 		prefix, err := netip.ParsePrefix(p)
 		if err != nil {
 			addr, err2 := netip.ParseAddr(p)
 			if err2 != nil {
-				bad("trusted_proxies", "%q is neither an address nor a CIDR range", p)
+				bad("cloudflare.trusted_proxies", "%q is neither an address nor a CIDR range", p)
 				continue
 			}
 			prefix = netip.PrefixFrom(addr, addr.BitLen())
 		}
 		c.Proxies = append(c.Proxies, prefix.Masked())
-	}
-
-	if (c.TLSCertFile == "") != (c.TLSKeyFile == "") {
-		bad("tls_cert_file", "set both tls_cert_file and tls_key_file, or neither")
-	}
-
-	if (c.Local.Listen == "") != (c.Local.URL == "") {
-		bad("local", "set both local.listen and local.url, or neither")
-	} else if c.Local.URL != "" {
-		if _, _, err := net.SplitHostPort(c.Local.Listen); err != nil {
-			bad("local.listen", "must be host:port, e.g. :8443")
-		}
-		if u, err := parseOrigin(c.Local.URL, false); err != nil {
-			bad("local.url", "%v", err)
-		} else if u.Scheme != "https" {
-			bad("local.url", "must start with https://")
-		} else {
-			c.Local.URL = u.String()
-		}
 	}
 
 	if c.StorageDir == "" {
@@ -280,8 +409,8 @@ func (c *Config) complete() error {
 }
 
 // parseOrigin accepts an origin such as https://share.example.com (a trailing slash is
-// fine). Plain http is allowed only for localhost, which is handy during development.
-func parseOrigin(raw string, allowLocalHTTP bool) (*url.URL, error) {
+// fine). Plain http only for an address on a home network or this machine (homenet.Host).
+func parseOrigin(raw string) (*url.URL, error) {
 	u, err := url.Parse(strings.TrimSpace(raw))
 	if err != nil || u.Host == "" {
 		return nil, fmt.Errorf("%q is not a URL like https://share.example.com", raw)
@@ -292,12 +421,19 @@ func parseOrigin(raw string, allowLocalHTTP bool) (*url.URL, error) {
 	switch u.Scheme {
 	case "https":
 	case "http":
-		host := u.Hostname()
-		if !allowLocalHTTP || (host != "localhost" && host != "127.0.0.1" && host != "::1") {
-			return nil, fmt.Errorf("%q must use https://", raw)
+		if !homenet.Host(u.Hostname()) {
+			return nil, fmt.Errorf("%q must use https://: plain http is only for addresses at home, such as http://192.168.1.20:8080 or http://share.local:8080", raw)
 		}
 	default:
 		return nil, fmt.Errorf("%q must use https://", raw)
 	}
 	return &url.URL{Scheme: u.Scheme, Host: strings.ToLower(u.Host)}, nil
+}
+
+// samePort reports whether two listen addresses use the same port. Port 0, any free one,
+// never clashes.
+func samePort(a, b string) bool {
+	_, pa, errA := net.SplitHostPort(a)
+	_, pb, errB := net.SplitHostPort(b)
+	return errA == nil && errB == nil && pa == pb && pa != "0"
 }

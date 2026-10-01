@@ -49,7 +49,7 @@ type env struct {
 
 func newEnv(t *testing.T) *env { return newEnvWith(t, "") }
 
-// newEnvWith adds settings to the test configuration, e.g. `"local": {...}`.
+// newEnvWith adds settings to the test configuration, e.g. `"home_url": "…"`.
 func newEnvWith(t *testing.T, settings string) *env {
 	t.Helper()
 	dir := t.TempDir()
@@ -58,7 +58,7 @@ func newEnvWith(t *testing.T, settings string) *env {
 		settings = ", " + settings
 	}
 	cfg, err := config.Parse([]byte(fmt.Sprintf(
-		`{"public_url": "https://share.example.test", "storage_dir": %q, "time_zone": "Europe/Rome", "listen": "127.0.0.1:0"%s}`,
+		`{"public_url": "https://share.example.test", "storage_dir": %q, "time_zone": "Europe/Rome", "http": {"listen": "127.0.0.1:0"}%s}`,
 		storageDir, settings)))
 	if err != nil {
 		t.Fatal(err)

@@ -13,14 +13,25 @@ import org.json.JSONObject
 data class ServerConfig(
     val publicUrl: String,
     val localUrl: String?,
-    /** SHA-256 fingerprints (lowercase hex) of the local address's certificate. */
+    /** SHA-256 fingerprints (lowercase hex) of the local address's certificate, when it is https. */
     val pins: List<String>,
     /** From /api/info; the local address must answer with the same id to be used. */
     val serverId: String?,
+    /** This phone's id on the server, for the proof a server gives over plain http (HomeProof). */
+    val deviceId: String? = null,
 ) {
-    val hasLocal: Boolean get() = !localUrl.isNullOrEmpty() && pins.isNotEmpty()
+    /** An address at home to use: plain http, or https with the server's own pinned certificate. */
+    val hasLocal: Boolean get() = !localUrl.isNullOrEmpty() && (isHttp(localUrl) || pins.isNotEmpty())
+
+    /** A server only at home: its public address is plain http too, so the route check asks it. */
+    val publicIsHttp: Boolean get() = isHttp(publicUrl)
+
+    /** Whether the route check has anything to ask on this network. */
+    val needsProbe: Boolean get() = hasLocal || publicIsHttp
 
     companion object {
+        fun isHttp(url: String?): Boolean = url?.startsWith("http://", ignoreCase = true) == true
+
         fun parse(json: String?): ServerConfig? {
             if (json.isNullOrEmpty()) return null
             return try {
@@ -33,6 +44,7 @@ data class ServerConfig(
                     localUrl = j.optString("local_url").trimEnd('/').ifEmpty { null },
                     pins = List(pins?.length() ?: 0) { pins!!.optString(it) }.filter { it.isNotEmpty() },
                     serverId = if (j.isNull("server_id")) null else j.optString("server_id").ifEmpty { null },
+                    deviceId = if (j.isNull("device_id")) null else j.optString("device_id").ifEmpty { null },
                 )
             } catch (e: JSONException) {
                 null

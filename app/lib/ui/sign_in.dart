@@ -31,7 +31,10 @@ class _SignInScreenState extends State<SignInScreen> {
     super.initState();
     // After a sign-out the address is still known.
     Services.read(context).platform.loadServer().then((c) {
-      if (c != null && mounted && _server.text.isEmpty) _server.text = c.publicUrl.host;
+      if (c != null && mounted && _server.text.isEmpty) {
+        // Just the name for an ordinary https address; with http or a port, all of it.
+        _server.text = c.publicUrl.scheme == 'https' && !c.publicUrl.hasPort ? c.publicUrl.host : c.publicUrl.toString();
+      }
     });
   }
 

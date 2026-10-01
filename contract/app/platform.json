@@ -1,12 +1,13 @@
 {
-  "notes": "What the app's Dart side and its Kotlin side hand each other over the platform channel (app/lib/data/platform.dart, app/android/app/src/main/kotlin/com/eschgi/share/platform/PlatformChannel.kt). Both sides' tests read this file. server_config is what server.save stores and the downloads read; files is the argument of transfer.download; the events arrive on com.eschgi.share/events. The upload event is the batch in upload_rows, with a few of its files: the last one sent, the one on its way and the next ones. The transfer event is the batch in batch_items: skipped files don't count towards the totals.",
+  "notes": "What the app's Dart side and its Kotlin side hand each other over the platform channel (app/lib/data/platform.dart, app/android/app/src/main/kotlin/com/eschgi/share/platform/PlatformChannel.kt). Both sides' tests read this file. server_config is what server.save stores and the downloads read; files is the argument of transfer.download; the events arrive on com.eschgi.share/events. device_id is the phone's id on the server, for the proof it asks of a server over plain http (api/home_proof.json); public_verified says whether a public address over plain http passed that on this network. The upload event is the batch in upload_rows, with a few of its files: the last one sent, the one on its way and the next ones. The transfer event is the batch in batch_items: skipped files don't count towards the totals.",
   "server_config": {
     "public_url": "https://share.example.com",
     "local_url": "https://192.168.8.1:8443",
     "pins": [
       "3f1c9e0a5b7d2c4e6f8091a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6"
     ],
-    "server_id": "q3m7k2x9w4t8r5n6p2j7h3c9d4"
+    "server_id": "q3m7k2x9w4t8r5n6p2j7h3c9d4",
+    "device_id": "dv6kq3zt7wbxl2m4nf5yh8rc"
   },
   "files": [
     {
@@ -84,7 +85,8 @@
     "route": "local",
     "reason": "none",
     "millis": 12,
-    "checking": false
+    "checking": false,
+    "public_verified": false
   },
   "route_reasons": [
     "none",
