@@ -14,6 +14,38 @@ A self-hosted place where family and friends drop photos, videos and documents.
 The server is one Go program without dependencies at runtime. It runs on a router or another
 small Linux machine with a USB drive, or on a VPS. The website is embedded in it.
 
+## Screenshots
+
+**The website**, for sending with a PIN:
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/web-pin.png" width="180" alt="Enter your PIN, with three of the five characters typed"><br><sub>Entering the PIN</sub></td>
+    <td align="center"><img src="docs/screenshots/web-ready.png" width="180" alt="Send your files: this PIN works until tomorrow, 08:06"><br><sub>Ready, with a 24-hour PIN</sub></td>
+    <td align="center"><img src="docs/screenshots/web-sending.png" width="180" alt="Sending your files: 5 of 12, about 3 minutes left"><br><sub>Sending</sub></td>
+    <td align="center"><img src="docs/screenshots/web-join.png" width="180" alt="Stefan invited you: download the app, install it, come back and tap Join"><br><sub>An invite, before the app is installed</sub></td>
+  </tr>
+</table>
+
+**The Android app**, for people with an account:
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/app-library.png" width="180" alt="The library, grouped by upload day"><br><sub>The library, by day</sub></td>
+    <td align="center"><img src="docs/screenshots/app-select.png" width="180" alt="Seven files selected, with a button to download them"><br><sub>Selecting to download</sub></td>
+    <td align="center"><img src="docs/screenshots/app-send.png" width="180" alt="Sending 12 of 40 files, directly over the local Wi-Fi"><br><sub>Sending, over the home Wi-Fi</sub></td>
+    <td align="center"><img src="docs/screenshots/app-settings.png" width="180" alt="An admin's settings: upload PINs, language, theme, server and people"><br><sub>Settings</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/app-pins.png" width="180" alt="A permanent PIN and one for 24 hours"><br><sub>Upload PINs</sub></td>
+    <td align="center"><img src="docs/screenshots/app-invite.png" width="180" alt="An invite for Oma Rosa as a QR code"><br><sub>Inviting someone</sub></td>
+    <td align="center"><img src="docs/screenshots/app-recently-deleted.png" width="180" alt="Recently deleted files, with the days left"><br><sub>Recently deleted</sub></td>
+    <td align="center"><img src="docs/screenshots/app-themes.png" width="180" alt="The theme picker: Automatic, five dark and two light themes"><br><sub>Seven themes</sub></td>
+  </tr>
+</table>
+
+Both speak English, German and Italian.
+
 ## Status
 
 | Part | State |
@@ -28,6 +60,40 @@ small Linux machine with a USB drive, or on a VPS. The website is embedded in it
 | Self-updating app, Google Play, a VPS setup | planned |
 
 The plan and the screens are in [`docs/`](docs/).
+
+## How it works
+
+- An admin makes a PIN, in the app or with `share pin create`: a permanent one, for the family, or
+  one for 24 hours, for a party. A PIN link (`https://share.example.com/#K7M2Q`) fills it in.
+- The website sends with [tus](https://tus.io), in pieces of 20 MiB that the server confirms one by
+  one, so a dropped connection costs at most one piece. If the page is closed in the middle, it
+  offers to continue when it's opened again. It can be installed as an app.
+- A finished file moves into the day's folder. The sender's browser or phone makes its thumbnail; for
+  JPEG, PNG and GIF the server makes one itself if none came.
+- The app shows the library by day. It saves photos and videos into the gallery, in the album
+  "Share", and documents into Downloads. It sends the same way as the website. Transfers keep going
+  when the app is closed, and continue where they stopped after an interruption.
+- At home the app reaches the server on its local address, without Cloudflare and the internet.
+- Deleted files stay in Recently deleted for 30 days (`trash_days`), and admins can bring them back.
+
+## Security
+
+- A PIN only lets people send. Nobody can see or download anything with it, and others with the same
+  PIN don't see what was sent.
+- Wrong PINs are limited: 5 from one browser or phone, or 30 from one address, within 10 minutes,
+  then a 10-minute pause. Above 300 an hour in total, new unlocks pause; sending goes on. Sign-ins
+  and invites have limits too.
+- An invite works once, within 24 hours. Passwords are optional; the server keeps PBKDF2 hashes.
+- Each phone has its own key. The server keeps only its SHA-256 hash, as for every token. On the
+  phone it's encrypted with a key in the Android KeyStore and left out of backups. Admins can sign
+  a phone out.
+- The local address uses HTTPS with a certificate the server makes itself. The app trusts it only
+  because it learned the fingerprint over the public address.
+- PINs and invites in links come after the `#`, which browsers don't send to the server or to
+  Cloudflare, and the pages remove them from the address bar.
+- The website loads nothing from elsewhere, fonts included, and has a strict Content Security
+  Policy. Its cookies are `__Host-`, HttpOnly and SameSite=Strict. Downloads are marked so that
+  Cloudflare neither caches nor changes them.
 
 ## Try it locally
 
@@ -55,6 +121,24 @@ Plain `http://` is accepted only for `localhost`.
 For work on the website, `cd web && npm run dev` serves it with hot reload and forwards the API to
 the server on `127.0.0.1:8080`.
 
+## Running it
+
+1. `scripts/build.sh` builds `dist/share-linux-arm64` and `dist/share-linux-amd64`. Copy the one for
+   the machine.
+2. Write `config.json` from `config.example.json`, with at least `public_url` and `storage_dir`.
+3. With the drive mounted, run `share init` once. `share check` says whether the drive suits: ext4
+   is best, FAT32 can't hold files over 4 GiB.
+4. Run `share serve` as a service. The first start prints an invite for the first admin, who opens
+   it on their phone.
+5. Put it behind a Cloudflare Tunnel ([`deploy/cloudflared`](deploy/cloudflared/README.md)), or let
+   it serve HTTPS itself with `tls_cert_file` and `tls_key_file`.
+
+`share` without arguments lists the other commands: PINs, invites, people, passwords and the local
+certificate.
+
+People get the app from the invite page, which offers the APK set in `app.apk_file` and then hands
+the invite to the app. How to build the APK is in [`app/README.md`](app/README.md).
+
 ## Configuration
 
 `config.example.json` has the common settings. Everything except `public_url` and `storage_dir`
@@ -77,11 +161,11 @@ For the app, two settings matter:
 |--------|--------------|
 | `server/` | The Go server (`cmd/share`), with the website embedded |
 | `web/` | The website: Vite, TypeScript, Preact and Uppy |
-| `app/` | The Android app: Flutter, with Kotlin for downloads, the local address and the phone's key ([README](app/README.md)) |
+| `app/` | The Android app: Flutter, with Kotlin for transfers, the local address and the phone's key ([README](app/README.md)) |
 | `contract/` | JSON fixtures the server, website and app tests share: PIN rules, error codes, API responses |
 | `deploy/` | The Cloudflare Tunnel settings |
 | `scripts/` | `build.sh` and `build.ps1`: the website, then the server for linux/arm64 and linux/amd64 |
-| `docs/` | The plan and the screen mockups |
+| `docs/` | The plan, the screen mockups and the screenshots above |
 
 ## Development
 

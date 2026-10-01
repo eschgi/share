@@ -31,6 +31,9 @@ keyAlias=…
 keyPassword=…
 ```
 
+Then `flutter build apk --flavor direct --release` makes
+`build/app/outputs/flutter-apk/app-direct-release.apk`, the file for the server's `app.apk_file`.
+
 ## Tests
 
 ```sh
