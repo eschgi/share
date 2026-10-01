@@ -60,7 +60,7 @@ class MediaStoreSink(private val resolver: ContentResolver, val uri: Uri) : Down
     companion object {
         const val ALBUM = "Share"
 
-        /** A new pending row for [file]. Media the gallery won't take goes to Download/Share. */
+        /** A new pending row for [file], with an empty file. Media the gallery won't take goes to Download/Share. */
         fun create(resolver: ContentResolver, file: FileRef): MediaStoreSink {
             if (file.isMedia) {
                 val collection = if (file.kind == "video") {
@@ -101,8 +101,12 @@ class MediaStoreSink(private val resolver: ContentResolver, val uri: Uri) : Down
             return false
         }
 
-        private fun insert(resolver: ContentResolver, collection: Uri, file: FileRef, path: String): Uri? =
-            resolver.insert(
+        /**
+         * A pending row and its empty file. MediaStore makes the file only when the row is first
+         * opened for writing, and until then not even its length can be read.
+         */
+        private fun insert(resolver: ContentResolver, collection: Uri, file: FileRef, path: String): Uri? {
+            val uri = resolver.insert(
                 collection,
                 ContentValues().apply {
                     put(MediaStore.MediaColumns.DISPLAY_NAME, file.name)
@@ -110,6 +114,14 @@ class MediaStoreSink(private val resolver: ContentResolver, val uri: Uri) : Down
                     put(MediaStore.MediaColumns.RELATIVE_PATH, path)
                     put(MediaStore.MediaColumns.IS_PENDING, 1)
                 },
-            )
+            ) ?: return null
+            try {
+                resolver.openFileDescriptor(uri, "rwt")?.close()
+            } catch (e: Exception) {
+                runCatching { resolver.delete(uri, null, null) }
+                throw e
+            }
+            return uri
+        }
     }
 }

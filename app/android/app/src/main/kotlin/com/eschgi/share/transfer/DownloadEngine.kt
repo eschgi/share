@@ -210,7 +210,9 @@ object DownloadEngine {
                         attempts = if (outcome.progressed) 1 else attempts + 1
                         if (attempts >= MAX_ATTEMPTS) {
                             // The partial file stays, so "Try again" continues it.
-                            db.finish(item.batch, file.id, TransferItem.FAILED, outcome.cause?.toString() ?: "HTTP ${outcome.status}")
+                            val error = outcome.cause?.toString() ?: "HTTP ${outcome.status}"
+                            Log.w(TAG, "download of ${file.id} failed: $error")
+                            db.finish(item.batch, file.id, TransferItem.FAILED, error)
                             return
                         }
                         if (route.isLocal) RouteMonitor.check(app) // maybe the local address went away
@@ -227,6 +229,7 @@ object DownloadEngine {
     }
 
     private fun fail(db: TransferDb, item: TransferItem, sink: DownloadSink, error: String) {
+        Log.w(TAG, "download of ${item.file.id} failed: $error")
         sink.discard()
         db.setTarget(item.batch, item.file.id, null)
         db.finish(item.batch, item.file.id, TransferItem.FAILED, error)
