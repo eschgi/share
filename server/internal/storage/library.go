@@ -172,18 +172,6 @@ func (lib *Library) moveIntoLibrary(f db.File) error {
 	return nil
 }
 
-func syncFile(root *os.Root, name string) error {
-	fh, err := root.Open(name)
-	if err != nil {
-		return err
-	}
-	defer fh.Close()
-	if err := fh.Sync(); err != nil && !errors.Is(err, os.ErrInvalid) {
-		return err
-	}
-	return nil
-}
-
 func (lib *Library) classify(f db.File) (mime, kind string) {
 	head := make([]byte, 512)
 	fh, err := lib.root.Open(f.RelPath)

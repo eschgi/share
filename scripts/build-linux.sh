@@ -2,8 +2,8 @@
 # Builds the website into the server, then the server for the router (linux/arm64) and for
 # a VPS (linux/amd64). Output: dist/share-linux-arm64, dist/share-linux-amd64.
 #
-#   scripts/build.sh            version from git (e.g. v0.1.0-3-gabc1234, or the commit)
-#   VERSION=0.1.0 scripts/build.sh
+#   scripts/build-linux.sh            version from git (e.g. v0.1.0-3-gabc1234, or the commit)
+#   VERSION=0.1.0 scripts/build-linux.sh
 set -eu
 
 root=$(cd "$(dirname "$0")/.." && pwd)
@@ -20,6 +20,6 @@ for arch in arm64 amd64; do
 		go build -trimpath -ldflags "-s -w -X main.version=$version" -o "$out" ./cmd/share)
 done
 
-(cd "$root/dist" && sha256sum share-linux-* > SHA256SUMS)
+(cd "$root/dist" && sha256sum share-* > SHA256SUMS)
 echo "Done:"
 ls -l "$root/dist"

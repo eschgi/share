@@ -1,0 +1,2 @@
+# Shell scripts keep LF in a Windows checkout too, so they still run in Git Bash and WSL.
+*.sh text eol=lf

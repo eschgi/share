@@ -123,8 +123,10 @@ the server on `127.0.0.1:8080`.
 
 ## Running it
 
-1. `scripts/build.sh` builds `dist/share-linux-arm64` and `dist/share-linux-amd64`. Copy the one for
-   the machine.
+1. `scripts/build-linux.sh` builds `dist/share-linux-arm64` and `dist/share-linux-amd64`;
+   `scripts/build-windows.sh` builds `dist/share-windows-amd64.exe` and
+   `dist/share-windows-arm64.exe`. On Windows, the PowerShell scripts `scripts\build-linux.ps1` and
+   `scripts\build-windows.ps1` do the same. Copy the one for the machine.
 2. Write `config.json` from `config.example.json`, with at least `public_url` and `storage_dir`.
 3. With the drive mounted, run `share init` once. `share check` says whether the drive suits: ext4
    is best, FAT32 can't hold files over 4 GiB.
@@ -132,6 +134,15 @@ the server on `127.0.0.1:8080`.
    it on their phone.
 5. Put it behind a Cloudflare Tunnel ([`deploy/cloudflared`](deploy/cloudflared/README.md)), or let
    it serve HTTPS itself with `tls_cert_file` and `tls_key_file`.
+
+On Windows:
+
+- Write paths in `config.json` with forward slashes, `"storage_dir": "D:/Share"`, or with doubled
+  backslashes.
+- `share check` can't ask a Windows drive for its file system and free space yet, so nothing holds
+  uploads back before the drive is full, and FAT32's 4 GiB limit goes unnoticed. Use an NTFS drive.
+- If PowerShell refuses to run the scripts, start them with
+  `powershell -ExecutionPolicy Bypass -File scripts\build-windows.ps1`.
 
 `share` without arguments lists the other commands: PINs, invites, people, passwords and the local
 certificate.
@@ -164,7 +175,7 @@ For the app, two settings matter:
 | `app/` | The Android app: Flutter, with Kotlin for transfers, the local address and the phone's key ([README](app/README.md)) |
 | `contract/` | JSON fixtures the server, website and app tests share: PIN rules, error codes, API responses |
 | `deploy/` | The Cloudflare Tunnel settings |
-| `scripts/` | `build.sh` and `build.ps1`: the website, then the server for linux/arm64 and linux/amd64 |
+| `scripts/` | `build-linux` and `build-windows`, each as `.sh` and `.ps1`: the website, then the server for arm64 and amd64 |
 | `docs/` | The plan, the screen mockups and the screenshots above |
 
 ## Development
@@ -174,7 +185,8 @@ For the app, two settings matter:
 (cd web && npm run typecheck && npm test)
 (cd app && flutter analyze && flutter test)
 (cd app/android && ./gradlew testDirectDebugUnitTest testPlayDebugUnitTest)
-scripts/build.sh                               # dist/share-linux-arm64, dist/share-linux-amd64
+scripts/build-linux.sh                         # dist/share-linux-arm64, dist/share-linux-amd64
+scripts/build-windows.sh                       # dist/share-windows-{amd64,arm64}.exe
 ```
 
 ## License
