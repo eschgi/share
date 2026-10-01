@@ -471,6 +471,72 @@
   .dialog p b{color:var(--text);font-weight:500}
   .dbtns{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:22px}
   .dbtns .btn{padding:0 20px}
+
+  /* ---------- bigger screens: tablets, and a computer's browser window ---------- */
+  /* Drawn at full size and shown at half; the website gets the same layouts from media queries. */
+  .sub-h{font-size:13px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--canvas-dim);margin:44px 0 0}
+  .slot.tab{width:410px} .slot.tabl{width:590px} .slot.wide{width:720px}
+  .tablet,.desktop{background:var(--bg);color:var(--text);position:relative;overflow:hidden;display:flex;flex-direction:column;
+    border:1px solid #2F2722;box-shadow:0 30px 70px rgba(0,0,0,.6),0 3px 10px rgba(0,0,0,.45);zoom:.5}
+  .tablet{width:820px;height:1180px;border-radius:44px}
+  .tablet.land{width:1180px;height:820px}
+  .desktop{width:1440px;height:900px;border-radius:14px}
+  body.shot .tablet,body.shot .desktop{zoom:1;border-radius:0;border:0;box-shadow:none}
+  body.shot .slot.tab,body.shot .slot.tabl,body.shot .slot.wide{width:auto}
+
+  /* the browser around the page: one tab with the page's title, and the address */
+  .chrome{flex:none;background:#0D0A08}
+  .tabs{height:40px;display:flex;align-items:flex-end;padding:0 12px}
+  .wdots{display:flex;gap:8px;align-self:center;margin-right:16px} .wdots i{width:12px;height:12px;border-radius:50%;background:#3A302A}
+  .btab{height:32px;width:240px;display:flex;align-items:center;gap:9px;padding:0 14px;border-radius:10px 10px 0 0;background:var(--bar);
+    font-size:13px;color:var(--text)}
+  .btab .ic{width:15px;height:15px}
+  .addr{height:40px;display:flex;align-items:center;padding:0 12px;background:var(--bar);border-bottom:1px solid var(--line-soft)}
+  .addr .u{flex:1;height:28px;border-radius:14px;background:#110E0C;display:flex;align-items:center;gap:8px;padding:0 14px;font-size:13px;color:var(--text-2)}
+  .addr .ic{width:13px;height:13px;color:var(--text-3)}
+  .dview{flex:1;min-height:0;display:flex;flex-direction:column;position:relative;overflow:hidden}
+
+  /* a header across the page, then one card, or two panes */
+  .dhead{width:1200px;max-width:calc(100% - 64px);margin:0 auto;padding-top:16px;flex:none}
+  .dhead .brand{height:52px}
+  .dcard{width:560px;margin:auto;padding:30px 40px;border:1px solid var(--line);border-radius:28px;box-shadow:0 30px 80px rgba(0,0,0,.35);
+    display:flex;flex-direction:column;flex:none}
+  .dcard > :first-child{margin-top:0}
+  .dcard > .grow{flex:none;height:22px}
+  .dcard .stack{width:380px;margin:0 auto 26px}
+  .dcard.wide{width:760px;margin:14px auto auto}
+  .dsplit,.dsend,.djoin{width:1200px;max-width:calc(100% - 64px);display:grid;flex:none}
+  .dsplit{margin:auto;grid-template-columns:1fr 1fr;gap:72px;align-items:center;padding-bottom:24px}
+  .djoin{margin:auto;grid-template-columns:1fr 400px;gap:88px;align-items:center;padding-bottom:24px}
+  .dsend{margin:0 auto;padding-top:18px;grid-template-columns:340px 1fr;gap:48px;align-items:start}
+  .pane{display:flex;flex-direction:column;min-width:0}
+  .pane > :first-child{margin-top:0}
+  .dsplit .stack{width:380px;margin:0 0 30px}
+  .dsplit .hero{font-size:46px}
+  .pane .small{margin-top:16px}
+  .gfill{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}
+
+  /* the drop area on computers; on touch screens a plain panel with the button */
+  .drop{min-height:430px;border:2px dashed var(--line);border-radius:30px;background:var(--s1);display:flex;flex-direction:column;
+    align-items:center;justify-content:center;text-align:center;padding:36px 48px}
+  .drop.touch{border-style:solid;border-color:var(--line-soft);min-height:380px}
+  .drop .roundico{margin:0 0 18px}
+  .drop-t{font-size:21px;font-weight:600;margin:0}
+  .drop-or{font-size:14px;color:var(--text-3);margin:12px 0 0}
+  .drop .btn.primary{width:100%;max-width:360px;margin-top:14px}
+  .drop .btn.link{margin-top:6px;padding:0 16px}
+  .btn.link .ic{width:20px;height:20px}
+
+  /* files dragged over the window */
+  .dropov{position:absolute;inset:0;z-index:8;background:rgba(10,8,6,.8);padding:28px;display:flex}
+  .dropov > div{flex:1;border:3px dashed var(--accent-text);border-radius:30px;background:rgba(232,125,80,.06);display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:20px}
+  .dropov .roundico{margin:0;width:96px;height:96px} .dropov .roundico .ic{width:44px;height:44px}
+  .dropov b{font-family:var(--serif);font-size:34px;font-weight:700}
+
+  .qrcard.lg{margin:0;padding:28px}
+  .qrcard.lg .qr{width:260px;height:260px;padding:16px}
+  .qrcard.lg b{font-size:16px;font-weight:600;margin-top:18px}
 </style>
 </head>
 <body>
@@ -489,6 +555,7 @@
   <symbol id="i-lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
   <symbol id="i-lock-open" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></symbol>
   <symbol id="i-smartphone" viewBox="0 0 24 24"><rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></symbol>
   <symbol id="i-rotate" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
   <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
   <symbol id="i-back" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></symbol>
@@ -542,7 +609,7 @@
       <div class="sec-tag">Website · installable PWA</div>
       <h2>Anyone with a PIN can send</h2>
       <p>Uppy runs headless underneath: tus for resumable uploads, Golden Retriever to survive a closed tab. The screens on top are our own,
-        because Uppy's stock Dashboard shows far more than someone sending a few photos needs. On a desktop the same pages sit in a centred column.
+        because Uppy's stock Dashboard shows far more than someone sending a few photos needs. Tablets and computers get their own layouts, below.
         The language comes from the browser; the globe button on the first screens switches it. Cloudflare sits in front and
         provides the HTTPS a PWA needs.</p>
     </div>
@@ -558,7 +625,7 @@
             <div class="brand"><span data-i="images"></span><span translate="no">Share</span><span class="langpill"><span data-i="globe"></span>EN</span></div>
             <div class="roundico"><span data-i="lock"></span></div>
             <h1 class="hero">Enter your PIN</h1>
-            <p class="lead">The 5-character code you were given. You only need it once on this phone.</p>
+            <p class="lead">The 5-character code you were given. You only need it once on this device.</p>
             <div class="pin"><b>K</b><b>7</b><b>M</b><b>2</b><b class="focus"></b></div>
             <p class="help">Letters or numbers. Capital or small doesn't matter.</p>
             <div class="grow"></div>
@@ -650,7 +717,7 @@
             </div>
             <div class="ghostcard">
               <div class="gh-t"><span data-i="alert"></span>2 videos need to be picked again</div>
-              <p>Your phone didn't keep these big files. Pick the same two again and they go on from where they stopped.</p>
+              <p>This browser didn't keep these big files. Pick the same two again and they go on from where they stopped.</p>
               <div class="ghrow"><div class="ghthumb"><span data-i="video"></span></div><div><b>20260927_101530.mp4</b><span>1.2 GB · 64% already sent</span></div></div>
               <div class="ghrow"><div class="ghthumb"><span data-i="video"></span></div><div><b>20260927_102211.mp4</b><span>380 MB · not started</span></div></div>
               <div class="btn tonal sm">Pick these 2 again</div>
@@ -683,6 +750,83 @@
             <p class="small">You can close this page now.</p>
           </div>
         </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ================================================================= WEBSITE ON BIGGER SCREENS -->
+  <section class="sec">
+    <div class="sec-head">
+      <div class="sec-tag">Website · tablets and computers</div>
+      <h2>The same pages, using the space</h2>
+      <p>Phones keep the screens above exactly. From 640 points wide (and 540 tall) the pages get a header across the window and one
+        card in the middle; from 1024 wide, Ready, Sending and the invite page get two panes. The size decides the layout, the pointer the
+        wording: with a mouse the page says "drop here" and "this tab", with a touch screen it keeps the phone's words. Shown here in a
+        1440×900 browser window, on an upright 820×1180 tablet and on the same tablet lying down.</p>
+    </div>
+    <p class="sub-h">On a computer</p>
+    <div class="board">
+
+      <div class="slot wide">
+        <h3><span class="n">1</span>PIN, on a computer <span class="badge new">new</span></h3>
+        <p class="cap">Screens with one task stay one column, in a card in the middle of the window, with the button right under the content instead of at the bottom of the window. Welcome back and Done look the same. "This phone" becomes "this device".</p>
+        <div class="desktop" data-shot="01-pin-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span translate="no">Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com</span></div></div><div class="dview"><div class="dhead"><div class="brand"><span data-i="images"></span><span translate="no">Share</span><span class="langpill"><span data-i="globe"></span>EN</span></div></div><div class="dcard"><div class="roundico"><span data-i="lock"></span></div><h1 class="hero">Enter your PIN</h1><p class="lead">The 5-character code you were given. You only need it once on this device.</p><div class="pin"><b>K</b><b>7</b><b>M</b><b>2</b><b class="focus"></b></div><p class="help">Letters or numbers. Capital or small doesn't matter.</p><div class="grow"></div><div class="btn off"><span data-i="lock-open"></span>Unlock</div><p class="small">Got a link? Opening it fills this in for you.</p></div></div></div>
+      </div>
+      <div class="slot wide">
+        <h3><span class="n">2</span>Ready, on a computer <span class="badge new">new</span></h3>
+        <p class="cap">Two panes: what this is on the left, a big drop area on the right. Files and whole folders can be dropped anywhere on the page; a folder's files land in the day's folder like any other. "Choose a folder" only shows with a mouse.</p>
+        <div class="desktop" data-shot="02-ready-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span translate="no">Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com</span></div></div><div class="dview"><div class="dhead"><div class="brand"><span data-i="images"></span><span translate="no">Share</span><span class="langpill"><span data-i="globe"></span>EN</span></div></div><div class="dsplit"><div class="pane"><div class="stack"><div class="pc pa ph t1"><span data-i="image"></span></div><div class="pc pb ph t2"><span data-i="image"></span></div><div class="pc pcen"><span data-i="file"></span><span class="ext">PDF</span></div></div><h1 class="hero">Send your files</h1><p class="lead">Photos, videos, documents, anything. Everything arrives unchanged, in full quality.</p></div><div class="pane"><div class="drop"><div class="roundico"><span data-i="upload"></span></div><p class="drop-t">Drop files or folders here</p><p class="drop-or">or</p><div class="btn primary"><span data-i="plus"></span>Choose files</div><div class="btn link"><span data-i="folder"></span>Choose a folder</div></div><p class="small">Tip: use Wi-Fi for big batches. If the page closes, open it again and it carries on.</p></div></div></div></div>
+      </div>
+      <div class="slot wide">
+        <h3><span class="n">3</span>With a 24-hour PIN, on a computer <span class="badge new">new</span></h3>
+        <p class="cap">The same page with a 24-hour PIN: until when it works sits under the text, as on the phone.</p>
+        <div class="desktop" data-shot="03-24-hour-pin-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span translate="no">Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com</span></div></div><div class="dview"><div class="dhead"><div class="brand"><span data-i="images"></span><span translate="no">Share</span><span class="langpill"><span data-i="globe"></span>EN</span></div></div><div class="dsplit"><div class="pane"><div class="stack"><div class="pc pa ph t6"><span data-i="image"></span></div><div class="pc pb ph t5"><span data-i="image"></span></div><div class="pc pcen"><span data-i="file"></span><span class="ext">PDF</span></div></div><h1 class="hero">Send your files</h1><p class="lead">Photos, videos, documents, anything. No app, no account.</p><div class="timepill"><span data-i="clock"></span>This PIN works until tomorrow, 18:30</div></div><div class="pane"><div class="drop"><div class="roundico"><span data-i="upload"></span></div><p class="drop-t">Drop files or folders here</p><p class="drop-or">or</p><div class="btn primary"><span data-i="plus"></span>Choose files</div><div class="btn link"><span data-i="folder"></span>Choose a folder</div></div><p class="small">Others with this PIN can't see what you send.</p></div></div></div></div>
+      </div>
+      <div class="slot wide">
+        <h3><span class="n">4</span>Sending, on a computer <span class="badge new">new</span></h3>
+        <p class="cap">Progress on the left, which stays in view while the tiles scroll with the page. The tab shows the percentage, so it can be followed from another tab, and closing the tab asks first while files are on their way. Files to pick again and files too large to send show in that column too, under the progress.</p>
+        <div class="desktop" data-shot="04-sending-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>37% · Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com</span></div></div><div class="dview"><div class="dhead"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div></div><div class="dsend"><div class="side pane"><h1 class="hero md">Sending your files…</h1><div class="count"><span class="big">37</span><span class="of">of 100</span><span class="eta">About 3 min left</span></div><div class="bar"><i style="width:37%"></i></div><div class="bytes"><span>520 MB of 1.4 GB</span></div><div class="note"><span data-i="monitor"></span><p data-tr><b>Keep this tab open.</b> You can work in other windows meanwhile.</p></div><div class="btn outline">Add more files</div></div><div class="grid gfill" data-tiles="p1/k d#PDF/k p2/k v3/k d#DOCX/k p4/k p5/k p6/k v7/k p8/k p9/k p10/k p1/k p3/k d#PDF/k p6/k p2/k v5/k p7/k p4/k p9/k p8/k p4/u70 d#ZIP/u40 v2/u15 p5/q d#XLSX/q p6/q p1/q p10/q p3/q v8/q p2/q p7/q d#PDF/q p9/q"></div></div></div></div>
+      </div>
+      <div class="slot wide">
+        <h3><span class="n">4</span>Dropping more files, on a computer <span class="badge new">new</span></h3>
+        <p class="cap">Dragging files over the window covers it with a drop target, on every screen that takes files. The browser never opens a dropped file in the tab instead, not even on the PIN screen, where nothing is taken.</p>
+        <div class="desktop" data-shot="04-drop-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>37% · Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com</span></div></div><div class="dview"><div class="dhead"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div></div><div class="dsend"><div class="side pane"><h1 class="hero md">Sending your files…</h1><div class="count"><span class="big">37</span><span class="of">of 100</span><span class="eta">About 3 min left</span></div><div class="bar"><i style="width:37%"></i></div><div class="bytes"><span>520 MB of 1.4 GB</span></div><div class="note"><span data-i="monitor"></span><p data-tr><b>Keep this tab open.</b> You can work in other windows meanwhile.</p></div><div class="btn outline">Add more files</div></div><div class="grid gfill" data-tiles="p1/k d#PDF/k p2/k v3/k d#DOCX/k p4/k p5/k p6/k v7/k p8/k p9/k p10/k p1/k p3/k d#PDF/k p6/k p2/k v5/k p7/k p4/k p9/k p8/k p4/u70 d#ZIP/u40 v2/u15 p5/q d#XLSX/q p6/q p1/q p10/q p3/q v8/q p2/q p7/q d#PDF/q p9/q"></div></div><div class="dropov"><div><div class="roundico"><span data-i="upload"></span></div><b>Drop to add them</b></div></div></div></div>
+      </div>
+      <div class="slot wide">
+        <h3><span class="n">5</span>Welcome back, on a computer</h3>
+        <p class="cap">The same card as the PIN. Dropping the files to pick again works too.</p>
+        <div class="desktop" data-shot="05-welcome-back-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span translate="no">Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com</span></div></div><div class="dview"><div class="dhead"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div></div><div class="dcard"><div class="roundico sm"><span data-i="rotate"></span></div><h1 class="hero md">Welcome back</h1><p class="lead">Your last upload was interrupted. Nothing is lost.</p><div class="card prog"><div class="prow"><b>37 of 100 sent</b><span>63 waiting · 890 MB</span></div><div class="bar"><i style="width:37%"></i></div></div><div class="ghostcard"><div class="gh-t"><span data-i="alert"></span>2 videos need to be picked again</div><p>This browser didn't keep these big files. Pick the same two again and they go on from where they stopped.</p><div class="ghrow"><div class="ghthumb"><span data-i="video"></span></div><div><b>20260927_101530.mp4</b><span>1.2 GB · 64% already sent</span></div></div><div class="ghrow"><div class="ghthumb"><span data-i="video"></span></div><div><b>20260927_102211.mp4</b><span>380 MB · not started</span></div></div><div class="btn tonal sm">Pick these 2 again</div></div><div class="grow"></div><div class="btn primary">Continue sending</div><p class="small link">Start over instead</p></div></div></div>
+      </div>
+      <div class="slot wide">
+        <h3><span class="n">6</span>Done, on a computer</h3>
+        <p class="cap">On a computer the install card speaks of an app window instead of the home screen.</p>
+        <div class="desktop" data-shot="06-done-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span translate="no">Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com</span></div></div><div class="dview"><div class="dhead"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div></div><div class="dcard"><div class="donecircle"><span data-i="check"></span></div><h1 class="hero center">All done, thank you!</h1><p class="lead center">Your files arrived safely, in full quality.</p><div class="stats"><div><b>100</b><span>files sent</span></div><div><b>1.4 GB</b><span>in total</span></div></div><div class="install"><div class="appico"><span data-i="images"></span></div><div class="it"><b>Install Share as an app</b><span>Next time it opens in its own window.</span><div class="btn tonal xs">Install</div></div></div><div class="grow"></div><div class="btn primary">Send more files</div><p class="small">You can close this page now.</p></div></div></div>
+      </div>
+      <div class="slot wide">
+        <h3><span class="n">9</span>An invite, opened on a computer <span class="badge new">new</span></h3>
+        <p class="cap">Today a dead end ("open this link on your Android phone"). Now the page shows the invite as a QR code: the phone's camera opens it there, and the app can scan it too. The same for iPhones. The link below is for Android tablets that Chrome shows as a desktop.</p>
+        <div class="desktop" data-shot="09-get-the-app-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span translate="no">Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com</span></div></div><div class="dview"><div class="dhead"><div class="brand"><span data-i="images"></span><span translate="no">Share</span><span class="langpill"><span data-i="globe"></span>EN</span></div></div><div class="djoin"><div class="pane"><div class="appico lg"><span data-i="images"></span></div><h1 class="hero md">Stefan invited you</h1><p class="lead">To see and download the shared files, install the Share app on your Android phone.</p><div class="steps"><div class="step"><span class="num">1</span><div><b>Scan the code with your Android phone</b><span>Its camera opens this invite on the phone.</span></div></div><div class="step"><span class="num">2</span><div><b>Install the app there</b><span>It takes a minute; the page on the phone shows how.</span></div></div><div class="step"><span class="num">3</span><div><b>Tap Join</b><span>The invite works once, until 21:00.</span></div></div></div></div><div class="pane"><div class="qrcard lg"><div class="qr" data-qr="27"></div><b>Scan this with your Android phone</b><span class="exp"><span data-i="clock"></span>Works once · until 21:00</span></div><p class="small link">On an Android tablet? Download the app here (18 MB)</p></div></div></div></div>
+      </div>
+
+    </div>
+    <p class="sub-h">On a tablet</p>
+    <div class="board">
+
+      <div class="slot tab">
+        <h3><span class="n">2</span>Ready, on a tablet <span class="badge new">new</span></h3>
+        <p class="cap">Upright tablets get one card in the middle, with the button under the text. Touch screens keep the phone's wording.</p>
+        <div class="tablet" data-shot="02-ready-tablet"><div class="sb" data-time="18:03"></div><div class="dhead"><div class="brand"><span data-i="images"></span><span translate="no">Share</span><span class="langpill"><span data-i="globe"></span>EN</span></div></div><div class="dcard"><div class="stack"><div class="pc pa ph t1"><span data-i="image"></span></div><div class="pc pb ph t2"><span data-i="image"></span></div><div class="pc pcen"><span data-i="file"></span><span class="ext">PDF</span></div></div><h1 class="hero">Send your files</h1><p class="lead">Photos, videos, documents, anything. Everything arrives unchanged, in full quality.</p><div class="grow"></div><div class="btn primary"><span data-i="plus"></span>Choose files</div><p class="small">Tip: use Wi-Fi for big batches. If the page closes, open it again and it carries on.</p></div><div class="gest"></div></div>
+      </div>
+      <div class="slot tab">
+        <h3><span class="n">4</span>Sending, on a tablet <span class="badge new">new</span></h3>
+        <p class="cap">A wider card with five tiles to a row; it stays at the top while tiles are added.</p>
+        <div class="tablet" data-shot="04-sending-tablet"><div class="sb" data-time="18:05"></div><div class="dhead"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div></div><div class="dcard wide"><h1 class="hero md">Sending your files…</h1><div class="count"><span class="big">37</span><span class="of">of 100</span><span class="eta">About 3 min left</span></div><div class="bar"><i style="width:37%"></i></div><div class="bytes"><span>520 MB of 1.4 GB</span><span>on Wi-Fi</span></div><div class="note"><span data-i="smartphone"></span><p data-tr><b>Keep this page open.</b> Switching apps for a moment is fine, it picks up where it stopped.</p></div><div class="grid gfill" data-tiles="p1/k d#PDF/k p2/k v3/k d#DOCX/k p4/k p5/k p6/k v7/k p8/k p9/k p10/k p4/u70 d#ZIP/u40 v2/u15 p5/q d#XLSX/q p6/q p1/q p3/q"></div><div class="grow"></div><div class="btn outline">Add more files</div></div><div class="gest"></div></div>
+      </div>
+      <div class="slot tabl">
+        <h3><span class="n">2</span>Ready, on a tablet lying down <span class="badge new">new</span></h3>
+        <p class="cap">From 1024 points wide, tablets get the computer's two panes too. Without a mouse the right pane is a plain panel with the button.</p>
+        <div class="tablet land" data-shot="02-ready-tablet-landscape"><div class="sb" data-time="18:03"></div><div class="dhead"><div class="brand"><span data-i="images"></span><span translate="no">Share</span><span class="langpill"><span data-i="globe"></span>EN</span></div></div><div class="dsplit"><div class="pane"><div class="stack"><div class="pc pa ph t1"><span data-i="image"></span></div><div class="pc pb ph t2"><span data-i="image"></span></div><div class="pc pcen"><span data-i="file"></span><span class="ext">PDF</span></div></div><h1 class="hero">Send your files</h1><p class="lead">Photos, videos, documents, anything. Everything arrives unchanged, in full quality.</p></div><div class="pane"><div class="drop touch"><div class="roundico"><span data-i="upload"></span></div><div class="btn primary"><span data-i="plus"></span>Choose files</div></div><p class="small">Tip: use Wi-Fi for big batches. If the page closes, open it again and it carries on.</p></div></div><div class="gest"></div></div>
       </div>
 
     </div>
@@ -1271,9 +1415,9 @@
           "2 Videos neu auswählen",
           "2 video da scegliere di nuovo"
       ],
-      "Your phone didn't keep these big files. Pick the same two again and they go on from where they stopped.": [
-          "Dein Handy hat diese großen Dateien nicht behalten. Wähl dieselben zwei nochmal aus, dann geht es dort weiter.",
-          "Il telefono non ha tenuto questi file grandi. Scegli di nuovo gli stessi due e ripartono da dove si erano fermati."
+      "This browser didn't keep these big files. Pick the same two again and they go on from where they stopped.": [
+          "Dieser Browser hat diese großen Dateien nicht behalten. Wähl dieselben zwei nochmal aus, dann geht es dort weiter.",
+          "Il browser non ha tenuto questi file grandi. Scegli di nuovo gli stessi due e ripartono da dove si erano fermati."
       ],
       "1.2 GB · 64% already sent": [
           "1,2 GB · 64 % schon gesendet",
@@ -1779,9 +1923,9 @@
           "Gib deine PIN ein",
           "Inserisci il tuo PIN"
       ],
-      "The 5-character code you were given. You only need it once on this phone.": [
-          "Der 5-stellige Code, den du bekommen hast. Auf diesem Handy brauchst du ihn nur einmal.",
-          "Il codice di 5 caratteri che hai ricevuto. Su questo telefono serve una volta sola."
+      "The 5-character code you were given. You only need it once on this device.": [
+          "Der 5-stellige Code, den du bekommen hast. Auf diesem Gerät brauchst du ihn nur einmal.",
+          "Il codice di 5 caratteri che hai ricevuto. Su questo dispositivo serve una volta sola."
       ],
       "Got a link? Opening it fills this in for you.": [
           "Du hast einen Link? Öffne ihn, dann ist das schon ausgefüllt.",
@@ -1910,6 +2054,74 @@
       "Local address in use": [
           "Lokale Adresse aktiv",
           "Indirizzo locale in uso"
+      ],
+      "Drop files or folders here": [
+          "Dateien oder Ordner hierher ziehen",
+          "Trascina qui file o cartelle"
+      ],
+      "or": [
+          "oder",
+          "oppure"
+      ],
+      "Choose a folder": [
+          "Ordner auswählen",
+          "Scegli una cartella"
+      ],
+      "37% · Share": [
+          "37 % · Share",
+          "37% · Share"
+      ],
+      "<b>Keep this tab open.</b> You can work in other windows meanwhile.": [
+          "<b>Lass diesen Tab offen.</b> Du kannst inzwischen in anderen Fenstern weiterarbeiten.",
+          "<b>Tieni aperta questa scheda.</b> Nel frattempo puoi lavorare in altre finestre."
+      ],
+      "Drop to add them": [
+          "Loslassen zum Hinzufügen",
+          "Rilascia per aggiungerli"
+      ],
+      "Install Share as an app": [
+          "Share als App installieren",
+          "Installa Share come app"
+      ],
+      "Next time it opens in its own window.": [
+          "Dann öffnet es sich in einem eigenen Fenster.",
+          "La prossima volta si apre in una finestra tutta sua."
+      ],
+      "To see and download the shared files, install the Share app on your Android phone.": [
+          "Um die geteilten Dateien zu sehen und herunterzuladen, installiere die Share-App auf deinem Android-Handy.",
+          "Per vedere e scaricare i file condivisi, installa l'app Share sul tuo telefono Android."
+      ],
+      "Scan the code with your Android phone": [
+          "Scanne den Code mit deinem Android-Handy",
+          "Inquadra il codice con il tuo telefono Android"
+      ],
+      "Its camera opens this invite on the phone.": [
+          "Die Kamera öffnet die Einladung dann auf dem Handy.",
+          "La fotocamera apre l'invito sul telefono."
+      ],
+      "Install the app there": [
+          "Installiere dort die App",
+          "Installa lì l'app"
+      ],
+      "It takes a minute; the page on the phone shows how.": [
+          "Das dauert eine Minute, die Seite auf dem Handy zeigt, wie.",
+          "Ci vuole un minuto: la pagina sul telefono ti guida."
+      ],
+      "Tap Join": [
+          "Auf „Beitreten“ tippen",
+          "Tocca Entra"
+      ],
+      "Scan this with your Android phone": [
+          "Scanne das mit deinem Android-Handy",
+          "Inquadralo con il tuo telefono Android"
+      ],
+      "Works once · until 21:00": [
+          "Einmal gültig · bis 21:00",
+          "Valido una volta · fino alle 21:00"
+      ],
+      "On an Android tablet? Download the app here (18 MB)": [
+          "Auf einem Android-Tablet? Lade die App hier herunter (18 MB)",
+          "Su un tablet Android? Scarica l'app qui (18 MB)"
       ]
   };
   // Names, codes, numbers and file names that stay the same in every language.
@@ -1920,7 +2132,7 @@
     if (!LANGS.includes(lang)) lang = 'en';
     const k = LANGS.indexOf(lang) - 1;
     const missing = new Set();
-    document.querySelectorAll('.phone').forEach(ph => {
+    document.querySelectorAll('.phone, .tablet, .desktop').forEach(ph => {
       ph.querySelectorAll('[data-tr]').forEach(el => {
         if (el.dataset.en == null) el.dataset.en = el.innerHTML;
         const key = el.dataset.en.replace(/\s+/g, ' ').trim();
