@@ -20,6 +20,12 @@ export function formatCount(n: number, lang: Lang): string {
   return new Intl.NumberFormat(lang).format(n);
 }
 
+/** A share such as "37%" ("37 %" in German), not rounded up to 100% before everything is there. */
+export function formatPercent(fraction: number, lang: Lang): string {
+  const floored = Math.floor(Math.min(Math.max(fraction, 0), 1) * 100) / 100;
+  return new Intl.NumberFormat(lang, { style: 'percent', maximumFractionDigits: 0 }).format(floored);
+}
+
 /** A wait such as "10 min" or "45 s". */
 export function formatWait(seconds: number, lang: Lang): string {
   if (seconds >= 60) return translate(lang, 'duration.minutes', { n: Math.ceil(seconds / 60) });

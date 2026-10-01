@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { ApiError, getApp, getInfo, peekInvite, type AppInfo, type Info, type InvitePeek } from '../api';
-import { Brand } from '../components/Brand';
+import { DropZone } from '../components/DropZone';
 import { Icon } from '../components/Icon';
+import { Page } from '../components/Page';
+import { QrCode } from '../components/QrCode';
 import { formatBytes, formatWhen } from '../format';
 import { I18nContext, isLang, languages, makeI18n, pickLanguage, storeLanguage, storedLanguage, type Lang } from '../i18n';
 
@@ -77,6 +79,7 @@ export function JoinPage() {
   const name = info?.name ?? 'Share';
 
   let body;
+  let split = false;
   if (state.kind === 'loading') {
     body = <p class="lead">{t('common.loading')}</p>;
   } else if (state.kind === 'problem') {
@@ -93,46 +96,76 @@ export function JoinPage() {
     const { peek, app } = state;
     const android = /Android/i.test(navigator.userAgent);
     const until = formatWhen(new Date(peek.expires_at), new Date(), lang);
+    const size = app.apk ? formatBytes(app.apk.size, lang) : '';
+    // On a computer or an iPhone the invite goes to the Android phone as a QR code: the phone's
+    // camera opens it there, and the app can scan it as well.
+    const scan = !android && !!app.apk && !!token;
+    split = android || scan;
     body = (
       <>
-        <div class="appico lg">
-          <Icon name="images" />
-        </div>
-        <h1 class="hero md">{peek.inviter ? t('join.invitedBy', { inviter: peek.inviter }) : t('join.invited')}</h1>
-        <p class="lead">{t('join.lead', { name })}</p>
-        {!android ? (
-          <p class="help">{t('join.notAndroid')}</p>
-        ) : app.apk ? (
-          <div class="steps">
-            <Step n={1} title={t('join.step1')} detail={t('join.step1Detail', { size: formatBytes(app.apk.size, lang) })} />
-            <Step n={2} title={t('join.step2')} detail={t('join.step2Detail')} />
-            <Step n={3} title={t('join.step3')} detail={t('join.step3Detail', { when: until })} />
+        <div class="pane">
+          <div class="appico lg">
+            <Icon name="images" />
           </div>
-        ) : (
-          <p class="help">{t('join.noApk')}</p>
-        )}
+          <h1 class="hero md">{peek.inviter ? t('join.invitedBy', { inviter: peek.inviter }) : t('join.invited')}</h1>
+          <p class="lead">{t(scan ? 'join.leadPhone' : 'join.lead', { name })}</p>
+          {android && app.apk ? (
+            <div class="steps">
+              <Step n={1} title={t('join.step1')} detail={t('join.step1Detail', { size })} />
+              <Step n={2} title={t('join.step2')} detail={t('join.step2Detail')} />
+              <Step n={3} title={t('join.step3')} detail={t('join.step3Detail', { when: until })} />
+            </div>
+          ) : scan ? (
+            <div class="steps">
+              <Step n={1} title={t('join.scanStep')} detail={t('join.scanStepDetail')} />
+              <Step n={2} title={t('join.installStep')} detail={t('join.installStepDetail')} />
+              <Step n={3} title={t('join.joinStep')} detail={t('join.step3Detail', { when: until })} />
+            </div>
+          ) : (
+            <p class="help">{t('join.noApk')}</p>
+          )}
+        </div>
         <div class="grow" />
-        {android && app.apk && (
-          <a class="btn primary" href="/download/share.apk" download="share.apk">
-            <Icon name="download" />
-            {t('join.download')}
-          </a>
-        )}
-        {android && token && (
-          <a class="btn link" href={intentLink(app, location.origin, token)}>
-            {t('join.already', { name: peek.name })}
-          </a>
-        )}
+        <div class="pane">
+          {android && app.apk && (
+            <a class="btn primary" href="/download/share.apk" download="share.apk">
+              <Icon name="download" />
+              {t('join.download')}
+            </a>
+          )}
+          {android && token && (
+            <a class="btn link" href={intentLink(app, location.origin, token)}>
+              {t('join.already', { name: peek.name })}
+            </a>
+          )}
+          {scan && (
+            <>
+              <div class="qrcard">
+                <QrCode text={`${location.origin}/join#${token}`} label={t('join.qrLabel')} />
+                <b>{t('join.scan')}</b>
+                <span class="exp">
+                  <Icon name="clock" />
+                  {t('join.scanUntil', { when: until })}
+                </span>
+              </div>
+              {/* Chrome shows Android tablets the desktop site, so they land here too. */}
+              <a class="small link" href="/download/share.apk" download="share.apk">
+                {t('join.tabletDownload', { size })}
+              </a>
+            </>
+          )}
+        </div>
       </>
     );
   }
 
   return (
     <I18nContext.Provider value={i18n}>
-      <main class="screen">
-        <Brand name={name} languageSwitch />
+      <Page name={name} languageSwitch layout={split ? 'split' : 'single'}>
         {body}
-      </main>
+      </Page>
+      {/* Takes no files, but keeps a dropped one from replacing the page. */}
+      <DropZone onFiles={null} label="" />
     </I18nContext.Provider>
   );
 }

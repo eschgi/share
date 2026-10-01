@@ -86,7 +86,8 @@ export class Uploader {
   readonly uppy: Uppy<Meta, Body>;
   private sessionEnded = false;
   private doneReported = false;
-  private frame = 0;
+  /** A redraw is due with the next frame (or timer, see changed()). */
+  private redrawDue = false;
   /** Golden Retriever is still looking for a saved queue; files picked meanwhile wait. */
   private restoring: boolean;
   private pickedWhileRestoring: File[] = [];
@@ -152,7 +153,11 @@ export class Uploader {
       const data = file.data;
       if (data instanceof File) this.uppy.setFileMeta(file.id, { lastModified: String(data.lastModified) });
     });
-    this.uppy.on('restriction-failed', (file) => events.onRejected(file?.name ?? ''));
+    this.uppy.on('restriction-failed', (file) => {
+      // Duplicates come this way too: a file picked or dropped twice is simply skipped.
+      const max = info.max_file_size_bytes;
+      if (file && max > 0 && (file.size ?? 0) > max) events.onRejected(file.name ?? '');
+    });
     this.uppy.on('state-update', () => this.changed());
     this.uppy.on('upload-success', (file, response) => {
       if (file) this.thumbnail(file, response.uploadURL);
@@ -183,13 +188,14 @@ export class Uploader {
       this.heldBack.push(...rest);
       return;
     }
-    if (rest.length > 0) this.addedHere = true;
-    for (const f of rest) {
-      try {
-        this.uppy.addFile({ name: f.name, type: f.type, data: f, source: 'Local' });
-      } catch {
-        // Restrictions (too large) and duplicates are reported through events or ignored.
-      }
+    if (rest.length === 0) return;
+    this.addedHere = true;
+    try {
+      // All at once: one by one, a dropped folder of thousands of files gets slow, as each one
+      // copies the whole list. Files that are too large or already there are left out.
+      this.uppy.addFiles(rest.map((f) => ({ name: f.name, type: f.type, data: f, source: 'Local' })));
+    } catch {
+      // Only for errors other than restrictions; then none of the files were added.
     }
   }
 
@@ -320,11 +326,17 @@ export class Uploader {
   }
 
   private changed(): void {
-    if (this.frame) return;
-    this.frame = requestAnimationFrame(() => {
-      this.frame = 0;
+    if (this.redrawDue) return;
+    this.redrawDue = true;
+    const redraw = () => {
+      if (!this.redrawDue) return;
+      this.redrawDue = false;
       this.events.onChange();
-    });
+    };
+    // With the next frame. Frames stop while the tab is in the background, where its title
+    // still shows the progress, so a timer stands in.
+    requestAnimationFrame(redraw);
+    setTimeout(redraw, 1000);
   }
 
   private checkDone(): void {

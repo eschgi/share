@@ -1,6 +1,6 @@
-// What the phone can tell us or do for us: keep the screen on while sending, say whether it
-// is on Wi-Fi, and install the site as an app. Each one is optional; a browser without it
-// just doesn't show the matching bit.
+// What the phone or computer can tell us or do for us: whether it is a touch screen, keep the
+// screen on while sending, say whether it is on Wi-Fi, and install the site as an app. Each
+// one is optional; a browser without it just doesn't show the matching bit.
 import { useEffect, useState } from 'preact/hooks';
 
 /** Keeps the screen on while active, so the phone doesn't go to sleep in the middle of sending. */
@@ -33,6 +33,42 @@ export function useWakeLock(active: boolean): void {
       document.removeEventListener('visibilitychange', onVisibility);
       lock?.release().catch(() => {});
     };
+  }, [active]);
+}
+
+/** Whether a media query matches, following changes such as a mouse being plugged into a tablet. */
+export function useMedia(query: string): boolean {
+  const [matches, setMatches] = useState(() => matchMedia(query).matches);
+  useEffect(() => {
+    const m = matchMedia(query);
+    const update = () => setMatches(m.matches);
+    update();
+    m.addEventListener('change', update);
+    return () => m.removeEventListener('change', update);
+  }, [query]);
+  return matches;
+}
+
+/**
+ * Phones and tablets, also with a trackpad attached: they keep the phone's wording. Everything
+ * else is a computer, which can drop files and pick folders.
+ */
+export const touchFirst = '(pointer: coarse)';
+
+/**
+ * While active, closing or reloading the page asks first, in the browser's own words. Big files
+ * would have to be picked again afterwards. The listener is only there while needed, because a
+ * page with one isn't kept in the back/forward cache.
+ */
+export function useLeaveWarning(active: boolean): void {
+  useEffect(() => {
+    if (!active) return;
+    const ask = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = ''; // older browsers ask only with this
+    };
+    addEventListener('beforeunload', ask);
+    return () => removeEventListener('beforeunload', ask);
   }, [active]);
 }
 

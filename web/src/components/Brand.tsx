@@ -17,20 +17,31 @@ function LanguageSwitch() {
   const { lang, offered, setLang, t } = useI18n();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const pill = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!open) return;
     const close = (e: Event) => {
       if (!ref.current?.contains(e.target as Node)) setOpen(false);
     };
+    // With a keyboard, Escape closes the menu and goes back to the button.
+    const escape = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setOpen(false);
+      pill.current?.focus();
+    };
     document.addEventListener('pointerdown', close);
-    return () => document.removeEventListener('pointerdown', close);
+    document.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('pointerdown', close);
+      document.removeEventListener('keydown', escape);
+    };
   }, [open]);
 
   if (offered.length < 2) return null;
   return (
     <div class="lang" ref={ref}>
-      <button type="button" class="langpill" aria-label={t('language')} aria-expanded={open} onClick={() => setOpen(!open)}>
+      <button ref={pill} type="button" class="langpill" aria-label={t('language')} aria-expanded={open} onClick={() => setOpen(!open)}>
         <Icon name="globe" />
         {lang.toUpperCase()}
       </button>

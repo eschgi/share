@@ -27,6 +27,19 @@ small Linux machine with a USB drive, or on a VPS. The website is embedded in it
   </tr>
 </table>
 
+**On a computer and a tablet**, the same pages use the space:
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/web-computer-ready.png" width="380" alt="Send your files, with an area to drop files or folders on"><br><sub>Dropping files or whole folders</sub></td>
+    <td align="center"><img src="docs/screenshots/web-computer-sending.png" width="380" alt="Sending 6 of 24 files, the progress beside the tiles"><br><sub>Sending, the progress in view</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/web-computer-join.png" width="380" alt="An invite opened on a computer, as a QR code to scan with the Android phone"><br><sub>An invite on a computer, for the phone</sub></td>
+    <td align="center"><img src="docs/screenshots/web-tablet-sending.png" width="264" alt="Sending on a tablet: one card, five tiles to a row"><br><sub>Sending on a tablet</sub></td>
+  </tr>
+</table>
+
 **The Android app**, for people with an account:
 
 <table>
@@ -55,6 +68,7 @@ Both speak English, German and Italian.
 | Server: managing PINs and people, deleting and restoring files | works |
 | Website: sending with a PIN, the invite page (English, German, Italian) | works |
 | Website: continuing after the page was closed, install as an app | works |
+| Website: layouts for tablets and computers, dropping files and folders, invites as a QR code | works |
 | Android app: see and download | built and tested, not yet tried on a phone |
 | Android app: send, manage PINs and people, Recently deleted | built and tested, not yet tried on a phone |
 | Self-updating app, Google Play, a VPS setup | planned |
@@ -68,6 +82,8 @@ The plan and the screens are in [`docs/`](docs/).
 - The website sends with [tus](https://tus.io), in pieces of 20 MiB that the server confirms one by
   one, so a dropped connection costs at most one piece. If the page is closed in the middle, it
   offers to continue when it's opened again. It can be installed as an app.
+- On a computer, files and whole folders can be dropped on the page, the tab shows how far sending is,
+  and closing it in the middle asks first. An invite opened there shows a QR code for the phone.
 - A finished file moves into the day's folder. The sender's browser or phone makes its thumbnail; for
   JPEG, PNG and GIF the server makes one itself if none came.
 - The app shows the library by day. It saves photos and videos into the gallery, in the album

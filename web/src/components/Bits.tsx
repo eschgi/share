@@ -63,7 +63,7 @@ export function Tile({ tile }: { tile: TileData }) {
   );
 }
 
-export function Note({ icon, children }: { icon: 'smartphone' | 'wifi' | 'alert'; children: ComponentChildren }) {
+export function Note({ icon, children }: { icon: 'smartphone' | 'monitor' | 'wifi' | 'alert'; children: ComponentChildren }) {
   return (
     <div class="note">
       <Icon name={icon} />

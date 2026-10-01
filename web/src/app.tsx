@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'preact/hooks';
 import { ApiError, getInfo, getSession, unlock, type Info } from './api';
-import { Brand } from './components/Brand';
+import { DropZone } from './components/DropZone';
+import { Page } from './components/Page';
+import { useLeaveWarning } from './device';
+import { formatPercent } from './format';
 import { I18nContext, isLang, languages, makeI18n, pickLanguage, storeLanguage, storedLanguage, type Lang } from './i18n';
 import { pinFromHash } from './pin';
 import { DoneScreen } from './screens/DoneScreen';
@@ -118,7 +121,20 @@ export function App() {
   );
 
   const name = info?.name ?? 'Share';
+  const snap = uploader.current?.snapshot() ?? null;
+  const unfinished = !!snap && snap.done + snap.failed + snap.ghosts.length < snap.total;
+
+  // While sending, the tab shows how far it is, also when another tab is in front.
+  const title =
+    state.screen === 'sending' && snap && snap.bytesTotal > 0 ? `${formatPercent(snap.bytesDone / snap.bytesTotal, lang)} · ${name}` : name;
+  useEffect(() => {
+    document.title = title;
+  }, [title]);
+  // Closing the tab in the middle asks first, also while waiting for a new PIN.
+  useLeaveWarning((state.screen === 'sending' && unfinished) || state.waitingForPin);
+
   const onFiles = (files: File[]) => {
+    if (files.length === 0) return; // e.g. a dropped folder with nothing but hidden files
     setRejected([]);
     uploader.current?.add(files);
     dispatch({ type: 'filesAdded' });
@@ -127,15 +143,47 @@ export function App() {
     uploader.current?.skipGhosts();
     if (uploader.current?.snapshot().total === 0) dispatch({ type: 'startedOver' }); // nothing left
   };
+  const sendMore = () => {
+    uploader.current?.clear();
+    dispatch({ type: 'sendMore' });
+  };
+
+  // Where files dropped on the page go: wherever files can be picked, and on screen 5 only the
+  // ones to pick again. Never before a PIN works.
+  let dropTo: ((files: File[]) => void) | null = null;
+  let dropLabel = '';
+  switch (state.screen) {
+    case 'ready':
+      dropTo = onFiles;
+      dropLabel = i18n.t('drop.send');
+      break;
+    case 'sending':
+      dropTo = onFiles;
+      dropLabel = i18n.t('drop.add');
+      break;
+    case 'welcome':
+      if (snap?.ghosts.length) {
+        dropTo = onFiles;
+        dropLabel = i18n.t('drop.pickAgain');
+      }
+      break;
+    case 'done':
+      dropTo = (files) => {
+        if (files.length === 0) return;
+        sendMore();
+        onFiles(files);
+      };
+      dropLabel = i18n.t('drop.send');
+      break;
+  }
 
   let screen;
   switch (state.screen) {
     case 'boot':
       screen = (
-        <main class="screen">
-          <Brand name={name} />
+        <Page name={name}>
           <p class="lead">{i18n.t('common.loading')}</p>
-        </main>
+        </Page>
       );
       break;
     case 'pin':
@@ -148,7 +196,7 @@ export function App() {
       screen = (
         <WelcomeScreen
           name={name}
-          snapshot={uploader.current!.snapshot()}
+          snapshot={snap!}
           onFiles={onFiles}
           onSkipGhosts={onSkipGhosts}
           onContinue={() => {
@@ -166,7 +214,7 @@ export function App() {
       screen = (
         <SendingScreen
           name={name}
-          snapshot={uploader.current!.snapshot()}
+          snapshot={snap!}
           online={online}
           rejected={rejected}
           onFiles={onFiles}
@@ -182,13 +230,15 @@ export function App() {
           files={state.done!.files}
           bytes={state.done!.bytes}
           offerInstall={state.session?.pin_kind === 'permanent'}
-          onMore={() => {
-            uploader.current?.clear();
-            dispatch({ type: 'sendMore' });
-          }}
+          onMore={sendMore}
         />
       );
       break;
   }
-  return <I18nContext.Provider value={i18n}>{screen}</I18nContext.Provider>;
+  return (
+    <I18nContext.Provider value={i18n}>
+      {screen}
+      <DropZone onFiles={dropTo} label={dropLabel} />
+    </I18nContext.Provider>
+  );
 }

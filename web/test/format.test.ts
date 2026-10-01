@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { RateMeter, formatBytes, formatETA, formatWait, formatWhen } from '../src/format';
+import { RateMeter, formatBytes, formatETA, formatPercent, formatWait, formatWhen } from '../src/format';
+
+describe('formatPercent', () => {
+  it('writes the share the way each language does', () => {
+    expect(formatPercent(0.376, 'en')).toBe('37%');
+    expect(formatPercent(0.376, 'de')).toBe('37\u00a0%');
+    expect(formatPercent(0.376, 'it')).toBe('37%');
+  });
+  it('only says 100% when everything is there', () => {
+    expect(formatPercent(0.999, 'en')).toBe('99%');
+    expect(formatPercent(1, 'en')).toBe('100%');
+    expect(formatPercent(0, 'en')).toBe('0%');
+  });
+});
 
 describe('formatBytes', () => {
   it('uses decimal units with one decimal below 10', () => {

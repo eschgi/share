@@ -14,7 +14,9 @@ later.
   file in a folder set in `config.json`. It runs on the GL.iNet router for now and maybe on a Hetzner VPS
   later, so it must not depend on anything router-specific.
 - **Website** (PWA): for sending only (1–6). Uppy runs headless under our own screens: tus for uploads,
-  Golden Retriever to survive a closed tab.
+  Golden Retriever to survive a closed tab. Phones get one column; tablets and computers a card in the
+  middle, or two panes from 1024 points wide. Computers can drop files and folders, and an invite
+  opened there shows a QR code for the phone.
 - **App** (Flutter, Android): library, bulk download, sending, and the admin screens (7–21).
 
 ## Access

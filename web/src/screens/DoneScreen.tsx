@@ -1,6 +1,6 @@
-import { Brand } from '../components/Brand';
 import { Icon } from '../components/Icon';
-import { useInstall } from '../device';
+import { Page } from '../components/Page';
+import { touchFirst, useInstall, useMedia } from '../device';
 import { formatBytes, formatCount } from '../format';
 import { useI18n } from '../i18n';
 
@@ -17,9 +17,10 @@ interface Props {
 export function DoneScreen({ name, files, bytes, offerInstall, onMore }: Props) {
   const { t, tn, lang } = useI18n();
   const install = useInstall();
+  // A computer installs it as an app in its own window, a phone puts it on the home screen.
+  const computer = !useMedia(touchFirst);
   return (
-    <main class="screen">
-      <Brand name={name} />
+    <Page name={name}>
       <div class="donecircle">
         <Icon name="check" />
       </div>
@@ -41,8 +42,8 @@ export function DoneScreen({ name, files, bytes, offerInstall, onMore }: Props) 
             <Icon name="images" />
           </div>
           <div class="it">
-            <b>{t('install.title', { name })}</b>
-            <span>{t('install.lead')}</span>
+            <b>{t(computer ? 'install.titleDesktop' : 'install.title', { name })}</b>
+            <span>{t(computer ? 'install.leadDesktop' : 'install.lead')}</span>
             <button type="button" class="btn tonal xs" onClick={() => void install()}>
               {t('install.button')}
             </button>
@@ -54,6 +55,6 @@ export function DoneScreen({ name, files, bytes, offerInstall, onMore }: Props) 
         {t('done.more')}
       </button>
       <p class="small">{t('done.close')}</p>
-    </main>
+    </Page>
   );
 }

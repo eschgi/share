@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { Brand } from '../components/Brand';
 import { Icon } from '../components/Icon';
+import { Page } from '../components/Page';
 import { formatWait } from '../format';
 import { useI18n } from '../i18n';
 import { cleanPinInput, pinLength } from '../pin';
@@ -92,8 +92,7 @@ export function PinScreen({ name, problem, unlocking, onSubmit }: Props) {
   }
 
   return (
-    <main class="screen">
-      <Brand name={name} languageSwitch />
+    <Page name={name} languageSwitch>
       <div class="roundico">
         <Icon name="lock" />
       </div>
@@ -143,6 +142,6 @@ export function PinScreen({ name, problem, unlocking, onSubmit }: Props) {
         {t('pin.unlock')}
       </button>
       <p class="small">{t('pin.link')}</p>
-    </main>
+    </Page>
   );
 }

@@ -1,6 +1,6 @@
-import { Brand } from '../components/Brand';
 import { GhostCard } from '../components/GhostCard';
 import { Icon } from '../components/Icon';
+import { Page } from '../components/Page';
 import { formatBytes, formatCount } from '../format';
 import { useI18n } from '../i18n';
 import type { Snapshot } from '../uploader';
@@ -19,8 +19,7 @@ export function WelcomeScreen({ name, snapshot: s, onFiles, onSkipGhosts, onCont
   const { t, lang } = useI18n();
   const pct = s.bytesTotal > 0 ? (s.bytesDone / s.bytesTotal) * 100 : 0;
   return (
-    <main class="screen">
-      <Brand name={name} />
+    <Page name={name}>
       <div class="roundico sm">
         <Icon name="rotate" />
       </div>
@@ -45,6 +44,6 @@ export function WelcomeScreen({ name, snapshot: s, onFiles, onSkipGhosts, onCont
       <button type="button" class="small link" onClick={onStartOver}>
         {t('welcome.startOver')}
       </button>
-    </main>
+    </Page>
   );
 }

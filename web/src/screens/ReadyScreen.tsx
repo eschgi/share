@@ -1,7 +1,8 @@
 import type { Session } from '../api';
 import { Stack } from '../components/Bits';
-import { Brand } from '../components/Brand';
 import { Icon } from '../components/Icon';
+import { Page } from '../components/Page';
+import { touchFirst, useMedia } from '../device';
 import { formatWhen } from '../format';
 import { useI18n } from '../i18n';
 import { FilePicker } from './FilePicker';
@@ -10,21 +11,34 @@ import { FilePicker } from './FilePicker';
 export function ReadyScreen({ name, session, onFiles }: { name: string; session: Session; onFiles: (f: File[]) => void }) {
   const { t, lang } = useI18n();
   const until = session.pin_kind === 'day' && session.expires_at ? new Date(session.expires_at) : null;
+  const computer = !useMedia(touchFirst);
   return (
-    <main class="screen">
-      <Brand name={name} languageSwitch />
-      <Stack day={!!until} />
-      <h1 class="hero">{t('ready.title')}</h1>
-      <p class="lead">{t(until ? 'ready.leadDay' : 'ready.lead')}</p>
-      {until && (
-        <div class="timepill">
-          <Icon name="clock" />
-          {t('ready.worksUntil', { when: formatWhen(until, new Date(), lang) })}
-        </div>
-      )}
+    <Page name={name} languageSwitch layout="split">
+      <div class="pane">
+        <Stack day={!!until} />
+        <h1 class="hero">{t('ready.title')}</h1>
+        <p class="lead">{t(until ? 'ready.leadDay' : 'ready.lead')}</p>
+        {until && (
+          <div class="timepill">
+            <Icon name="clock" />
+            {t('ready.worksUntil', { when: formatWhen(until, new Date(), lang) })}
+          </div>
+        )}
+      </div>
       <div class="grow" />
-      <FilePicker label={t('ready.choose')} look="primary" onFiles={onFiles} />
-      <p class="small">{t(until ? 'ready.private' : 'ready.tip')}</p>
-    </main>
+      <div class="pane">
+        {/* On computers a drop area; its picture and words only show there. */}
+        <div class="drop">
+          <span class="roundico">
+            <Icon name="upload" />
+          </span>
+          {computer && <p class="drop-t">{t('drop.title')}</p>}
+          {computer && <p class="drop-or">{t('drop.or')}</p>}
+          <FilePicker label={t('ready.choose')} look="primary" onFiles={onFiles} />
+          {computer && <FilePicker label={t('ready.chooseFolder')} look="link" icon="folder" directory onFiles={onFiles} />}
+        </div>
+        <p class="small">{t(until ? 'ready.private' : 'ready.tip')}</p>
+      </div>
+    </Page>
   );
 }
