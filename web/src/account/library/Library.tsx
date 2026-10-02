@@ -1,14 +1,29 @@
 import './library.css';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { ApiError, getFile, getFileIds, getFiles, getLibrary, zipUrl, type FileInfo, type FileKind, type LibraryDay, type LibraryFilter } from '../../api';
+import {
+  ApiError,
+  createDownload,
+  getFile,
+  getFileIds,
+  getFiles,
+  getLibrary,
+  zipUrl,
+  type FileInfo,
+  type FileKind,
+  type LibraryDay,
+  type LibraryFilter,
+} from '../../api';
 import { Icon } from '../../components/Icon';
+import { useMedia } from '../../device';
 import { formatBytes, formatDay } from '../../format';
 import { useI18n } from '../../i18n';
 import { useOverlay } from '../../router';
 import { Avatar, Link } from '../components/Bits';
 import { Confirm } from '../components/Modal';
 import { useAccount } from '../context';
-import { useMedia } from '../media';
+import { canSaveToFolder } from '../save/folder';
+import { SaveChoice } from '../save/SaveChoice';
+import { startSave } from '../save/store';
 import { Shell, TitleBar } from '../Shell';
 import { Viewer } from '../viewer/Viewer';
 import {
@@ -56,7 +71,7 @@ type Deleting = { kind: 'selection'; count: number } | { kind: 'file'; file: Fil
 /** Screens 11, 12, 24 and 25: everything that was sent, newest day first, and selecting many. */
 export function Library() {
   const { t, tn, lang } = useI18n();
-  const { me, toast } = useAccount();
+  const { info, me, toast } = useAccount();
   const admin = me.user.role === 'admin';
   const model = useMemo(() => new LibraryModel({ overview: getLibrary, page: getFiles }), []);
   const [, redraw] = useState(0);
@@ -68,6 +83,7 @@ export function Library() {
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState<Deleting | null>(null);
   const [deleteProblem, setDeleteProblem] = useState<string | null>(null);
+  const [choosing, setChoosing] = useState(false);
   const touch = useMedia('(pointer: coarse)');
   const shareable = useMemo(canShareFiles, []);
   const lib = useRef<HTMLDivElement>(null);
@@ -269,9 +285,16 @@ export function Library() {
   const problemText = (e: unknown) =>
     e instanceof ApiError && e.code === 'busy' ? t('zip.busy') : t(e instanceof ApiError && e.status > 0 ? 'common.failed' : 'common.offline');
 
-  async function downloadSelected() {
+  /** Several files go into a folder or a ZIP, where the browser can save into folders (screen 26). */
+  function downloadSelected() {
     if (busy) return;
     if (picked.count > zipLimit) return toast({ text: t('zip.tooMany') });
+    if (picked.count > 1 && canSaveToFolder()) return setChoosing(true);
+    void downloadAsZip();
+  }
+
+  async function downloadAsZip() {
+    setChoosing(false);
     setBusy(true);
     try {
       const ids = await selectedIds(sel, idsOfDay);
@@ -289,6 +312,30 @@ export function Library() {
       setBusy(false);
     }
   }
+
+  async function saveIntoFolder(dir: FileSystemDirectoryHandle) {
+    setChoosing(false);
+    setBusy(true);
+    try {
+      // The ZIP's list has every file's path in a folder for its day, as on the server.
+      const zip = await createDownload(await selectedIds(sel, idsOfDay));
+      startSave(zip.files, dir);
+      clear();
+    } catch (e) {
+      toast({ text: problemText(e) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** What the server will call the ZIP: its name and the files' day, or today. */
+  const zipName = () => {
+    const days = [...sel.days.keys()];
+    const today = new Date();
+    const day =
+      days.length === 1 ? days[0] : `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    return `${info?.name ?? 'Share'} ${day}.zip`;
+  };
 
   async function shareSelected() {
     if (busy) return;
@@ -539,7 +586,7 @@ export function Library() {
               <span class="lbl">{t('select.delete')}</span>
             </button>
           )}
-          <button type="button" class="btn primary sm sel-dl" disabled={busy} onClick={() => void downloadSelected()}>
+          <button type="button" class="btn primary sm sel-dl" disabled={busy} onClick={downloadSelected}>
             <Icon name="download" />
             {tn('select.download', picked.count)}
             <small class="sel-phone"> · {size}</small>
@@ -562,6 +609,16 @@ export function Library() {
                 }
               : undefined
           }
+        />
+      )}
+      {choosing && (
+        <SaveChoice
+          count={picked.count}
+          bytes={picked.bytes}
+          zipName={zipName()}
+          onZip={() => void downloadAsZip()}
+          onFolder={(dir) => void saveIntoFolder(dir)}
+          onClose={() => setChoosing(false)}
         />
       )}
       {deleting && (

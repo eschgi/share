@@ -1,0 +1,166 @@
+/* Saving into a folder (screens 26 and 27). */
+
+/* The choice: into a folder, or one ZIP. */
+.dopt {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-top: 10px;
+  padding: 14px 50px 14px 14px;
+  border: 1.5px solid var(--line);
+  border-radius: 18px;
+  cursor: pointer;
+}
+.dopt:first-child {
+  margin-top: 0;
+}
+.dopt.on {
+  border-color: var(--accent-text);
+  background: var(--accent-soft);
+}
+.dopt:has(input:focus-visible) {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
+.dopt .dt {
+  flex: 1;
+  min-width: 0;
+}
+.dopt b {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+}
+.dopt .dt span {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-2);
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.dopt .radio {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+}
+.dbtns .dleft {
+  margin-right: auto;
+}
+
+/* Saving: a panel in the corner, or a sheet over the bottom bar on a narrow window. */
+.savep {
+  position: fixed;
+  left: max(12px, env(safe-area-inset-left));
+  right: max(12px, env(safe-area-inset-right));
+  bottom: calc(92px + env(safe-area-inset-bottom));
+  z-index: 12;
+  padding: 20px 22px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--s1);
+  box-shadow: 0 24px 70px var(--shadow);
+}
+.savep h2 {
+  margin: 0 0 12px;
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 700;
+}
+.savep .bar {
+  height: 8px;
+  margin-top: 10px;
+}
+.drow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 8px;
+  padding: 11px 0;
+}
+.drow > div {
+  min-width: 0;
+}
+.drow b {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 15px;
+  font-weight: 500;
+}
+.drow div span {
+  color: var(--text-3);
+  font-size: 13px;
+}
+.note.slim {
+  gap: 12px;
+  margin: 6px 0 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--s2);
+}
+.note.slim p {
+  font-size: 13.5px;
+}
+.note.slim > .ic {
+  width: 20px;
+  height: 20px;
+}
+.btnrow {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+}
+.btnrow .btn {
+  flex: 1;
+  height: 52px;
+  margin: 0;
+  border-radius: 16px;
+  font-size: 16px;
+}
+/* Folded away: how far it is, and a way back. */
+.savemini {
+  position: fixed;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: calc(92px + env(safe-area-inset-bottom));
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 48px;
+  padding: 0 18px 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--s2);
+  color: var(--text);
+  font-size: 14.5px;
+  font-weight: 600;
+  box-shadow: 0 14px 40px var(--shadow);
+}
+.minibar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: conic-gradient(var(--accent-text) var(--p), var(--s3) 0);
+  mask: radial-gradient(circle, transparent 6px, #000 6.5px);
+}
+.savemini .lnk {
+  color: var(--accent-text);
+}
+.savep .btn:focus-visible,
+.savemini:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
+
+@media (min-width: 640px) and (min-height: 540px) {
+  .savep {
+    left: auto;
+    right: 40px;
+    bottom: 36px;
+    width: 440px;
+  }
+  .savemini {
+    right: 40px;
+    bottom: 36px;
+  }
+}

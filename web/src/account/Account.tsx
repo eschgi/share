@@ -27,6 +27,7 @@ import de from './i18n/de.json';
 import en from './i18n/en.json';
 import it from './i18n/it.json';
 import { Library } from './library/Library';
+import { SavePanel } from './save/SavePanel';
 import { SendTab } from './send/SendTab';
 import { Settings } from './settings/Settings';
 import { SignIn } from './SignIn';
@@ -140,6 +141,7 @@ export function Account({ me: first, notice }: AccountProps) {
       <AccountContext.Provider value={state}>
         <ToastContext.Provider value={toastView}>
           {page}
+          {me && <SavePanel />}
           {!layered && toastView}
         </ToastContext.Provider>
       </AccountContext.Provider>
