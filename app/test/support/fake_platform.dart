@@ -135,6 +135,9 @@ class FakePlatform implements Platform {
   Future<void> keepScreenOn(bool on) async => screenOn = on;
 
   @override
+  Future<({String name, int code})> appVersion() async => (name: '0.3.0', code: 3);
+
+  @override
   Future<String> cacheDir() async => '';
 
   /// What pickAndSend gives back, and what was asked.

@@ -225,6 +225,9 @@ abstract class Platform {
 
   Future<String> deviceName();
 
+  /// This app's version, from its build: "0.3.0" and 3.
+  Future<({String name, int code})> appVersion();
+
   /// The link the app was opened with, once; later links arrive on [links].
   Future<String?> initialLink();
   Stream<String> get links;
@@ -372,6 +375,12 @@ class ChannelPlatform implements Platform {
 
   @override
   Future<String> deviceName() async => await _soft<String>('device.name') ?? 'Phone';
+
+  @override
+  Future<({String name, int code})> appVersion() async {
+    final m = await _soft<Map<Object?, Object?>>('app.version');
+    return (name: m?['name'] as String? ?? '', code: (m?['code'] as num?)?.toInt() ?? 0);
+  }
 
   @override
   Future<String?> initialLink() => _soft<String>('link.initial');

@@ -11,6 +11,7 @@ import '../l10n/app_localizations.dart';
 import 'admin/invite_person_screen.dart';
 import 'admin/people.dart';
 import 'admin/pins_screen.dart';
+import 'about_screen.dart';
 import 'admin/trash_screen.dart';
 import 'devices.dart';
 import 'format.dart';
@@ -308,6 +309,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: t.settingsPassword,
             subtitle: u.hasPassword && u.username != null ? t.settingsPasswordSet(u.username!) : t.settingsPasswordNone,
             onTap: _password,
+          ),
+          SettingsRow(
+            leading: SettingsRow.icon(context, AppIcons.info),
+            title: t.aboutTitle,
+            subtitle: t.aboutSub,
+            onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const AboutScreen(signedIn: true))),
           ),
           SettingsRow(leading: SettingsRow.icon(context, AppIcons.logOut), title: t.settingsSignOut, onTap: _signOut, trailing: const SizedBox()),
           SettingsRow(

@@ -7,12 +7,13 @@ import 'data/platform.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  _registerFontLicenses();
+  _registerLicenses();
   runApp(ShareApp(services: AppServices(platform: ChannelPlatform())));
 }
 
-/// The bundled fonts' licences, shown in the app's licence page.
-void _registerFontLicenses() {
+/// For the licence page (About): the bundled fonts', and those of the Android libraries the
+/// Dart packages don't bring along, all Apache 2.0, as Share itself is.
+void _registerLicenses() {
   LicenseRegistry.addLicense(() async* {
     for (final (package, file) in const [
       ('Noto Serif', 'OFL-NotoSerif.txt'),
@@ -21,5 +22,8 @@ void _registerFontLicenses() {
     ]) {
       yield LicenseEntryWithLineBreaks([package], await rootBundle.loadString('assets/fonts/$file'));
     }
+    final apache = await rootBundle.loadString('assets/licenses/Apache-2.0.txt');
+    yield LicenseEntryWithLineBreaks(['Share'], 'Copyright 2026 Stefan Eschgfäller\n\n$apache');
+    yield LicenseEntryWithLineBreaks(['AndroidX', 'AndroidX Media3', 'Kotlin'], apache);
   });
 }

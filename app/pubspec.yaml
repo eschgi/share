@@ -54,3 +54,4 @@ flutter:
     - assets/fonts/OFL-NotoSerif.txt
     - assets/fonts/OFL-RobotoMono.txt
     - assets/fonts/LICENSE-Lucide.txt
+    - assets/licenses/Apache-2.0.txt

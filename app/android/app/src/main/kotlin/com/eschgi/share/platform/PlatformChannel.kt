@@ -131,6 +131,7 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
                 (if (check) RouteMonitor.check(app) else RouteMonitor.current(app)).toMap()
             }
             "device.name" -> result.success(deviceName())
+            "app.version" -> result.success(mapOf("name" to BuildConfig.VERSION_NAME, "code" to BuildConfig.VERSION_CODE.toLong()))
             "link.initial" -> {
                 result.success(initialLink)
                 initialLink = null

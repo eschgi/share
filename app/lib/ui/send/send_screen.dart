@@ -5,6 +5,7 @@ import '../../data/models.dart';
 import '../../data/pin.dart';
 import '../../data/platform.dart';
 import '../../l10n/app_localizations.dart';
+import '../about_screen.dart';
 import '../format.dart';
 import '../icons.dart';
 import '../sign_in.dart';
@@ -74,11 +75,13 @@ class PinSendScreen extends StatelessWidget {
               icon: const Icon(AppIcons.more),
               onSelected: (choice) async {
                 if (choice == 'pin') return _newPin(context);
-                await Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const SignInScreen()));
+                final screen = choice == 'about' ? const AboutScreen(signedIn: false) : const SignInScreen();
+                await Navigator.push(context, MaterialPageRoute<void>(builder: (_) => screen));
               },
               itemBuilder: (_) => [
                 PopupMenuItem(value: 'pin', child: Text(t.pinOther)),
                 PopupMenuItem(value: 'sign-in', child: Text(t.pinSignIn)),
+                PopupMenuItem(value: 'about', child: Text(t.aboutTitle)),
               ],
             ),
           ],

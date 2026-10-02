@@ -17,6 +17,7 @@ class FakeServer {
       'POST /api/invites/accept': (_) => json(contractResponse('api/invite_accept.json')),
       'POST /api/auth/logout': (_) => http.Response('', 204),
       'GET /api/server': (_) => json(contractResponse('api/server.json')),
+      'GET /api/about': (_) => json(contractResponse('api/about.json')),
       'GET /api/me/devices': (_) => json({'devices': myDevices}),
       'GET /api/library': (req) => json(_library(req.url.queryParameters)),
       'GET /api/files': (req) => json(_files(req.url.queryParameters)),
