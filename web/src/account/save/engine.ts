@@ -54,6 +54,8 @@ export interface SaveState {
 export interface SaveOptions {
   signal: AbortSignal;
   onChange: (s: SaveState) => void;
+  /** A file is in the folder now, at path: saved, or found there already. */
+  onSaved?: (item: SaveItem, path: string) => void;
   parallel?: number;
   /** Waits, unless the signal ends it first. */
   sleep?: (ms: number, signal: AbortSignal) => Promise<void>;
@@ -117,17 +119,18 @@ export async function saveFiles(items: SaveItem[], folder: Folder, fetchFile: Fe
   const claimed = new Set<string>();
   let waits = 0;
 
-  /** Where a file goes: its own path, or "name (2)" and on if another file has that name. Null:
-   * it is there already. An empty file of its name is what a closed tab left: it is replaced. */
-  async function placeFor(item: SaveItem): Promise<string | null> {
+  /** Where a file goes: its own path, or "name (2)" and on if another file has that name; there:
+   * it is in one of them already. An empty file of its name is what a closed tab left: it is
+   * replaced. */
+  async function placeFor(item: SaveItem): Promise<{ path: string; there: boolean }> {
     for (let n = 1; ; n++) {
       const path = n === 1 ? item.path : numbered(item.path, n);
       if (claimed.has(path)) continue;
       const size = await folder.sizeOf(path);
-      if (size === item.size) return null;
+      if (size === item.size) return { path, there: true };
       if (size === null || (size === 0 && item.size > 0)) {
         claimed.add(path);
-        return path;
+        return { path, there: false };
       }
     }
   }
@@ -141,16 +144,18 @@ export async function saveFiles(items: SaveItem[], folder: Folder, fetchFile: Fe
   }
 
   async function saveOne(item: SaveItem): Promise<void> {
-    let path: string | null;
+    let place: { path: string; there: boolean };
     try {
-      path = await placeFor(item);
+      place = await placeFor(item);
     } catch {
       throw new FolderError(false);
     }
-    if (path === null) {
+    const path = place.path;
+    if (place.there) {
       state.skipped++;
       state.done++;
       state.bytesDone += item.size;
+      opts.onSaved?.(item, path);
       return changed();
     }
     let writer: Writer;
@@ -192,6 +197,7 @@ export async function saveFiles(items: SaveItem[], folder: Folder, fetchFile: Fe
           if (written < item.size) throw new Error('cut off');
           await writer.close();
           state.done++;
+          opts.onSaved?.(item, path);
           return changed();
         } catch (e) {
           if (stopped() || e instanceof FolderError) throw e;

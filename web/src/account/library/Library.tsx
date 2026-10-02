@@ -22,6 +22,7 @@ import { Avatar, Link } from '../components/Bits';
 import { Confirm } from '../components/Modal';
 import { useAccount } from '../context';
 import { canSaveToFolder } from '../save/folder';
+import { useSavedMarks } from '../save/marks';
 import { SaveChoice } from '../save/SaveChoice';
 import { startSave } from '../save/store';
 import { Shell, TitleBar } from '../Shell';
@@ -84,6 +85,7 @@ export function Library() {
   const [deleting, setDeleting] = useState<Deleting | null>(null);
   const [deleteProblem, setDeleteProblem] = useState<string | null>(null);
   const [choosing, setChoosing] = useState(false);
+  const saved = useSavedMarks();
   const touch = useMedia('(pointer: coarse)');
   const shareable = useMemo(canShareFiles, []);
   const lib = useRef<HTMLDivElement>(null);
@@ -531,6 +533,7 @@ export function Library() {
                     selecting={selecting}
                     onClick={(e) => onTileClick(first + j, e)}
                     onCircle={() => toggle(first + j)}
+                    savedInto={saved.has(f.id) ? saved.folder : undefined}
                   />
                 ))}
               </div>

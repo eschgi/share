@@ -38,26 +38,34 @@ interface TileProps {
   onClick: (e: MouseEvent) => void;
   /** The circle in the corner, which shows on hover with a mouse and while selecting. */
   onCircle: () => void;
+  /** The save folder's name, when the file is in it. */
+  savedInto?: string;
 }
 
 /** One file in the library's grid. Selected, it draws back from its neighbours, as in the app. */
-export function Tile({ file, index, selected, selecting, onClick, onCircle }: TileProps) {
+export function Tile({ file, index, selected, selecting, onClick, onCircle, savedInto }: TileProps) {
   const { t } = useI18n();
   const ext = file.kind === 'document' ? extOf(file.name) : '';
+  const saved = savedInto !== undefined ? t('library.savedInto', { folder: savedInto }) : '';
   return (
     <div class={`ltile${selected ? ' sel' : ''}${selecting ? ' selecting' : ''}`} data-index={index}>
       <button
         type="button"
         class="lopen"
-        aria-label={file.name}
+        aria-label={saved ? `${file.name} · ${saved}` : file.name}
         aria-pressed={selecting ? selected : undefined}
-        title={file.name}
+        title={saved ? `${file.name}\n${saved}` : file.name}
         onClick={onClick}
         onContextMenu={(e) => selecting && e.preventDefault()}
       >
         <Thumb key={file.updated_at} file={file} />
         {ext && <span class="extb">{ext}</span>}
         {file.kind === 'video' && file.duration_ms !== null && <span class="dur">{formatDuration(file.duration_ms)}</span>}
+        {saved && (
+          <span class="savedb">
+            <Icon name="folder" />
+          </span>
+        )}
       </button>
       <button
         type="button"

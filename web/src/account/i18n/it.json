@@ -92,6 +92,7 @@
   "library.nothingFound": "Nessun file corrispondente.",
   "library.dayMeta.one": "1 file · {size}",
   "library.dayMeta.other": "{n} file · {size}",
+  "library.savedInto": "Salvato in “{folder}”",
   "viewer.download": "Scarica",
   "viewer.details": "Dettagli",
   "viewer.fromPin": "Inviato con un PIN",

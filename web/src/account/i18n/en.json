@@ -92,6 +92,7 @@
   "library.nothingFound": "No files match.",
   "library.dayMeta.one": "1 file · {size}",
   "library.dayMeta.other": "{n} files · {size}",
+  "library.savedInto": "Saved into “{folder}”",
   "viewer.download": "Download",
   "viewer.details": "Details",
   "viewer.fromPin": "Sent with a PIN",

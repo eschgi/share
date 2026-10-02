@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { saveFiles, type SaveItem, type SaveState } from './engine';
 import { fetchFile, folderOf } from './folder';
+import { markSaved } from './marks';
 
 export interface SaveRun {
   /** The picked folder's name. */
@@ -41,6 +42,7 @@ export function startSave(items: SaveItem[], dir: FileSystemDirectoryHandle): vo
   changed();
   void saveFiles(items, folderOf(dir), fetchFile, {
     signal: ctl.signal,
+    onSaved: (item, path) => markSaved(item.id, { path, size: item.size }, dir.name),
     onChange: (state) => {
       if (!run || controller !== ctl) return;
       run = { ...run, state };

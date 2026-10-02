@@ -2,6 +2,7 @@
 // it, keeping it for next time, the right to write there, and the engine's folder and network
 // on top of them. Other browsers, and plain http at home, download a ZIP instead.
 import type { Answer, FetchFile, Folder } from './engine';
+import { forgetMarks } from './marks';
 
 type Permission = 'granted' | 'denied' | 'prompt';
 type WithPermission = FileSystemDirectoryHandle & {
@@ -40,32 +41,43 @@ export async function mayWrite(dir: FileSystemDirectoryHandle): Promise<boolean>
   }
 }
 
-// The folder picked last time, kept in IndexedDB: a folder can't go into localStorage.
+// The folder picked last time, kept in IndexedDB: a folder can't go into localStorage. The
+// same database keeps which files are in it (marks.ts).
 
-function db(): Promise<IDBDatabase> {
+/** share-kept: the folder (kept) and the files saved into it (saved), by file id. */
+export function keptDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open('share-kept', 1);
-    req.onupgradeneeded = () => req.result.createObjectStore('kept');
+    const req = indexedDB.open('share-kept', 2);
+    req.onupgradeneeded = () => {
+      const d = req.result;
+      if (!d.objectStoreNames.contains('kept')) d.createObjectStore('kept');
+      if (!d.objectStoreNames.contains('saved')) d.createObjectStore('saved');
+    };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
 }
 
+/** Keeps the folder for next time. Another folder than before has none of the saved files. */
 async function keep(dir: FileSystemDirectoryHandle): Promise<void> {
-  const d = await db();
+  const before = await keptFolder();
+  const same = before !== null && (await before.isSameEntry(dir).catch(() => false));
+  const d = await keptDb();
   await new Promise<void>((resolve, reject) => {
-    const tx = d.transaction('kept', 'readwrite');
+    const tx = d.transaction(['kept', 'saved'], 'readwrite');
     tx.objectStore('kept').put(dir, 'saveFolder');
+    if (!same) tx.objectStore('saved').clear();
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
   d.close();
+  if (!same) forgetMarks();
 }
 
 /** The folder picked last time, if any. */
 export async function keptFolder(): Promise<FileSystemDirectoryHandle | null> {
   try {
-    const d = await db();
+    const d = await keptDb();
     const dir = await new Promise<FileSystemDirectoryHandle | undefined>((resolve, reject) => {
       const req = d.transaction('kept').objectStore('kept').get('saveFolder');
       req.onsuccess = () => resolve(req.result as FileSystemDirectoryHandle | undefined);

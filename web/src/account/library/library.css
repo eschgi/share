@@ -352,6 +352,23 @@ span.thumb {
   border-bottom: 4px solid transparent;
   border-left: 6px solid #fff;
 }
+/* In the save folder already, as the app marks files on the phone. */
+.savedb {
+  position: absolute;
+  left: 5px;
+  bottom: 5px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+}
+.savedb .ic {
+  width: 12px;
+  height: 12px;
+}
 .lempty {
   display: flex;
   flex-direction: column;
@@ -571,6 +588,12 @@ span.thumb {
     right: 7px;
     bottom: 7px;
     font-size: 12px;
+  }
+  .savedb {
+    left: 7px;
+    bottom: 7px;
+    width: 22px;
+    height: 22px;
   }
 }
 

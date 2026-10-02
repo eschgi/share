@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { numbered, saveFiles, type Answer, type Folder, type SaveItem, type SaveState, type Writer } from '../src/account/save/engine';
+import { wrongMarks } from '../src/account/save/marks';
 
 /** A folder in memory. A file is there once its writer closes, as with the real thing. */
 class FakeFolder implements Folder {
@@ -181,5 +182,33 @@ describe('saveFiles', () => {
     const end = await saveFiles(items, folder, fetch, { signal: new AbortController().signal, onChange: () => {}, sleep: noWait });
     expect(end.stopped).toBe('signedOut');
     expect(folder.files.size).toBe(0);
+  });
+
+  it('tells which files are in the folder, saved or there already, and where', async () => {
+    const { items, folder, server } = setup({ a: 20, b: 20, c: 20 });
+    folder.files.set('2026-10-01/a.jpg', bytes(20));
+    folder.files.set('2026-10-01/b.jpg', bytes(5));
+    server.gone.add('c');
+    const saved: [string, string][] = [];
+    const onSaved = (item: SaveItem, path: string) => saved.push([item.id, path]);
+    await saveFiles(items, folder, server.fetch, { signal: new AbortController().signal, onChange: () => {}, sleep: noWait, onSaved });
+    expect(saved.sort()).toEqual([
+      ['a', '2026-10-01/a.jpg'],
+      ['b', '2026-10-01/b (2).jpg'],
+    ]);
+  });
+});
+
+describe('marks', () => {
+  it('are wrong for files missing from the folder or changed there', async () => {
+    const folder = new FakeFolder();
+    folder.files.set('2026-10-01/a.jpg', bytes(20));
+    folder.files.set('2026-10-01/b.jpg', bytes(7));
+    const marks = new Map([
+      ['a', { path: '2026-10-01/a.jpg', size: 20 }],
+      ['b', { path: '2026-10-01/b.jpg', size: 20 }],
+      ['c', { path: '2026-10-01/c.jpg', size: 20 }],
+    ]);
+    expect(await wrongMarks(marks, folder)).toEqual(['b', 'c']);
   });
 });

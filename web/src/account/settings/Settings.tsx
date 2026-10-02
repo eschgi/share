@@ -15,6 +15,7 @@ import { SelectAllTrash, TrashList, useTrash } from '../admin/Trash';
 import { Avatar, Link, RoleBadge, Row } from '../components/Bits';
 import { Confirm } from '../components/Modal';
 import { useAccount } from '../context';
+import { clearMarks } from '../save/marks';
 import { Shell, TitleBar } from '../Shell';
 import { DevicesDialog, LanguageDialog, PasswordDialog, ThemeDialog, themeSummary } from './dialogs';
 
@@ -188,6 +189,7 @@ function SettingsList({ data, current }: { data: AdminData; current?: Page }) {
       return setProblem(t(e instanceof ApiError && e.status > 0 ? 'common.failed' : 'common.offline'));
     }
     setSignedInHint(false);
+    await clearMarks();
     location.replace('/');
   };
 
