@@ -28,6 +28,8 @@ import en from './i18n/en.json';
 import it from './i18n/it.json';
 import { Library } from './library/Library';
 import { SavePanel } from './save/SavePanel';
+import { SendGuard } from './send/SendGuard';
+import { startSender } from './send/sender';
 import { SendTab } from './send/SendTab';
 import { Settings } from './settings/Settings';
 import { SignIn } from './SignIn';
@@ -49,11 +51,13 @@ export function Account({ me: first, notice }: AccountProps) {
         setLang(pickLanguage(i.languages, storedLanguage(), navigator.languages, i.default_language));
       })
       .catch(() => {});
-    // Signed out elsewhere (an admin, another tab): the next answer says so.
-    onSignedOut(() => {
+    // Signed out elsewhere (an admin, another tab): the next answer says so, also an upload's.
+    const signedOut = () => {
       setSignedInHint(false);
       location.replace('/sign-in?signed_out=1&next=' + encodeURIComponent(location.pathname));
-    });
+    };
+    onSignedOut(signedOut);
+    if (first) startSender(signedOut);
     return () => onSignedOut(null);
   }, []);
 
@@ -142,6 +146,7 @@ export function Account({ me: first, notice }: AccountProps) {
         <ToastContext.Provider value={toastView}>
           {page}
           {me && <SavePanel />}
+          {me && <SendGuard />}
           {!layered && toastView}
         </ToastContext.Provider>
       </AccountContext.Provider>

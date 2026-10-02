@@ -1,23 +1,24 @@
-import type { Session } from '../api';
 import { Stack } from '../components/Bits';
 import { Icon } from '../components/Icon';
 import { Page } from '../components/Page';
 import { touchFirst, useMedia } from '../device';
 import { formatWhen } from '../format';
 import { useI18n } from '../i18n';
+import type { Sender } from '../state';
 import { FilePicker } from './FilePicker';
 
-/** Screens 2 and 3: ready to send; with a 24-hour PIN it also says until when it works. */
-export function ReadyScreen({ name, session, onFiles }: { name: string; session: Session; onFiles: (f: File[]) => void }) {
+/** Screens 2, 3 and 29: ready to send; with a 24-hour PIN it also says until when it works, and
+ * signed in, that no PIN is needed. */
+export function ReadyScreen({ name, session, onFiles }: { name: string; session: Sender; onFiles: (f: File[]) => void }) {
   const { t, lang } = useI18n();
-  const until = session.pin_kind === 'day' && session.expires_at ? new Date(session.expires_at) : null;
+  const until = session.kind === 'pin' && session.pin_kind === 'day' && session.expires_at ? new Date(session.expires_at) : null;
   const computer = !useMedia(touchFirst);
   return (
     <Page name={name} languageSwitch layout="split">
       <div class="pane">
         <Stack day={!!until} />
         <h1 class="hero">{t('ready.title')}</h1>
-        <p class="lead">{t(until ? 'ready.leadDay' : 'ready.lead')}</p>
+        <p class="lead">{t(session.kind === 'account' ? 'send.lead' : until ? 'ready.leadDay' : 'ready.lead')}</p>
         {until && (
           <div class="timepill">
             <Icon name="clock" />

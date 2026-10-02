@@ -765,15 +765,16 @@
   margin: -8px -8px -8px 0;
 }
 
-/* Until sending is there (step 10). */
-.send {
+/* Sending (screen 29): the PIN pages' screens (styles.css), inside the frame, which has the
+   header; on a phone they fill what is between the title bar and the bottom bar. */
+.screen.in-shell {
+  flex: 1;
   width: 100%;
-  max-width: 560px;
-  margin: 0 auto;
-  padding: 0 24px;
+  min-height: 0;
+  padding-top: 0;
 }
-.send .lead {
-  margin-top: 4px;
+.send-wait {
+  padding: 0 24px;
 }
 
 /* For screen readers only. */
@@ -871,9 +872,13 @@
   .settings {
     padding: 18px 0 24px;
   }
-  .send {
-    width: min(560px, calc(100% - 64px));
-    padding: 18px 0 0;
+  .screen.in-shell {
+    padding-top: 8px;
+  }
+  .send-wait {
+    width: min(1200px, calc(100% - 64px));
+    margin: 18px auto 0;
+    padding: 0;
   }
 
   .modal[open] {

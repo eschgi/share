@@ -1,6 +1,10 @@
 // Which screen shows, as a pure reducer. Upload progress itself lives in Uppy; this only
-// knows about PIN sessions and the big steps (screens 1–6 of the mockup).
+// knows about who sends and the big steps (screens 1–6 of the mockup). The PIN's pages and the
+// pages of people with an account (account/send) both use it.
 import type { Session } from './api';
+
+/** Who sends: someone with a PIN, or a person signed in in this browser, who needs none. */
+export type Sender = Session | { kind: 'account' };
 
 export type Screen = 'boot' | 'pin' | 'ready' | 'welcome' | 'sending' | 'done';
 
@@ -17,7 +21,7 @@ export type PinProblem =
 
 export interface State {
   screen: Screen;
-  session: Session | null;
+  session: Sender | null;
   unlocking: boolean;
   problem: PinProblem | null;
   /** Uploads are waiting for a new PIN because the old one ended mid-way. */
@@ -28,7 +32,7 @@ export interface State {
 }
 
 export type Action =
-  | { type: 'booted'; session: Session | null; sessionEnded: boolean }
+  | { type: 'booted'; session: Sender | null; sessionEnded: boolean }
   | { type: 'bootFailed' }
   | { type: 'restored' }
   | { type: 'unlockStarted' }

@@ -1,5 +1,9 @@
-import type { ComponentChildren } from 'preact';
+import { createContext, type ComponentChildren } from 'preact';
+import { useContext } from 'preact/hooks';
 import { Brand } from './Brand';
+
+/** Inside the frame of the account's pages (account/Shell.tsx), which has its own header. */
+export const InShell = createContext(false);
 
 interface Props {
   name: string;
@@ -18,6 +22,13 @@ interface Props {
  * the content's wrappers take no room there; styles.css lays them out on bigger screens.
  */
 export function Page({ name, languageSwitch, layout = 'single', children }: Props) {
+  if (useContext(InShell)) {
+    return (
+      <div class={`screen in-shell ${layout}`}>
+        <div class="body">{children}</div>
+      </div>
+    );
+  }
   return (
     <main class={`screen ${layout}`}>
       <Brand name={name} languageSwitch={languageSwitch} />

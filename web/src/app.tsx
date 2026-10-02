@@ -223,7 +223,7 @@ export function App() {
           name={name}
           files={state.done!.files}
           bytes={state.done!.bytes}
-          offerInstall={state.session?.pin_kind === 'permanent'}
+          offerInstall={state.session?.kind === 'pin' && state.session.pin_kind === 'permanent'}
           onMore={sendMore}
         />
       );
