@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { browserName } from '../src/browser';
+import { browserName, isApple } from '../src/browser';
 
 const ua = {
   chromeWindows: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36',
@@ -49,5 +49,16 @@ describe('browserName', () => {
     expect(browserName(ua.chromeWindows, { brands: brands('Microsoft Edge'), platform: 'macOS' })).toBe('Edge · Mac');
     expect(browserName(ua.chromeWindows, { brands: brands('Google Chrome'), platform: 'Chrome OS' })).toBe('Chrome · ChromeOS');
     expect(browserName(ua.chromeAndroid, { brands: brands('Google Chrome'), platform: 'Android' })).toBe('Chrome · Android');
+  });
+});
+
+describe('isApple', () => {
+  it('knows iPhones and iPads, also when an iPad says it is a Mac', () => {
+    expect(isApple(ua.safariIphone, 5)).toBe(true);
+    expect(isApple(ua.firefoxIpad, 5)).toBe(true);
+    expect(isApple(ua.safariMac, 5)).toBe(true);
+    expect(isApple(ua.safariMac, 0)).toBe(false);
+    expect(isApple(ua.chromeAndroid, 5)).toBe(false);
+    expect(isApple(ua.chromeWindows, 10)).toBe(false);
   });
 });

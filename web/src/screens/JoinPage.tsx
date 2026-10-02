@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
-import { ApiError, getApp, getInfo, peekInvite, type AppInfo, type Info, type InvitePeek } from '../api';
+import { acceptInvite, ApiError, getApp, getInfo, getMe, peekInvite, type AppInfo, type Info, type InvitePeek } from '../api';
+import { isApple, thisBrowser } from '../browser';
 import { DropZone } from '../components/DropZone';
 import { Icon } from '../components/Icon';
 import { Page } from '../components/Page';
 import { QrCode } from '../components/QrCode';
 import { formatBytes, formatWhen } from '../format';
+import { setSignedInHint } from '../hint';
 import { I18nContext, isLang, languages, makeI18n, pickLanguage, storeLanguage, storedLanguage, type Lang } from '../i18n';
 
 type State =
@@ -36,13 +38,19 @@ export function intentLink(app: AppInfo, server: string, token: string): string 
   return `intent://join?${q}#Intent;scheme=${app.link_scheme};package=${app.android_package};S.browser_fallback_url=${fallback};end`;
 }
 
-/** Screen 9: what an invite link opens when the app isn't installed yet. */
+/**
+ * Screens 9 and 23: what an invite link opens when the app isn't installed yet. On Android it
+ * leads to the app, on a computer to the app on an Android phone, by QR code; and everywhere it
+ * can sign this browser in instead, which on iPhones and iPads is the way in.
+ */
 export function JoinPage() {
   // Read the token before it leaves the address bar, so it doesn't stay in the history.
   const token = useMemo(() => tokenFromHash(location.hash), []);
   const [info, setInfo] = useState<Info | null>(null);
   const [lang, setLang] = useState<Lang>(() => pickLanguage(languages, storedLanguage(), navigator.languages, 'en'));
   const [state, setState] = useState<State>({ kind: 'loading' });
+  const [joining, setJoining] = useState(false);
+  const [joinProblem, setJoinProblem] = useState<string | null>(null);
 
   useEffect(() => {
     if (location.hash) history.replaceState(null, '', location.pathname + location.search);
@@ -78,6 +86,36 @@ export function JoinPage() {
   const { t } = i18n;
   const name = info?.name ?? 'Share';
 
+  /** Uses the invite for this browser: it signs in as the invited person and opens the library. */
+  async function joinHere() {
+    if (!token || joining) return;
+    // The invite works once; without cookies it would be used up for nothing.
+    if (!navigator.cookieEnabled) return setJoinProblem(t('join.noCookie'));
+    setJoining(true);
+    setJoinProblem(null);
+    try {
+      await acceptInvite(token, thisBrowser());
+    } catch (e) {
+      setJoining(false);
+      if (e instanceof ApiError && problems[e.code]) return setState({ kind: 'problem', key: problems[e.code] });
+      return setJoinProblem(t(e instanceof ApiError && e.status > 0 ? 'join.failed' : 'pin.network'));
+    }
+    try {
+      await getMe();
+    } catch {
+      setJoining(false);
+      return setJoinProblem(t('join.cookieLost'));
+    }
+    setSignedInHint(true);
+    location.replace('/library');
+  }
+  const problemLine = joinProblem && (
+    <p class="help err" role="alert">
+      <Icon name="alert" />
+      {joinProblem}
+    </p>
+  );
+
   let body;
   let split = false;
   if (state.kind === 'loading') {
@@ -92,15 +130,56 @@ export function JoinPage() {
         <p class="lead">{t(state.key)}</p>
       </>
     );
+  } else if (isApple(navigator.userAgent, navigator.maxTouchPoints) || !state.app.apk) {
+    // No app for this device: the browser is the way in (screen 23 on an iPhone).
+    const { peek } = state;
+    const until = formatWhen(new Date(peek.expires_at), new Date(), lang);
+    body = (
+      <>
+        <div class="bigav" aria-hidden="true">
+          {([...peek.name.trim()][0] ?? '?').toLocaleUpperCase()}
+          <i>
+            <Icon name="check" />
+          </i>
+        </div>
+        <h1 class="hero md center">{peek.inviter ? t('join.invitedBy', { inviter: peek.inviter }) : t('join.invited')}</h1>
+        <p class="lead center">{t('join.browserLead', { person: peek.name })}</p>
+        <div class="facts">
+          <div>
+            <Icon name="user" />
+            <em>{t('join.factName')}</em>
+            <b>{peek.name}</b>
+          </div>
+          <div>
+            <Icon name="shield" />
+            <em>{t('join.factRole')}</em>
+            <b>{t(peek.role === 'admin' ? 'join.roleAdmin' : 'join.roleMember')}</b>
+          </div>
+          <div>
+            <Icon name="clock" />
+            <em>{t('join.factValid')}</em>
+            <b>{t('join.validUntil', { when: until })}</b>
+          </div>
+        </div>
+        <div class="grow" />
+        {problemLine}
+        <button type="button" class="btn primary" disabled={joining} onClick={() => void joinHere()}>
+          {t('join.useBrowser', { name })}
+        </button>
+        <p class="small">
+          {peek.inviter ? t('join.notYouInviter', { person: peek.name, inviter: peek.inviter }) : t('join.notYou', { person: peek.name })}
+        </p>
+      </>
+    );
   } else {
     const { peek, app } = state;
     const android = /Android/i.test(navigator.userAgent);
     const until = formatWhen(new Date(peek.expires_at), new Date(), lang);
     const size = app.apk ? formatBytes(app.apk.size, lang) : '';
-    // On a computer or an iPhone the invite goes to the Android phone as a QR code: the phone's
-    // camera opens it there, and the app can scan it as well.
-    const scan = !android && !!app.apk && !!token;
-    split = android || scan;
+    // On a computer the invite goes to the Android phone as a QR code: the phone's camera opens
+    // it there, and the app can scan it as well. Or this browser takes it.
+    const scan = !android && !!token;
+    split = true;
     body = (
       <>
         <div class="pane">
@@ -108,35 +187,39 @@ export function JoinPage() {
             <Icon name="images" />
           </div>
           <h1 class="hero md">{peek.inviter ? t('join.invitedBy', { inviter: peek.inviter }) : t('join.invited')}</h1>
-          <p class="lead">{t(scan ? 'join.leadPhone' : 'join.lead', { name })}</p>
-          {android && app.apk ? (
-            <div class="steps">
-              <Step n={1} title={t('join.step1')} detail={t('join.step1Detail', { size })} />
-              <Step n={2} title={t('join.step2')} detail={t('join.step2Detail')} />
-              <Step n={3} title={t('join.step3')} detail={t('join.step3Detail', { when: until })} />
-            </div>
-          ) : scan ? (
+          <p class="lead">{t(scan ? 'join.leadBoth' : 'join.lead', { name })}</p>
+          {scan ? (
             <div class="steps">
               <Step n={1} title={t('join.scanStep')} detail={t('join.scanStepDetail')} />
               <Step n={2} title={t('join.installStep')} detail={t('join.installStepDetail')} />
               <Step n={3} title={t('join.joinStep')} detail={t('join.step3Detail', { when: until })} />
             </div>
           ) : (
-            <p class="help">{t('join.noApk')}</p>
+            <div class="steps">
+              <Step n={1} title={t('join.step1')} detail={t('join.step1Detail', { size })} />
+              <Step n={2} title={t('join.step2')} detail={t('join.step2Detail')} />
+              <Step n={3} title={t('join.step3')} detail={t('join.step3Detail', { when: until })} />
+            </div>
           )}
         </div>
         <div class="grow" />
         <div class="pane">
-          {android && app.apk && (
-            <a class="btn primary" href="/download/share.apk" download="share.apk">
-              <Icon name="download" />
-              {t('join.download')}
-            </a>
-          )}
-          {android && token && (
-            <a class="btn link" href={intentLink(app, location.origin, token)}>
-              {t('join.already', { name: peek.name })}
-            </a>
+          {android && (
+            <>
+              <a class="btn primary" href="/download/share.apk" download="share.apk">
+                <Icon name="download" />
+                {t('join.download')}
+              </a>
+              {token && (
+                <a class="btn link" href={intentLink(app, location.origin, token)}>
+                  {t('join.already', { name: peek.name })}
+                </a>
+              )}
+              {problemLine}
+              <button type="button" class="small link" disabled={joining} onClick={() => void joinHere()}>
+                {t('join.useBrowserLink', { name })}
+              </button>
+            </>
           )}
           {scan && (
             <>
@@ -148,6 +231,13 @@ export function JoinPage() {
                   {t('join.scanUntil', { when: until })}
                 </span>
               </div>
+              <div class="or">{t('join.or')}</div>
+              {problemLine}
+              <button type="button" class="btn outline" disabled={joining} onClick={() => void joinHere()}>
+                <Icon name="monitor" />
+                {t('join.useBrowser', { name })}
+              </button>
+              <p class="small">{t('join.useBrowserNote', { person: peek.name })}</p>
               {/* Chrome shows Android tablets the desktop site, so they land here too. */}
               <a class="small link" href="/download/share.apk" download="share.apk">
                 {t('join.tabletDownload', { size })}

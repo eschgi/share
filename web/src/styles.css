@@ -990,6 +990,87 @@ a.small:focus-visible {
   border-radius: 4px;
 }
 
+/* Screen 23: an invite that this browser takes. The letter of the person it signs in as, and
+   what the invite says. */
+.bigav {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 104px;
+  height: 104px;
+  flex: none;
+  margin: 36px auto 26px;
+  border-radius: 50%;
+  background: #d9bfa6;
+  color: #3a2a1c;
+  font-family: var(--serif);
+  font-size: 44px;
+  font-weight: 700;
+}
+.bigav i {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--ok-strong);
+  color: #fff;
+  box-shadow: 0 0 0 4px var(--bg);
+}
+.bigav i .ic {
+  width: 19px;
+  height: 19px;
+}
+.facts {
+  flex: none;
+  margin-top: 28px;
+  border: 1px solid var(--line-soft);
+  border-radius: 18px;
+  background: var(--s1);
+}
+.facts div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+}
+.facts div + div {
+  border-top: 1px solid var(--line-soft);
+}
+.facts .ic {
+  color: var(--text-3);
+}
+.facts em {
+  flex: none;
+  min-width: 62px;
+  color: var(--text-3);
+  font-size: 14px;
+  font-style: normal;
+}
+.facts b {
+  font-size: 15px;
+  font-weight: 500;
+}
+/* "or", between two ways. */
+.or {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 22px 0 8px;
+  color: var(--text-3);
+  font-size: 14px;
+}
+.or::before,
+.or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
 /* Tablets and computers: a header across the window, and the content in a card in the middle
    of what is left. Auto margins centre it; when it is taller than the window it starts under
    the header and the page scrolls, instead of being cut off. */

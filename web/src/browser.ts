@@ -44,11 +44,16 @@ function systemOf(ua: string, platform?: string): string {
   return 'Computer';
 }
 
+/** iPhones and iPads, for which there is no app. iPads say they are Macs; their touch screen
+ * tells them apart. */
+export function isApple(ua: string, touchPoints: number): boolean {
+  return /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && touchPoints > 1);
+}
+
 /** This browser's name. */
 export function thisBrowser(): string {
   const hints = (navigator as Navigator & { userAgentData?: { brands?: Brand[]; platform?: string } }).userAgentData;
   let ua = navigator.userAgent;
-  // iPads say they are Macs; their touch screen tells them apart.
   if (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) ua = ua.replace('Macintosh', 'iPad');
   return browserName(ua, hints);
 }
