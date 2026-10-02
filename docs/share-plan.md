@@ -1,22 +1,25 @@
 # Share — plan
 
-Status: planning. Screens: [share-mockup.html](share-mockup.html) (numbers below refer to its screens).
+Status: built; what works is in the README's status. Screens: [share-mockup.html](share-mockup.html)
+(numbers below refer to its screens).
 
 Share is a self-hosted place to collect files. Anyone with a PIN sends photos, videos and documents
 through a website, without an account. People with an account see and download everything in an
-Android app, and admins run it from there. Nothing is family-specific: friends and anyone else with a
-PIN or an invite use the same screens. The project is open source, and the app will go on Google Play
-later.
+Android app or on the website, and admins run it from either. Nothing is family-specific: friends
+and anyone else with a PIN or an invite use the same screens. The project is open source, and the
+app will go on Google Play later.
 
 ## Parts
 
 - **Server**: one Go binary. It serves the website, the API, uploads and downloads, and keeps every
   file in a folder set in `config.json`. It runs on the GL.iNet router for now and maybe on a Hetzner VPS
   later, so it must not depend on anything router-specific.
-- **Website** (PWA): for sending only (1–6). Uppy runs headless under our own screens: tus for uploads,
-  Golden Retriever to survive a closed tab. Phones get one column; tablets and computers a card in the
-  middle, or two panes from 1024 points wide. Computers can drop files and folders, and an invite
-  opened there shows a QR code for the phone.
+- **Website** (PWA): for sending with a PIN (1–6), and for people with an account everything the app
+  does (22–37). Uppy runs headless under our own screens: tus for uploads, Golden Retriever to survive
+  a closed tab. Phones get one column and the app's bars; tablets and computers a card in the middle,
+  or two panes from 1024 points wide, and the account's pages a header with Library, Send and
+  Settings. Computers can drop files and folders, and an invite opened there shows a QR code for the
+  phone, or signs in the browser.
 - **App** (Flutter, Android): library, bulk download, sending, and the admin screens (7–21).
 
 ## Access
@@ -30,7 +33,10 @@ later.
   own key, which an admin can revoke.
 - **Admins** delete files (kept 30 days in Recently deleted), manage PINs, and invite, remove or promote
   people.
-- **Signed-in users** send without a PIN (15).
+- **Signed-in users** send without a PIN (15, 29).
+- **Browsers** sign in like phones, with the password or an invite (22, 23), and keep their key in a
+  cookie the page can't read. One that signs in at home, over plain http, gets a session that works
+  only at home: a cookie belongs to an address, and someone else's network has the same addresses.
 - **No uploader names**: the website doesn't ask for one.
 
 ## Library
@@ -39,6 +45,10 @@ later.
 - Grouped by upload day, newest first (11).
 - Downloads: photos and videos go into a "Share" album in the gallery, documents into Downloads; files
   already on the phone are skipped (13).
+- In a browser (24–28): one file downloads as it is; several as one ZIP, stored without compression
+  and laid out before the files are read, so its size is exact and the browser resumes it. Chrome
+  and Edge on a computer can save them into a folder instead, a folder per day, skipping files that
+  are there already (26, 27).
 
 ## Network
 

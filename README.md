@@ -5,10 +5,11 @@ A self-hosted place where family and friends drop photos, videos and documents.
 - **Sending** works in any browser with a 5-character PIN: no app, no account. Uploads go in
   pieces and continue after a dropped connection, so videos of several gigabytes get through,
   also behind Cloudflare's 100 MB request limit.
-- **Seeing and downloading** everything is for people with an account, in an Android app.
-  They join with an invite, without a password, and send from the app too. At home the app uses
-  the server's local address and skips the internet. Admins manage PINs and people there, and
-  deleted files wait 30 days in Recently deleted.
+- **Seeing and downloading** everything is for people with an account, in the Android app or in
+  any browser, on iPhones and computers too. They join with an invite, without a password, and
+  send from there as well, without a PIN. At home the app uses the server's local address and skips
+  the internet. Admins manage PINs and people in either, and deleted files wait 30 days in Recently
+  deleted.
 - Files are stored unchanged in one folder per upload day: `<storage_dir>/2026-09-30/IMG_0001.jpg`.
 
 The server is one Go program without dependencies at runtime. It runs on a router or another
@@ -23,7 +24,7 @@ small Linux machine with a USB drive, or on a VPS. The website is embedded in it
     <td align="center"><img src="docs/screenshots/web-pin.png" width="180" alt="Enter your PIN, with three of the five characters typed"><br><sub>Entering the PIN</sub></td>
     <td align="center"><img src="docs/screenshots/web-ready.png" width="180" alt="Send your files: this PIN works until tomorrow, 08:06"><br><sub>Ready, with a 24-hour PIN</sub></td>
     <td align="center"><img src="docs/screenshots/web-sending.png" width="180" alt="Sending your files: 5 of 12, about 3 minutes left"><br><sub>Sending</sub></td>
-    <td align="center"><img src="docs/screenshots/web-join.png" width="180" alt="Stefan invited you: download the app, install it, come back and tap Join"><br><sub>An invite, before the app is installed</sub></td>
+    <td align="center"><img src="docs/screenshots/web-join.png" width="180" alt="Stefan invited you: download the app, install it, come back and tap Join, or use Share in this browser"><br><sub>An invite, on Android</sub></td>
   </tr>
 </table>
 
@@ -35,8 +36,34 @@ small Linux machine with a USB drive, or on a VPS. The website is embedded in it
     <td align="center"><img src="docs/screenshots/web-computer-sending.png" width="380" alt="Sending 6 of 24 files, the progress beside the tiles"><br><sub>Sending, the progress in view</sub></td>
   </tr>
   <tr>
-    <td align="center"><img src="docs/screenshots/web-computer-join.png" width="380" alt="An invite opened on a computer, as a QR code to scan with the Android phone"><br><sub>An invite on a computer, for the phone</sub></td>
+    <td align="center"><img src="docs/screenshots/web-computer-join.png" width="380" alt="An invite opened on a computer: a QR code to scan with the Android phone, or Use Share in this browser"><br><sub>An invite on a computer: the phone or this browser</sub></td>
     <td align="center"><img src="docs/screenshots/web-tablet-sending.png" width="264" alt="Sending on a tablet: one card, five tiles to a row"><br><sub>Sending on a tablet</sub></td>
+  </tr>
+</table>
+
+**The website, for people with an account**, does what the app does:
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/web-join-iphone.png" width="180" alt="An invite on an iPhone: this browser will be signed in as Maria, with the button Use Share in this browser"><br><sub>Joining in the browser, on an iPhone</sub></td>
+    <td align="center"><img src="docs/screenshots/web-library.png" width="180" alt="The library on a phone, by upload day"><br><sub>The library, by day</sub></td>
+    <td align="center"><img src="docs/screenshots/web-select.png" width="180" alt="Eight files selected, with Delete and Download 8 at the bottom"><br><sub>Selecting many</sub></td>
+    <td align="center"><img src="docs/screenshots/web-viewer.png" width="180" alt="One photo, with the film strip, Download, Details and Delete"><br><sub>One file</sub></td>
+  </tr>
+</table>
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/web-computer-library.png" width="380" alt="The library on a computer, eight tiles to a row, with the search in the header"><br><sub>The library on a computer</sub></td>
+    <td align="center"><img src="docs/screenshots/web-computer-select.png" width="380" alt="Twelve files selected, the actions floating at the bottom"><br><sub>Selecting with the mouse and Shift</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/web-computer-save.png" width="380" alt="Saving 12 files into the folder Share, a folder for each day"><br><sub>Saving into a folder, in Chrome and Edge</sub></td>
+    <td align="center"><img src="docs/screenshots/web-computer-viewer.png" width="380" alt="One photo, with arrows, the film strip and its details beside it"><br><sub>One file, with its details</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/web-computer-settings.png" width="380" alt="An admin's settings: the list on the left, the people on the right"><br><sub>An admin's settings, with the people</sub></td>
+    <td align="center"><img src="docs/screenshots/web-computer-pins.png" width="380" alt="Upload PINs: a permanent one and one for 24 hours"><br><sub>Upload PINs</sub></td>
   </tr>
 </table>
 
@@ -70,6 +97,10 @@ Both speak English, German and Italian.
 | Website: sending with a PIN, the invite page (English, German, Italian) | works |
 | Website: continuing after the page was closed, install as an app | works |
 | Website: layouts for tablets and computers, dropping files and folders, invites as a QR code | works |
+| Website for people with an account: signing in with a password or an invite, the library, the viewer | works |
+| Website: downloads of one file, of many as a ZIP that resumes, or into a folder (Chrome, Edge) | works |
+| Website: selecting, sharing from phones, deleting with Undo, sending without a PIN | works |
+| Website: upload PINs, people and invites, Recently deleted, storage | works |
 | Android app: see and download | built and tested, not yet tried on a phone |
 | Android app: send, manage PINs and people, Recently deleted | built and tested, not yet tried on a phone |
 | Self-updating app, Google Play, a VPS setup | planned |
@@ -78,8 +109,9 @@ The plan and the screens are in [`docs/`](docs/).
 
 ## How it works
 
-- An admin makes a PIN, in the app or with `share pin create`: a permanent one, for the family, or
-  one for 24 hours, for a party. A PIN link (`https://share.example.com/#K7M2Q`) fills it in.
+- An admin makes a PIN, in the app, on the website or with `share pin create`: a permanent one, for
+  the family, or one for 24 hours, for a party. A PIN link (`https://share.example.com/#K7M2Q`)
+  fills it in.
 - The website sends with [tus](https://tus.io), in pieces of 20 MiB that the server confirms one by
   one, so a dropped connection costs at most one piece. If the page is closed in the middle, it
   offers to continue when it's opened again. It can be installed as an app.
@@ -92,6 +124,11 @@ The plan and the screens are in [`docs/`](docs/).
   when the app is closed, and continue where they stopped after an interruption.
 - At home the app reaches the server on its address at home (`home_url`), plain http or https,
   without Cloudflare and the internet.
+- People with an account can use the website instead of the app, signed in with their password or
+  an invite: the library by day, a viewer that also plays videos, selecting many, sending without a
+  PIN, and an admin's settings. One file downloads as it is; several as one ZIP, whose exact size is
+  known at once and which the browser's download list resumes. Chrome and Edge on a computer can
+  also save them straight into a folder, a folder per day, skipping files already there.
 - Deleted files stay in Recently deleted for 30 days (`trash_days`), and admins can bring them back.
 
 ## Security
@@ -171,7 +208,7 @@ the server on `127.0.0.1:8080`; `npm run dev -- --host` makes it reachable from 
 3. With the drive mounted, run `share init` once. `share check` says whether the drive suits: ext4
    is best, FAT32 can't hold files over 4 GiB.
 4. Run `share serve` as a service. The first start prints an invite for the first admin, who opens
-   it on their phone.
+   it on their phone, or in a browser.
 5. Put it behind a Cloudflare Tunnel ([`deploy/cloudflared`](deploy/cloudflared/README.md)), or let
    it serve HTTPS itself: `"https": {"listen": ":443", "certificate": {"cert_file": "…", "key_file": "…"}}`.
 
@@ -188,8 +225,9 @@ On Windows:
 port's own certificate.
 
 People get the app from the invite page, which offers the APK set in `app.apk_file` and then hands
-the invite to the app. Each release has it as `share.apk`, with `share.apk.json` (its version) to put
-next to it. How to build the APK yourself is in [`app/README.md`](app/README.md).
+the invite to the app; or they use the website in their browser instead, as on an iPhone. Each
+release has the APK as `share.apk`, with `share.apk.json` (its version) to put next to it. How to
+build the APK yourself is in [`app/README.md`](app/README.md).
 
 ## Configuration
 
