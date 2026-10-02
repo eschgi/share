@@ -227,6 +227,37 @@ func TestDeleteAccount(t *testing.T) {
 	}
 }
 
+func TestAboutIsForPeopleWithAnAccount(t *testing.T) {
+	e := newEnv(t)
+	admin := e.admin()
+	e.setPassword(admin.token, "stefan", "correct horse")
+	maria := e.accept(e.invite(admin, "Maria", db.RoleMember), "Pixel 8")
+	browser := e.webBrowser()
+	if r := e.signInWeb(browser, "stefan", "correct horse"); r.status != http.StatusOK {
+		t.Fatalf("sign in: %d %s", r.status, r.body)
+	}
+	for name, r := range map[string]response{
+		"admin":   e.get("/api/about", admin.token),
+		"member":  e.get("/api/about", maria.token),
+		"browser": e.do(browser, "GET", "/api/about", "", nil, nil),
+	} {
+		if r.status != http.StatusOK {
+			t.Errorf("%s: %d %s", name, r.status, r.body)
+			continue
+		}
+		assertShape(t, name, readFixture(t, "api/about.json")["response"], r.json(t))
+		if v := r.json(t)["version"]; v != "dev" {
+			t.Errorf("%s: version %v, want dev for a build without one", name, v)
+		}
+	}
+	pinToken, _ := e.unlockApp(e.newPin(db.PinDay).Code, "")
+	wantStatus(t, "a PIN", e.get("/api/about", pinToken), http.StatusForbidden, "forbidden")
+	wantStatus(t, "nobody", e.get("/api/about", ""), http.StatusUnauthorized, "unauthorized")
+	if info := e.get("/api/info", "").json(t); info["version"] != nil {
+		t.Errorf("/api/info tells everyone the version: %v", info)
+	}
+}
+
 func TestPhonesSeeTheLibraryAndPINsDont(t *testing.T) {
 	e := newEnv(t)
 	admin := e.admin()

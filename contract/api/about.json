@@ -1,0 +1,10 @@
+{
+  "method": "GET",
+  "path": "/api/about",
+  "auth": "device",
+  "status": 200,
+  "response": {
+    "version": "v0.2.0-4-gd54ba27"
+  },
+  "notes": "The server's version for the About screens: what the build was given (git describe in CI and scripts/build-*.sh), \"dev\" for a build without one. Only signed-in phones and browsers see it; a PIN session gets 403 forbidden, and /api/info, which anyone can read, doesn't have it."
+}

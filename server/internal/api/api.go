@@ -37,6 +37,8 @@ type API struct {
 	Downloads   *downloads.Store
 	Checksums   *checksum.Store
 	Now         func() time.Time
+	// ServerVersion is the program's version, e.g. v0.1.0-3-gabc1234, for /api/about.
+	ServerVersion string
 }
 
 // Register adds the API routes to mux.
@@ -60,6 +62,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/me/password", a.setPassword)
 	mux.HandleFunc("POST /api/me/delete", a.deleteMe)
 	mux.HandleFunc("GET /api/server", a.serverInfo)
+	mux.HandleFunc("GET /api/about", a.about)
 
 	mux.HandleFunc("GET /api/library", a.library)
 	mux.HandleFunc("GET /api/files", a.files)

@@ -33,6 +33,7 @@ type Options struct {
 	Now            func() time.Time
 	WaitForStorage bool // wait for the storage marker instead of failing (the drive may mount late)
 	Upload         *upload.Config
+	Version        string // the program's version, for the About screens; "dev" when empty
 }
 
 // App is a running server's parts.
@@ -132,9 +133,13 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 			return nil, fmt.Errorf("https certificate: %w", err)
 		}
 	}
+	version := opts.Version
+	if version == "" {
+		version = "dev"
+	}
 	apiHandlers := &api.API{
 		Cfg: cfg, Auth: authSvc, ServerID: serverID, MaxFileSize: maxFile, Lib: lib, Thumbs: th, Local: local,
-		APK: &api.APK{Path: cfg.App.APKFile}, Downloads: dl, Checksums: crcs, Now: now,
+		APK: &api.APK{Path: cfg.App.APKFile}, Downloads: dl, Checksums: crcs, Now: now, ServerVersion: version,
 	}
 
 	mux := http.NewServeMux()

@@ -355,6 +355,19 @@ func (a *API) serverInfo(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, a.server())
 }
 
+// About is what the About screens show of the server. Only people with an account see the
+// version: /api/info, which anyone can read, doesn't tell scanners which build runs here.
+type About struct {
+	Version string `json:"version"`
+}
+
+func (a *API) about(w http.ResponseWriter, r *http.Request) {
+	if _, ok := a.device(w, r); !ok {
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, About{Version: a.ServerVersion})
+}
+
 func internal(w http.ResponseWriter, what string, err error) {
 	log.Printf("api: %s: %v", what, err)
 	httpx.WriteError(w, http.StatusInternalServerError, "internal", "Something went wrong on the server.")

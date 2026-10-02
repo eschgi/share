@@ -134,7 +134,7 @@ func serve(args []string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	log.Printf("share %s starting", version)
-	a, err := app.New(ctx, cfg, app.Options{WaitForStorage: true})
+	a, err := app.New(ctx, cfg, app.Options{WaitForStorage: true, Version: version})
 	if err != nil {
 		return err
 	}
