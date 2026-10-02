@@ -5,14 +5,21 @@
   "status": 200,
   "response": {
     "storage_dir": "/mnt/usb/share",
-    "fs_type": "ext4",
+    "fs_type": "exfat",
     "total_bytes": 1000204886016,
     "free_bytes": 612345678848,
     "files": 4210,
     "bytes": 311234567890,
     "trash_files": 12,
     "trash_bytes": 812345678,
-    "trash_days": 30
+    "trash_days": 30,
+    "warnings": [
+      {
+        "code": "ignores_case",
+        "level": "warning",
+        "message": "the storage drive is exfat: it ignores case in names and is slower than ext4"
+      }
+    ]
   },
-  "notes": "Where the files are (set in config.json on the server) and how full the drive is. files and bytes count the library; the trash is counted apart. fs_type, total_bytes and free_bytes are empty or 0 if the drive can't be asked."
+  "notes": "Where the files are (set in config.json on the server) and how full the drive is. files and bytes count the library; the trash is counted apart. fs_type, total_bytes and free_bytes are empty or 0 if the drive can't be asked. warnings is what `share check` finds, problems first; [] when all is well. Their codes and levels are in contract/storage_warnings.json; message is the console's English text."
 }

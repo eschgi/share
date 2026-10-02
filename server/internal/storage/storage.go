@@ -84,66 +84,86 @@ func WaitForMarker(ctx context.Context, storageDir string, logf func(string, ...
 	}
 }
 
+// Finding is something Check found. Code names it for the website and the app, which
+// translate it (contract/storage_warnings.json); Message says it for the console and the log.
+type Finding struct {
+	Code    string
+	Message string
+}
+
+func (f Finding) String() string { return f.Message }
+
 // Report is the result of Check.
 type Report struct {
 	Storage  FSInfo
 	Data     FSInfo
-	Problems []string // the server won't work well until these are fixed
-	Warnings []string
+	Problems []Finding // the server won't work well until these are fixed
+	Warnings []Finding
 	// MaxFileSize is the largest file the drive can hold (FAT32: 4 GiB − 1); 0 means no limit.
 	MaxFileSize int64
 }
 
-// Check inspects the folders and the drives under them.
-func Check(l Layout) Report {
+// Check inspects the folders and the drives under them. minFree is the space uploads leave
+// free on the storage drive.
+func Check(l Layout, minFree int64) Report {
 	var r Report
-	problem := func(format string, args ...any) { r.Problems = append(r.Problems, fmt.Sprintf(format, args...)) }
-	warn := func(format string, args ...any) { r.Warnings = append(r.Warnings, fmt.Sprintf(format, args...)) }
+	problem := func(code, format string, args ...any) {
+		r.Problems = append(r.Problems, Finding{code, fmt.Sprintf(format, args...)})
+	}
+	warn := func(code, format string, args ...any) {
+		r.Warnings = append(r.Warnings, Finding{code, fmt.Sprintf(format, args...)})
+	}
 
 	if _, err := os.Stat(filepath.Join(l.StorageDir, MarkerName)); err != nil {
-		problem("%s has no %s marker; mount the drive and run `share init`", l.StorageDir, MarkerName)
+		problem("marker_missing", "%s has no %s marker; mount the drive and run `share init`", l.StorageDir, MarkerName)
 		return r
 	}
 	var err error
 	if r.Storage, err = Stat(l.StorageDir); err != nil {
-		problem("storage folder: %v", err)
+		problem("storage_unreadable", "storage folder: %v", err)
 		return r
 	}
 	for _, dir := range []string{l.UploadsDir(), l.TrashDir()} {
 		info, err := Stat(dir)
 		switch {
 		case err != nil:
-			problem("%s is missing; run `share init`", dir)
+			problem("folder_missing", "%s is missing; run `share init`", dir)
 		case info.Device != r.Storage.Device:
-			problem("%s is on another drive than %s; finishing uploads needs both on one drive", dir, l.StorageDir)
+			problem("other_drive", "%s is on another drive than %s; finishing uploads needs both on one drive", dir, l.StorageDir)
 		}
 	}
 	switch r.Storage.Type {
 	case "vfat":
-		warn("the storage drive is FAT32: files over 4 GiB can't be stored; ext4 is recommended")
+		warn("fat32", "the storage drive is FAT32: files over 4 GiB can't be stored; ext4 is recommended")
 		r.MaxFileSize = 4<<30 - 1
 	case "exfat", "ntfs", "ntfs3", "fuseblk":
-		warn("the storage drive is %s: it ignores case in names and is slower than ext4", r.Storage.Type)
+		warn("ignores_case", "the storage drive is %s: it ignores case in names and is slower than ext4", r.Storage.Type)
 	case "tmpfs", "squashfs", "overlay", "ubifs", "jffs2":
-		problem("the storage folder is on %s, which is the router's memory or flash, not a drive", r.Storage.Type)
+		problem("not_a_drive", "the storage folder is on %s, which is the router's memory or flash, not a drive", r.Storage.Type)
 	}
 
 	if err := os.MkdirAll(l.DataDir, 0o700); err != nil {
-		problem("data folder: %v", err)
+		problem("data_unreadable", "data folder: %v", err)
 		return r
 	}
 	if r.Data, err = Stat(l.DataDir); err != nil {
-		problem("data folder: %v", err)
+		problem("data_unreadable", "data folder: %v", err)
 		return r
 	}
 	switch r.Data.Type {
 	case "fuseblk", "nfs", "cifs", "smb2":
-		problem("the data folder is on %s; SQLite isn't safe there — set data_dir to a local disk", r.Data.Type)
+		problem("data_unsafe", "the data folder is on %s; SQLite isn't safe there — set data_dir to a local disk", r.Data.Type)
 	case "tmpfs":
-		problem("the data folder is in memory (tmpfs) and would be lost on restart")
+		problem("data_in_memory", "the data folder is in memory (tmpfs) and would be lost on restart")
 	}
-	if r.Storage.Free < 1<<30 {
-		warn("less than 1 GiB free on the storage drive")
+	// Uploads stop where they would leave less than minFree; say so a while before.
+	switch free := r.Storage.Free; {
+	case free <= minFree:
+		problem("drive_full", "the storage drive is full: %s free, and uploads leave %s (min_free_space_mib)", gib(free), gib(minFree))
+	case free < minFree+1<<30:
+		warn("low_space", "only %s free on the storage drive; uploads stop at %s (min_free_space_mib)", gib(free), gib(minFree))
 	}
 	return r
 }
+
+func gib(b int64) string { return fmt.Sprintf("%.1f GiB", float64(b)/(1<<30)) }

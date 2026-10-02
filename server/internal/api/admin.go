@@ -584,17 +584,28 @@ func (a *API) trashChange(w http.ResponseWriter, r *http.Request, what string, c
 	httpx.WriteJSON(w, http.StatusOK, Changed{Changed: len(files)})
 }
 
-// StorageInfo is where the files are and how full the drive is.
+// StorageInfo is where the files are, how full the drive is, and what an admin should know
+// about it.
 type StorageInfo struct {
-	StorageDir string `json:"storage_dir"`
-	FSType     string `json:"fs_type"`
-	TotalBytes int64  `json:"total_bytes"`
-	FreeBytes  int64  `json:"free_bytes"`
-	Files      int    `json:"files"` // in the library
-	Bytes      int64  `json:"bytes"`
-	TrashFiles int    `json:"trash_files"`
-	TrashBytes int64  `json:"trash_bytes"`
-	TrashDays  int    `json:"trash_days"`
+	StorageDir string           `json:"storage_dir"`
+	FSType     string           `json:"fs_type"`
+	TotalBytes int64            `json:"total_bytes"`
+	FreeBytes  int64            `json:"free_bytes"`
+	Files      int              `json:"files"` // in the library
+	Bytes      int64            `json:"bytes"`
+	TrashFiles int              `json:"trash_files"`
+	TrashBytes int64            `json:"trash_bytes"`
+	TrashDays  int              `json:"trash_days"`
+	Warnings   []StorageWarning `json:"warnings"` // problems first
+}
+
+// StorageWarning is what `share check` finds: a problem keeps Share from working well, a
+// warning is worth knowing. The website and the app translate the code
+// (contract/storage_warnings.json); the message is for the console, in English.
+type StorageWarning struct {
+	Code    string `json:"code"`
+	Level   string `json:"level"` // "problem" or "warning"
+	Message string `json:"message"`
 }
 
 func (a *API) storageInfo(w http.ResponseWriter, r *http.Request) {
@@ -613,6 +624,14 @@ func (a *API) storageInfo(w http.ResponseWriter, r *http.Request) {
 	}
 	if fs, err := storage.Stat(a.Cfg.StorageDir); err == nil {
 		info.FSType, info.TotalBytes, info.FreeBytes = fs.Type, fs.Total, fs.Free
+	}
+	report := a.CheckStorage()
+	info.Warnings = make([]StorageWarning, 0, len(report.Problems)+len(report.Warnings))
+	for _, f := range report.Problems {
+		info.Warnings = append(info.Warnings, StorageWarning{Code: f.Code, Level: "problem", Message: f.Message})
+	}
+	for _, f := range report.Warnings {
+		info.Warnings = append(info.Warnings, StorageWarning{Code: f.Code, Level: "warning", Message: f.Message})
 	}
 	httpx.WriteJSON(w, http.StatusOK, info)
 }

@@ -34,6 +34,8 @@ type Options struct {
 	WaitForStorage bool // wait for the storage marker instead of failing (the drive may mount late)
 	Upload         *upload.Config
 	Version        string // the program's version, for the About screens; "dev" when empty
+	// CheckStorage looks at the drives for the admins' storage page; storage.Check when nil.
+	CheckStorage func() storage.Report
 }
 
 // App is a running server's parts.
@@ -68,12 +70,16 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 	} else if _, err := os.Stat(filepath.Join(cfg.StorageDir, storage.MarkerName)); err != nil {
 		return nil, fmt.Errorf("%s isn't a Share storage folder (no %s); mount the drive and run `share init`", cfg.StorageDir, storage.MarkerName)
 	}
-	report := storage.Check(layout)
+	report := storage.Check(layout, cfg.MinFreeSpace())
 	for _, p := range report.Problems {
-		log.Printf("storage: problem: %s", p)
+		log.Printf("storage: problem: %s", p.Message)
 	}
 	for _, w := range report.Warnings {
-		log.Printf("storage: %s", w)
+		log.Printf("storage: %s", w.Message)
+	}
+	checkStorage := opts.CheckStorage
+	if checkStorage == nil {
+		checkStorage = func() storage.Report { return storage.Check(layout, cfg.MinFreeSpace()) }
 	}
 
 	d, err := db.Open(layout.DBPath())
@@ -140,6 +146,7 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 	apiHandlers := &api.API{
 		Cfg: cfg, Auth: authSvc, ServerID: serverID, MaxFileSize: maxFile, Lib: lib, Thumbs: th, Local: local,
 		APK: &api.APK{Path: cfg.App.APKFile}, Downloads: dl, Checksums: crcs, Now: now, ServerVersion: version,
+		CheckStorage: checkStorage,
 	}
 
 	mux := http.NewServeMux()

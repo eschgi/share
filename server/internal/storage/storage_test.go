@@ -2,9 +2,12 @@ package storage
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -251,7 +254,7 @@ func TestCheck(t *testing.T) {
 	dir := t.TempDir()
 	l := Layout{StorageDir: filepath.Join(dir, "s"), DataDir: filepath.Join(dir, "d")}
 	os.MkdirAll(l.StorageDir, 0o755)
-	if r := Check(l); len(r.Problems) != 1 || !strings.Contains(r.Problems[0], "share init") {
+	if r := Check(l, 0); len(r.Problems) != 1 || r.Problems[0].Code != "marker_missing" || !strings.Contains(r.Problems[0].Message, "share init") {
 		t.Fatalf("without marker: %+v", r)
 	}
 	if err := Init(l); err != nil {
@@ -259,9 +262,73 @@ func TestCheck(t *testing.T) {
 	}
 	// Test folders may live on tmpfs, which Check rightly complains about; everything else
 	// must be fine after init.
-	for _, p := range Check(l).Problems {
-		if !strings.Contains(p, "tmpfs") {
-			t.Errorf("after init: %s", p)
+	r := Check(l, 0)
+	for _, p := range r.Problems {
+		if p.Code != "not_a_drive" && p.Code != "data_in_memory" && !(p.Code == "drive_full" && r.Storage.Free == 0) {
+			t.Errorf("after init: %s %s", p.Code, p.Message)
+		}
+	}
+	free := r.Storage.Free
+	if free < 2<<30 {
+		t.Skipf("only %d bytes free here", free)
+	}
+	codes := func(fs []Finding) (out []string) {
+		for _, f := range fs {
+			out = append(out, f.Code)
+		}
+		return out
+	}
+	// Uploads stop at minFree; a little before, it warns.
+	if r := Check(l, free+1<<30); !slices.Contains(codes(r.Problems), "drive_full") {
+		t.Errorf("no room left for uploads: %v", r.Problems)
+	}
+	if r := Check(l, free-256<<20); !slices.Contains(codes(r.Warnings), "low_space") || slices.Contains(codes(r.Problems), "drive_full") {
+		t.Errorf("256 MiB left for uploads: %v, %v", r.Warnings, r.Problems)
+	}
+	if r := Check(l, 0); len(r.Warnings) != 0 && r.Storage.Type != "vfat" && r.Storage.Type != "exfat" {
+		t.Errorf("with room: %v", r.Warnings)
+	}
+	os.Remove(l.TrashDir())
+	if r := Check(l, 0); !slices.Contains(codes(r.Problems), "folder_missing") {
+		t.Errorf("without .trash: %v", r.Problems)
+	}
+}
+
+// TestFindingsMatchContract reads Check's source: every code it can find must be in
+// contract/storage_warnings.json with its level, which the website and the app translate.
+func TestFindingsMatchContract(t *testing.T) {
+	raw, err := os.ReadFile("../../../contract/storage_warnings.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fixture struct {
+		Codes map[string]struct{ Level string }
+	}
+	if err := json.Unmarshal(raw, &fixture); err != nil {
+		t.Fatal(err)
+	}
+	src, err := os.ReadFile("storage.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := map[string]string{}
+	for _, m := range regexp.MustCompile(`\b(problem|warn)\("([a-z0-9_]+)"`).FindAllStringSubmatch(string(src), -1) {
+		level := map[string]string{"problem": "problem", "warn": "warning"}[m[1]]
+		if found[m[2]] != "" && found[m[2]] != level {
+			t.Errorf("%s is both a problem and a warning", m[2])
+		}
+		found[m[2]] = level
+	}
+	for code, level := range found {
+		if c, ok := fixture.Codes[code]; !ok {
+			t.Errorf("%s is not in the contract", code)
+		} else if c.Level != level {
+			t.Errorf("%s is a %s, the contract says %s", code, level, c.Level)
+		}
+	}
+	for code := range fixture.Codes {
+		if found[code] == "" {
+			t.Errorf("the contract has %s, which Check never finds", code)
 		}
 	}
 }

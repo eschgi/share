@@ -39,6 +39,8 @@ type API struct {
 	Now         func() time.Time
 	// ServerVersion is the program's version, e.g. v0.1.0-3-gabc1234, for /api/about.
 	ServerVersion string
+	// CheckStorage looks at the drives, for what the admins' storage page warns about.
+	CheckStorage func() storage.Report
 }
 
 // Register adds the API routes to mux.

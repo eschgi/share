@@ -156,7 +156,7 @@ func initStorage(args []string) error {
 		return err
 	}
 	fmt.Printf("Storage folder ready: %s\n", cfg.StorageDir)
-	return printReport(storage.Check(layout))
+	return printReport(storage.Check(layout, cfg.MinFreeSpace()))
 }
 
 func check(args []string) error {
@@ -169,7 +169,7 @@ func check(args []string) error {
 		return err
 	}
 	fmt.Printf("Config %s is valid. Public address: %s\n", *f.config, cfg.PublicURL)
-	return printReport(storage.Check(storage.Layout{StorageDir: cfg.StorageDir, DataDir: cfg.DataDir}))
+	return printReport(storage.Check(storage.Layout{StorageDir: cfg.StorageDir, DataDir: cfg.DataDir}, cfg.MinFreeSpace()))
 }
 
 func printReport(r storage.Report) error {
@@ -180,10 +180,10 @@ func printReport(r storage.Report) error {
 		fmt.Printf("Data folder:   %s\n", r.Data.Type)
 	}
 	for _, w := range r.Warnings {
-		fmt.Println("Warning:", w)
+		fmt.Println("Warning:", w.Message)
 	}
 	for _, p := range r.Problems {
-		fmt.Println("Problem:", p)
+		fmt.Println("Problem:", p.Message)
 	}
 	if len(r.Problems) > 0 {
 		return errors.New("fix the problems above")

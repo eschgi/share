@@ -1,0 +1,17 @@
+{
+  "description": "What GET /api/admin/storage warns admins about, by code, as `share check` finds it. problem: Share won't work well until it's fixed (and `share check` fails); warning: worth knowing. The website and the app translate every code here; for a code they don't know, they show a general line.",
+  "codes": {
+    "marker_missing": {"level": "problem", "meaning": "The storage folder has no .share-storage marker: the drive isn't mounted, or `share init` never ran."},
+    "storage_unreadable": {"level": "problem", "meaning": "The storage folder can't be read."},
+    "folder_missing": {"level": "problem", "meaning": ".uploads or .trash is missing from the storage folder; `share init` makes them."},
+    "other_drive": {"level": "problem", "meaning": ".uploads or .trash is on another drive than the storage folder; finishing uploads needs one drive."},
+    "not_a_drive": {"level": "problem", "meaning": "The storage folder is in the router's memory or flash, not on a drive."},
+    "data_unreadable": {"level": "problem", "meaning": "The data folder (database, thumbnails) can't be made or read."},
+    "data_unsafe": {"level": "problem", "meaning": "The data folder is on a network or FUSE drive, where the database isn't safe."},
+    "data_in_memory": {"level": "problem", "meaning": "The data folder is in memory and would be lost on restart."},
+    "drive_full": {"level": "problem", "meaning": "The storage drive has no more room than min_free_space_mib keeps free: uploads stop."},
+    "fat32": {"level": "warning", "meaning": "The storage drive is FAT32: files over 4 GiB can't be stored."},
+    "ignores_case": {"level": "warning", "meaning": "The storage drive is exFAT or NTFS: it ignores case in names and is slower than ext4."},
+    "low_space": {"level": "warning", "meaning": "Less than 1 GiB is left before uploads stop."}
+  }
+}

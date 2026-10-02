@@ -38,12 +38,13 @@ func (c *clock) Now() time.Time      { c.mu.Lock(); defer c.mu.Unlock(); return 
 func (c *clock) Add(d time.Duration) { c.mu.Lock(); defer c.mu.Unlock(); c.t = c.t.Add(d) }
 
 type env struct {
-	t     *testing.T
-	app   *App
-	srv   *httptest.Server
-	clock *clock
-	cfg   *config.Config
-	free  atomic.Int64
+	t      *testing.T
+	app    *App
+	srv    *httptest.Server
+	clock  *clock
+	cfg    *config.Config
+	free   atomic.Int64
+	report atomic.Pointer[storage.Report] // what the storage page finds; nothing when nil
 }
 
 func newEnv(t *testing.T) *env { return newEnvWith(t, "") }
@@ -69,7 +70,13 @@ func newEnvWith(t *testing.T, settings string) *env {
 	e.free.Store(1 << 40)
 	upCfg := upload.DefaultConfig()
 	upCfg.FreeSpace = func() (int64, error) { return e.free.Load(), nil }
-	a, err := New(context.Background(), cfg, Options{Now: e.clock.Now, Upload: &upCfg})
+	checkStorage := func() storage.Report {
+		if r := e.report.Load(); r != nil {
+			return *r
+		}
+		return storage.Report{}
+	}
+	a, err := New(context.Background(), cfg, Options{Now: e.clock.Now, Upload: &upCfg, CheckStorage: checkStorage})
 	if err != nil {
 		t.Fatal(err)
 	}

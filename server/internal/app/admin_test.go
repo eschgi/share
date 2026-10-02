@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/eschgi/share/server/internal/db"
+	"github.com/eschgi/share/server/internal/storage"
 )
 
 func (e *env) get(path, token string) response {
@@ -314,5 +315,20 @@ func TestStorageInfo(t *testing.T) {
 	v := info.json(t)
 	if v["files"] != 1.0 || v["bytes"] != 300.0 || v["trash_files"] != 1.0 || v["trash_bytes"] != 200.0 || v["storage_dir"] != e.cfg.StorageDir {
 		t.Errorf("storage: %v", v)
+	}
+	if w, ok := v["warnings"].([]any); !ok || len(w) != 0 {
+		t.Errorf("warnings when all is well: %v", v["warnings"])
+	}
+
+	e.report.Store(&storage.Report{
+		Problems: []storage.Finding{{Code: "drive_full", Message: "the storage drive is full"}},
+		Warnings: []storage.Finding{{Code: "fat32", Message: "the storage drive is FAT32"}},
+	})
+	info = e.get("/api/admin/storage", admin.token)
+	assertShape(t, "storage with warnings", readFixture(t, "api/storage.json")["response"], info.json(t))
+	got := info.json(t)["warnings"].([]any)
+	if len(got) != 2 || got[0].(map[string]any)["code"] != "drive_full" || got[0].(map[string]any)["level"] != "problem" ||
+		got[1].(map[string]any)["code"] != "fat32" || got[1].(map[string]any)["level"] != "warning" {
+		t.Errorf("warnings: %v", got)
 	}
 }
