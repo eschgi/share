@@ -101,8 +101,14 @@ Both speak English, German and Italian.
 | Website: downloads of one file, of many as a ZIP that resumes, or into a folder (Chrome, Edge) | works |
 | Website: selecting, sharing from phones, deleting with Undo, sending without a PIN | works |
 | Website: upload PINs, people and invites, Recently deleted, storage | works |
+| Server: the version for people with an account, new passwords from admins, the drive's warnings | works |
+| Website: zooming into photos, marks for files saved into a folder, notifications when a transfer ends | works |
+| Website: Use another PIN, About, new passwords and the drive's warnings for admins | works |
+| Website: Share into Share, installed on Android | built and tested in Chrome, not yet tried on a phone |
 | Android app: see and download | built and tested, not yet tried on a phone |
 | Android app: send, manage PINs and people, Recently deleted | built and tested, not yet tried on a phone |
+| Android app: videos and sound in the viewer, deleting there, one's own phones and browsers | built and tested, not yet tried on a phone |
+| Android app: Share into Share, new passwords, the drive's warnings, About | built and tested, not yet tried on a phone |
 | Self-updating app, Google Play, a VPS setup | planned |
 
 The plan and the screens are in [`docs/`](docs/).
@@ -130,6 +136,19 @@ The plan and the screens are in [`docs/`](docs/).
   known at once and which the browser's download list resumes. Chrome and Edge on a computer can
   also save them straight into a folder, a folder per day, skipping files already there.
 - Deleted files stay in Recently deleted for 30 days (`trash_days`), and admins can bring them back.
+- **Share into Share.** In another app's share sheet, "Send with Share" sends what was picked there:
+  in the app, and on Android also in the website installed as an app. Signed in, it goes at once;
+  with a PIN, with the PIN; with neither, it waits for one, or can be dropped. The files wait on the
+  phone until the server has them.
+- The app plays videos and sound itself: a copy on the phone if there is one, else straight from the
+  server, at home over its local address. The website's viewer zooms into photos, with two fingers,
+  a double tap, the mouse wheel or the keyboard.
+- Files saved into a folder on a computer get a mark in the library, as files saved on the phone do
+  in the app. A transfer that ends while the page is in the background can say so in a
+  notification, once the browser was allowed to show one.
+- Admins can give someone who forgot a password a new one, which the server makes up and shows once,
+  and see what `share check` finds about the drive, such as a full drive or FAT32. Settings show the
+  version running on the server.
 
 ## Security
 
@@ -160,6 +179,18 @@ The plan and the screens are in [`docs/`](docs/).
   it learned the fingerprint over the public address.
 - PINs and invites in links come after the `#`, which browsers don't send to the server or to
   Cloudflare, and the pages remove them from the address bar.
+- A password an admin makes up for someone is shown once and kept only as a hash; it isn't for the
+  admin's own account, the person's phones and browsers stay signed in, and the log notes only who
+  gave it to whom, by id. The app copies it marked as sensitive, so Android hides it in the
+  clipboard's preview.
+- The server's version is only for people with an account, not in the public `/api/info`, so
+  scanners can't tell which build runs.
+- Files shared into the installed website go to its service worker and from there into the
+  browser's storage; the server never reads them on the way, and answers a share that reaches it
+  without them. Signing out drops them. The app keeps shared files, or copies of them, in its own
+  storage until they are sent, and a week at most.
+- The app's player gets the phone's key only where the app's own requests would send it: plain http
+  only after the proof above, and never to the https port at home, whose files it fetches first.
 - The website loads nothing from elsewhere, fonts included, and has a strict Content Security
   Policy. Its cookies are HttpOnly and SameSite=Strict, and `__Host-` except over plain http at
   home, where browsers keep no secure ones. Only Share's own pages can change something: a request

@@ -32,7 +32,7 @@ app will go on Google Play later.
   one-time invite (QR code or link, valid 24 hours) that needs no password (10, 20). Each phone gets its
   own key, which an admin can revoke.
 - **Admins** delete files (kept 30 days in Recently deleted), manage PINs, and invite, remove or promote
-  people.
+  people, or give someone who forgot a password a new one.
 - **Signed-in users** send without a PIN (15, 29).
 - **Browsers** sign in like phones, with the password or an invite (22, 23), and keep their key in a
   cookie the page can't read. One that signs in at home, over plain http, gets a session that works
