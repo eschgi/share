@@ -39,6 +39,7 @@ void main() {
     expect(find.text('Upload PINs'), findsOneWidget);
     expect(find.text('1 permanent · 1 for 24 hours'), findsOneWidget);
     expect(find.text('Maria'), findsOneWidget);
+    expect(find.textContaining('1 phone, 1 browser'), findsOneWidget, reason: "Maria's phone and browser");
     expect(find.text('Oma Rosa'), findsOneWidget);
     expect(find.text('Invited'), findsOneWidget);
     await tester.scrollUntilVisible(find.text('/mnt/usb/share'), 200, scrollable: settingsList);
@@ -117,12 +118,15 @@ void main() {
     await tester.tap(find.text('Maria'));
     await tester.pumpAndSettle();
     expect(find.text('Pixel 8'), findsOneWidget);
+    expect(find.text('Phones and browsers'.toUpperCase()), findsOneWidget);
+    expect(find.textContaining('only at home'), findsOneWidget, reason: 'a browser signed in at home');
+    expect(find.text('Add a phone or browser'), findsOneWidget);
     await tester.tap(find.text('Sign out').last);
     await tester.pumpAndSettle();
-    expect(find.text('Sign out Galaxy Tab?'), findsOneWidget);
+    expect(find.text('Sign out Chrome · Windows?'), findsOneWidget);
     await tester.tap(find.text('Sign out').last);
     await tester.pumpAndSettle();
-    expect(find.text('Galaxy Tab'), findsNothing);
+    expect(find.text('Chrome · Windows'), findsNothing);
 
     await tester.tap(find.text('Make admin'));
     await tester.pumpAndSettle();

@@ -28,7 +28,7 @@ class PeopleGroup extends StatelessWidget {
         SettingsRow(
           leading: Avatar(name: p.name, id: p.id, size: 40),
           title: p.name,
-          subtitle: p.isMe ? t.personYou(p.phones.length) : _activity(t, p, now),
+          subtitle: p.isMe ? t.personYou(devices(t, p.phones)) : _activity(t, p, now),
           trailing: RoleBadge(label: p.isAdmin ? t.roleAdmin : t.roleMember, admin: p.isAdmin, crown: false),
           onTap: () async {
             await showModalBottomSheet<void>(context: context, isScrollControlled: true, builder: (_) => PersonSheet(person: p));
@@ -53,8 +53,16 @@ class PeopleGroup extends StatelessWidget {
     ]);
   }
 
+  /// "1 phone, 1 browser", "2 phones": someone's phones, and the browsers signed in on the website.
+  static String devices(AppLocalizations t, List<Phone> all) {
+    final browsers = all.where((p) => p.isBrowser).length;
+    final phones = all.length - browsers;
+    if (all.isEmpty) return t.personNoDevices;
+    return [if (phones > 0) t.personPhoneCount(phones), if (browsers > 0) t.personBrowserCount(browsers)].join(', ');
+  }
+
   static String _activity(AppLocalizations t, Person p, DateTime now) {
-    final phones = t.personPhoneCount(p.phones.length);
+    final phones = devices(t, p.phones);
     final seen = p.lastSeenAt;
     if (seen == null) return phones;
     final days = daysAgo(seen, now);
@@ -164,9 +172,12 @@ class _PersonSheetState extends State<PersonSheet> {
           SettingsGroup(children: [
             for (final phone in p.phones)
               SettingsRow(
-                leading: SettingsRow.icon(context, AppIcons.smartphone),
+                leading: SettingsRow.icon(context, phone.isBrowser ? AppIcons.monitor : AppIcons.smartphone),
                 title: phone.name,
-                subtitle: phone.isThis ? t.personThisPhone : t.personLastUsed(formatWhen(phone.lastSeenAt, now, locale)),
+                subtitle: [
+                  phone.isThis ? t.personThisPhone : t.personLastUsed(formatWhen(phone.lastSeenAt, now, locale)),
+                  if (phone.homeOnly) t.personAtHome,
+                ].join(' · '),
                 trailing: phone.isThis
                     ? const SizedBox()
                     : TextButton(

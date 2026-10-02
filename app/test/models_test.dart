@@ -56,6 +56,8 @@ void main() {
     expect(people.users.first.isMe, isTrue);
     expect(people.users.first.phones.single.isThis, isTrue);
     expect(people.users.last.phones, hasLength(2));
+    expect([people.users.last.phones.first.isBrowser, people.users.last.phones.last.isBrowser], [false, true]);
+    expect(people.users.last.phones.last.homeOnly, isTrue);
     expect(people.invites.single.userId, isNull);
 
     final invite = NewInvite.fromJson(contractResponse('api/invite_create.json'));

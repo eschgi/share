@@ -257,8 +257,17 @@ class PinInfo {
 }
 
 /// A signed-in phone of someone.
+/// A signed-in phone (the app) or browser (the website).
 class Phone {
-  const Phone({required this.id, required this.name, required this.createdAt, required this.lastSeenAt, this.isThis = false});
+  const Phone({
+    required this.id,
+    required this.name,
+    required this.createdAt,
+    required this.lastSeenAt,
+    this.isThis = false,
+    this.isBrowser = false,
+    this.homeOnly = false,
+  });
 
   factory Phone.fromJson(Json j) => Phone(
         id: _str(j['id']),
@@ -266,6 +275,8 @@ class Phone {
         createdAt: _time(j['created_at']) ?? DateTime.fromMillisecondsSinceEpoch(0),
         lastSeenAt: _time(j['last_seen_at']) ?? DateTime.fromMillisecondsSinceEpoch(0),
         isThis: _bool(j['this']),
+        isBrowser: j['client'] == 'web',
+        homeOnly: _bool(j['home_only']),
       );
 
   final String id;
@@ -273,6 +284,9 @@ class Phone {
   final DateTime createdAt;
   final DateTime lastSeenAt;
   final bool isThis; // the phone asking
+  final bool isBrowser;
+  /// A browser that signed in at home, where alone it stays signed in.
+  final bool homeOnly;
 }
 
 class Person {

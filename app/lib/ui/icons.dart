@@ -67,6 +67,8 @@ abstract final class AppIcons {
   static const IconData minus = IconData(0xe11c, fontFamily: 'Lucide');
   /// circle-minus
   static const IconData minusCircle = IconData(0xe07e, fontFamily: 'Lucide');
+  /// monitor
+  static const IconData monitor = IconData(0xe11d, fontFamily: 'Lucide');
   /// ellipsis-vertical
   static const IconData more = IconData(0xe0b7, fontFamily: 'Lucide');
   /// palette

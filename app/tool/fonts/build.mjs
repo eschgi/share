@@ -47,6 +47,7 @@ const icons = {
   logOut: 'log-out',
   minus: 'minus',
   minusCircle: 'circle-minus',
+  monitor: 'monitor',
   more: 'ellipsis-vertical',
   palette: 'palette',
   play: 'play',

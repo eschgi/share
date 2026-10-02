@@ -365,11 +365,11 @@
   "settingsPinsNone": "None yet",
   "settingsPeople": "People",
   "settingsInvite": "Invite",
-  "personYou": "{phones, plural, =0{You} =1{You · 1 phone} other{You · {phones} phones}}",
+  "personYou": "You · {devices}",
   "@personYou": {
     "placeholders": {
-      "phones": {
-        "type": "int"
+      "devices": {
+        "type": "String"
       }
     }
   },
@@ -381,6 +381,16 @@
       }
     }
   },
+  "personBrowserCount": "{browsers, plural, =1{1 browser} other{{browsers} browsers}}",
+  "@personBrowserCount": {
+    "placeholders": {
+      "browsers": {
+        "type": "int"
+      }
+    }
+  },
+  "personNoDevices": "No phone or browser",
+  "personAtHome": "only at home",
   "activeToday": "active today",
   "activeYesterday": "active yesterday",
   "activeDaysAgo": "active {days} days ago",
@@ -561,7 +571,7 @@
     }
   },
   "inviteAnother": "Invite someone else",
-  "invitePhoneTitle": "A phone for {name}",
+  "invitePhoneTitle": "A phone or browser for {name}",
   "@invitePhoneTitle": {
     "placeholders": {
       "name": {
@@ -569,7 +579,7 @@
       }
     }
   },
-  "invitePhoneLead": "Scan this with the new phone. It will be signed in as {name}.",
+  "invitePhoneLead": "Scan this with the new phone, or open the link in the new browser. It signs in as {name}.",
   "@invitePhoneLead": {
     "placeholders": {
       "name": {
@@ -577,7 +587,7 @@
       }
     }
   },
-  "personPhones": "Phones",
+  "personPhones": "Phones and browsers",
   "personThisPhone": "This phone",
   "personLastUsed": "Last used {when}",
   "@personLastUsed": {
@@ -589,7 +599,7 @@
   },
   "personMakeAdmin": "Make admin",
   "personMakeMember": "Make member",
-  "personAddPhone": "Add a phone",
+  "personAddPhone": "Add a phone or browser",
   "personSignOutPhone": "Sign out",
   "personSignOutTitle": "Sign out {phone}?",
   "@personSignOutTitle": {
@@ -599,7 +609,7 @@
       }
     }
   },
-  "personSignOutBody": "To come back it needs a new invite.",
+  "personSignOutBody": "To come back it needs a new invite or the password.",
   "personRemove": "Remove {name}",
   "@personRemove": {
     "placeholders": {
@@ -616,10 +626,10 @@
       }
     }
   },
-  "personRemoveBody": "Their phones are signed out. The files they sent stay in the library.",
+  "personRemoveBody": "Their phones and browsers are signed out. The files they sent stay in the library.",
   "personLastAdmin": "This is the only admin. Make someone else admin first.",
   "inviteWithdraw": "Withdraw the invite",
-  "inviteForPhone": "For another phone of {name}",
+  "inviteForPhone": "For another phone or browser of {name}",
   "@inviteForPhone": {
     "placeholders": {
       "name": {
