@@ -104,6 +104,9 @@ type Service struct {
 	loginPerUser *ratelimit.Limiter
 	loginPerIP   *ratelimit.Limiter
 	invitePerIP  *ratelimit.Limiter
+	// Wrong current passwords per person, when changing it: someone at an unlocked phone or
+	// browser mustn't be able to try passwords there without end.
+	passwordPerUser *ratelimit.Limiter
 }
 
 // NewService returns a Service with the standard limits.
@@ -117,6 +120,8 @@ func NewService(d *db.DB, now func() time.Time, proxies []netip.Prefix, clientIP
 		loginPerUser: ratelimit.New(10, 10*time.Minute, 10*time.Minute),
 		loginPerIP:   ratelimit.New(30, 10*time.Minute, 10*time.Minute),
 		invitePerIP:  ratelimit.New(20, 10*time.Minute, 10*time.Minute),
+
+		passwordPerUser: ratelimit.New(5, 15*time.Minute, 15*time.Minute),
 	}
 }
 
@@ -129,6 +134,7 @@ func (s *Service) PruneLimits() {
 	s.loginPerUser.Prune(now)
 	s.loginPerIP.Prune(now)
 	s.invitePerIP.Prune(now)
+	s.passwordPerUser.Prune(now)
 }
 
 // UnlockResult is a new PIN session.
@@ -144,7 +150,7 @@ type UnlockResult struct {
 // unfinished uploads move to the new one so they can continue.
 func (s *Service) Unlock(ctx context.Context, r *http.Request, input, client string) (*UnlockResult, error) {
 	if client != "web" && client != "app" {
-		return nil, fmt.Errorf("client must be web or app")
+		return nil, &InputError{"client", "must be web or app"}
 	}
 	code, ok := NormalizeCode(input)
 	if !ok {
@@ -328,6 +334,19 @@ func SetSessionCookie(w http.ResponseWriter, r *http.Request, token string, expi
 // ClearSessionCookie removes the website PIN session.
 func ClearSessionCookie(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, cookie(r, CookiePin, "", -1))
+}
+
+// HasSessionCookie reports whether a request carries one of the website's session cookies,
+// under either name: it comes from a browser, which a page elsewhere could make send it.
+func HasSessionCookie(r *http.Request) bool {
+	for _, name := range []string{CookiePin} {
+		for _, n := range []string{name, plainName(name)} {
+			if _, err := r.Cookie(n); err == nil {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // EnsureClientCookie gives a browser its random id for the wrong-PIN limit, once.

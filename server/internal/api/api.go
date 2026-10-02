@@ -128,8 +128,12 @@ func (a *API) unlock(w http.ResponseWriter, r *http.Request) {
 	res, err := a.Auth.Unlock(r.Context(), r, req.Code, req.Client)
 	var wrong *auth.WrongPINError
 	var locked *auth.LockedError
+	var input *auth.InputError
 	switch {
 	case err == nil:
+	case errors.As(err, &input):
+		httpx.WriteError(w, http.StatusBadRequest, "bad_request", "The "+input.Field+" "+input.Problem+".")
+		return
 	case errors.Is(err, auth.ErrPINFormat):
 		httpx.WriteError(w, http.StatusBadRequest, "pin_format", "A PIN has 5 letters or numbers.")
 		return

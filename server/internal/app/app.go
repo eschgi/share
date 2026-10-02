@@ -138,7 +138,7 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 
 	a := &App{Cfg: cfg, DB: d, Lib: lib, Auth: authSvc, Upload: up, Thumbs: th, UI: ui, Local: local, now: now}
 	// Browsers may only change state from this site itself; the app sends no Origin.
-	a.Handler = a.guard(http.NewCrossOriginProtection().Handler(mux))
+	a.Handler = a.guard(sameOrigin(mux))
 	a.sched = &jobs.Scheduler{Now: now, Logf: log.Printf, Tasks: []jobs.Task{
 		{Name: "reconcile uploads", Every: 5 * time.Minute, Run: func(ctx context.Context) error {
 			authSvc.PruneLimits()

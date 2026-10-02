@@ -237,13 +237,22 @@ func (a *API) setPassword(w http.ResponseWriter, r *http.Request) {
 	}
 	err := a.Auth.SetPassword(r.Context(), p, req.Username, req.CurrentPassword, req.Password)
 	var input *auth.InputError
+	var wrong *auth.WrongPasswordError
+	var locked *auth.LockedError
 	switch {
 	case err == nil:
 		w.WriteHeader(http.StatusNoContent)
 	case errors.As(err, &input):
 		httpx.WriteError(w, http.StatusBadRequest, "bad_request", "The "+input.Field+" "+input.Problem+".")
-	case errors.Is(err, auth.ErrPasswordWrong):
-		httpx.WriteError(w, http.StatusForbidden, "password_wrong", "The current password is wrong.")
+	case errors.As(err, &locked):
+		httpx.WriteErrorDetail(w, http.StatusTooManyRequests, httpx.ErrorDetail{
+			Code: "login_locked", Message: "Too many wrong passwords. Wait a moment and try again.",
+			RetryAfterSeconds: httpx.Seconds(locked.RetryAfter),
+		})
+	case errors.As(err, &wrong):
+		httpx.WriteErrorDetail(w, http.StatusForbidden, httpx.ErrorDetail{
+			Code: "password_wrong", Message: "The current password is wrong.", AttemptsLeft: &wrong.AttemptsLeft,
+		})
 	case errors.Is(err, auth.ErrUsernameTaken):
 		httpx.WriteError(w, http.StatusConflict, "username_taken", "Someone else has that username.")
 	default:

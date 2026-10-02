@@ -178,6 +178,37 @@ func TestSignInWithPassword(t *testing.T) {
 	}
 }
 
+func TestWrongCurrentPasswordsPause(t *testing.T) {
+	e := newEnv(t)
+	admin := e.admin()
+	put := func(current string) response {
+		v := map[string]string{"username": "stefan", "password": "correct horse"}
+		if current != "" {
+			v["current_password"] = current
+		}
+		return e.do(nil, "PUT", "/api/me/password", admin.token, bytes.NewReader(mustJSON(t, v)), map[string]string{"Content-Type": "application/json"})
+	}
+	if r := put(""); r.status != http.StatusNoContent {
+		t.Fatalf("the first password: %d %s", r.status, r.body)
+	}
+	for i := 1; i <= 4; i++ {
+		r := put("guess")
+		if r.status != http.StatusForbidden || r.errorCode() != "password_wrong" || r.json(t)["error"].(map[string]any)["attempts_left"] != float64(5-i) {
+			t.Fatalf("wrong current password %d: %d %s", i, r.status, r.body)
+		}
+	}
+	if r := put("guess"); r.status != http.StatusTooManyRequests || r.errorCode() != "login_locked" || r.header.Get("Retry-After") == "" {
+		t.Fatalf("5th wrong current password: %d %s, want 429 login_locked", r.status, r.body)
+	}
+	if r := put("correct horse"); r.status != http.StatusTooManyRequests {
+		t.Errorf("the right one during the pause: %d, want 429", r.status)
+	}
+	e.clock.Add(15 * time.Minute)
+	if r := put("correct horse"); r.status != http.StatusNoContent {
+		t.Errorf("after the pause: %d %s", r.status, r.body)
+	}
+}
+
 func TestDeleteAccount(t *testing.T) {
 	e := newEnv(t)
 	admin := e.admin()

@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/http/cookiejar"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -423,8 +422,8 @@ func TestBrowsersCantChangeStateFromOtherSites(t *testing.T) {
 	e := newEnv(t)
 	r := e.postJSON(nil, "/api/pin/unlock", "", map[string]string{"code": "K7M2Q"},
 		map[string]string{"Sec-Fetch-Site": "cross-site", "Origin": "https://evil.example"})
-	if r.status != http.StatusForbidden {
-		t.Fatalf("cross-site unlock: %d, want 403", r.status)
+	if r.status != http.StatusForbidden || r.errorCode() != "cross_origin" {
+		t.Fatalf("cross-site unlock: %d %s, want 403 cross_origin", r.status, r.body)
 	}
 	// JSON endpoints also insist on the JSON content type.
 	r = e.do(nil, "POST", "/api/pin/unlock", "", strings.NewReader(`{"code":"K7M2Q"}`), map[string]string{"Content-Type": "text/plain"})
@@ -498,9 +497,7 @@ func TestFullDriveRejectsNewUploads(t *testing.T) {
 func TestWebsiteSessionCookie(t *testing.T) {
 	e := newEnv(t)
 	pin := e.newPin(db.PinDay)
-	jar, _ := cookiejar.New(nil)
-	browser := e.srv.Client()
-	browser.Jar = jar
+	browser := e.webBrowser()
 
 	r := e.postJSON(browser, "/api/pin/unlock", "", map[string]string{"code": strings.ToLower(pin.Code), "client": "web"}, nil)
 	if r.status != http.StatusOK {
@@ -525,8 +522,8 @@ func TestWebsiteSessionCookie(t *testing.T) {
 	}
 	assertShape(t, "session", session[0].(map[string]any)["response"], r.json(t))
 
-	if r := e.do(browser, "POST", "/api/session/end", "", nil, nil); r.status != http.StatusNoContent {
-		t.Fatalf("end session: %d", r.status)
+	if r := e.postJSON(browser, "/api/session/end", "", struct{}{}, fromPage); r.status != http.StatusNoContent {
+		t.Fatalf("end session: %d %s", r.status, r.body)
 	}
 	r = e.do(browser, "GET", "/api/session", "", nil, nil)
 	if r.status != http.StatusUnauthorized {

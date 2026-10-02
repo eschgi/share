@@ -42,6 +42,16 @@ func (e *WrongLoginError) Error() string {
 	return fmt.Sprintf("wrong username or password, %d tries left", e.AttemptsLeft)
 }
 
+// WrongPasswordError is a wrong current password when changing it. It is ErrPasswordWrong,
+// with how many tries are left before a pause.
+type WrongPasswordError struct{ AttemptsLeft int }
+
+func (e *WrongPasswordError) Error() string {
+	return fmt.Sprintf("%v, %d tries left", ErrPasswordWrong, e.AttemptsLeft)
+}
+
+func (e *WrongPasswordError) Unwrap() error { return ErrPasswordWrong }
+
 // InputError is a field with an unusable value.
 type InputError struct{ Field, Problem string }
 
@@ -265,13 +275,22 @@ func (s *Service) SetPassword(ctx context.Context, p *Principal, username, curre
 		return &InputError{"password", "needs at least 8 characters"}
 	}
 	if u.PasswordHash != "" {
+		now, key := s.Now(), "user:"+u.ID
+		if blocked, retry := s.passwordPerUser.Check(key, now); blocked {
+			return &LockedError{RetryAfter: retry}
+		}
 		ok, err := CheckPassword(ctx, u.PasswordHash, current)
 		if err != nil {
 			return err
 		}
 		if !ok {
-			return ErrPasswordWrong
+			left, blocked := s.passwordPerUser.Fail(key, now)
+			if blocked > 0 {
+				return &LockedError{RetryAfter: blocked}
+			}
+			return &WrongPasswordError{AttemptsLeft: left}
 		}
+		s.passwordPerUser.Reset(key)
 	}
 	hash, err := HashPassword(ctx, password)
 	if err != nil {
