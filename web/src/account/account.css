@@ -318,6 +318,25 @@
 .row.dang .rt > b {
   color: var(--danger);
 }
+/* What share check found about the drive, under the storage row. */
+.rt > .swarn {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 6px;
+  color: var(--warn);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.rt > .swarn.problem {
+  color: var(--danger);
+}
+.swarn .ic {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  margin-top: 1px;
+}
 .row.on {
   background: var(--accent-soft);
 }

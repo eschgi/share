@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import storageWarnings from '../../contract/storage_warnings.json';
 import type { ListedDevice, Person } from '../src/api';
 import accountDe from '../src/account/i18n/de.json';
 import accountEn from '../src/account/i18n/en.json';
 import accountIt from '../src/account/i18n/it.json';
 import { daysLeft, devicesText, personLine } from '../src/account/admin/format';
+import { hasProblem, warningKey } from '../src/account/settings/storage';
 import { addDictionaries, translate, translatePlural, type Lang } from '../src/i18n';
 
 addDictionaries({ en: accountEn, de: accountDe, it: accountIt });
@@ -41,5 +43,25 @@ describe('daysLeft', () => {
     expect(daysLeft(new Date(Date.UTC(2026, 10, 1, 12)), now)).toBe(30);
     expect(daysLeft(new Date(Date.UTC(2026, 9, 3, 11)), now)).toBe(0);
     expect(daysLeft(new Date(Date.UTC(2026, 9, 1)), now)).toBe(0);
+  });
+});
+
+describe('storage warnings', () => {
+  const dictionaries = { en: accountEn, de: accountDe, it: accountIt } as Record<string, Record<string, string>>;
+  it('have words for every code the server can send, in every language', () => {
+    for (const code of Object.keys(storageWarnings.codes)) {
+      for (const [lang, dict] of Object.entries(dictionaries)) {
+        expect(dict[warningKey(code, (k) => k in dict)], `${lang} ${code}`).toBeTruthy();
+        expect(warningKey(code, (k) => k in dict), `${lang} ${code}`).toBe(`storage.warn.${code}`);
+      }
+    }
+  });
+  it('fall back to a general line for codes of a newer server', () => {
+    expect(warningKey('raid_degraded', (k) => k in accountEn)).toBe('storage.warn.unknown');
+  });
+  it('tell problems from warnings', () => {
+    expect(hasProblem(undefined)).toBe(false);
+    expect(hasProblem([{ code: 'low_space', level: 'warning', message: '' }])).toBe(false);
+    expect(hasProblem([{ code: 'low_space', level: 'warning', message: '' }, { code: 'drive_full', level: 'problem', message: '' }])).toBe(true);
   });
 });

@@ -275,5 +275,18 @@
   "trash.restore.other": "Restore {n}",
   "storage.title": "Storage",
   "storage.free": "{free} free of {total}",
-  "storage.setOnServer": "Set in config.json on the server"
+  "storage.setOnServer": "Set in config.json on the server",
+  "storage.warn.marker_missing": "The drive isn't mounted, or Share's storage folder was never set up (share init).",
+  "storage.warn.storage_unreadable": "The storage folder can't be read.",
+  "storage.warn.folder_missing": "Folders inside the storage folder are missing. Run share init on the server.",
+  "storage.warn.other_drive": "Parts of the storage folder are on another drive, so uploads can't finish.",
+  "storage.warn.not_a_drive": "The files are in the router's memory or flash, not on a drive.",
+  "storage.warn.data_unreadable": "The data folder, with the database and thumbnails, can't be read.",
+  "storage.warn.data_unsafe": "The database is on a network or FUSE drive, where it isn't safe. Set data_dir to a local disk.",
+  "storage.warn.data_in_memory": "The database is in memory and would be lost when the server restarts.",
+  "storage.warn.drive_full": "The drive is full: uploads have stopped. Make some room, for example by emptying Recently deleted.",
+  "storage.warn.fat32": "The drive is FAT32: files over 4 GB can't be stored.",
+  "storage.warn.ignores_case": "The drive is exFAT or NTFS: it ignores capitals in names and is slower than ext4.",
+  "storage.warn.low_space": "Less than 1 GB is left before uploads stop.",
+  "storage.warn.unknown": "The server found something to look at. Run share check there."
 }

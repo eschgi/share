@@ -1,6 +1,6 @@
 import '../admin/admin.css';
 import { useState } from 'preact/hooks';
-import { ApiError, deleteMe, logout } from '../../api';
+import { ApiError, deleteMe, logout, type StorageWarning } from '../../api';
 import { Icon } from '../../components/Icon';
 import { useMedia } from '../../device';
 import { formatBytes } from '../../format';
@@ -19,6 +19,7 @@ import { useAccount } from '../context';
 import { clearMarks } from '../save/marks';
 import { Shell, TitleBar } from '../Shell';
 import { AboutDialog, DevicesDialog, LanguageDialog, PasswordDialog, ThemeDialog, themeSummary } from './dialogs';
+import { hasProblem, warningKey } from './storage';
 
 /** The admin's pages besides the list: on a computer beside it, elsewhere pages of their own. */
 type Page = 'pins' | 'people' | 'trash';
@@ -244,12 +245,13 @@ function SettingsList({ data, current }: { data: AdminData; current?: Page }) {
             <Row icon="trash" title={t('trash.title')} sub={trashLine} href="/settings/trash" current={current === 'trash'} />
             {storage && (
               <div class="row">
-                <span class="ri">
+                <span class={`ri${hasProblem(storage.warnings) ? ' dang' : ''}`}>
                   <Icon name="hdd" />
                 </span>
                 <span class="rt">
                   <b>{t('storage.title')}</b>
                   <span>{freeLine || t('storage.setOnServer')}</span>
+                  <StorageWarnings warnings={storage.warnings} />
                 </span>
               </div>
             )}
@@ -286,12 +288,13 @@ function SettingsList({ data, current }: { data: AdminData; current?: Page }) {
               <p class="glabel">{t('storage.title')}</p>
               <div class="group">
                 <div class="row">
-                  <span class="ri">
+                  <span class={`ri${hasProblem(storage.warnings) ? ' dang' : ''}`}>
                     <Icon name="hdd" />
                   </span>
                   <span class="rt">
                     <b class="mono">{storage.storage_dir}</b>
                     <span>{[t('storage.setOnServer'), freeLine].filter(Boolean).join(' · ')}</span>
+                    <StorageWarnings warnings={storage.warnings} />
                   </span>
                 </div>
                 <Row icon="trash" title={t('trash.title')} sub={trashLine} href="/settings/trash" />
@@ -352,6 +355,22 @@ function SettingsList({ data, current }: { data: AdminData; current?: Page }) {
           onClose={close}
         />
       )}
+    </>
+  );
+}
+
+/** What share check finds about the drive, under the storage row; problems first, as the server
+ * sends them. */
+function StorageWarnings({ warnings }: { warnings?: StorageWarning[] }) {
+  const { t } = useI18n();
+  return (
+    <>
+      {(warnings ?? []).map((w) => (
+        <span key={w.code} class={`swarn ${w.level}`}>
+          <Icon name="alert" />
+          {t(warningKey(w.code, (key) => t(key) !== key))}
+        </span>
+      ))}
     </>
   );
 }

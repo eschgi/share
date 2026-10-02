@@ -285,6 +285,16 @@ export interface Storage {
   trash_files: number;
   trash_bytes: number;
   trash_days: number;
+  /** What share check finds about the drive, problems first (contract/storage_warnings.json). */
+  warnings?: StorageWarning[];
+}
+
+export interface StorageWarning {
+  code: string;
+  /** problem: Share won't work well until it's fixed. */
+  level: 'problem' | 'warning';
+  /** The server console's English words, for codes the website doesn't know. */
+  message: string;
 }
 
 export const getStorage = () => request<Storage>('GET', '/api/admin/storage');
