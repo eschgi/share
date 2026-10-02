@@ -84,3 +84,9 @@ export class RateMeter {
     return remaining / r;
   }
 }
+
+/** Whole days from when to now, by the calendar here: 0 today, 1 yesterday. */
+export function daysAgo(when: Date, now: Date): number {
+  const day = (d: Date) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+  return Math.max(0, Math.round((day(now) - day(when)) / 86_400_000));
+}

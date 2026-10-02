@@ -2,7 +2,7 @@ import './fonts';
 import './styles.css';
 import { render } from 'preact';
 import { applyTheme, watchTheme } from './theme';
-import { App } from './app';
+import { Root } from './root';
 import { captureInstallPrompt } from './device';
 
 captureInstallPrompt();
@@ -14,4 +14,4 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
 
 applyTheme();
 watchTheme();
-render(<App />, document.getElementById('app')!);
+render(<Root />, document.getElementById('app')!);

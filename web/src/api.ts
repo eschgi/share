@@ -10,6 +10,7 @@ export interface Info {
   max_file_size_bytes: number;
 }
 
+/** A PIN session; GET /api/session is only about those (a signed-in browser is /api/me). */
 export interface Session {
   kind: 'pin';
   pin_kind: 'permanent' | 'day';
@@ -42,6 +43,13 @@ export function errorCode(body: string | undefined): string | undefined {
   }
 }
 
+let whenSignedOut: (() => void) | null = null;
+
+/** What to do when the server says this browser was signed out, on any request. */
+export function onSignedOut(f: (() => void) | null): void {
+  whenSignedOut = f;
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   let res: Response;
   try {
@@ -63,12 +71,22 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   }
   if (!res.ok) {
     const e = (data as ErrorBody | null)?.error ?? {};
+    if (res.status === 401 && e.code === 'signed_out') whenSignedOut?.();
     throw new ApiError(res.status, e.code ?? 'internal', e.message ?? res.statusText, e.retry_after_seconds, e.attempts_left);
   }
   return data as T;
 }
 
-export const getInfo = () => request<Info>('GET', '/api/info');
+let info: Promise<Info> | null = null;
+
+/** The server's name, languages and limits: asked once per page load, again only after a failure. */
+export function getInfo(): Promise<Info> {
+  info ??= request<Info>('GET', '/api/info').catch((e: unknown) => {
+    info = null;
+    throw e;
+  });
+  return info;
+}
 
 /** The current PIN session, or null when there is none (or it has ended). */
 export async function getSession(): Promise<{ session: Session | null; ended: boolean }> {
@@ -105,3 +123,57 @@ export interface AppInfo {
 }
 
 export const getApp = () => request<AppInfo>('GET', '/api/app');
+
+// People with an account. A browser signs in with "client": "web": its key comes back as a
+// cookie the page can't read, never in the body. POSTs send {} at least: the server wants JSON
+// from browsers, which no form on another site can send.
+
+export type Role = 'admin' | 'member';
+
+export interface User {
+  id: string;
+  name: string;
+  role: Role;
+  username: string | null;
+  has_password: boolean;
+}
+
+/** A signed-in phone (the app) or browser; home_only: a browser that signed in at home, where
+ * alone its session works. */
+export interface Device {
+  id: string;
+  name: string;
+  client: 'app' | 'web';
+  home_only: boolean;
+}
+
+export interface Me {
+  user: User;
+  device: Device;
+}
+
+/** A device in a list: when it came and was last used, and whether it is the one asking. */
+export interface ListedDevice extends Device {
+  created_at: string;
+  last_seen_at: string;
+  this: boolean;
+}
+
+export const getMe = () => request<Me>('GET', '/api/me');
+
+export const login = (username: string, password: string, deviceName: string) =>
+  request<Me>('POST', '/api/auth/login', { username, password, device_name: deviceName, client: 'web' });
+
+export const acceptInvite = (token: string, deviceName: string) =>
+  request<Me>('POST', '/api/invites/accept', { token, device_name: deviceName, client: 'web' });
+
+export const logout = () => request<void>('POST', '/api/auth/logout', {});
+
+export const setPassword = (username: string, password: string, current?: string) =>
+  request<void>('PUT', '/api/me/password', { username, password, current_password: current || undefined });
+
+export const deleteMe = () => request<void>('POST', '/api/me/delete', {});
+
+export const getMyDevices = () => request<{ devices: ListedDevice[] }>('GET', '/api/me/devices');
+
+export const signOutDevice = (id: string) => request<void>('DELETE', `/api/devices/${encodeURIComponent(id)}`);

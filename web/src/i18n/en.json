@@ -12,6 +12,7 @@
   "pin.help": "Letters or numbers. Capital or small doesn't matter.",
   "pin.unlock": "Unlock",
   "pin.link": "Got a link? Opening it fills this in for you.",
+  "pin.signIn": "Have an account? Sign in",
   "pin.wrong.one": "That PIN didn't work. 1 try left.",
   "pin.wrong.other": "That PIN didn't work. {n} tries left.",
   "pin.wrongPlain": "That PIN didn't work.",

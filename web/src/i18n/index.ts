@@ -8,7 +8,7 @@ import it from './it.json';
 export const languages = ['en', 'de', 'it'] as const;
 export type Lang = (typeof languages)[number];
 
-const dictionaries: Record<Lang, Record<string, string>> = { en, de, it };
+const dictionaries: Record<Lang, Record<string, string>> = { en: { ...en }, de: { ...de }, it: { ...it } };
 
 const storageKey = 'share.language';
 
@@ -47,6 +47,20 @@ export function storeLanguage(lang: Lang): void {
   }
 }
 
+/** Forgets the chosen language: the browser's own counts again. */
+export function clearStoredLanguage(): void {
+  try {
+    localStorage.removeItem(storageKey);
+  } catch {
+    // nothing was kept
+  }
+}
+
+/** Adds texts that come later, with the pages of people with an account. */
+export function addDictionaries(extra: Record<Lang, Record<string, string>>): void {
+  for (const l of languages) Object.assign(dictionaries[l], extra[l]);
+}
+
 export type Params = Record<string, string | number>;
 
 /** Looks up key in lang, falling back to English, then to the key itself. */
@@ -56,8 +70,11 @@ export function translate(lang: Lang, key: string, params?: Params): string {
   return text.replace(/\{(\w+)\}/g, (m, name: string) => (name in params ? String(params[name]) : m));
 }
 
-/** Translates a plural key: key.one or key.other by the language's plural rules. */
+/** Translates a plural key: key.one or key.other by the language's plural rules, and key.zero
+ * for nothing at all, where a text says so ("Nothing sent yet"). */
 export function translatePlural(lang: Lang, key: string, n: number, params?: Params): string {
+  const zero = `${key}.zero`;
+  if (n === 0 && (zero in dictionaries[lang] || zero in dictionaries.en)) return translate(lang, zero, { n, ...params });
   const form = new Intl.PluralRules(lang).select(n);
   const full = `${key}.${form}`;
   const k = full in dictionaries[lang] || full in dictionaries.en ? full : `${key}.other`;

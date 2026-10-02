@@ -4,6 +4,7 @@
 // site (and an installed app) opens even without a connection and shows what is waiting.
 // Uploads and the API always go straight to the network.
 import '@uppy/golden-retriever/lib/ServiceWorker.js';
+import { isAppPath } from './paths';
 
 declare const self: ServiceWorkerGlobalScope;
 
@@ -20,7 +21,7 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
-  if (req.mode === 'navigate' && url.pathname === '/') {
+  if (req.mode === 'navigate' && isAppPath(url.pathname)) {
     event.respondWith(page(req));
   } else if (url.pathname.startsWith('/assets/')) {
     event.respondWith(asset(req));
@@ -45,7 +46,8 @@ async function fresh(req: Request): Promise<Response> {
 
 /**
  * The page: fresh from the network when possible, the last copy otherwise. That includes
- * Cloudflare's error pages (502, 530) for when the server or the tunnel is down.
+ * Cloudflare's error pages (502, 530) for when the server or the tunnel is down. Every path of
+ * ours (paths.ts) gets the same page, so one copy, kept as '/', serves them all.
  */
 async function page(req: Request): Promise<Response> {
   const cache = await caches.open(cacheName);

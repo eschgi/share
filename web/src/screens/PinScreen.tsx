@@ -137,6 +137,9 @@ export function PinScreen({ name, problem, unlocking, onSubmit }: Props) {
         {t('pin.unlock')}
       </button>
       <p class="small">{t('pin.link')}</p>
+      <a class="small link" href="/sign-in">
+        {t('pin.signIn')}
+      </a>
     </Page>
   );
 }

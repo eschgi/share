@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RateMeter, formatBytes, formatETA, formatPercent, formatWait, formatWhen } from '../src/format';
+import { RateMeter, daysAgo, formatBytes, formatETA, formatPercent, formatWait, formatWhen } from '../src/format';
 
 describe('formatPercent', () => {
   it('writes the share the way each language does', () => {
@@ -60,5 +60,21 @@ describe('RateMeter', () => {
     expect(m.eta(1000)).toBeNull();
     m.add(4000, 4_000_000); // 1 MB/s
     expect(m.eta(60_000_000)).toBeCloseTo(60);
+  });
+});
+
+describe('daysAgo', () => {
+  it('counts calendar days here, not periods of 24 hours', () => {
+    const now = new Date(2026, 9, 2, 0, 30);
+    expect(daysAgo(new Date(2026, 9, 2, 0, 5), now)).toBe(0);
+    expect(daysAgo(new Date(2026, 9, 1, 23, 50), now)).toBe(1);
+    expect(daysAgo(new Date(2026, 8, 25, 12, 0), now)).toBe(7);
+  });
+  it('counts across a change of the clocks', () => {
+    expect(daysAgo(new Date(2026, 2, 28, 12, 0), new Date(2026, 2, 30, 12, 0))).toBe(2);
+    expect(daysAgo(new Date(2026, 9, 24, 12, 0), new Date(2026, 9, 26, 12, 0))).toBe(2);
+  });
+  it('says today for times a little ahead', () => {
+    expect(daysAgo(new Date(2026, 9, 3, 9, 0), new Date(2026, 9, 2, 9, 0))).toBe(0);
   });
 });
