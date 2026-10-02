@@ -8,6 +8,7 @@ import { pickLanguage, useI18n, type I18n, type Lang } from '../../i18n';
 import { applyTheme, darkThemes, lightThemes, resolveTheme, storeTheme, type Theme, type ThemeChoice } from '../../theme';
 import { Confirm, Modal } from '../components/Modal';
 import { useAccount } from '../context';
+import { suggestedUsername, validUsername } from './username';
 
 /** "Last used today", "… yesterday", "… 3 days ago". */
 export function lastUsed(i18n: I18n, when: string): string {
@@ -251,11 +252,6 @@ export function themeSummary(t: I18n['t'], choice: ThemeChoice): string {
   return t('theme.autoNow', { name: t(`theme.${now}`) });
 }
 
-/** A username for someone without one: their name in small letters, with dots for spaces. */
-function suggestedUsername(name: string): string {
-  return name.trim().toLocaleLowerCase().replace(/\s+/g, '.');
-}
-
 /** Sets a first password, or changes it: for signing in on other phones and in browsers. */
 export function PasswordDialog({ onClose }: { onClose: () => void }) {
   const { t, tn, lang } = useI18n();
@@ -270,6 +266,7 @@ export function PasswordDialog({ onClose }: { onClose: () => void }) {
   async function save(e: Event) {
     e.preventDefault();
     if (busy) return;
+    if (!validUsername(username)) return setProblem(t('password.usernameBad'));
     if ([...next].length < 8) return setProblem(t('password.tooShort'));
     setBusy(true);
     setProblem(null);

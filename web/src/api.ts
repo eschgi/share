@@ -355,6 +355,9 @@ export interface NewInvite {
 export const getPeople = () => request<People>('GET', '/api/users');
 export const setRole = (id: string, role: Role) => request<void>('PATCH', `/api/users/${encodeURIComponent(id)}`, { role });
 export const removePerson = (id: string) => request<void>('DELETE', `/api/users/${encodeURIComponent(id)}`);
+/** Makes up a new password for someone else, shown once; username is needed if they have none. */
+export const newPassword = (id: string, username?: string) =>
+  request<{ username: string; password: string }>('POST', `/api/users/${encodeURIComponent(id)}/password`, { username });
 export const createInvite = (name: string, role: Role) => request<NewInvite>('POST', '/api/invites', { name, role });
 export const inviteDevice = (userId: string) => request<NewInvite>('POST', `/api/users/${encodeURIComponent(userId)}/invites`, {});
 export const withdrawInvite = (id: string) => request<void>('DELETE', `/api/invites/${encodeURIComponent(id)}`);

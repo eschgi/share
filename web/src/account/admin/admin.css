@@ -465,3 +465,13 @@
     font-size: 20px;
   }
 }
+
+/* A new password, shown once: the username and the password, each to copy. */
+.newpw .rt > span {
+  margin: 0 0 3px;
+}
+.newpw .rt > b.mono {
+  font-size: 17px;
+  letter-spacing: 0.4px;
+  user-select: all;
+}

@@ -23,6 +23,7 @@ import { Confirm, Modal } from '../components/Modal';
 import { useAccount } from '../context';
 import { lastUsed } from '../settings/dialogs';
 import { personLine } from './format';
+import { NewPasswordDialog } from './NewPassword';
 import { copyText, sharesLinks, shareText } from './share';
 
 /** When an invite ends: "21:00" today, else with the day. */
@@ -100,6 +101,7 @@ function PersonDialog({ person, onClose }: { person: Person; onClose: () => void
   const [problem, setProblem] = useState<string | null>(null);
   const [asking, setAsking] = useState<Asking>(null);
   const [adding, setAdding] = useState(false);
+  const [newPassword, setNewPassword] = useState(false);
 
   /** Runs a change; a refusal, such as for the last admin, shows as a message. */
   const run = async (change: () => Promise<void>): Promise<boolean> => {
@@ -194,6 +196,17 @@ function PersonDialog({ person, onClose }: { person: Person; onClose: () => void
           </span>
         </button>
         {!p.me && (
+          <button type="button" class="row" disabled={busy} onClick={() => setNewPassword(true)}>
+            <span class="ri">
+              <Icon name="key" />
+            </span>
+            <span class="rt">
+              <b>{t('people.newPassword')}</b>
+              <span>{p.has_password ? t('people.newPasswordForgot', { name: p.name }) : t('people.newPasswordFirst')}</span>
+            </span>
+          </button>
+        )}
+        {!p.me && (
           <button type="button" class="row dang" disabled={busy} onClick={() => setAsking({ kind: 'remove' })}>
             <span class="ri dang">
               <Icon name="user-x" />
@@ -234,6 +247,9 @@ function PersonDialog({ person, onClose }: { person: Person; onClose: () => void
         />
       )}
       {adding && <InviteDialog forPerson={p} onClose={() => setAdding(false)} />}
+      {newPassword && (
+        <NewPasswordDialog person={p} onDone={(username) => setP({ ...p, username, has_password: true })} onClose={() => setNewPassword(false)} />
+      )}
     </Modal>
   );
 }
