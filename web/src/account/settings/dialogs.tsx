@@ -1,7 +1,7 @@
 // The settings' dialogs that everyone has: their phones and browsers, language, theme and
 // password. Each is rendered only while open.
 import { useEffect, useState } from 'preact/hooks';
-import { ApiError, getMyDevices, setPassword, signOutDevice, type ListedDevice } from '../../api';
+import { ApiError, getAbout, getMyDevices, setPassword, signOutDevice, type ListedDevice } from '../../api';
 import { Icon } from '../../components/Icon';
 import { daysAgo, formatWait } from '../../format';
 import { pickLanguage, useI18n, type I18n, type Lang } from '../../i18n';
@@ -89,6 +89,53 @@ export function DevicesDialog({ onClose }: { onClose: () => void }) {
           onClose={() => setAsking(null)}
         />
       )}
+    </Modal>
+  );
+}
+
+/** Where Share's source code is; the repository also has the license texts. */
+const sourceUrl = 'https://github.com/eschgi/share';
+
+/** What runs here: the server's version, the license and where the source code is. */
+export function AboutDialog({ onClose }: { onClose: () => void }) {
+  const { t } = useI18n();
+  const [version, setVersion] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    getAbout().then(
+      (a) => setVersion(a.version),
+      () => setFailed(true),
+    );
+  }, []);
+  const link = (href: string, icon: 'share' | 'file', title: string, sub: string) => (
+    <a class="row" href={href} target="_blank" rel="noopener noreferrer">
+      <span class="ri">
+        <Icon name={icon} />
+      </span>
+      <span class="rt">
+        <b>{title}</b>
+        <span>{sub}</span>
+      </span>
+    </a>
+  );
+  return (
+    <Modal title={t('about.title')} onClose={onClose}>
+      <div class="group">
+        <div class="row">
+          <span class="ri">
+            <Icon name="info" />
+          </span>
+          <span class="rt">
+            <b>{t('about.version')}</b>
+            <span class="mono">{version ?? (failed ? t('common.offline') : '…')}</span>
+          </span>
+        </div>
+        {link(`${sourceUrl}/blob/main/LICENSE`, 'file', t('about.license'), 'Apache License 2.0')}
+        {link(sourceUrl, 'share', t('about.source'), sourceUrl.replace('https://', ''))}
+      </div>
+      <p class="modal-text about-made">
+        Copyright 2026 Stefan Eschgfäller. {t('about.madeWith')}
+      </p>
     </Modal>
   );
 }

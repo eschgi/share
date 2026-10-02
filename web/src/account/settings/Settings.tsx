@@ -18,7 +18,7 @@ import { Confirm } from '../components/Modal';
 import { useAccount } from '../context';
 import { clearMarks } from '../save/marks';
 import { Shell, TitleBar } from '../Shell';
-import { DevicesDialog, LanguageDialog, PasswordDialog, ThemeDialog, themeSummary } from './dialogs';
+import { AboutDialog, DevicesDialog, LanguageDialog, PasswordDialog, ThemeDialog, themeSummary } from './dialogs';
 
 /** The admin's pages besides the list: on a computer beside it, elsewhere pages of their own. */
 type Page = 'pins' | 'people' | 'trash';
@@ -161,7 +161,7 @@ function Spinner() {
   return <span class="spinner" role="status" aria-label={t('common.loading')} />;
 }
 
-type Dialog = 'devices' | 'language' | 'theme' | 'password' | 'signOut' | 'delete' | 'invite';
+type Dialog = 'devices' | 'language' | 'theme' | 'password' | 'signOut' | 'delete' | 'invite' | 'about';
 
 /** The list: the person, then the admin's parts, how the website looks, and leaving. With
  * current, it sits beside the admin's pages (on a computer), which open on the right. */
@@ -310,10 +310,14 @@ function SettingsList({ data, current }: { data: AdminData; current?: Page }) {
         </>
       )}
       <div class="group">
+        <Row icon="info" title={t('about.title')} sub={t('about.sub')} onClick={() => setDialog('about')} />
+      </div>
+      <div class="group">
         <Row icon="log-out" title={t('settings.signOut')} chevron={false} onClick={() => setDialog('signOut')} />
         <Row icon="user-x" title={t('settings.deleteAccount')} chevron={false} tone="danger" onClick={() => setDialog('delete')} />
       </div>
       {dialog === 'devices' && <DevicesDialog onClose={close} />}
+      {dialog === 'about' && <AboutDialog onClose={close} />}
       {dialog === 'language' && <LanguageDialog onClose={close} />}
       {dialog === 'theme' && <ThemeDialog choice={theme} onChoose={setTheme} onClose={close} />}
       {dialog === 'password' && <PasswordDialog onClose={close} />}

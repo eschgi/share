@@ -179,6 +179,9 @@ export const deleteMe = () => request<void>('POST', '/api/me/delete', {});
 
 export const getMyDevices = () => request<{ devices: ListedDevice[] }>('GET', '/api/me/devices');
 
+/** The server's version, for the About dialog; only for people with an account. */
+export const getAbout = () => request<{ version: string }>('GET', '/api/about');
+
 export const signOutDevice = (id: string) => request<void>('DELETE', `/api/devices/${encodeURIComponent(id)}`);
 
 // The library: everything that was sent, by upload day, newest first.

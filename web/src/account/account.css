@@ -465,6 +465,11 @@
   line-height: 1.55;
   text-wrap: pretty;
 }
+.modal-text.about-made {
+  margin-top: 14px;
+  color: var(--text-3);
+  font-size: 13.5px;
+}
 .modal-text + .group,
 .modal-text + .label {
   margin-top: 18px;
