@@ -537,6 +537,178 @@
   .qrcard.lg{margin:0;padding:28px}
   .qrcard.lg .qr{width:260px;height:260px;padding:16px}
   .qrcard.lg b{font-size:16px;font-weight:600;margin-top:18px}
+  /* ---------- the website for people with an account (22–37) ---------- */
+  /* A header with the three places of the app's bottom bar. Phones keep the app's bars. */
+  .ahd{width:1200px;max-width:calc(100% - 64px);margin:0 auto;padding-top:12px;height:78px;display:flex;align-items:center;gap:28px;flex:none}
+  .ahd .brand{height:auto}
+  .ahd > .av{margin-left:auto}
+  .dtabs{display:flex;gap:4px}
+  .dtabs a{height:42px;padding:0 16px;border-radius:12px;display:flex;align-items:center;gap:9px;font-size:15.5px;font-weight:500;color:var(--text-2)}
+  .dtabs a .ic{width:19px;height:19px}
+  .dtabs a.on{background:var(--accent-soft);color:var(--accent-text)}
+  .dsearch{margin-left:auto;width:320px;height:44px;border-radius:12px;background:var(--s1);border:1px solid var(--line);display:flex;align-items:center;
+    gap:10px;padding:0 14px;font-size:14.5px;color:var(--text-3)}
+  .dsearch .ic{width:18px;height:18px}
+  .dsearch + .av{margin-left:0}
+
+  .dlib{width:1200px;max-width:calc(100% - 64px);margin:0 auto;flex:1;min-height:0;overflow:hidden}
+  .dlib .chips{padding:6px 0 0}
+  .dlib .tipbar{margin:14px 0 0;font-size:14px}
+  .dlib .day{padding:22px 2px 12px}
+  .dlib .day h4{font-size:17px}
+  .dlib .day .meta{font-size:13.5px}
+  .g8{grid-template-columns:repeat(8,1fr);gap:6px}
+  .g8 .tile{border-radius:8px}
+  .g8 .tile.sel{border-radius:14px}
+  .g8 .tile > .tico{width:24%;height:24%}
+  .g8 .tile .fname{font-size:12.5px}
+  .g8 .tile .extb{font-size:10px;top:7px;right:7px}
+  .g8 .tile .dur{font-size:12px;right:7px;bottom:7px}
+  .g8 .tile .selm{top:9px;left:9px;width:24px;height:24px}
+
+  /* the selection's actions float at the bottom of the window */
+  .selbar{position:absolute;left:50%;bottom:30px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;z-index:4;
+    background:var(--s2);border:1px solid var(--line);border-radius:22px;padding:10px 12px 10px 8px;box-shadow:0 20px 60px rgba(0,0,0,.55)}
+  .selbar > b{font-size:17px;font-weight:600;white-space:nowrap}
+  .selbar > .sz{font-size:14.5px;color:var(--text-3);white-space:nowrap;margin-right:6px}
+  .selbar .btn{padding:0 20px}
+  .gap{flex:1;min-width:24px}
+  .btn.dout{border:1.5px solid var(--line);color:var(--danger)}
+
+  /* dialogs in the middle of the window; on phones they are the app's sheets */
+  .ddlg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:560px;z-index:6;background:var(--s1);border:1px solid var(--line);
+    border-radius:26px;padding:26px 26px 20px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+  .ddlg.wide{width:640px}
+  .ddlg h3{margin:0 0 16px;font-family:var(--serif);font-size:24px;font-weight:700}
+  .ddlg .input,.ddlg .opt,.ddlg .seg,.ddlg .code b,.ddlg .group,.sheet .group{background:var(--s2)}
+  .ddlg .dbtns{margin-top:22px}
+  .ddlg .dbtns .btn,.ddlg .dbtns .tbtn{padding:0 20px}
+  .dlgh{display:flex;align-items:center;gap:14px;margin:-6px -8px 14px 0}
+  .dlgh h3{flex:1;margin:0}
+  .dopt{position:relative;display:flex;gap:14px;align-items:flex-start;border:1.5px solid var(--line);border-radius:18px;padding:14px 50px 14px 14px;margin-top:10px}
+  .dopt.on{border-color:var(--accent-text);background:var(--accent-soft)}
+  .dopt b{display:block;font-size:16px;font-weight:600}
+  .dopt .dt span{display:block;font-size:13.5px;line-height:1.45;color:var(--text-2);margin-top:3px}
+  .dopt .dt em{display:inline-block;font-style:normal;font-size:14px;font-weight:600;color:var(--accent-text);margin-top:8px}
+  .dopt .radio{position:absolute;top:16px;right:16px;width:20px;height:20px;border-radius:50%;border:2px solid var(--text-3)}
+  .dopt.on .radio{border-color:var(--accent-text);background:radial-gradient(var(--accent-text) 0 4.5px,transparent 5px)}
+
+  /* saving into a folder: the app's download sheet, as a panel in the corner */
+  .savep{position:absolute;right:40px;bottom:36px;width:440px;z-index:4;background:var(--s1);border:1px solid var(--line);border-radius:24px;
+    padding:20px 22px;box-shadow:0 24px 70px rgba(0,0,0,.55)}
+  .savep h3{margin:0 0 12px;font-family:var(--serif);font-size:22px;font-weight:700}
+  .savep .bar{height:8px;margin-top:10px}
+  .savep .dest{margin-top:8px}
+  .savep .note.slim{background:var(--s2)}
+
+  .toast{position:absolute;left:50%;bottom:30px;transform:translateX(-50%);display:flex;align-items:center;gap:26px;z-index:7;white-space:nowrap;
+    background:var(--s3);border-radius:14px;padding:15px 20px;font-size:15.5px;box-shadow:0 14px 40px rgba(0,0,0,.5)}
+  .toast b{color:var(--accent-text);font-weight:600}
+  .phone .toast{bottom:96px;left:14px;right:14px;transform:none;white-space:normal;gap:14px;font-size:14.5px;line-height:1.45;align-items:flex-start}
+  .toast .ic{width:20px;height:20px;color:var(--accent-text);flex:none;margin-top:1px}
+
+  /* one file, on a computer: the picture, the film strip, and the details beside them */
+  .dviewer{background:#000;color:#fff;display:grid;grid-template-columns:1fr 360px;grid-template-rows:auto 1fr auto}
+  .dvt{display:flex;align-items:center;gap:6px;padding:14px 18px 14px 26px;grid-column:1}
+  .dvt .vt{flex:1} .dvt .vt b{display:block;font-size:16px;font-weight:500} .dvt .vt span{font-size:13px;color:rgba(255,255,255,.62)}
+  .dvt .ib{color:#fff}
+  .vbtn{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 14px;border-radius:12px;font-size:15px;color:rgba(255,255,255,.86)}
+  .vbtn .ic{width:19px;height:19px}
+  .vbtn.on{background:rgba(255,255,255,.13)}
+  .vstage{grid-column:1;display:flex;align-items:center;justify-content:center;gap:30px;min-height:0}
+  .varr{width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,.1);color:#fff;display:grid;place-items:center;flex:none}
+  .varr .ic{width:26px;height:26px}
+  .vpic{position:relative;width:780px;height:585px;background:var(--scene);overflow:hidden;flex:none}
+  .vpic::before{content:"";position:absolute;left:0;right:0;top:36%;height:24.5%;background:linear-gradient(180deg,#3B3450,#29293D);
+    clip-path:polygon(0 100%,0 58%,8% 40%,17% 55%,28% 10%,40% 48%,50% 30%,57% 62%,62% 90%,67% 60%,74% 22%,84% 48%,92% 32%,100% 50%,100% 100%)}
+  .vpic::after{content:"";position:absolute;left:62%;top:60.5%;width:11%;height:30%;transform:translateX(-50%);
+    background:linear-gradient(180deg,rgba(255,214,160,.5),rgba(255,214,160,0));filter:blur(3px)}
+  .dviewer .film{grid-column:1;margin:4px 0 26px}
+  .vside{grid-column:2;grid-row:1 / 4;background:#15110F;border-left:1px solid #2A2420;padding:26px 24px}
+  .vside h4{margin:2px 0 16px;font-size:18px;font-weight:600}
+  .vrow{display:flex;gap:14px;align-items:flex-start;padding:13px 0;border-top:1px solid #2A2420}
+  .vrow .ic{width:20px;height:20px;color:rgba(255,255,255,.55);margin-top:1px}
+  .vrow b{display:block;font-size:15px;font-weight:500}
+  .vrow div span{display:block;font-size:13px;color:rgba(255,255,255,.55);margin-top:3px}
+
+  /* settings on a computer: the list on the left, the chosen page on the right */
+  .dset{width:1200px;max-width:calc(100% - 64px);margin:6px auto 0;display:grid;grid-template-columns:380px 1fr;gap:44px;flex:1;min-height:0;align-items:start}
+  .dset.one{grid-template-columns:560px;justify-content:center}
+  .dset .group + .group{margin-top:12px}
+  .row.on{background:var(--accent-soft)}
+  .row.on .rt b{color:var(--accent-text)}
+  .row.dang .rt b{color:var(--danger)}
+  .ri.dang{background:var(--danger-soft);color:var(--danger)}
+  .tbtn.danger{color:var(--danger)}
+  .profile .chev{margin-left:auto}
+  .phead{display:flex;align-items:center;gap:12px;min-height:50px;margin-bottom:8px}
+  .phead h2{flex:1;margin:0;font-family:var(--serif);font-size:27px;font-weight:700}
+  .phead .btn{padding:0 16px}
+  .pane2 > .lead.sm{margin:0 0 14px}
+  .pgrid{max-width:620px}
+  .pgrid .glabel{margin-top:6px}
+  .pc-actions > span{white-space:nowrap}
+  .trow .tile.mini{width:52px;height:52px}
+  .trbar{display:flex;align-items:center;gap:10px;margin-top:18px}
+  .trbar > span{font-size:15px;color:var(--text-2)}
+  .trbar .btn{padding:0 22px}
+  .qrrow{display:flex;gap:22px;align-items:center;margin-top:20px;background:var(--s2);border-radius:20px;padding:16px}
+  .qrrow .qr{width:164px;height:164px;padding:10px;flex:none}
+  .qrrow b{display:block;font-size:15.5px;font-weight:500;line-height:1.4}
+  .qrrow .exp{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-3);margin-top:8px}
+  .qrrow .exp .ic{width:15px;height:15px}
+  .qrrow .btn{display:inline-flex;margin-top:14px;padding:0 18px}
+  .pdh{display:flex;align-items:center;gap:14px;margin-bottom:4px}
+  .pdh > div{flex:1;min-width:0} .pdh b{display:block;font-size:20px;font-weight:600} .pdh div span{font-size:13.5px;color:var(--text-3)}
+  .mt12{margin-top:12px}
+
+  /* the website's sign-in, and the invite page's way into the browser */
+  .dform{background:var(--s1);border:1px solid var(--line-soft);border-radius:28px;padding:30px 32px}
+  .dform .label:first-child{margin-top:0}
+  .dform .input{background:var(--s2)}
+  .djoin .or{margin:22px 0 16px}
+  .djoin .pane > .btn{width:100%}
+
+  /* theme previews: the library in miniature, drawn in each theme's colours */
+  .tprev{position:relative;aspect-ratio:1/1.08;border-radius:14px;overflow:hidden;background:var(--pb);border:1px solid var(--pl)}
+  .tprev i{position:absolute;display:block}
+  .tprev .tl{left:12%;top:10%;width:46%;height:6%;border-radius:3px;background:var(--pt)}
+  .tprev .tc{left:10%;right:10%;top:23%;height:20%;border-radius:8px;background:var(--p1)}
+  .tprev .tc::before,.tprev .tc::after{content:"";position:absolute;left:10%;height:14%;border-radius:2px;background:var(--p2)}
+  .tprev .tc::before{top:28%;width:60%} .tprev .tc::after{top:58%;width:40%}
+  .tprev .tt{left:10%;right:10%;top:49%;height:18%;display:flex;gap:6%}
+  .tprev .tt b{flex:1;border-radius:5px}
+  .tprev .tb{left:10%;right:10%;top:72%;height:9%;border-radius:6px;background:var(--pa)}
+  .tprev .tn{left:0;right:0;bottom:0;height:11%;background:var(--pn);display:flex;justify-content:space-around;align-items:center}
+  .tprev .tn b{width:7%;aspect-ratio:1;border-radius:50%;background:var(--p2);opacity:.55}
+  .tprev .tn b:first-child{background:var(--pa);opacity:1}
+  .th-ember{--pb:#16120F;--pn:#1C1713;--p1:#211B17;--pl:#3E352E;--pt:#F4ECE3;--p2:#BFB2A4;--pa:#C95E34}
+  .th-midnight{--pb:#0F141B;--pn:#131A23;--p1:#161E28;--pl:#303D4E;--pt:#E9EFF6;--p2:#A9B5C4;--pa:#3B7DD8}
+  .th-moss{--pb:#111512;--pn:#151A16;--p1:#19201B;--pl:#334137;--pt:#EAF0EA;--p2:#AEBDB0;--pa:#6B8A38}
+  .th-plum{--pb:#151118;--pn:#1A151E;--p1:#1F1924;--pl:#3D3346;--pt:#F2ECF5;--p2:#BEB2C6;--pa:#9B5CC9}
+  .th-black{--pb:#000000;--pn:#0B0A09;--p1:#121010;--pl:#302B28;--pt:#F4ECE3;--p2:#BFB2A4;--pa:#C95E34}
+  .th-linen{--pb:#F6F0E9;--pn:#EEE6DC;--p1:#FFFCF8;--pl:#D9CBBD;--pt:#2A1F18;--p2:#5F5147;--pa:#C45A30}
+  .th-frost{--pb:#F3F6FA;--pn:#E8EDF4;--p1:#FFFFFF;--pl:#CFD8E3;--pt:#16202B;--p2:#4A5767;--pa:#2F6BCB}
+  .tauto{display:flex;align-items:center;gap:18px;padding:2px 0 4px}
+  .tsplit{position:relative;width:92px;aspect-ratio:1/1.08;flex:none}
+  .tsplit > *{position:absolute;inset:0}
+  .tsplit > :last-child{clip-path:inset(0 0 0 50%)}
+  .tauto b{display:block;font-size:16.5px;font-weight:600}
+  .tauto span{font-size:14px;color:var(--text-2)}
+  .tgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+  .tch{position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;font-size:14px;color:var(--text-2)}
+  .tch .tprev{width:100%}
+  .tch.on .tprev{outline:2.5px solid var(--accent-text);outline-offset:2px}
+  .tch.on{color:var(--text);font-weight:600}
+  .tck{position:absolute;top:-7px;right:-7px;width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;
+    box-shadow:0 0 0 3px var(--s1);z-index:1}
+  .tck .ic{width:15px;height:15px} .tck svg{stroke-width:3.2}
+
+  /* Linen, the light theme, on one whole browser window */
+  .desktop.linen{--bg:#F6F0E9;--bar:#EEE6DC;--s1:#FFFCF8;--s2:#F1E9E0;--s3:#E6DCD1;--line:#D9CBBD;--line-soft:#E9DFD4;
+    --text:#2A1F18;--text-2:#5F5147;--text-3:#85766A;--accent:#C45A30;--on-accent:#FFFFFF;--accent-text:#A4461F;--accent-soft:rgba(196,90,48,.12);
+    --ok:#257346;--ok-soft:rgba(46,133,83,.12);--danger:#B23A2B;--danger-soft:rgba(200,70,58,.11);--warn:#8A5C00;--warn-soft:rgba(233,187,104,.18)}
+  .linen .chrome{background:#E2D8CC} .linen .wdots i{background:#CBBDAF} .linen .addr .u{background:#FFFCF8}
 </style>
 </head>
 <body>
@@ -586,6 +758,13 @@
   <symbol id="i-bat" viewBox="0 0 24 24"><rect x="1.5" y="6.5" width="19" height="11" rx="2.5"/><rect x="4" y="9" width="11" height="6" rx="1" fill="currentColor" stroke="none"/><path d="M23 10.5v3"/></symbol>
   <symbol id="i-server" viewBox="0 0 24 24"><rect width="20" height="8" x="2" y="2" rx="2"/><rect width="20" height="8" x="2" y="14" rx="2"/><path d="M6 6h.01"/><path d="M6 18h.01"/></symbol>
   <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></symbol>
+  <symbol id="i-chev-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="i-archive" viewBox="0 0 24 24"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+  <symbol id="i-user-x" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m17 8 5 5"/><path d="m22 8-5 5"/></symbol>
+  <symbol id="i-log-out" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></symbol>
+  <symbol id="i-palette" viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></symbol>
 </svg>
 
 <div class="page">
@@ -593,7 +772,7 @@
   <header class="page-head">
     <h1>Share, dark</h1>
     <p class="lede">A dark take on your orientation mockups, stretched over the whole system. One Go binary serves the website and the API
-      and keeps every file in a folder set in <code>config.json</code>: on the router for now, maybe on a Hetzner VPS later. The <b>website</b> is only for sending: anyone with a PIN, no account. Nothing is family-specific; friends and anyone else
+      and keeps every file in a folder set in <code>config.json</code>: on the router for now, maybe on a Hetzner VPS later. The <b>website</b> is for sending: anyone with a PIN, no account. People with an account can do everything there that the app does (22–37). Nothing is family-specific; friends and anyone else
       with a PIN or an invite see the same screens.
       The <b>app</b> is for seeing and downloading, and for admins, for running the whole thing. Numbers follow the order in which you'd meet the screens.</p>
     <div class="legend">
@@ -1246,6 +1425,168 @@
 
     </div>
   </section>
+
+  <!-- ================================================================= WEBSITE WITH AN ACCOUNT -->
+  <section class="sec">
+    <div class="sec-head">
+      <div class="sec-tag">Website · people with an account</div>
+      <h2>Everything the app does, in the browser</h2>
+      <p>Signed in, the website does what the app does: the library by day, downloads, sending without a PIN, settings. A browser signs in with a password, or straight from an invite. That works at home over plain http too; such a sign-in then only works at home, because the browser would hand its key to any device with the same address elsewhere. Phones get the app's bars, computers a header with the same three places. Shown here as Maria, a member.</p>
+    </div>
+    <p class="sub-h">On a computer</p>
+    <div class="board">
+
+      <div class="slot wide">
+        <h3><span class="n">22</span>Sign in, on a computer <span class="badge new">new</span></h3>
+        <p class="cap">For people who set a password in the app. There's no server field: the page is the server. Most people come in through an invite instead (23). The PIN page links here: “Have an account? Sign in”.</p>
+        <div class="desktop" data-shot="22-sign-in-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com/sign-in</span></div></div><div class="dview"><div class="dhead"><div class="brand"><span data-i="images"></span><span translate="no">Share</span><span class="langpill"><span data-i="globe"></span>EN</span></div></div><div class="dsplit"><div class="pane"><div class="stack"><div class="pc pa ph t1"><span data-i="image"></span></div><div class="pc pb ph t2"><span data-i="image"></span></div><div class="pc pcen"><span data-i="file"></span><span class="ext">PDF</span></div></div><h1 class="hero">Sign in</h1><p class="lead">To see and download everything that was shared.</p><p class="help">No password yet? Set one in the app under Settings › Password, or ask for an invite.</p></div><div class="pane"><div class="dform"><div class="label">Username</div><div class="input">maria</div><div class="label">Password</div><div class="input focus"><span class="dots">••••••••••</span><span class="caret"></span><span class="trail" data-i="eye"></span></div><div class="btn primary mt24">Sign in</div></div><p class="small link">Only sending? Enter a PIN instead</p></div></div></div></div>
+      </div>
+      <div class="slot wide">
+        <h3><span class="n">23</span>An invite, opened on a computer <span class="badge new">new</span></h3>
+        <p class="cap">Page 9 gets a second way in: “Use Share in this browser” signs this browser in as Maria, without a password. The invite works once, so it's the phone or this browser; an admin can add the other one later (31).</p>
+        <div class="desktop" data-shot="23-invite-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com/join</span></div></div><div class="dview"><div class="dhead"><div class="brand"><span data-i="images"></span><span translate="no">Share</span><span class="langpill"><span data-i="globe"></span>EN</span></div></div><div class="djoin"><div class="pane"><div class="appico lg"><span data-i="images"></span></div><h1 class="hero md">Stefan invited you</h1><p class="lead">See and download the shared files in the Share app on your Android phone, or right here in this browser.</p><div class="steps"><div class="step"><span class="num">1</span><div><b>Scan the code with your Android phone</b><span>Its camera opens this invite on the phone.</span></div></div><div class="step"><span class="num">2</span><div><b>Install the app there</b><span>It takes a minute; the page on the phone shows how.</span></div></div><div class="step"><span class="num">3</span><div><b>Tap Join</b><span>The invite works once, until 21:00.</span></div></div></div></div><div class="pane"><div class="qrcard lg"><div class="qr" data-qr="27"></div><b>Scan this with your Android phone</b><span class="exp"><span data-i="clock"></span>Works once · until 21:00</span></div><div class="or">or</div><div class="btn outline"><span data-i="monitor"></span>Use Share in this browser</div><p class="small">Signs this browser in as Maria, no password needed. The invite then can't be used on the phone.</p></div></div></div></div>
+      </div>
+      <div class="slot wide">
+        <h3><span class="n">24</span>Library, on a computer <span class="badge new">new</span></h3>
+        <p class="cap">The app's library with room to spare: eight tiles to a row, the three places of the app's bottom bar in the header, and the search always open. New files appear by themselves, every 30 seconds and whenever the tab comes back.</p>
+        <div class="desktop" data-shot="24-library-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>Library · Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com/library</span></div></div><div class="dview"><div class="ahd"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div><nav class="dtabs"><a class="on"><span data-i="images"></span>Library</a><a><span data-i="upload"></span>Send</a><a><span data-i="settings"></span>Settings</a></nav><span class="dsearch"><span data-i="search"></span>Search file names</span><span class="av tan">M</span></div><div class="dlib"><div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div><div class="day"><div><h4>Today</h4><div class="meta">6 files · 74 MB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p3 p8 v2@0:18 d#PDF=Car_insurance.pdf p6 p1"></div><div class="day"><div><h4>Yesterday</h4><div class="meta">45 files · 620 MB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p4 p7 p9 v5@1:15 p2 p10 p6 p3 p5 d#DOCX=Recipes_Oma.docx p8 p1 v3@0:42 p2 p9 p7"></div><div class="day"><div><h4>Sunday, 27 Sep</h4><div class="meta">48 files · 1.1 GB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p1 p2 d#PDF=Invitation.pdf p5 v4@0:42 p3 p8 p6"></div></div></div></div>
+      </div>
+      <div class="slot wide">
+        <h3><span class="n">25</span>Select many, on a computer <span class="badge new">new</span></h3>
+        <p class="cap">A circle shows on the tile under the mouse; clicking it starts selecting. Shift-click takes everything in between, Ctrl+A everything, Esc ends it. The bar floats at the bottom with count and size; admins also get Delete.</p>
+        <div class="desktop" data-shot="25-select-many-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>Library · Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com/library</span></div></div><div class="dview"><div class="ahd"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div><nav class="dtabs"><a class="on"><span data-i="images"></span>Library</a><a><span data-i="upload"></span>Send</a><a><span data-i="settings"></span>Settings</a></nav><span class="dsearch"><span data-i="search"></span>Search file names</span><span class="av tan">M</span></div><div class="dlib"><div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div><div class="tipbar"><span data-i="info"></span><span>Click a day's circle to select all of it. Shift-click selects everything in between.</span></div><div class="day"><div><h4>Today</h4><div class="meta">6 files · 74 MB</div></div><span class="dsel on"><span data-i="check"></span></span></div><div class="grid g8" data-tiles="p3/s p8/s v2@0:18/s d#PDF=Car_insurance.pdf/s p6/s p1/s"></div><div class="day"><div><h4>Yesterday</h4><div class="meta">17 of 45 selected</div></div><span class="dsel part"><span data-i="minus"></span></span></div><div class="grid g8" data-tiles="p4/s p7/s p9/o v5@1:15/s p2/s p10/o p6/o p3/s p5/s d#DOCX=Recipes_Oma.docx/o p8/s p1/s v3@0:42/o p2/s p9/s p7/o"></div><div class="day"><div><h4>Sunday, 27 Sep</h4><div class="meta">48 files · 1.1 GB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p1/o p2/o d#PDF=Invitation.pdf/o p5/o v4@0:42/o p3/o p8/o p6/o"></div></div><div class="selbar"><span class="ib"><span data-i="x"></span></span><b>23 selected</b><span class="sz">356 MB</span><span class="tbtn">Select all</span><span class="gap"></span><div class="btn primary sm"><span data-i="download"></span>Download 23</div></div></div></div>
+      </div>
+      <div class="slot wide">
+        <h3><span class="n">26</span>Downloading several, in Chrome or Edge <span class="badge new">new</span></h3>
+        <p class="cap">Two ways: into a folder, file by file like the app, skipping files that are already there; or as one ZIP, with a folder per day inside. Other browsers, and phones, get the ZIP right away (below).</p>
+        <div class="desktop" data-shot="26-download-several-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>Library · Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com/library</span></div></div><div class="dview"><div class="ahd"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div><nav class="dtabs"><a class="on"><span data-i="images"></span>Library</a><a><span data-i="upload"></span>Send</a><a><span data-i="settings"></span>Settings</a></nav><span class="dsearch"><span data-i="search"></span>Search file names</span><span class="av tan">M</span></div><div class="dlib"><div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div><div class="tipbar"><span data-i="info"></span><span>Click a day's circle to select all of it. Shift-click selects everything in between.</span></div><div class="day"><div><h4>Today</h4><div class="meta">6 files · 74 MB</div></div><span class="dsel on"><span data-i="check"></span></span></div><div class="grid g8" data-tiles="p3/s p8/s v2@0:18/s d#PDF=Car_insurance.pdf/s p6/s p1/s"></div><div class="day"><div><h4>Yesterday</h4><div class="meta">17 of 45 selected</div></div><span class="dsel part"><span data-i="minus"></span></span></div><div class="grid g8" data-tiles="p4/s p7/s p9/o v5@1:15/s p2/s p10/o p6/o p3/s p5/s d#DOCX=Recipes_Oma.docx/o p8/s p1/s v3@0:42/o p2/s p9/s p7/o"></div><div class="day"><div><h4>Sunday, 27 Sep</h4><div class="meta">48 files · 1.1 GB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p1/o p2/o d#PDF=Invitation.pdf/o p5/o v4@0:42/o p3/o p8/o p6/o"></div></div><div class="selbar"><span class="ib"><span data-i="x"></span></span><b>23 selected</b><span class="sz">356 MB</span><span class="tbtn">Select all</span><span class="gap"></span><div class="btn primary sm"><span data-i="download"></span>Download 23</div></div><div class="scrim"></div><div class="ddlg"><h3>Download 23 files · 356 MB</h3><div class="dopt on"><span class="ri acc"><span data-i="folder"></span></span><div class="dt"><b>Into a folder</b><span>Into “Share”, a folder for each day. Files already there are skipped.</span><em>Choose another folder</em></div><i class="radio"></i></div><div class="dopt"><span class="ri"><span data-i="archive"></span></span><div class="dt"><b>As one ZIP file</b><span>Share 2026-09-30.zip, into Downloads. Unpack it afterwards.</span></div><i class="radio"></i></div><div class="dbtns"><span class="tbtn">Cancel</span><div class="btn primary sm"><span data-i="download"></span>Download</div></div></div></div></div>
+      </div>
+      <div class="slot wide">
+        <h3><span class="n">27</span>Saving into the folder <span class="badge new">new</span></h3>
+        <p class="cap">The app's download sheet as a panel in the corner, so the library stays usable. Three files at a time, a folder per day as on the server, and a dropped connection resumes the file. Closing the tab asks first.</p>
+        <div class="desktop" data-shot="27-saving-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>Library · Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com/library</span></div></div><div class="dview"><div class="ahd"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div><nav class="dtabs"><a class="on"><span data-i="images"></span>Library</a><a><span data-i="upload"></span>Send</a><a><span data-i="settings"></span>Settings</a></nav><span class="dsearch"><span data-i="search"></span>Search file names</span><span class="av tan">M</span></div><div class="dlib"><div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div><div class="day"><div><h4>Today</h4><div class="meta">6 files · 74 MB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p3 p8 v2@0:18 d#PDF=Car_insurance.pdf p6 p1"></div><div class="day"><div><h4>Yesterday</h4><div class="meta">45 files · 620 MB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p4 p7 p9 v5@1:15 p2 p10 p6 p3 p5 d#DOCX=Recipes_Oma.docx p8 p1 v3@0:42 p2 p9 p7"></div><div class="day"><div><h4>Sunday, 27 Sep</h4><div class="meta">48 files · 1.1 GB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p1 p2 d#PDF=Invitation.pdf p5 v4@0:42 p3 p8 p6"></div></div><div class="savep"><h3>Saving 23 files</h3><div class="prow"><b>5 of 23</b><span>45 of 356 MB</span></div><div class="bar"><i style="width:13%"></i></div><div class="dest"><div class="drow"><span class="ri"><span data-i="folder"></span></span><div><b>Into the folder “Share”</b><span>A folder for each day, as on the server</span></div></div></div><div class="note slim"><span data-i="monitor"></span><p>Keep this tab open until it's done. 3 files were already in the folder, so they're skipped.</p></div><div class="btnrow"><div class="btn outline">Cancel</div><div class="btn tonal">Hide</div></div></div></div></div>
+      </div>
+      <div class="slot wide">
+        <h3><span class="n">28</span>One file, on a computer <span class="badge new">new</span></h3>
+        <p class="cap">Arrow keys or the side buttons go through the files, Esc closes. Photos show at full size, videos play right here, documents offer the download. The details stay beside the picture. Admins also get Delete.</p>
+        <div class="desktop" data-shot="28-one-file-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>Library · Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com/library</span></div></div><div class="dview dviewer"><div class="dvt"><div class="vt"><b>Sunday, 27 Sep</b><span>14:32</span></div><span class="vbtn"><span data-i="download"></span>Download</span><span class="vbtn on"><span data-i="info"></span>Details</span><span class="ib"><span data-i="x"></span></span></div><div class="vstage"><span class="varr"><span data-i="chev-left"></span></span><div class="vpic"></div><span class="varr"><span data-i="chev"></span></span></div><div class="film" data-tiles="p2 p5 p1/c p7 p3"></div><aside class="vside"><h4>20260927_143201.jpg</h4><div class="vrow"><span data-i="clock"></span><div><b>Sunday, 27 Sep, 14:32</b></div></div><div class="vrow"><span data-i="user"></span><div><b>From Peter</b></div></div><div class="vrow"><span data-i="image"></span><div><b>4.2 MB · 4000 × 3000</b><span>image/jpeg</span></div></div></aside></div></div>
+      </div>
+      <div class="slot wide">
+        <h3><span class="n">29</span>Send, on a computer <span class="badge new">new</span></h3>
+        <p class="cap">The website's own send pages, without the PIN; sending and Done look as in 4–6. Files dropped on the library come here too.</p>
+        <div class="desktop" data-shot="29-send-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>Send · Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com/send</span></div></div><div class="dview"><div class="ahd"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div><nav class="dtabs"><a><span data-i="images"></span>Library</a><a class="on"><span data-i="upload"></span>Send</a><a><span data-i="settings"></span>Settings</a></nav><span class="av tan">M</span></div><div class="dsplit"><div class="pane"><div class="stack"><div class="pc pa ph t4"><span data-i="image"></span></div><div class="pc pb ph t3"><span data-i="image"></span></div><div class="pc pcen"><span data-i="file"></span><span class="ext">PDF</span></div></div><h1 class="hero">Send your files</h1><p class="lead">No PIN needed while you're signed in. Everything arrives unchanged, in full quality.</p></div><div class="pane"><div class="drop"><div class="roundico"><span data-i="upload"></span></div><p class="drop-t">Drop files or folders here</p><p class="drop-or">or</p><div class="btn primary"><span data-i="plus"></span>Choose files</div><div class="btn link"><span data-i="folder"></span>Choose a folder</div></div><p class="small">Tip: use Wi-Fi for big batches. If the page closes, open it again and it carries on.</p></div></div></div></div>
+      </div>
+
+    </div>
+    <p class="sub-h">On a phone</p>
+    <div class="board">
+
+      <div class="slot">
+        <h3><span class="n">22</span>Sign in <span class="badge new">new</span></h3>
+        <p class="cap">The same, in one column. No server field, and nothing to scan: a browser joins through the invite's link.</p>
+        <div class="phone" data-shot="22-sign-in"><div class="sb" data-time="9:41"></div><div class="wb"><div class="brand"><span data-i="images"></span><span translate="no">Share</span><span class="langpill"><span data-i="globe"></span>EN</span></div><div class="roundico"><span data-i="user"></span></div><h1 class="hero md">Sign in</h1><p class="lead">To see and download everything that was shared.</p><div class="label">Username</div><div class="input">maria</div><div class="label">Password</div><div class="input focus"><span class="dots">••••••••••</span><span class="caret"></span><span class="trail" data-i="eye"></span></div><div class="btn primary mt24">Sign in</div><div class="grow"></div><p class="small">No password yet? Set one in the app under Settings › Password, or ask for an invite.</p><p class="small link">Only sending? Enter a PIN instead</p></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">23</span>An invite, on an iPhone <span class="badge new">new</span></h3>
+        <p class="cap">There's no app for iPhones, so the browser is the way in. On Android the app stays first, with “Or use Share in this browser” under it.</p>
+        <div class="phone" data-shot="23-invite-iphone"><div class="sb" data-time="19:02"></div><div class="wb"><div class="brand"><span data-i="images"></span><span translate="no">Share</span><span class="langpill"><span data-i="globe"></span>EN</span></div><div class="bigav">M<i><span data-i="check"></span></i></div><h1 class="hero md center">Stefan invited you</h1><p class="lead center">This browser will be signed in as Maria. No password needed.</p><div class="facts"><div><span data-i="user"></span><em>Name</em><b>Maria</b></div><div><span data-i="shield"></span><em>Role</em><b>Member: see, download, send</b></div><div><span data-i="clock"></span><em>Valid</em><b>Once, until 21:00</b></div></div><div class="grow"></div><div class="btn primary">Use Share in this browser</div><p class="small">Not Maria? Stop here and ask Stefan for your own invite.</p></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">26</span>Downloading several, on a phone <span class="badge new">new</span></h3>
+        <p class="cap">The ZIP starts at once; the browser's own download list shows how far it is, and it continues after a dropped connection. Library, selecting and one file look as in the app (11, 12, 14).</p>
+        <div class="phone" data-shot="26-download-zip"><div class="sb" data-time="9:44"></div><div class="ab"><h2>Library</h2><span class="ib"><span data-i="search"></span></span><span class="av sm tan">M</span></div><div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div><div class="scroll"><div class="day"><div><h4>Today</h4><div class="meta">6 files · 74 MB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p3 p8 v2@0:18 d#PDF=Car_insurance.pdf p6 p1"></div><div class="day"><div><h4>Yesterday</h4><div class="meta">45 files · 620 MB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p4 p7 p9 v5@1:15 p2 p10 p6 p3"></div><div class="day"><div><h4>Sunday, 27 Sep</h4><div class="meta">48 files · 1.1 GB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p1 p2 d#PDF=Invitation.pdf p5 v4@0:42 p3 d#DOCX=Recipes_Oma.docx p8"></div></div><nav class="nav" data-on="library"></nav><div class="toast"><span data-i="download"></span><span>Downloading 23 files as one ZIP, 356 MB. Your browser shows how far it is.</span></div></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ================================================================= WEBSITE FOR ADMINS -->
+  <section class="sec">
+    <div class="sec-head">
+      <div class="sec-tag">Website · admins</div>
+      <h2>Running Share from the browser</h2>
+      <p>Everything admins do in the app: PINs, people, invites, Recently deleted. What is a screen of its own in the app opens on the right on a computer, and the app's sheets become dialogs. Shown here as Stefan.</p>
+    </div>
+    <p class="sub-h">On a computer</p>
+    <div class="board">
+
+      <div class="slot wide">
+        <h3><span class="n">30</span>Settings, as admin, on a computer <span class="badge new">new</span></h3>
+        <p class="cap">The list stays on the left, the chosen page opens on the right. People shows everyone's phones and browsers. The profile card opens your own, so a forgotten browser can be signed out without an admin.</p>
+        <div class="desktop" data-shot="30-settings-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>Settings · Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com/settings/people</span></div></div><div class="dview"><div class="ahd"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div><nav class="dtabs"><a><span data-i="images"></span>Library</a><a><span data-i="upload"></span>Send</a><a class="on"><span data-i="settings"></span>Settings</a></nav><span class="av acc">S</span></div><div class="dset"><div class="pane"><div class="profile"><span class="av lg acc">S</span><div><b>Stefan <span class="role admin"><span data-i="crown"></span>Admin</span></b><span class="sub">Signed in in this browser</span></div><span class="chev" data-i="chev"></span></div><div class="group"><div class="row"><span class="ri acc"><span data-i="key"></span></span><div class="rt"><b>Upload PINs</b><span>1 permanent · 1 for 24 hours</span></div><span class="chev" data-i="chev"></span></div><div class="row on"><span class="ri"><span data-i="users"></span></span><div class="rt"><b>People</b><span>3 people · 1 invite open</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="trash"></span></span><div class="rt"><b>Recently deleted</b><span>3 files · 9.3 MB</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="hdd"></span></span><div class="rt"><b>Storage</b><span>789 GB free of 931 GB</span></div></div></div><div class="group"><div class="row"><span class="ri"><span data-i="globe"></span></span><div class="rt"><b>Language</b><span>Automatic · English</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="palette"></span></span><div class="rt"><b>Theme</b><span>Ember</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="lock"></span></span><div class="rt"><b>Password</b><span>Set · username stefan</span></div><span class="chev" data-i="chev"></span></div></div><div class="group"><div class="row"><span class="ri"><span data-i="log-out"></span></span><div class="rt"><b>Sign out</b></div></div><div class="row dang"><span class="ri dang"><span data-i="user-x"></span></span><div class="rt"><b>Delete my account</b></div></div></div></div><div class="pane pane2"><div class="phead"><h2>People</h2><span class="btn tonal xs"><span data-i="user-plus"></span>Invite</span></div><div class="group"><div class="row"><span class="av acc">S</span><div class="rt"><b>Stefan</b><span>You · 1 phone, 1 browser</span></div><span class="role admin">Admin</span><span class="chev" data-i="chev"></span></div><div class="row"><span class="av tan">M</span><div class="rt"><b>Maria</b><span>1 phone, 1 browser · active today</span></div><span class="role">Member</span><span class="chev" data-i="chev"></span></div><div class="row"><span class="av sage">P</span><div class="rt"><b>Peter</b><span>1 phone · active today</span></div><span class="role">Member</span><span class="chev" data-i="chev"></span></div><div class="row"><span class="av pend">O</span><div class="rt"><b>Oma Rosa</b><span>Invite open until 21:00</span></div><span class="role pend">Invited</span><span class="chev" data-i="chev"></span></div></div></div></div></div></div>
+      </div>
+      <div class="slot wide">
+        <h3><span class="n">31</span>A person <span class="badge new">new</span></h3>
+        <p class="cap">Phones and browsers in one list. A browser that signed in over plain http at home says so: that sign-in only works at home. “Add a phone or browser” makes an invite for this person.</p>
+        <div class="desktop" data-shot="31-person-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>Settings · Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com/settings/people</span></div></div><div class="dview"><div class="ahd"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div><nav class="dtabs"><a><span data-i="images"></span>Library</a><a><span data-i="upload"></span>Send</a><a class="on"><span data-i="settings"></span>Settings</a></nav><span class="av acc">S</span></div><div class="dset"><div class="pane"><div class="profile"><span class="av lg acc">S</span><div><b>Stefan <span class="role admin"><span data-i="crown"></span>Admin</span></b><span class="sub">Signed in in this browser</span></div><span class="chev" data-i="chev"></span></div><div class="group"><div class="row"><span class="ri acc"><span data-i="key"></span></span><div class="rt"><b>Upload PINs</b><span>1 permanent · 1 for 24 hours</span></div><span class="chev" data-i="chev"></span></div><div class="row on"><span class="ri"><span data-i="users"></span></span><div class="rt"><b>People</b><span>3 people · 1 invite open</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="trash"></span></span><div class="rt"><b>Recently deleted</b><span>3 files · 9.3 MB</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="hdd"></span></span><div class="rt"><b>Storage</b><span>789 GB free of 931 GB</span></div></div></div><div class="group"><div class="row"><span class="ri"><span data-i="globe"></span></span><div class="rt"><b>Language</b><span>Automatic · English</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="palette"></span></span><div class="rt"><b>Theme</b><span>Ember</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="lock"></span></span><div class="rt"><b>Password</b><span>Set · username stefan</span></div><span class="chev" data-i="chev"></span></div></div><div class="group"><div class="row"><span class="ri"><span data-i="log-out"></span></span><div class="rt"><b>Sign out</b></div></div><div class="row dang"><span class="ri dang"><span data-i="user-x"></span></span><div class="rt"><b>Delete my account</b></div></div></div></div><div class="pane pane2"><div class="phead"><h2>People</h2><span class="btn tonal xs"><span data-i="user-plus"></span>Invite</span></div><div class="group"><div class="row"><span class="av acc">S</span><div class="rt"><b>Stefan</b><span>You · 1 phone, 1 browser</span></div><span class="role admin">Admin</span><span class="chev" data-i="chev"></span></div><div class="row"><span class="av tan">M</span><div class="rt"><b>Maria</b><span>1 phone, 1 browser · active today</span></div><span class="role">Member</span><span class="chev" data-i="chev"></span></div><div class="row"><span class="av sage">P</span><div class="rt"><b>Peter</b><span>1 phone · active today</span></div><span class="role">Member</span><span class="chev" data-i="chev"></span></div><div class="row"><span class="av pend">O</span><div class="rt"><b>Oma Rosa</b><span>Invite open until 21:00</span></div><span class="role pend">Invited</span><span class="chev" data-i="chev"></span></div></div></div></div><div class="scrim"></div><div class="ddlg wide"><div class="pdh"><span class="av lg tan">M</span><div><b>Maria</b><span>@maria</span></div><span class="role">Member</span><span class="ib"><span data-i="x"></span></span></div><div class="glabel">Phones and browsers</div><div class="group"><div class="row"><span class="ri"><span data-i="smartphone"></span></span><div class="rt"><b>Pixel 8</b><span>Last used today</span></div><span class="tbtn danger">Sign out</span></div><div class="row"><span class="ri"><span data-i="monitor"></span></span><div class="rt"><b>Chrome · Windows</b><span>Only at home · last used 3 days ago</span></div><span class="tbtn danger">Sign out</span></div><div class="row acc"><span class="ri acc"><span data-i="plus"></span></span><div class="rt"><b>Add a phone or browser</b></div></div></div><div class="group mt12"><div class="row"><span class="ri"><span data-i="crown"></span></span><div class="rt"><b>Make admin</b><span>Admin: also delete files, and manage PINs and people</span></div></div><div class="row dang"><span class="ri dang"><span data-i="user-x"></span></span><div class="rt"><b>Remove Maria</b></div></div></div></div></div></div>
+      </div>
+      <div class="slot wide">
+        <h3><span class="n">32</span>Invite someone <span class="badge new">new</span></h3>
+        <p class="cap">As in the app (20). On a computer the link is copied rather than shared. Whoever opens it can join on the phone, or in a browser.</p>
+        <div class="desktop" data-shot="32-invite-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>Settings · Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com/settings/people</span></div></div><div class="dview"><div class="ahd"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div><nav class="dtabs"><a><span data-i="images"></span>Library</a><a><span data-i="upload"></span>Send</a><a class="on"><span data-i="settings"></span>Settings</a></nav><span class="av acc">S</span></div><div class="dset"><div class="pane"><div class="profile"><span class="av lg acc">S</span><div><b>Stefan <span class="role admin"><span data-i="crown"></span>Admin</span></b><span class="sub">Signed in in this browser</span></div><span class="chev" data-i="chev"></span></div><div class="group"><div class="row"><span class="ri acc"><span data-i="key"></span></span><div class="rt"><b>Upload PINs</b><span>1 permanent · 1 for 24 hours</span></div><span class="chev" data-i="chev"></span></div><div class="row on"><span class="ri"><span data-i="users"></span></span><div class="rt"><b>People</b><span>3 people · 1 invite open</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="trash"></span></span><div class="rt"><b>Recently deleted</b><span>3 files · 9.3 MB</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="hdd"></span></span><div class="rt"><b>Storage</b><span>789 GB free of 931 GB</span></div></div></div><div class="group"><div class="row"><span class="ri"><span data-i="globe"></span></span><div class="rt"><b>Language</b><span>Automatic · English</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="palette"></span></span><div class="rt"><b>Theme</b><span>Ember</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="lock"></span></span><div class="rt"><b>Password</b><span>Set · username stefan</span></div><span class="chev" data-i="chev"></span></div></div><div class="group"><div class="row"><span class="ri"><span data-i="log-out"></span></span><div class="rt"><b>Sign out</b></div></div><div class="row dang"><span class="ri dang"><span data-i="user-x"></span></span><div class="rt"><b>Delete my account</b></div></div></div></div><div class="pane pane2"><div class="phead"><h2>People</h2><span class="btn tonal xs"><span data-i="user-plus"></span>Invite</span></div><div class="group"><div class="row"><span class="av acc">S</span><div class="rt"><b>Stefan</b><span>You · 1 phone, 1 browser</span></div><span class="role admin">Admin</span><span class="chev" data-i="chev"></span></div><div class="row"><span class="av tan">M</span><div class="rt"><b>Maria</b><span>1 phone, 1 browser · active today</span></div><span class="role">Member</span><span class="chev" data-i="chev"></span></div><div class="row"><span class="av sage">P</span><div class="rt"><b>Peter</b><span>1 phone · active today</span></div><span class="role">Member</span><span class="chev" data-i="chev"></span></div><div class="row"><span class="av pend">O</span><div class="rt"><b>Oma Rosa</b><span>Invite open until 21:00</span></div><span class="role pend">Invited</span><span class="chev" data-i="chev"></span></div></div></div></div><div class="scrim"></div><div class="ddlg wide"><div class="dlgh"><h3>Invite someone</h3><span class="ib"><span data-i="x"></span></span></div><div class="label t0">Name</div><div class="input">Oma Rosa</div><div class="label">Role</div><div class="seg"><span class="on"><span data-i="check"></span>Member</span><span>Admin</span></div><p class="help">Members see, download and send. Admins can also delete files, manage PINs and invite people.</p><div class="qrrow"><div class="qr" data-qr="11"></div><div><b>Let Oma Rosa scan this with the phone camera, or send her the link for a browser.</b><span class="exp"><span data-i="clock"></span>Works once · expires in 24 h</span><div class="btn tonal sm"><span data-i="copy"></span>Copy link</div></div></div><div class="dbtns"><span class="tbtn">Invite someone else</span><div class="btn outline sm">Close</div></div></div></div></div>
+      </div>
+      <div class="slot wide">
+        <h3><span class="n">33</span>Upload PINs, on a computer <span class="badge new">new</span></h3>
+        <p class="cap">Both kinds side by side. Copy link puts the PIN's link on the clipboard; on phones it's Share, as in the app. A PIN counts every phone or browser it was used on.</p>
+        <div class="desktop" data-shot="33-upload-pins-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>Settings · Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com/settings/pins</span></div></div><div class="dview"><div class="ahd"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div><nav class="dtabs"><a><span data-i="images"></span>Library</a><a><span data-i="upload"></span>Send</a><a class="on"><span data-i="settings"></span>Settings</a></nav><span class="av acc">S</span></div><div class="dset"><div class="pane"><div class="profile"><span class="av lg acc">S</span><div><b>Stefan <span class="role admin"><span data-i="crown"></span>Admin</span></b><span class="sub">Signed in in this browser</span></div><span class="chev" data-i="chev"></span></div><div class="group"><div class="row on"><span class="ri acc"><span data-i="key"></span></span><div class="rt"><b>Upload PINs</b><span>1 permanent · 1 for 24 hours</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="users"></span></span><div class="rt"><b>People</b><span>3 people · 1 invite open</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="trash"></span></span><div class="rt"><b>Recently deleted</b><span>3 files · 9.3 MB</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="hdd"></span></span><div class="rt"><b>Storage</b><span>789 GB free of 931 GB</span></div></div></div><div class="group"><div class="row"><span class="ri"><span data-i="globe"></span></span><div class="rt"><b>Language</b><span>Automatic · English</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="palette"></span></span><div class="rt"><b>Theme</b><span>Ember</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="lock"></span></span><div class="rt"><b>Password</b><span>Set · username stefan</span></div><span class="chev" data-i="chev"></span></div></div><div class="group"><div class="row"><span class="ri"><span data-i="log-out"></span></span><div class="rt"><b>Sign out</b></div></div><div class="row dang"><span class="ri dang"><span data-i="user-x"></span></span><div class="rt"><b>Delete my account</b></div></div></div></div><div class="pane pane2"><div class="phead"><h2>Upload PINs</h2><span class="btn primary xs"><span data-i="plus"></span>New PIN</span></div><p class="lead sm" data-tr>A PIN only lets people <b>send</b>. Nobody can see or download anything with it.</p><div class="pgrid"><div><div class="glabel">Permanent</div><div class="pincard"><div class="pc-top"><div class="code"><b>K</b><b>7</b><b>M</b><b>2</b><b>Q</b></div><span class="pcico" data-i="infinity"></span></div><div class="pc-meta">Since 12 Sep · used on 6 devices</div><div class="pc-actions"><span><span data-i="copy"></span>Copy link</span><span><span data-i="qr"></span>QR code</span><span><span data-i="refresh"></span>New code</span><span class="danger">End now</span></div></div></div><div><div class="glabel">For 24 hours</div><div class="pincard"><div class="pc-top"><div class="code"><b>4</b><b>H</b><b>X</b><b>9</b><b>T</b></div></div><div class="pc-meta"><span class="timepill sm"><span data-i="clock"></span>Ends today 18:30</span>45 files from 7 devices</div><div class="pc-actions"><span><span data-i="copy"></span>Copy link</span><span><span data-i="qr"></span>QR code</span><span class="danger">End now</span></div></div></div></div></div></div></div></div>
+      </div>
+      <div class="slot wide">
+        <h3><span class="n">34</span>New PIN <span class="badge new">new</span></h3>
+        <p class="cap">The app's sheet (19) as a dialog. Create &amp; copy link makes the PIN and copies its link, ready to paste into a message.</p>
+        <div class="desktop" data-shot="34-new-pin-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>Settings · Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com/settings/pins</span></div></div><div class="dview"><div class="ahd"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div><nav class="dtabs"><a><span data-i="images"></span>Library</a><a><span data-i="upload"></span>Send</a><a class="on"><span data-i="settings"></span>Settings</a></nav><span class="av acc">S</span></div><div class="dset"><div class="pane"><div class="profile"><span class="av lg acc">S</span><div><b>Stefan <span class="role admin"><span data-i="crown"></span>Admin</span></b><span class="sub">Signed in in this browser</span></div><span class="chev" data-i="chev"></span></div><div class="group"><div class="row on"><span class="ri acc"><span data-i="key"></span></span><div class="rt"><b>Upload PINs</b><span>1 permanent · 1 for 24 hours</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="users"></span></span><div class="rt"><b>People</b><span>3 people · 1 invite open</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="trash"></span></span><div class="rt"><b>Recently deleted</b><span>3 files · 9.3 MB</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="hdd"></span></span><div class="rt"><b>Storage</b><span>789 GB free of 931 GB</span></div></div></div><div class="group"><div class="row"><span class="ri"><span data-i="globe"></span></span><div class="rt"><b>Language</b><span>Automatic · English</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="palette"></span></span><div class="rt"><b>Theme</b><span>Ember</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="lock"></span></span><div class="rt"><b>Password</b><span>Set · username stefan</span></div><span class="chev" data-i="chev"></span></div></div><div class="group"><div class="row"><span class="ri"><span data-i="log-out"></span></span><div class="rt"><b>Sign out</b></div></div><div class="row dang"><span class="ri dang"><span data-i="user-x"></span></span><div class="rt"><b>Delete my account</b></div></div></div></div><div class="pane pane2"><div class="phead"><h2>Upload PINs</h2><span class="btn primary xs"><span data-i="plus"></span>New PIN</span></div><p class="lead sm" data-tr>A PIN only lets people <b>send</b>. Nobody can see or download anything with it.</p><div class="pgrid"><div><div class="glabel">Permanent</div><div class="pincard"><div class="pc-top"><div class="code"><b>K</b><b>7</b><b>M</b><b>2</b><b>Q</b></div><span class="pcico" data-i="infinity"></span></div><div class="pc-meta">Since 12 Sep · used on 6 devices</div><div class="pc-actions"><span><span data-i="copy"></span>Copy link</span><span><span data-i="qr"></span>QR code</span><span><span data-i="refresh"></span>New code</span><span class="danger">End now</span></div></div></div><div><div class="glabel">For 24 hours</div><div class="pincard"><div class="pc-top"><div class="code"><b>4</b><b>H</b><b>X</b><b>9</b><b>T</b></div></div><div class="pc-meta"><span class="timepill sm"><span data-i="clock"></span>Ends today 18:30</span>45 files from 7 devices</div><div class="pc-actions"><span><span data-i="copy"></span>Copy link</span><span><span data-i="qr"></span>QR code</span><span class="danger">End now</span></div></div></div></div></div></div><div class="scrim"></div><div class="ddlg"><h3>New upload PIN</h3><div class="label t0">How long should it work?</div><div class="opts"><div class="opt"><span data-i="infinity"></span><i class="radio"></i><b>Permanent</b><span class="sub">Until you delete it</span></div><div class="opt on"><span data-i="clock"></span><i class="radio"></i><b>24 hours</b><span class="sub">Until tomorrow, 10:04</span></div></div><div class="label">PIN</div><div class="coderow"><div class="code"><b>R</b><b>8</b><b>D</b><b>4</b><b>W</b></div><span class="ib tonal"><span data-i="refresh"></span></span></div><p class="help">Made up for you. You can also type your own.</p><div class="dbtns"><span class="tbtn">Cancel</span><div class="btn primary sm"><span data-i="copy"></span>Create &amp; copy link</div></div></div></div></div>
+      </div>
+      <div class="slot wide">
+        <h3><span class="n">35</span>Recently deleted <span class="badge new">new</span></h3>
+        <p class="cap">Rows toggle on click, as in the app. Restore puts the files back where they were; Delete now removes them for good, after asking.</p>
+        <div class="desktop" data-shot="35-recently-deleted-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>Settings · Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com/settings/trash</span></div></div><div class="dview"><div class="ahd"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div><nav class="dtabs"><a><span data-i="images"></span>Library</a><a><span data-i="upload"></span>Send</a><a class="on"><span data-i="settings"></span>Settings</a></nav><span class="av acc">S</span></div><div class="dset"><div class="pane"><div class="profile"><span class="av lg acc">S</span><div><b>Stefan <span class="role admin"><span data-i="crown"></span>Admin</span></b><span class="sub">Signed in in this browser</span></div><span class="chev" data-i="chev"></span></div><div class="group"><div class="row"><span class="ri acc"><span data-i="key"></span></span><div class="rt"><b>Upload PINs</b><span>1 permanent · 1 for 24 hours</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="users"></span></span><div class="rt"><b>People</b><span>3 people · 1 invite open</span></div><span class="chev" data-i="chev"></span></div><div class="row on"><span class="ri"><span data-i="trash"></span></span><div class="rt"><b>Recently deleted</b><span>3 files · 9.3 MB</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="hdd"></span></span><div class="rt"><b>Storage</b><span>789 GB free of 931 GB</span></div></div></div><div class="group"><div class="row"><span class="ri"><span data-i="globe"></span></span><div class="rt"><b>Language</b><span>Automatic · English</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="palette"></span></span><div class="rt"><b>Theme</b><span>Ember</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="lock"></span></span><div class="rt"><b>Password</b><span>Set · username stefan</span></div><span class="chev" data-i="chev"></span></div></div><div class="group"><div class="row"><span class="ri"><span data-i="log-out"></span></span><div class="rt"><b>Sign out</b></div></div><div class="row dang"><span class="ri dang"><span data-i="user-x"></span></span><div class="rt"><b>Delete my account</b></div></div></div></div><div class="pane pane2"><div class="phead"><h2>Recently deleted</h2><span class="tbtn">Select all</span></div><p class="lead sm">Deleted files stay here for 30 days. Then they're gone for good.</p><div class="group"><div class="row trow"><div class="tile mini ph t7"><span data-i="image"></span></div><div class="rt"><b>IMG_2041.jpg</b><span>3.1 MB · 30 days left · Deleted by Stefan</span></div><span class="dsel"></span></div><div class="row trow"><div class="tile mini ph t4"><span data-i="image"></span></div><div class="rt"><b>IMG_2042.jpg</b><span>3.1 MB · 26 days left · Deleted by Stefan</span></div><span class="dsel on"><span data-i="check"></span></span></div><div class="row trow"><div class="tile mini doc"><span data-i="file"></span></div><div class="rt"><b>Car_insurance.pdf</b><span>3.1 MB · 22 days left · Deleted by Stefan</span></div><span class="dsel"></span></div></div><div class="trbar"><span>1 selected</span><span class="gap"></span><div class="btn dout sm">Delete now</div><div class="btn primary sm"><span data-i="rotate"></span>Restore</div></div></div></div></div></div>
+      </div>
+      <div class="slot wide">
+        <h3><span class="n">36</span>Deleted, with Undo <span class="badge new">new</span></h3>
+        <p class="cap">After the dialog of 21. Undo brings the files straight back, without a trip to Recently deleted.</p>
+        <div class="desktop" data-shot="36-deleted-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>Library · Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com/library</span></div></div><div class="dview"><div class="ahd"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div><nav class="dtabs"><a class="on"><span data-i="images"></span>Library</a><a><span data-i="upload"></span>Send</a><a><span data-i="settings"></span>Settings</a></nav><span class="dsearch"><span data-i="search"></span>Search file names</span><span class="av acc">S</span></div><div class="dlib"><div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div><div class="day"><div><h4>Today</h4><div class="meta">6 files · 74 MB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p3 p8 v2@0:18 d#PDF=Car_insurance.pdf p6 p1"></div><div class="day"><div><h4>Yesterday</h4><div class="meta">45 files · 620 MB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p4 p7 p9 v5@1:15 p2 p10 p6 p3 p5 d#DOCX=Recipes_Oma.docx p8 p1 v3@0:42 p2 p9 p7"></div><div class="day"><div><h4>Sunday, 27 Sep</h4><div class="meta">48 files · 1.1 GB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p1 p2 d#PDF=Invitation.pdf p5 v4@0:42 p3 p8 p6"></div></div><div class="toast"><span>5 files deleted</span><b>Undo</b></div></div></div>
+      </div>
+
+    </div>
+    <p class="sub-h">On a phone</p>
+    <div class="board">
+
+      <div class="slot">
+        <h3><span class="n">30</span>Settings, as admin <span class="badge new">new</span></h3>
+        <p class="cap">The app's settings (17) with Theme, and without Server: a browser can't switch addresses. Further down: Password, Sign out, Delete my account.</p>
+        <div class="phone" data-shot="30-settings"><div class="sb" data-time="10:02"></div><div class="ab"><h2>Settings</h2></div><div class="scroll pad"><div class="profile"><span class="av lg acc">S</span><div><b>Stefan <span class="role admin"><span data-i="crown"></span>Admin</span></b><span class="sub">Signed in in this browser</span></div></div><div class="group"><div class="row"><span class="ri acc"><span data-i="key"></span></span><div class="rt"><b>Upload PINs</b><span>1 permanent · 1 for 24 hours</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="globe"></span></span><div class="rt"><b>Language</b><span>Automatic · English</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="palette"></span></span><div class="rt"><b>Theme</b><span>Ember</span></div><span class="chev" data-i="chev"></span></div></div><div class="glabel">People<span class="gact"><span data-i="user-plus"></span>Invite</span></div><div class="group"><div class="row"><span class="av acc">S</span><div class="rt"><b>Stefan</b><span>You · 1 phone, 1 browser</span></div><span class="role admin">Admin</span></div><div class="row"><span class="av tan">M</span><div class="rt"><b>Maria</b><span>1 phone, 1 browser · active today</span></div><span class="role">Member</span></div><div class="row"><span class="av sage">P</span><div class="rt"><b>Peter</b><span>1 phone · active today</span></div><span class="role">Member</span></div><div class="row"><span class="av pend">O</span><div class="rt"><b>Oma Rosa</b><span>Invite open until 21:00</span></div><span class="role pend">Invited</span></div></div><div class="glabel">Storage</div><div class="group"><div class="row"><span class="ri"><span data-i="trash"></span></span><div class="rt"><b>Recently deleted</b><span>3 files · 9.3 MB</span></div><span class="chev" data-i="chev"></span></div></div></div><nav class="nav" data-on="settings"></nav></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">31</span>A person, on a phone <span class="badge new">new</span></h3>
+        <p class="cap">The same as a sheet, as in the app. Signing out the browser you're using isn't offered here; Sign out in the settings does that.</p>
+        <div class="phone" data-shot="31-person"><div class="sb" data-time="10:03"></div><div class="ab"><h2>Settings</h2></div><div class="scroll pad"><div class="profile"><span class="av lg acc">S</span><div><b>Stefan <span class="role admin"><span data-i="crown"></span>Admin</span></b><span class="sub">Signed in in this browser</span></div></div><div class="group"><div class="row"><span class="ri acc"><span data-i="key"></span></span><div class="rt"><b>Upload PINs</b><span>1 permanent · 1 for 24 hours</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="globe"></span></span><div class="rt"><b>Language</b><span>Automatic · English</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="palette"></span></span><div class="rt"><b>Theme</b><span>Ember</span></div><span class="chev" data-i="chev"></span></div></div><div class="glabel">People<span class="gact"><span data-i="user-plus"></span>Invite</span></div><div class="group"><div class="row"><span class="av acc">S</span><div class="rt"><b>Stefan</b><span>You · 1 phone, 1 browser</span></div><span class="role admin">Admin</span></div><div class="row"><span class="av tan">M</span><div class="rt"><b>Maria</b><span>1 phone, 1 browser · active today</span></div><span class="role">Member</span></div><div class="row"><span class="av sage">P</span><div class="rt"><b>Peter</b><span>1 phone · active today</span></div><span class="role">Member</span></div><div class="row"><span class="av pend">O</span><div class="rt"><b>Oma Rosa</b><span>Invite open until 21:00</span></div><span class="role pend">Invited</span></div></div><div class="glabel">Storage</div><div class="group"><div class="row"><span class="ri"><span data-i="trash"></span></span><div class="rt"><b>Recently deleted</b><span>3 files · 9.3 MB</span></div><span class="chev" data-i="chev"></span></div></div></div><nav class="nav" data-on="settings"></nav><div class="scrim"></div><div class="sheet"><div class="grip"></div><div class="pdh"><span class="av lg tan">M</span><div><b>Maria</b><span>@maria</span></div><span class="role">Member</span></div><div class="glabel">Phones and browsers</div><div class="group"><div class="row"><span class="ri"><span data-i="smartphone"></span></span><div class="rt"><b>Pixel 8</b><span>Last used today</span></div><span class="tbtn danger">Sign out</span></div><div class="row"><span class="ri"><span data-i="monitor"></span></span><div class="rt"><b>Chrome · Windows</b><span>Only at home · last used 3 days ago</span></div><span class="tbtn danger">Sign out</span></div><div class="row acc"><span class="ri acc"><span data-i="plus"></span></span><div class="rt"><b>Add a phone or browser</b></div></div></div><div class="group mt12"><div class="row"><span class="ri"><span data-i="crown"></span></span><div class="rt"><b>Make admin</b><span>Admin: also delete files, and manage PINs and people</span></div></div><div class="row dang"><span class="ri dang"><span data-i="user-x"></span></span><div class="rt"><b>Remove Maria</b></div></div></div></div></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ================================================================= WEBSITE THEMES -->
+  <section class="sec">
+    <div class="sec-head">
+      <div class="sec-tag">Website · themes</div>
+      <h2>Seven themes, as in the app</h2>
+      <p>Automatic, five dark and two light themes, the same as the app's. The choice applies at once and stays with this browser. Shown as Maria.</p>
+    </div>
+    <p class="sub-h">On a computer</p>
+    <div class="board">
+
+      <div class="slot wide">
+        <h3><span class="n">37</span>Theme <span class="badge new">new</span></h3>
+        <p class="cap">A member's settings are one column; the theme picker is a dialog over them.</p>
+        <div class="desktop" data-shot="37-theme-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>Settings · Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com/settings</span></div></div><div class="dview"><div class="ahd"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div><nav class="dtabs"><a><span data-i="images"></span>Library</a><a><span data-i="upload"></span>Send</a><a class="on"><span data-i="settings"></span>Settings</a></nav><span class="av tan">M</span></div><div class="dset one"><div class="pane"><div class="profile"><span class="av lg tan">M</span><div><b>Maria <span class="role">Member</span></b><span class="sub">Signed in in this browser</span></div><span class="chev" data-i="chev"></span></div><div class="group"><div class="row"><span class="ri"><span data-i="globe"></span></span><div class="rt"><b>Language</b><span>Automatic · English</span></div><span class="chev" data-i="chev"></span></div><div class="row on"><span class="ri"><span data-i="palette"></span></span><div class="rt"><b>Theme</b><span>Ember</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="lock"></span></span><div class="rt"><b>Password</b><span>None yet: set one to sign in on other devices</span></div><span class="chev" data-i="chev"></span></div></div><div class="group"><div class="row"><span class="ri"><span data-i="log-out"></span></span><div class="rt"><b>Sign out</b></div></div><div class="row dang"><span class="ri dang"><span data-i="user-x"></span></span><div class="rt"><b>Delete my account</b></div></div></div></div></div><div class="scrim"></div><div class="ddlg wide"><div class="dlgh"><h3>Theme</h3><span class="ib"><span data-i="x"></span></span></div><div class="tauto"><div class="tsplit"><div data-th="linen"></div><div data-th="ember"></div></div><div><b>Automatic</b><span>Linen by day, Ember at night</span></div></div><div class="glabel">Dark</div><div class="tgrid"><div class="tch on"><span class="tck"><span data-i="check"></span></span><div data-th="ember"></div>Ember</div><div class="tch"><div data-th="midnight"></div>Midnight</div><div class="tch"><div data-th="moss"></div>Moss</div><div class="tch"><div data-th="plum"></div>Plum</div><div class="tch"><div data-th="black"></div>Black</div></div><div class="glabel">Light</div><div class="tgrid"><div class="tch"><div data-th="linen"></div>Linen</div><div class="tch"><div data-th="frost"></div>Frost</div></div></div></div></div>
+      </div>
+      <div class="slot wide">
+        <h3><span class="n">37</span>Linen, on a computer <span class="badge new">new</span></h3>
+        <p class="cap">A light theme on the library. The pictures keep their colours; only the page changes.</p>
+        <div class="desktop linen" data-shot="37-linen-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>Library · Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com/library</span></div></div><div class="dview"><div class="ahd"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div><nav class="dtabs"><a class="on"><span data-i="images"></span>Library</a><a><span data-i="upload"></span>Send</a><a><span data-i="settings"></span>Settings</a></nav><span class="dsearch"><span data-i="search"></span>Search file names</span><span class="av tan">M</span></div><div class="dlib"><div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div><div class="day"><div><h4>Today</h4><div class="meta">6 files · 74 MB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p3 p8 v2@0:18 d#PDF=Car_insurance.pdf p6 p1"></div><div class="day"><div><h4>Yesterday</h4><div class="meta">45 files · 620 MB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p4 p7 p9 v5@1:15 p2 p10 p6 p3 p5 d#DOCX=Recipes_Oma.docx p8 p1 v3@0:42 p2 p9 p7"></div><div class="day"><div><h4>Sunday, 27 Sep</h4><div class="meta">48 files · 1.1 GB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p1 p2 d#PDF=Invitation.pdf p5 v4@0:42 p3 p8 p6"></div></div></div></div>
+      </div>
+
+    </div>
+  </section>
 </div>
 
 <script>
@@ -1325,6 +1666,13 @@
       if (v) d += `M${c} ${r}h1v1h-1z`;
     }
     el.innerHTML = `<svg viewBox="0 0 ${n} ${n}" shape-rendering="crispEdges"><path d="${d}" fill="#17120F"/></svg>`;
+  });
+
+  // Theme previews: the library in miniature, in the colours of data-th's theme.
+  document.querySelectorAll('[data-th]').forEach(el => {
+    el.classList.add('tprev', 'th-' + el.dataset.th);
+    el.innerHTML = '<i class="tl"></i><i class="tc"></i><i class="tt"><b style="background:#7B6352"></b><b style="background:#5A6782"></b>' +
+      '<b style="background:#65704F"></b></i><i class="tb"></i><i class="tn"><b></b><b></b><b></b></i>';
   });
 
   // ---------- languages ----------
@@ -2122,10 +2470,306 @@
       "On an Android tablet? Download the app here (18 MB)": [
           "Auf einem Android-Tablet? Lade die App hier herunter (18 MB)",
           "Su un tablet Android? Scarica l'app qui (18 MB)"
+      ],
+      "To see and download everything that was shared.": [
+          "Um alles zu sehen und herunterzuladen, was geteilt wurde.",
+          "Per vedere e scaricare tutto ciò che è stato condiviso."
+      ],
+      "No password yet? Set one in the app under Settings › Password, or ask for an invite.": [
+          "Noch kein Passwort? Leg in der App unter Einstellungen › Passwort eins fest, oder frag nach einer Einladung.",
+          "Non hai una password? Impostala nell'app in Impostazioni › Password, oppure chiedi un invito."
+      ],
+      "Only sending? Enter a PIN instead": [
+          "Nur senden? Gib stattdessen eine PIN ein",
+          "Devi solo inviare? Inserisci invece un PIN"
+      ],
+      "See and download the shared files in the Share app on your Android phone, or right here in this browser.": [
+          "Sieh dir die geteilten Dateien in der Share-App auf deinem Android-Handy an und lade sie herunter, oder gleich hier im Browser.",
+          "Guarda e scarica i file condivisi nell'app Share sul tuo telefono Android, oppure direttamente qui nel browser."
+      ],
+      "Use Share in this browser": [
+          "Share in diesem Browser nutzen",
+          "Usa Share in questo browser"
+      ],
+      "Signs this browser in as Maria, no password needed. The invite then can't be used on the phone.": [
+          "Meldet diesen Browser als Maria an, ohne Passwort. Auf dem Handy gilt die Einladung dann nicht mehr.",
+          "Questo browser accede come Maria, senza password. Poi l'invito non vale più sul telefono."
+      ],
+      "Library · Share": [
+          "Mediathek · Share",
+          "Raccolta · Share"
+      ],
+      "Search file names": [
+          "Dateinamen suchen",
+          "Cerca nei nomi dei file"
+      ],
+      "Click a day's circle to select all of it. Shift-click selects everything in between.": [
+          "Klick auf den Kreis eines Tages, um alles davon auszuwählen. Ein Klick mit gedrückter Umschalttaste wählt alles dazwischen aus.",
+          "Fai clic sul cerchio di un giorno per selezionarlo tutto. Un clic con Maiusc premuto seleziona tutto ciò che sta in mezzo."
+      ],
+      "Download 23 files · 356 MB": [
+          "23 Dateien herunterladen · 356 MB",
+          "Scarica 23 file · 356 MB"
+      ],
+      "Into a folder": [
+          "In einen Ordner",
+          "In una cartella"
+      ],
+      "Into “Share”, a folder for each day. Files already there are skipped.": [
+          "In „Share“, ein Ordner pro Tag. Dateien, die schon dort sind, werden übersprungen.",
+          "In “Share”, una cartella per ogni giorno. I file già presenti vengono saltati."
+      ],
+      "Choose another folder": [
+          "Anderen Ordner wählen",
+          "Scegli un'altra cartella"
+      ],
+      "As one ZIP file": [
+          "Als eine ZIP-Datei",
+          "Come un unico file ZIP"
+      ],
+      "Share 2026-09-30.zip, into Downloads. Unpack it afterwards.": [
+          "Share 2026-09-30.zip, in Downloads. Danach entpacken.",
+          "Share 2026-09-30.zip, in Download. Poi va estratto."
+      ],
+      "5 of 23": [
+          "5 von 23",
+          "5 di 23"
+      ],
+      "45 of 356 MB": [
+          "45 von 356 MB",
+          "45 di 356 MB"
+      ],
+      "Into the folder “Share”": [
+          "In den Ordner „Share“",
+          "Nella cartella “Share”"
+      ],
+      "A folder for each day, as on the server": [
+          "Ein Ordner pro Tag, wie auf dem Server",
+          "Una cartella per ogni giorno, come sul server"
+      ],
+      "Keep this tab open until it's done. 3 files were already in the folder, so they're skipped.": [
+          "Lass diesen Tab offen, bis alles fertig ist. 3 Dateien waren schon im Ordner und werden übersprungen.",
+          "Tieni aperta questa scheda finché non ha finito. 3 file erano già nella cartella e vengono saltati."
+      ],
+      "Sunday, 27 Sep, 14:32": [
+          "Sonntag, 27. September, 14:32",
+          "Domenica 27 settembre, 14:32"
+      ],
+      "From Peter": [
+          "Von Peter",
+          "Da Peter"
+      ],
+      "4.2 MB · 4000 × 3000": [
+          "4,2 MB · 4000 × 3000",
+          "4,2 MB · 4000 × 3000"
+      ],
+      "Send · Share": [
+          "Senden · Share",
+          "Invia · Share"
+      ],
+      "No PIN needed while you're signed in. Everything arrives unchanged, in full quality.": [
+          "Keine PIN nötig, du bist angemeldet. Es kommt unverändert in voller Qualität an.",
+          "Nessun PIN: hai già effettuato l'accesso. Arriva tutto intatto, in qualità originale."
+      ],
+      "This browser will be signed in as Maria. No password needed.": [
+          "Dieser Browser wird als Maria angemeldet. Kein Passwort nötig.",
+          "In questo browser accederai come Maria. Senza password."
+      ],
+      "Downloading 23 files as one ZIP, 356 MB. Your browser shows how far it is.": [
+          "23 Dateien werden als eine ZIP-Datei heruntergeladen, 356 MB. Wie weit es ist, zeigt dein Browser.",
+          "Download di 23 file in un unico ZIP, 356 MB. A che punto è lo mostra il browser."
+      ],
+      "Settings · Share": [
+          "Einstellungen · Share",
+          "Impostazioni · Share"
+      ],
+      "Signed in in this browser": [
+          "In diesem Browser angemeldet",
+          "Accesso effettuato in questo browser"
+      ],
+      "3 people · 1 invite open": [
+          "3 Personen · 1 Einladung offen",
+          "3 persone · 1 invito aperto"
+      ],
+      "Recently deleted": [
+          "Zuletzt gelöscht",
+          "Eliminati di recente"
+      ],
+      "3 files · 9.3 MB": [
+          "3 Dateien · 9,3 MB",
+          "3 file · 9,3 MB"
+      ],
+      "789 GB free of 931 GB": [
+          "789 GB frei von 931 GB",
+          "789 GB liberi su 931 GB"
+      ],
+      "Theme": [
+          "Design",
+          "Tema"
+      ],
+      "Ember": [
+          "Glut",
+          "Brace"
+      ],
+      "Set · username stefan": [
+          "Festgelegt · Benutzername stefan",
+          "Impostata · nome utente stefan"
+      ],
+      "Sign out": [
+          "Abmelden",
+          "Esci"
+      ],
+      "Delete my account": [
+          "Mein Konto löschen",
+          "Elimina il mio account"
+      ],
+      "You · 1 phone, 1 browser": [
+          "Du · 1 Handy, 1 Browser",
+          "Tu · 1 telefono, 1 browser"
+      ],
+      "1 phone, 1 browser · active today": [
+          "1 Handy, 1 Browser · heute aktiv",
+          "1 telefono, 1 browser · attività oggi"
+      ],
+      "Phones and browsers": [
+          "Handys und Browser",
+          "Telefoni e browser"
+      ],
+      "Last used today": [
+          "Zuletzt benutzt heute",
+          "Usato l'ultima volta oggi"
+      ],
+      "Only at home · last used 3 days ago": [
+          "Nur zu Hause · zuletzt benutzt vor 3 Tagen",
+          "Solo a casa · usato l'ultima volta 3 giorni fa"
+      ],
+      "Add a phone or browser": [
+          "Handy oder Browser hinzufügen",
+          "Aggiungi un telefono o un browser"
+      ],
+      "Make admin": [
+          "Zum Admin machen",
+          "Rendi admin"
+      ],
+      "Admin: also delete files, and manage PINs and people": [
+          "Admin: auch Dateien löschen, PINs und Personen verwalten",
+          "Admin: anche eliminare file e gestire PIN e persone"
+      ],
+      "Remove Maria": [
+          "Maria entfernen",
+          "Rimuovi Maria"
+      ],
+      "Let Oma Rosa scan this with the phone camera, or send her the link for a browser.": [
+          "Lass Oma Rosa das mit der Handykamera scannen, oder schick ihr den Link für einen Browser.",
+          "Fai scansionare questo codice a Nonna Rosa con la fotocamera, oppure mandale il link per un browser."
+      ],
+      "Copy link": [
+          "Link kopieren",
+          "Copia il link"
+      ],
+      "Invite someone else": [
+          "Noch jemanden einladen",
+          "Invita qualcun altro"
+      ],
+      "Close": [
+          "Schließen",
+          "Chiudi"
+      ],
+      "Since 12 Sep · used on 6 devices": [
+          "Seit 12. September · auf 6 Geräten genutzt",
+          "Dal 12 settembre · usato su 6 dispositivi"
+      ],
+      "45 files from 7 devices": [
+          "45 Dateien von 7 Geräten",
+          "45 file da 7 dispositivi"
+      ],
+      "Create & copy link": [
+          "Erstellen & Link kopieren",
+          "Crea e copia il link"
+      ],
+      "Deleted files stay here for 30 days. Then they're gone for good.": [
+          "Gelöschte Dateien bleiben 30 Tage hier. Danach sind sie endgültig weg.",
+          "I file eliminati restano qui per 30 giorni. Poi spariscono per sempre."
+      ],
+      "3.1 MB · 30 days left · Deleted by Stefan": [
+          "3,1 MB · noch 30 Tage · Gelöscht von Stefan",
+          "3,1 MB · ancora 30 giorni · Eliminato da Stefan"
+      ],
+      "3.1 MB · 26 days left · Deleted by Stefan": [
+          "3,1 MB · noch 26 Tage · Gelöscht von Stefan",
+          "3,1 MB · ancora 26 giorni · Eliminato da Stefan"
+      ],
+      "3.1 MB · 22 days left · Deleted by Stefan": [
+          "3,1 MB · noch 22 Tage · Gelöscht von Stefan",
+          "3,1 MB · ancora 22 giorni · Eliminato da Stefan"
+      ],
+      "1 selected": [
+          "1 ausgewählt",
+          "1 selezionato"
+      ],
+      "Delete now": [
+          "Jetzt löschen",
+          "Elimina ora"
+      ],
+      "Restore": [
+          "Wiederherstellen",
+          "Ripristina"
+      ],
+      "5 files deleted": [
+          "5 Dateien gelöscht",
+          "5 file eliminati"
+      ],
+      "Undo": [
+          "Rückgängig",
+          "Annulla"
+      ],
+      "None yet: set one to sign in on other devices": [
+          "Noch keins: leg eins fest, um dich auf anderen Geräten anzumelden",
+          "Ancora nessuna: impostane una per accedere da altri dispositivi"
+      ],
+      "Automatic": [
+          "Automatisch",
+          "Automatico"
+      ],
+      "Linen by day, Ember at night": [
+          "Tagsüber Leinen, nachts Glut",
+          "Di giorno Lino, di notte Brace"
+      ],
+      "Dark": [
+          "Dunkel",
+          "Scuri"
+      ],
+      "Midnight": [
+          "Mitternacht",
+          "Mezzanotte"
+      ],
+      "Moss": [
+          "Moos",
+          "Muschio"
+      ],
+      "Plum": [
+          "Pflaume",
+          "Prugna"
+      ],
+      "Black": [
+          "Schwarz",
+          "Nero"
+      ],
+      "Light": [
+          "Hell",
+          "Chiari"
+      ],
+      "Linen": [
+          "Leinen",
+          "Lino"
+      ],
+      "Frost": [
+          "Frost",
+          "Brina"
       ]
   };
   // Names, codes, numbers and file names that stay the same in every language.
-  const KEEP = /^(?:[A-Z0-9]|\d+(?::\d+)?|Stefan|Maria|Peter|maria|Admin|PIN|PDF|DOCX|ZIP|XLSX|•+|\d{8}_\d{6}\.(?:jpg|mp4)|\/mnt\/usb\/share|(?:https:\/\/)?share\.example\.com|https:\/\/192\.168\.8\.1:8443)$/;
+  const KEEP = /^(?:[A-Z0-9]|\d+(?::\d+)?|Stefan|Maria|Peter|maria|Admin|PIN|PDF|DOCX|ZIP|XLSX|•+|\d{8}_\d{6}\.(?:jpg|mp4)|\/mnt\/usb\/share|(?:https:\/\/)?share\.example\.com(?:\/[a-z\/-]*)?|https:\/\/192\.168\.8\.1:8443|\d+ (?:KB|MB|GB)|@maria|Pixel 8|Chrome · Windows|IMG_\d+\.jpg|image\/jpeg)$/;
   const LANGS = ['en', 'de', 'it'];
   const original = new WeakMap();
   function setLang(lang) {
