@@ -119,8 +119,12 @@ object UploadEngine {
                     is Uploader.Outcome.Done -> {
                         queue.finish(item, UploadRow.DONE, uploadId = outcome.id)
                         live.remove(key)
-                        release(app, item)
-                        sendThumb(app, server, local, item, outcome.id)
+                        // The thumbnail reads the file once more: its grant goes only afterwards.
+                        try {
+                            sendThumb(app, server, local, item, outcome.id)
+                        } finally {
+                            release(app, item)
+                        }
                     }
                     Uploader.Outcome.SignedOut, Uploader.Outcome.PinEnded ->
                         // Which of the two it is follows from how the batch sends, not from the answer.
