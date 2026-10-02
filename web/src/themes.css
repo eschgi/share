@@ -1,0 +1,256 @@
+/* The app's themes (app/lib/ui/theme.dart) as the colours the rest of the website uses. Ember is
+   the default. theme-boot.js and theme.ts put the chosen one on <html> as data-theme; "auto"
+   follows the system, Linen by day and Ember at night. Every theme sets every colour, so a
+   theme's preview can show it anywhere. The pictures (tones, the stack of prints) and the QR
+   code look the same in all of them. */
+:root,
+[data-theme='ember'] {
+  --bg: #16120f;
+  --bar: #1c1713;
+  --s1: #211b17;
+  --s2: #2a231e;
+  --s3: #352d27;
+  --line: #3e352e;
+  --line-soft: #2c2520;
+  --text: #f4ece3;
+  --text-2: #bfb2a4;
+  --text-3: #8e8174;
+  --accent: #c95e34;
+  --accent-hover: #d66a3e;
+  --on-accent: #fff7f1;
+  --accent-text: #ee8d61;
+  --accent-soft: rgba(232, 125, 80, 0.15);
+  --accent-soft-hover: rgba(232, 125, 80, 0.23);
+  --ok: #72cb9a;
+  --ok-strong: #2e8553;
+  --ok-soft: rgba(114, 203, 154, 0.14);
+  --danger: #f2826f;
+  --danger-strong: #c8463a;
+  --danger-soft: rgba(242, 130, 111, 0.14);
+  --warn: #e9bb68;
+  --warn-soft: rgba(233, 187, 104, 0.13);
+  --shadow: rgba(0, 0, 0, 0.5);
+  --scrim: rgba(6, 5, 4, 0.66);
+  --drop-scrim: rgba(10, 8, 6, 0.8);
+  color-scheme: dark;
+}
+
+[data-theme='midnight'] {
+  --bg: #0f141b;
+  --bar: #131a23;
+  --s1: #161e28;
+  --s2: #1d2633;
+  --s3: #263140;
+  --line: #303d4e;
+  --line-soft: #1e2834;
+  --text: #e9eff6;
+  --text-2: #a9b5c4;
+  --text-3: #7a8797;
+  --accent: #3b7dd8;
+  --accent-hover: #4a8be3;
+  --on-accent: #f5f9ff;
+  --accent-text: #86b6f7;
+  --accent-soft: rgba(134, 182, 247, 0.15);
+  --accent-soft-hover: rgba(134, 182, 247, 0.23);
+  --ok: #72cb9a;
+  --ok-strong: #2e8553;
+  --ok-soft: rgba(114, 203, 154, 0.14);
+  --danger: #f2826f;
+  --danger-strong: #c8463a;
+  --danger-soft: rgba(242, 130, 111, 0.14);
+  --warn: #e9bb68;
+  --warn-soft: rgba(233, 187, 104, 0.13);
+  --shadow: rgba(0, 0, 0, 0.6);
+  --scrim: rgba(4, 6, 10, 0.66);
+  --drop-scrim: rgba(7, 10, 14, 0.8);
+  color-scheme: dark;
+}
+
+[data-theme='moss'] {
+  --bg: #111512;
+  --bar: #151a16;
+  --s1: #19201b;
+  --s2: #202923;
+  --s3: #29342c;
+  --line: #334137;
+  --line-soft: #212b24;
+  --text: #eaf0ea;
+  --text-2: #aebdb0;
+  --text-3: #7f8e82;
+  --accent: #6b8a38;
+  --accent-hover: #789a42;
+  --on-accent: #f7fbef;
+  --accent-text: #b3cf7a;
+  --accent-soft: rgba(179, 207, 122, 0.15);
+  --accent-soft-hover: rgba(179, 207, 122, 0.23);
+  --ok: #6fd0b5;
+  --ok-strong: #237a66;
+  --ok-soft: rgba(111, 208, 181, 0.14);
+  --danger: #f2826f;
+  --danger-strong: #c8463a;
+  --danger-soft: rgba(242, 130, 111, 0.14);
+  --warn: #e9bb68;
+  --warn-soft: rgba(233, 187, 104, 0.13);
+  --shadow: rgba(0, 0, 0, 0.5);
+  --scrim: rgba(5, 7, 5, 0.66);
+  --drop-scrim: rgba(8, 10, 8, 0.8);
+  color-scheme: dark;
+}
+
+[data-theme='plum'] {
+  --bg: #151118;
+  --bar: #1a151e;
+  --s1: #1f1924;
+  --s2: #28202e;
+  --s3: #322939;
+  --line: #3d3346;
+  --line-soft: #261f2c;
+  --text: #f2ecf5;
+  --text-2: #beb2c6;
+  --text-3: #8e8298;
+  --accent: #9b5cc9;
+  --accent-hover: #a86bd4;
+  --on-accent: #fbf5ff;
+  --accent-text: #c9a0f0;
+  --accent-soft: rgba(201, 160, 240, 0.15);
+  --accent-soft-hover: rgba(201, 160, 240, 0.23);
+  --ok: #72cb9a;
+  --ok-strong: #2e8553;
+  --ok-soft: rgba(114, 203, 154, 0.14);
+  --danger: #f2826f;
+  --danger-strong: #c8463a;
+  --danger-soft: rgba(242, 130, 111, 0.14);
+  --warn: #e9bb68;
+  --warn-soft: rgba(233, 187, 104, 0.13);
+  --shadow: rgba(0, 0, 0, 0.5);
+  --scrim: rgba(7, 5, 9, 0.66);
+  --drop-scrim: rgba(10, 8, 12, 0.8);
+  color-scheme: dark;
+}
+
+[data-theme='black'] {
+  --bg: #000000;
+  --bar: #0b0a09;
+  --s1: #121010;
+  --s2: #1b1817;
+  --s3: #262221;
+  --line: #302b28;
+  --line-soft: #1b1817;
+  --text: #f4ece3;
+  --text-2: #bfb2a4;
+  --text-3: #8e8174;
+  --accent: #c95e34;
+  --accent-hover: #d66a3e;
+  --on-accent: #fff7f1;
+  --accent-text: #ee8d61;
+  --accent-soft: rgba(232, 125, 80, 0.15);
+  --accent-soft-hover: rgba(232, 125, 80, 0.23);
+  --ok: #72cb9a;
+  --ok-strong: #2e8553;
+  --ok-soft: rgba(114, 203, 154, 0.14);
+  --danger: #f2826f;
+  --danger-strong: #c8463a;
+  --danger-soft: rgba(242, 130, 111, 0.14);
+  --warn: #e9bb68;
+  --warn-soft: rgba(233, 187, 104, 0.13);
+  --shadow: transparent;
+  --scrim: rgba(0, 0, 0, 0.7);
+  --drop-scrim: rgba(0, 0, 0, 0.8);
+  color-scheme: dark;
+}
+
+/* Linen is also "auto" by day, below. */
+[data-theme='linen'] {
+  --bg: #f6f0e9;
+  --bar: #eee6dc;
+  --s1: #fffcf8;
+  --s2: #f1e9e0;
+  --s3: #e6dcd1;
+  --line: #d9cbbd;
+  --line-soft: #e9dfd4;
+  --text: #2a1f18;
+  --text-2: #5f5147;
+  --text-3: #85766a;
+  --accent: #c45a30;
+  --accent-hover: #b04f29;
+  --on-accent: #ffffff;
+  --accent-text: #a4461f;
+  --accent-soft: rgba(196, 90, 48, 0.12);
+  --accent-soft-hover: rgba(196, 90, 48, 0.18);
+  --ok: #257346;
+  --ok-strong: #2e8553;
+  --ok-soft: rgba(46, 133, 83, 0.12);
+  --danger: #b23a2b;
+  --danger-strong: #c8463a;
+  --danger-soft: rgba(200, 70, 58, 0.11);
+  --warn: #8a5c00;
+  --warn-soft: rgba(233, 187, 104, 0.18);
+  --shadow: rgba(58, 36, 18, 0.18);
+  --scrim: rgba(42, 31, 24, 0.36);
+  --drop-scrim: rgba(246, 240, 233, 0.88);
+  color-scheme: light;
+}
+
+[data-theme='frost'] {
+  --bg: #f3f6fa;
+  --bar: #e8edf4;
+  --s1: #ffffff;
+  --s2: #edf1f6;
+  --s3: #e0e7ef;
+  --line: #cfd8e3;
+  --line-soft: #e3e9f0;
+  --text: #16202b;
+  --text-2: #4a5767;
+  --text-3: #738091;
+  --accent: #2f6bcb;
+  --accent-hover: #285db3;
+  --on-accent: #ffffff;
+  --accent-text: #2558a8;
+  --accent-soft: rgba(47, 107, 203, 0.12);
+  --accent-soft-hover: rgba(47, 107, 203, 0.18);
+  --ok: #257346;
+  --ok-strong: #2e8553;
+  --ok-soft: rgba(46, 133, 83, 0.12);
+  --danger: #b23a2b;
+  --danger-strong: #c8463a;
+  --danger-soft: rgba(200, 70, 58, 0.11);
+  --warn: #8a5c00;
+  --warn-soft: rgba(233, 187, 104, 0.18);
+  --shadow: rgba(22, 32, 43, 0.18);
+  --scrim: rgba(22, 32, 43, 0.36);
+  --drop-scrim: rgba(243, 246, 250, 0.88);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: light) {
+  [data-theme='auto'] {
+    --bg: #f6f0e9;
+    --bar: #eee6dc;
+    --s1: #fffcf8;
+    --s2: #f1e9e0;
+    --s3: #e6dcd1;
+    --line: #d9cbbd;
+    --line-soft: #e9dfd4;
+    --text: #2a1f18;
+    --text-2: #5f5147;
+    --text-3: #85766a;
+    --accent: #c45a30;
+    --accent-hover: #b04f29;
+    --on-accent: #ffffff;
+    --accent-text: #a4461f;
+    --accent-soft: rgba(196, 90, 48, 0.12);
+    --accent-soft-hover: rgba(196, 90, 48, 0.18);
+    --ok: #257346;
+    --ok-strong: #2e8553;
+    --ok-soft: rgba(46, 133, 83, 0.12);
+    --danger: #b23a2b;
+    --danger-strong: #c8463a;
+    --danger-soft: rgba(200, 70, 58, 0.11);
+    --warn: #8a5c00;
+    --warn-soft: rgba(233, 187, 104, 0.18);
+    --shadow: rgba(58, 36, 18, 0.18);
+    --scrim: rgba(42, 31, 24, 0.36);
+    --drop-scrim: rgba(246, 240, 233, 0.88);
+    color-scheme: light;
+  }
+}

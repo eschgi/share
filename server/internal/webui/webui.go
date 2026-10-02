@@ -91,6 +91,10 @@ func (u *UI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("Service-Worker-Allowed", "/")
 		u.file(w, r, "sw.js")
+	case p == "/theme-boot.js":
+		// Every page loads it before it is drawn; its name has no hash, so it is always checked.
+		w.Header().Set("Cache-Control", "no-cache")
+		u.file(w, r, "theme-boot.js")
 	case strings.HasPrefix(p, "/assets/"):
 		// Vite puts a content hash in every asset name, so these never change.
 		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")

@@ -24,8 +24,24 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(page(req));
   } else if (url.pathname.startsWith('/assets/')) {
     event.respondWith(asset(req));
+  } else if (url.pathname === '/theme-boot.js') {
+    event.respondWith(fresh(req));
   }
 });
+
+/** A file without a hash in its name: fresh when possible, the last copy otherwise. */
+async function fresh(req: Request): Promise<Response> {
+  const cache = await caches.open(cacheName);
+  try {
+    const res = await fetch(req);
+    if (res.ok) await cache.put(req, res.clone());
+    return res;
+  } catch (err) {
+    const cached = await cache.match(req);
+    if (cached) return cached;
+    throw err;
+  }
+}
 
 /**
  * The page: fresh from the network when possible, the last copy otherwise. That includes
