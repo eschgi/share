@@ -11,13 +11,15 @@ interface Props {
   name: string;
   session: Sender;
   onFiles: (f: File[]) => void;
+  /** A share didn't bring its files along: they have to be picked here. */
+  shareFailed?: boolean;
   /** With a PIN: stops using it, to enter another one. */
   onForgetPin?: () => void;
 }
 
 /** Screens 2, 3 and 29: ready to send; with a 24-hour PIN it also says until when it works, and
  * signed in, that no PIN is needed. */
-export function ReadyScreen({ name, session, onFiles, onForgetPin }: Props) {
+export function ReadyScreen({ name, session, onFiles, shareFailed, onForgetPin }: Props) {
   const { t, lang } = useI18n();
   const until = session.kind === 'pin' && session.pin_kind === 'day' && session.expires_at ? new Date(session.expires_at) : null;
   const computer = !useMedia(touchFirst);
@@ -36,6 +38,12 @@ export function ReadyScreen({ name, session, onFiles, onForgetPin }: Props) {
       </div>
       <div class="grow" />
       <div class="pane">
+        {shareFailed && (
+          <p class="help sharefail">
+            <Icon name="alert" />
+            {t('share.failed')}
+          </p>
+        )}
         {/* On computers a drop area; its picture and words only show there. */}
         <div class="drop">
           <span class="roundico">

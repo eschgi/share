@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import routes from '../../contract/web_routes.json';
-import { decide, isAppPath, nextAfterSignIn } from '../src/paths';
+import { sortShared, type Shared } from '../src/inbox';
+import { decide, isAppPath, nextAfterSignIn, shareTarget } from '../src/paths';
 
 describe('isAppPath', () => {
   it.each(routes.examples.page)('takes %s, as the server does', (p) => {
@@ -47,5 +48,20 @@ describe('nextAfterSignIn', () => {
     expect(nextAfterSignIn('?next=https%3A%2F%2Fevil.example%2Flibrary')).toBe('/library');
     expect(nextAfterSignIn('?next=%2F%2Fevil.example%2Flibrary')).toBe('/library');
     expect(nextAfterSignIn('?next=%2F%5Cevil.example')).toBe('/library');
+  });
+});
+
+describe('the share target', () => {
+  it('is where the manifest sends shared files, as the server says', () => {
+    expect(shareTarget).toEqual({ path: routes.share_target.path, field: routes.share_target.field });
+    expect(isAppPath(shareTarget.path)).toBe(false);
+  });
+  it('keeps shared files for a week', () => {
+    const day = 24 * 60 * 60 * 1000;
+    const now = 100 * day;
+    const shared = (key: number, daysAgo: number) => ({ key, batch: 'b', file: {} as File, at: now - daysAgo * day }) as Shared;
+    const { fresh, old } = sortShared([shared(1, 0), shared(2, 6.9), shared(3, 7.1)], now);
+    expect(fresh.map((s) => s.key)).toEqual([1, 2]);
+    expect(old.map((s) => s.key)).toEqual([3]);
   });
 });

@@ -6,6 +6,7 @@ import { useMedia } from '../../device';
 import { formatBytes } from '../../format';
 import { setSignedInHint } from '../../hint';
 import { useI18n } from '../../i18n';
+import { dropShared } from '../../incoming';
 import { useRoute } from '../../router';
 import { storedTheme, type ThemeChoice } from '../../theme';
 import { got, useAdminData, type AdminData } from '../admin/data';
@@ -189,7 +190,7 @@ function SettingsList({ data, current }: { data: AdminData; current?: Page }) {
       return setProblem(t(e instanceof ApiError && e.status > 0 ? 'common.failed' : 'common.offline'));
     }
     setSignedInHint(false);
-    await clearMarks();
+    await Promise.all([clearMarks(), dropShared()]);
     location.replace('/');
   };
 

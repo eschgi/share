@@ -3,6 +3,7 @@
 // queue that a closed page interrupted. The screens' steps are the PIN pages' (state.ts).
 import { useEffect, useState } from 'preact/hooks';
 import { getInfo } from '../../api';
+import { claimShared, sharedGone } from '../../incoming';
 import { initialState, reduce, type Action, type State } from '../../state';
 import { holdQueueLock, Uploader, type Snapshot } from '../../uploader';
 
@@ -35,10 +36,17 @@ export function startSender(signedOut: () => void): void {
           changed();
         },
         onRestored: () => dispatch({ type: 'restored' }),
+        onSharedGone: sharedGone,
       },
       keepQueue,
     );
     dispatch({ type: 'booted', session: { kind: 'account' }, sessionEnded: false });
+    // Files shared from other apps go out right away, from whichever page this is.
+    const shared = await claimShared();
+    if (shared.length > 0) {
+      uploader.addShared(shared);
+      dispatch({ type: 'filesAdded' });
+    }
   })().catch(() => {
     starting = null;
   });

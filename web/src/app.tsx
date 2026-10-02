@@ -5,6 +5,7 @@ import { Page } from './components/Page';
 import { useLeaveWarning } from './device';
 import { formatPercent } from './format';
 import { I18nContext, isLang, languages, makeI18n, pickLanguage, storeLanguage, storedLanguage, type Lang } from './i18n';
+import { claimShared, dropShared, shareFailed, sharedGone, type Shared } from './incoming';
 import { pinFromHash } from './pin';
 import { DoneScreen } from './screens/DoneScreen';
 import { PinScreen } from './screens/PinScreen';
@@ -36,6 +37,8 @@ export function App() {
   const [lang, setLang] = useState<Lang>(() => pickLanguage(languages, storedLanguage(), navigator.languages, 'en'));
   const [online, setOnline] = useState(navigator.onLine);
   const [rejected, setRejected] = useState<string[]>([]);
+  /** Files shared from other apps, waiting for a PIN that works. */
+  const [shared, setShared] = useState<Shared[]>([]);
   const [, setTick] = useState(0);
   const redraw = () => setTick((n) => n + 1);
   const uploader = useRef<Uploader | null>(null);
@@ -92,7 +95,9 @@ export function App() {
           onSessionEnded: (lost) => dispatch({ type: 'sessionEnded', lost }),
           onRejected: (name) => setRejected((r) => (r.includes(name) ? r : [...r, name])),
           onRestored: () => dispatch({ type: 'restored' }),
+          onSharedGone: sharedGone,
         }, keepQueue);
+        void claimShared().then(setShared);
         if (hashPin) {
           await doUnlock(hashPin);
           return;
@@ -113,6 +118,15 @@ export function App() {
       }),
     [lang, info],
   );
+
+  // Shared files go out as soon as a PIN works.
+  useEffect(() => {
+    if (shared.length === 0 || !uploader.current || (state.screen !== 'ready' && state.screen !== 'welcome')) return;
+    setRejected([]);
+    uploader.current.addShared(shared);
+    setShared([]);
+    dispatch({ type: 'filesAdded' });
+  }, [shared, state.screen]);
 
   const name = info?.name ?? 'Share';
   const snap = uploader.current?.snapshot() ?? null;
@@ -188,10 +202,25 @@ export function App() {
       );
       break;
     case 'pin':
-      screen = <PinScreen name={name} problem={state.problem} unlocking={state.unlocking} onSubmit={doUnlock} />;
+      screen = (
+        <PinScreen
+          name={name}
+          problem={state.problem}
+          unlocking={state.unlocking}
+          onSubmit={doUnlock}
+          waiting={shared.length}
+          shareFailed={shareFailed}
+          onDontSend={() => {
+            void dropShared(shared.map((s) => s.key));
+            setShared([]);
+          }}
+        />
+      );
       break;
     case 'ready':
-      screen = <ReadyScreen name={name} session={state.session!} onFiles={onFiles} onForgetPin={() => void forgetPin()} />;
+      screen = (
+        <ReadyScreen name={name} session={state.session!} onFiles={onFiles} shareFailed={shareFailed} onForgetPin={() => void forgetPin()} />
+      );
       break;
     case 'welcome':
       screen = (

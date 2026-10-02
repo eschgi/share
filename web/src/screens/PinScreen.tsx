@@ -11,6 +11,11 @@ interface Props {
   problem: PinProblem | null;
   unlocking: boolean;
   onSubmit: (code: string) => void;
+  /** Files shared from other apps that go once the PIN works. */
+  waiting?: number;
+  /** A share didn't bring its files along: they have to be picked after the PIN. */
+  shareFailed?: boolean;
+  onDontSend?: () => void;
 }
 
 /** The boxes turn red only when the PIN itself didn't work, not when the browser or the session is the problem. */
@@ -27,7 +32,7 @@ function pinWasWrong(problem: PinProblem | null): boolean {
 }
 
 /** Screen 1: five boxes, not case-sensitive, unlocks as soon as the fifth character is in. */
-export function PinScreen({ name, problem, unlocking, onSubmit }: Props) {
+export function PinScreen({ name, problem, unlocking, onSubmit, waiting = 0, shareFailed, onDontSend }: Props) {
   const { t, tn, lang } = useI18n();
   const [value, setValue] = useState('');
   const [focused, setFocused] = useState(false);
@@ -93,6 +98,23 @@ export function PinScreen({ name, problem, unlocking, onSubmit }: Props) {
       </div>
       <h1 class="hero">{t('pin.title')}</h1>
       <p class="lead">{t('pin.lead')}</p>
+      {waiting > 0 && (
+        <div class="sharedcard">
+          <Icon name="upload" />
+          <p>{tn('share.waiting', waiting)}</p>
+          {onDontSend && (
+            <button type="button" class="small link" onClick={onDontSend}>
+              {t('share.dontSend')}
+            </button>
+          )}
+        </div>
+      )}
+      {shareFailed && waiting === 0 && (
+        <p class="help">
+          <Icon name="alert" />
+          {t('share.failed')}
+        </p>
+      )}
       <label class={`pin ${message && pinWasWrong(problem) ? 'err' : ''}`}>
         <input
           ref={input}

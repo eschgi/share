@@ -3,6 +3,12 @@
   "pages": ["/", "/sign-in", "/library", "/send", "/settings"],
   "with_sub_pages": ["/library", "/send", "/settings"],
   "max_sub_segments": 3,
+  "share_target": {
+    "path": "/share-target",
+    "field": "files",
+    "fallback": "/send?share=failed",
+    "notes": "The manifest's share_target: Android's share sheet posts files there (multipart, field files) once the website is installed. The service worker takes them into IndexedDB and sends the browser to /send. Without a service worker the server answers 303 to the fallback without reading the files, and the Send page offers to pick them instead."
+  },
   "examples": {
     "page": [
       "/",

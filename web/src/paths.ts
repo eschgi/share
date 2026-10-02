@@ -1,6 +1,9 @@
 // The website's pages and where each one goes for whom. The server answers all of them with
 // this one page (contract/web_routes.json); this decides what it shows. Pure, for the tests.
 
+/** Where Android's share sheet posts files, in the field files (the manifest's share_target). */
+export const shareTarget = { path: '/share-target', field: 'files' };
+
 /** The pages of people with an account; each may have up to three more segments. */
 const accountPages = ['/library', '/send', '/settings'];
 const segment = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;

@@ -64,14 +64,35 @@ func New(cfg *config.Config) *UI {
 			{"src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png"},
 			{"src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
 		},
+		// Installed on Android, the website is in the share sheet. The service worker takes
+		// the files (web/src/sw.ts); they never come here.
+		"share_target": map[string]any{
+			"action":  ShareTarget,
+			"method":  "POST",
+			"enctype": "multipart/form-data",
+			"params":  map[string]any{"files": []map[string]any{{"name": "files", "accept": []string{"*/*"}}}},
+		},
 	})
 	return u
 }
+
+// ShareTarget is where the share sheet posts files (contract/web_routes.json). The service
+// worker answers it; when there is none, such as right after installing, the server sends the
+// browser to the Send page, which offers to pick the files instead, without reading them.
+const (
+	ShareTarget       = "/share-target"
+	ShareTargetFailed = "/send?share=failed"
+)
 
 // Built reports whether the website was embedded (npm run build ran before go build).
 func (u *UI) Built() bool { return u.built }
 
 func (u *UI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == ShareTarget {
+		setPageHeaders(w)
+		http.Redirect(w, r, ShareTargetFailed, http.StatusSeeOther)
+		return
+	}
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		w.Header().Set("Allow", "GET, HEAD")
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)

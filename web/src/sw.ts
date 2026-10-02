@@ -1,10 +1,11 @@
 /// <reference lib="webworker" />
 // The service worker. Golden Retriever's part keeps picked files in memory while the page
 // reloads, and takes over new versions right away. Ours keeps the page and its assets, so the
-// site (and an installed app) opens even without a connection and shows what is waiting.
-// Uploads and the API always go straight to the network.
+// site (and an installed app) opens even without a connection and shows what is waiting, and
+// takes files shared from other apps. Uploads and the API always go straight to the network.
 import '@uppy/golden-retriever/lib/ServiceWorker.js';
-import { isAppPath } from './paths';
+import { stash } from './inbox';
+import { isAppPath, shareTarget } from './paths';
 
 declare const self: ServiceWorkerGlobalScope;
 
@@ -18,9 +19,13 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
-  if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
+  if (req.method === 'POST' && url.pathname === shareTarget.path) {
+    event.respondWith(receiveShare(req));
+    return;
+  }
+  if (req.method !== 'GET') return;
   if (req.mode === 'navigate' && isAppPath(url.pathname)) {
     event.respondWith(page(req));
   } else if (url.pathname.startsWith('/assets/')) {
@@ -29,6 +34,21 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(fresh(req));
   }
 });
+
+/**
+ * Files from Android's share sheet: kept in the inbox, all of them or none, and the Send page
+ * sends them. They never go to the server this way.
+ */
+async function receiveShare(req: Request): Promise<Response> {
+  try {
+    const form = await req.formData();
+    const files = form.getAll(shareTarget.field).filter((f): f is File => f instanceof File && f.name !== '');
+    if (files.length > 0) await stash(files, crypto.randomUUID(), Date.now());
+    return Response.redirect('/send', 303);
+  } catch {
+    return Response.redirect('/send?share=failed', 303);
+  }
+}
 
 /** A file without a hash in its name: fresh when possible, the last copy otherwise. */
 async function fresh(req: Request): Promise<Response> {

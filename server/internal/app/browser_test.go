@@ -3,6 +3,7 @@ package app
 import (
 	"net/http"
 	"net/http/cookiejar"
+	"strings"
 	"testing"
 
 	"github.com/eschgi/share/server/internal/db"
@@ -68,6 +69,29 @@ func TestCookieRequestsMustComeFromAPage(t *testing.T) {
 	token, _ := e.unlockApp(pin.Code, "")
 	if r := e.do(nil, "POST", "/api/session/end", token, nil, nil); r.status != http.StatusNoContent {
 		t.Errorf("the app ending its session: %d %s", r.status, r.body)
+	}
+}
+
+func TestShareTargetWithoutServiceWorker(t *testing.T) {
+	e := newEnv(t)
+	pin := e.newPin(db.PinPermanent)
+	browser := e.webBrowser()
+	if r := e.postJSON(browser, "/api/pin/unlock", "", map[string]string{"code": pin.Code}, fromPage); r.status != http.StatusOK {
+		t.Fatalf("unlock: %d %s", r.status, r.body)
+	}
+	browser.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	share := func(site string) response {
+		body := "--x\r\nContent-Disposition: form-data; name=\"files\"; filename=\"a.jpg\"\r\n\r\nJPEG\r\n--x--\r\n"
+		return e.do(browser, "POST", "/share-target", "", strings.NewReader(body), map[string]string{
+			"Content-Type": "multipart/form-data; boundary=x", "Sec-Fetch-Site": site,
+		})
+	}
+	// Android's share sheet starts the request itself: Sec-Fetch-Site is none.
+	if r := share("none"); r.status != http.StatusSeeOther || r.header.Get("Location") != "/send?share=failed" {
+		t.Errorf("from the share sheet: %d to %q, want 303 to /send?share=failed", r.status, r.header.Get("Location"))
+	}
+	if r := share("cross-site"); r.status != http.StatusForbidden || r.errorCode() != "cross_origin" {
+		t.Errorf("from another site: %d %s, want 403 cross_origin", r.status, r.body)
 	}
 }
 

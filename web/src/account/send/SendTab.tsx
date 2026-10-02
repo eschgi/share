@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { InShell } from '../../components/Page';
 import { useI18n } from '../../i18n';
+import { shareFailed } from '../../incoming';
 import { DoneScreen } from '../../screens/DoneScreen';
 import { ReadyScreen } from '../../screens/ReadyScreen';
 import { SendingScreen } from '../../screens/SendingScreen';
@@ -30,7 +31,7 @@ export function SendTab() {
   let screen;
   switch (state.screen) {
     case 'ready':
-      screen = <ReadyScreen name={name} session={state.session!} onFiles={sendFiles} />;
+      screen = <ReadyScreen name={name} session={state.session!} onFiles={sendFiles} shareFailed={shareFailed} />;
       break;
     case 'welcome':
       screen = (

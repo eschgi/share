@@ -5,6 +5,7 @@ import Uppy, { type Body, type Meta, type UppyFile } from '@uppy/core';
 import GoldenRetriever, { type GoldenRetrieverOptions } from '@uppy/golden-retriever';
 import Tus from '@uppy/tus';
 import { errorCode, type Info } from './api';
+import type { Shared } from './inbox';
 import { dedupeBatches, matchGhosts, unbatched } from './restore';
 import { ThumbQueue } from './thumbs';
 
@@ -44,6 +45,8 @@ export interface UploaderEvents {
   onRejected(name: string): void;
   /** A queue the closed page interrupted came back and waits for continue(). */
   onRestored(): void;
+  /** A file shared from another app was sent, or given up: it can leave the inbox. */
+  onSharedGone?(key: number): void;
 }
 
 const MiB = 1 << 20;
@@ -97,6 +100,8 @@ export class Uploader {
   private waitingToContinue = false;
   /** Files picked on screen 5 that matched no ghost; they start with continue(). */
   private heldBack: File[] = [];
+  /** Files shared from other apps, with their key in the inbox. */
+  private readonly shared = new WeakMap<File, number>();
   private readonly thumbs = new ThumbQueue();
 
   /** keepQueue: this tab keeps the queue across a closed page (see holdQueueLock). */
@@ -156,14 +161,26 @@ export class Uploader {
     this.uppy.on('restriction-failed', (file) => {
       // Duplicates come this way too: a file picked or dropped twice is simply skipped.
       const max = info.max_file_size_bytes;
-      if (file && max > 0 && (file.size ?? 0) > max) events.onRejected(file.name ?? '');
+      if (file && max > 0 && (file.size ?? 0) > max) {
+        events.onRejected(file.name ?? '');
+        const key = file.data instanceof File ? this.shared.get(file.data) : undefined;
+        if (key !== undefined) events.onSharedGone?.(key);
+      }
     });
     this.uppy.on('state-update', () => this.changed());
     this.uppy.on('upload-success', (file, response) => {
       if (file) this.thumbnail(file, response.uploadURL);
+      const key = file?.meta.shareKey;
+      if (typeof key === 'string') events.onSharedGone?.(Number(key));
       this.checkDone();
     });
     this.uppy.on('complete', () => this.checkDone());
+  }
+
+  /** Queues files shared from other apps; each leaves the inbox once it is sent. */
+  addShared(files: Shared[]): void {
+    for (const s of files) this.shared.set(s.file, s.key);
+    this.add(files.map((s) => s.file));
   }
 
   /** Queues files; they start right away. A file matching a ghost continues its upload. */
@@ -180,6 +197,7 @@ export class Uploader {
     );
     for (const [id, file] of matched) {
       this.uppy.setFileState(id, { data: file, isGhost: false, error: null });
+      this.markShared(id, file);
       // Before continue() its restored batch takes it along. Afterwards that batch failed it
       // for lack of data, so it starts again, at the offset the server has.
       if (!this.waitingToContinue) this.uppy.retryUpload(id).catch(() => {});
@@ -193,7 +211,7 @@ export class Uploader {
     try {
       // All at once: one by one, a dropped folder of thousands of files gets slow, as each one
       // copies the whole list. Files that are too large or already there are left out.
-      this.uppy.addFiles(rest.map((f) => ({ name: f.name, type: f.type, data: f, source: 'Local' })));
+      this.uppy.addFiles(rest.map((f) => ({ name: f.name, type: f.type, data: f, source: 'Local', meta: this.shareMeta(f) })));
     } catch {
       // Only for errors other than restrictions; then none of the files were added.
     }
@@ -217,7 +235,11 @@ export class Uploader {
 
   /** Screen 5: drop the queue that came back, and its unfinished parts on the server. */
   startOver(): void {
-    for (const f of this.uppy.getFiles()) this.terminate(f);
+    for (const f of this.uppy.getFiles()) {
+      this.terminate(f);
+      const key = f.meta.shareKey;
+      if (typeof key === 'string' && !f.progress.uploadComplete) this.events.onSharedGone?.(Number(key));
+    }
     this.clear();
   }
 
@@ -288,6 +310,17 @@ export class Uploader {
     } else if (waited) {
       this.add(picked);
     }
+  }
+
+  /** A shared file keeps its inbox key in its meta, which also comes back after a closed page. */
+  private shareMeta(f: File): Meta {
+    const key = this.shared.get(f);
+    return key === undefined ? {} : { shareKey: String(key) };
+  }
+
+  private markShared(id: string, f: File): void {
+    const meta = this.shareMeta(f);
+    if (meta.shareKey) this.uppy.setFileMeta(id, meta);
   }
 
   /** Removes an unfinished upload from the server. */
