@@ -21,7 +21,8 @@ export interface Account {
   me: Me;
   /** Reads the person again, after a change such as a new password. */
   refreshMe: () => Promise<void>;
-  toast: (t: Toast) => void;
+  /** Says something for a few seconds; null takes it away. */
+  toast: (t: Toast | null) => void;
   /** Whether the language follows the browser, and how to choose: a language, or "auto". */
   languageAuto: boolean;
   chooseLanguage: (l: Lang | 'auto') => void;

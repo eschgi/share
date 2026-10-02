@@ -40,7 +40,14 @@
   contain-intrinsic-size: auto 480px;
 }
 .dayh {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   padding: 18px 4px 10px;
+}
+.dayh > div {
+  flex: 1;
+  min-width: 0;
 }
 .dayh h2 {
   margin: 0;
@@ -57,18 +64,224 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 3px;
 }
+/* A tile: the file, which opens it, and the circle that selects it. A selected tile draws back
+   from its neighbours, as in the phone's own gallery. A long press selects, so the browser's
+   own menu and text selection stay away. */
 .ltile {
   position: relative;
   aspect-ratio: 1;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  transition: transform 0.12s ease-out;
+}
+.ltile.sel {
+  transform: scale(0.86);
+}
+.lopen {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
   padding: 0;
   overflow: hidden;
   border: 0;
   border-radius: 4px;
   background: var(--s1);
 }
-.ltile:focus-visible {
+.ltile.sel .lopen {
+  border-radius: 12px;
+}
+.lopen img {
+  pointer-events: none;
+}
+.lopen:focus-visible {
   outline: 2px solid var(--accent-text);
   outline-offset: 2px;
+}
+.selm {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  display: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.18);
+  color: #fff;
+}
+.ltile:has(.thumb.doc) .selm {
+  border-color: var(--text-3);
+  background: none;
+}
+.selm.on,
+.ltile:has(.thumb.doc) .selm.on {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.selm .ic {
+  width: 13px;
+  height: 13px;
+  stroke-width: 3.4;
+}
+.ltile.selecting .selm {
+  display: grid;
+}
+@media (hover: hover) {
+  .ltile:hover .selm {
+    display: grid;
+  }
+}
+/* A day's circle: all of the day, some of it, or none. */
+.dsel {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  margin: -10px -10px -10px 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+}
+.dsel::before {
+  content: '';
+  position: absolute;
+  inset: 10px;
+  border: 2px solid var(--text-3);
+  border-radius: 50%;
+}
+.dsel.all::before {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.dsel.some::before {
+  border-color: var(--accent-text);
+}
+.dsel .ic {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  stroke-width: 3.2;
+}
+.dsel.all .ic {
+  color: var(--on-accent);
+}
+.dsel.some .ic {
+  color: var(--accent-text);
+}
+.dsel:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: -4px;
+}
+.tipbar {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 10px 0 0;
+  padding: 11px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 14px;
+  background: var(--s1);
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.tipbar .ic {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  margin-top: 1px;
+  color: var(--accent-text);
+}
+
+/* While selecting on a phone, the title bar counts and the bottom bar acts, as in the app. */
+.ab.ctx {
+  gap: 4px;
+  padding-left: max(8px, env(safe-area-inset-left));
+  background: var(--s1);
+}
+.ab.ctx h1 {
+  margin-left: 4px;
+  font-family: var(--sans);
+  font-size: 20px;
+  font-weight: 500;
+}
+.shell.selecting .nav,
+.lib.selecting .chips {
+  display: none;
+}
+.selbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 11;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px max(16px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  border-top: 1px solid var(--line-soft);
+  background: var(--bar);
+}
+.abtn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 16px;
+  background: var(--s2);
+  color: var(--text);
+}
+.abtn .ic {
+  width: 22px;
+  height: 22px;
+}
+.abtn.danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.abtn .lbl {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.abtn:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
+.selbar .sel-dl {
+  flex: 1;
+  width: auto;
+  height: 56px;
+  margin: 0;
+  border-radius: 16px;
+  font-size: 16.5px;
+  white-space: nowrap;
+}
+.sel-dl small {
+  font-size: 14px;
+  font-weight: 500;
+  opacity: 0.8;
+}
+@media (max-width: 639.98px), (max-height: 539.98px) {
+  .sel-wide {
+    display: none !important;
+  }
 }
 .thumb {
   display: block;
@@ -257,8 +470,94 @@ span.thumb {
     grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
     gap: 6px;
   }
-  .ltile {
+  .lopen {
     border-radius: 8px;
+  }
+  .ltile.sel .lopen {
+    border-radius: 14px;
+  }
+  .selm {
+    top: 9px;
+    left: 9px;
+    width: 24px;
+    height: 24px;
+  }
+  .dayh {
+    padding-right: 2px;
+  }
+
+  /* The selection's actions float at the bottom of the window (screen 25). */
+  .lib.selecting .chips {
+    display: flex;
+  }
+  .lib.selecting {
+    padding-bottom: 110px;
+  }
+  .selbar {
+    left: 50%;
+    right: auto;
+    bottom: 30px;
+    width: max-content;
+    max-width: calc(100% - 64px);
+    padding: 10px 12px 10px 8px;
+    border: 1px solid var(--line);
+    border-radius: 22px;
+    background: var(--s2);
+    box-shadow: 0 20px 60px var(--shadow);
+    transform: translateX(-50%);
+  }
+  .selbar > b {
+    font-size: 17px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .sel-size {
+    margin-right: 6px;
+    color: var(--text-3);
+    font-size: 14.5px;
+    white-space: nowrap;
+  }
+  .selbar .gap {
+    flex: 1;
+    min-width: 24px;
+  }
+  .abtn,
+  .abtn.danger {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: auto;
+    height: 46px;
+    padding: 0 16px;
+    border: 1.5px solid var(--line);
+    border-radius: 14px;
+    background: none;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .abtn .ic {
+    width: 19px;
+    height: 19px;
+  }
+  .abtn .lbl {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+  }
+  .selbar .sel-dl {
+    flex: none;
+    height: 46px;
+    padding: 0 20px;
+    border-radius: 14px;
+    font-size: 16px;
+  }
+  .sel-phone {
+    display: none;
+  }
+  body:has(.selbar) .toast {
+    bottom: 110px;
   }
   .fname {
     font-size: 12.5px;

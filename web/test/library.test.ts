@@ -153,3 +153,16 @@ describe('LibraryModel', () => {
     expect(server.calls[0]).toMatchObject({ cursor: 'c1' });
   });
 });
+
+describe('LibraryModel.remove', () => {
+  it('takes deleted files out of the list and the days', async () => {
+    const server = new FakeServer();
+    const m = new LibraryModel(server.requests);
+    void m.reload();
+    await server.answer(overview(1, [['2026-10-02', 2, 300], ['2026-10-01', 1, 100]]));
+    await server.answer({ files: [file('a', '2026-10-02', 100), file('b', '2026-10-02', 200), file('c', '2026-10-01', 100)], next_cursor: null });
+    m.remove(['b', 'c']);
+    expect(m.files.map((f) => f.id)).toEqual(['a']);
+    expect(m.overview?.days).toEqual([{ day: '2026-10-02', count: 1, bytes: 100 }]);
+  });
+});

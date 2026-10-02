@@ -243,3 +243,42 @@ export const contentUrl = (f: FileInfo) => `/api/files/${encodeURIComponent(f.id
 
 /** A file's thumbnail; its address changes when a better one arrives, so it can be cached. */
 export const thumbUrl = (f: FileInfo) => `/api/files/${encodeURIComponent(f.id)}/thumb?v=${Date.parse(f.updated_at).toString(36)}`;
+
+export const getFile = (id: string) => request<FileInfo>('GET', `/api/files/${encodeURIComponent(id)}`);
+
+/** Every file of a day that the filter shows, for selecting the day as a whole. */
+export const getFileIds = (f: LibraryFilter, day: string) =>
+  request<{ ids: string[]; bytes: number }>('GET', '/api/files/ids' + libraryQuery(f, { day }));
+
+/** Several files as one ZIP: the archive's name, its exact size, and each file's path in it. */
+export interface ZipDownload {
+  id: string;
+  name: string;
+  size: number;
+  count: number;
+  files: { id: string; path: string; size: number }[];
+}
+
+export const createDownload = (ids: string[]) => request<ZipDownload>('POST', '/api/downloads', { ids });
+
+export const zipUrl = (d: ZipDownload) => `/api/downloads/${encodeURIComponent(d.id)}`;
+
+/** Admins: files go to Recently deleted, and come back from there. At most 1000 ids at once. */
+export const deleteFiles = (ids: string[]) => request<{ changed: number }>('POST', '/api/files/delete', { ids });
+
+export const restoreFiles = (ids: string[]) => request<{ changed: number }>('POST', '/api/trash/restore', { ids });
+
+/** Admins: the drive, the library and Recently deleted. */
+export interface Storage {
+  storage_dir: string;
+  fs_type: string;
+  total_bytes: number;
+  free_bytes: number;
+  files: number;
+  bytes: number;
+  trash_files: number;
+  trash_bytes: number;
+  trash_days: number;
+}
+
+export const getStorage = () => request<Storage>('GET', '/api/admin/storage');

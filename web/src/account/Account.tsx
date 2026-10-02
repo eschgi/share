@@ -22,6 +22,7 @@ import type { AccountProps } from '../root';
 import { navigate, useRoute } from '../router';
 import { ToastView } from './components/Bits';
 import { AccountContext, type Account as AccountState, type Toast } from './context';
+import { ToastContext, useAnyLayer } from './layers';
 import de from './i18n/de.json';
 import en from './i18n/en.json';
 import it from './i18n/it.json';
@@ -131,11 +132,16 @@ export function Account({ me: first, notice }: AccountProps) {
   const state: AccountState | null = me
     ? { info, me, refreshMe, toast: setToast, languageAuto: stored === null || !isLang(stored), chooseLanguage }
     : null;
+  // While a dialog is open, the toast is drawn on it (layers.ts).
+  const layered = useAnyLayer();
+  const toastView = toast && <ToastView text={toast.text} action={toast.action} onDone={() => setToast(null)} />;
   return (
     <I18nContext.Provider value={i18n}>
       <AccountContext.Provider value={state}>
-        {page}
-        {toast && <ToastView text={toast.text} action={toast.action} onDone={() => setToast(null)} />}
+        <ToastContext.Provider value={toastView}>
+          {page}
+          {!layered && toastView}
+        </ToastContext.Provider>
       </AccountContext.Provider>
     </I18nContext.Provider>
   );

@@ -1,12 +1,16 @@
 import type { ComponentChildren } from 'preact';
-import { useId, useLayoutEffect, useRef } from 'preact/hooks';
-import { Icon } from '../../components/Icon';
+import { useContext, useId, useLayoutEffect, useRef } from 'preact/hooks';
+import { Bold } from '../../components/Bits';
+import { Icon, type IconName } from '../../components/Icon';
 import { useI18n } from '../../i18n';
 import { useOverlay } from '../../router';
+import { ToastContext, useLayer } from '../layers';
 import { lockScroll } from '../scroll';
 
 interface Props {
   title: string;
+  /** A picture before the title, such as the bin when deleting. */
+  icon?: IconName;
   onClose: () => void;
   wide?: boolean;
   children: ComponentChildren;
@@ -17,10 +21,12 @@ interface Props {
  * bigger screens. Render it only while open. It is a real <dialog>, so the page behind is out
  * of reach and Escape closes it; Back closes it too, and the focus goes back where it was.
  */
-export function Modal({ title, onClose, wide, children }: Props) {
+export function Modal({ title, icon, onClose, wide, children }: Props) {
   const { t } = useI18n();
   const ref = useRef<HTMLDialogElement>(null);
   const id = useId();
+  const top = useLayer();
+  const toast = useContext(ToastContext);
   useOverlay(true, onClose);
   useLayoutEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
@@ -45,6 +51,11 @@ export function Modal({ title, onClose, wide, children }: Props) {
       <div class="modal-panel">
         <div class="grip" />
         <header class="modal-head">
+          {icon && (
+            <span class="dico">
+              <Icon name={icon} />
+            </span>
+          )}
           <h2 id={id}>{title}</h2>
           <button type="button" class="ib" aria-label={t('common.close')} onClick={onClose}>
             <Icon name="x" />
@@ -52,13 +63,16 @@ export function Modal({ title, onClose, wide, children }: Props) {
         </header>
         {children}
       </div>
+      {top && toast}
     </dialog>
   );
 }
 
 interface ConfirmProps {
   title: string;
+  /** May mark a phrase with <b>…</b>. */
   body: string;
+  icon?: IconName;
   confirm: string;
   /** A red button, for what can't be taken back. */
   danger?: boolean;
@@ -69,11 +83,13 @@ interface ConfirmProps {
 }
 
 /** Asks before doing something that affects others or can't be undone, as the app does. */
-export function Confirm({ title, body, confirm, danger, busy, problem, onConfirm, onClose }: ConfirmProps) {
+export function Confirm({ title, body, icon, confirm, danger, busy, problem, onConfirm, onClose }: ConfirmProps) {
   const { t } = useI18n();
   return (
-    <Modal title={title} onClose={onClose}>
-      <p class="modal-text">{body}</p>
+    <Modal title={title} icon={icon} onClose={onClose}>
+      <p class="modal-text">
+        <Bold text={body} />
+      </p>
       {problem && (
         <p class="help err" role="alert">
           <Icon name="alert" />

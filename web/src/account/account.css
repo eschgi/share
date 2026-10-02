@@ -443,6 +443,21 @@
   line-height: 1.25;
   text-wrap: balance;
 }
+/* Before the title of a dialog that deletes: the bin. */
+.dico {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.dico .ic {
+  width: 22px;
+  height: 22px;
+}
 .modal-text {
   margin: 0;
   color: var(--text-2);

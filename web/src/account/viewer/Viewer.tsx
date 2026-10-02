@@ -1,5 +1,5 @@
 import './viewer.css';
-import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
+import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { contentUrl, thumbUrl, type FileInfo } from '../../api';
 import { Icon } from '../../components/Icon';
 import { formatBytes, formatDay, formatDuration, formatTime } from '../../format';
@@ -8,6 +8,7 @@ import { useOverlay } from '../../router';
 import { Modal } from '../components/Modal';
 import { useMedia } from '../media';
 import { Thumb } from '../library/Tile';
+import { ToastContext, useLayer } from '../layers';
 import { lockScroll } from '../scroll';
 import { filmRange, previewOf, swipeStep } from './view';
 
@@ -19,6 +20,8 @@ interface Props {
   more?: () => void;
   onMove: (id: string) => void;
   onClose: () => void;
+  /** Admins: asks to delete the file shown. */
+  onDelete?: (file: FileInfo) => void;
 }
 
 /** Whether the details are open: beside the picture on computers, where there's room, at first. */
@@ -31,12 +34,14 @@ const wideQuery = '(min-width: 1024px) and (min-height: 540px)';
  * the original is there, videos and sound play right here. Arrows, swipes and the film strip
  * go to the others; Back and Escape close it.
  */
-export function Viewer({ files, id, more, onMove, onClose }: Props) {
+export function Viewer({ files, id, more, onMove, onClose, onDelete }: Props) {
   const { t, lang } = useI18n();
   const ref = useRef<HTMLDialogElement>(null);
   const wide = useMedia(wideQuery);
   const [details, setDetails] = useState(() => detailsOpen ?? matchMedia(wideQuery).matches);
   const start = useRef<{ x: number; y: number } | null>(null);
+  const top = useLayer();
+  const toast = useContext(ToastContext);
   useOverlay(true, onClose);
 
   useLayoutEffect(() => {
@@ -137,6 +142,14 @@ export function Viewer({ files, id, more, onMove, onClose }: Props) {
         </div>
         <span class="wide-only">{download}</span>
         <span class="wide-only">{detailsButton}</span>
+        {onDelete && (
+          <span class="wide-only">
+            <button type="button" class="vbtn" onClick={() => onDelete(file)}>
+              <Icon name="trash" />
+              {t('select.delete')}
+            </button>
+          </span>
+        )}
         <button type="button" class="ib narrow-only" aria-label={t('viewer.details')} onClick={toggleDetails}>
           <Icon name="info" />
         </button>
@@ -192,6 +205,12 @@ export function Viewer({ files, id, more, onMove, onClose }: Props) {
           <Icon name="info" />
           {t('viewer.details')}
         </button>
+        {onDelete && (
+          <button type="button" onClick={() => onDelete(file)}>
+            <Icon name="trash" />
+            {t('select.delete')}
+          </button>
+        )}
       </nav>
       {details && wide && (
         <aside class="vside">
@@ -204,6 +223,7 @@ export function Viewer({ files, id, more, onMove, onClose }: Props) {
           <div class="vfacts">{facts}</div>
         </Modal>
       )}
+      {top && toast}
     </dialog>
   );
 }

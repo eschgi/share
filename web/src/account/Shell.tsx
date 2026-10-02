@@ -17,6 +17,8 @@ interface Props {
   tab: Tab;
   /** Extra things for the header on bigger screens, such as the library's search. */
   tools?: ComponentChildren;
+  /** Files are being selected: on a phone their actions take the bottom bar's place. */
+  selecting?: boolean;
   children: ComponentChildren;
 }
 
@@ -24,7 +26,7 @@ interface Props {
  * The frame of the account's pages: the app's three places. On a phone they are the app's
  * bottom bar, with each page's title bar on top; on bigger screens a header across the window.
  */
-export function Shell({ tab, tools, children }: Props) {
+export function Shell({ tab, tools, selecting, children }: Props) {
   const { t } = useI18n();
   const { info, me } = useAccount();
   const title = `${t(tabs.find((x) => x.tab === tab)!.label)} · ${info?.name ?? 'Share'}`;
@@ -41,7 +43,7 @@ export function Shell({ tab, tools, children }: Props) {
       </Link>
     ));
   return (
-    <div class="shell">
+    <div class={`shell${selecting ? ' selecting' : ''}`}>
       <header class="ahd">
         <Link href="/library" class="brand">
           <Icon name="images" />

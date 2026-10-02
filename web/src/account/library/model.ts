@@ -119,6 +119,23 @@ export class LibraryModel {
     }
   }
 
+  /** Takes files out of the list, and out of their days' totals, after they were deleted. */
+  remove(ids: readonly string[]): void {
+    const gone = new Set(ids);
+    const removed = this.files.filter((f) => gone.has(f.id));
+    if (removed.length === 0) return;
+    this.files = this.files.filter((f) => !gone.has(f.id));
+    for (const f of removed) this.shown.delete(f.id);
+    if (this.overview) {
+      const days = this.overview.days.map((d) => {
+        const out = removed.filter((f) => f.day === d.day);
+        return { ...d, count: d.count - out.length, bytes: d.bytes - out.reduce((s, f) => s + f.size, 0) };
+      });
+      this.overview = { ...this.overview, days: days.filter((d) => d.count > 0) };
+    }
+    this.changed();
+  }
+
   private add(files: FileInfo[], onTop: boolean): void {
     const fresh = files.filter((f) => !this.shown.has(f.id));
     for (const f of fresh) this.shown.add(f.id);
