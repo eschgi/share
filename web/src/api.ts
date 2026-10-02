@@ -105,6 +105,9 @@ export interface UnlockResult {
 
 export const unlock = (code: string) => request<UnlockResult>('POST', '/api/pin/unlock', { code, client: 'web' });
 
+/** Stops using the PIN in this browser: the server ends the session and drops its cookie. */
+export const endSession = () => request<void>('POST', '/api/session/end', {});
+
 export interface InvitePeek {
   inviter: string | null; // null for invites made on the server's console
   name: string;

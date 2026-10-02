@@ -7,9 +7,17 @@ import { useI18n } from '../i18n';
 import type { Sender } from '../state';
 import { FilePicker } from './FilePicker';
 
+interface Props {
+  name: string;
+  session: Sender;
+  onFiles: (f: File[]) => void;
+  /** With a PIN: stops using it, to enter another one. */
+  onForgetPin?: () => void;
+}
+
 /** Screens 2, 3 and 29: ready to send; with a 24-hour PIN it also says until when it works, and
  * signed in, that no PIN is needed. */
-export function ReadyScreen({ name, session, onFiles }: { name: string; session: Sender; onFiles: (f: File[]) => void }) {
+export function ReadyScreen({ name, session, onFiles, onForgetPin }: Props) {
   const { t, lang } = useI18n();
   const until = session.kind === 'pin' && session.pin_kind === 'day' && session.expires_at ? new Date(session.expires_at) : null;
   const computer = !useMedia(touchFirst);
@@ -39,6 +47,11 @@ export function ReadyScreen({ name, session, onFiles }: { name: string; session:
           {computer && <FilePicker label={t('ready.chooseFolder')} look="link" icon="folder" directory onFiles={onFiles} />}
         </div>
         <p class="small">{t(until ? 'ready.private' : 'ready.tip')}</p>
+        {session.kind === 'pin' && onForgetPin && (
+          <button type="button" class="small link" onClick={onForgetPin}>
+            {t('pin.useAnother')}
+          </button>
+        )}
       </div>
     </Page>
   );

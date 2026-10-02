@@ -11,10 +11,12 @@ interface Props {
   /** Offer to install the site as an app: only with a permanent PIN, which lasts. */
   offerInstall: boolean;
   onMore: () => void;
+  /** With a PIN: stops using it, to enter another one. */
+  onForgetPin?: () => void;
 }
 
 /** Screen 6: a clear end, with totals. */
-export function DoneScreen({ name, files, bytes, offerInstall, onMore }: Props) {
+export function DoneScreen({ name, files, bytes, offerInstall, onMore, onForgetPin }: Props) {
   const { t, tn, lang } = useI18n();
   const install = useInstall();
   // A computer installs it as an app in its own window, a phone puts it on the home screen.
@@ -55,6 +57,11 @@ export function DoneScreen({ name, files, bytes, offerInstall, onMore }: Props) 
         {t('done.more')}
       </button>
       <p class="small">{t('done.close')}</p>
+      {onForgetPin && (
+        <button type="button" class="small link" onClick={onForgetPin}>
+          {t('pin.useAnother')}
+        </button>
+      )}
     </Page>
   );
 }

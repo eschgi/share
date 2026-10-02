@@ -29,6 +29,14 @@ describe('screen flow', () => {
     expect(s).toMatchObject({ screen: 'ready', done: null });
   });
 
+  it('goes back to the PIN screen for another PIN, from ready or done', () => {
+    const ready = run({ type: 'booted', session, sessionEnded: false }, { type: 'pinForgotten' });
+    expect(ready).toMatchObject({ screen: 'pin', session: null, problem: null });
+    const done = run({ type: 'booted', session, sessionEnded: false }, { type: 'filesAdded' }, { type: 'allDone', files: 2, bytes: 10 }, { type: 'pinForgotten' });
+    expect(done).toMatchObject({ screen: 'pin', session: null, problem: null, done: null });
+    expect(reduce(done, { type: 'unlocked', session }).screen).toBe('ready');
+  });
+
   it('keeps the PIN screen after a wrong try', () => {
     const s = run(
       { type: 'booted', session: null, sessionEnded: false },

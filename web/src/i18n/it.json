@@ -13,6 +13,7 @@
   "pin.unlock": "Sblocca",
   "pin.link": "Hai un link? Aprilo e il PIN si inserisce da solo.",
   "pin.signIn": "Hai un account? Accedi",
+  "pin.useAnother": "Usa un altro PIN",
   "pin.wrong.one": "Questo PIN non ha funzionato. Ancora 1 tentativo.",
   "pin.wrong.other": "Questo PIN non ha funzionato. Ancora {n} tentativi.",
   "pin.wrongPlain": "Questo PIN non ha funzionato.",

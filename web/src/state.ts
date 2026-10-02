@@ -44,7 +44,9 @@ export type Action =
   | { type: 'allDone'; files: number; bytes: number }
   /** lost: the server got no session at all, rather than one whose PIN ended. */
   | { type: 'sessionEnded'; lost?: boolean }
-  | { type: 'sendMore' };
+  | { type: 'sendMore' }
+  /** The person wants to use another PIN; this one's session is over. */
+  | { type: 'pinForgotten' };
 
 export const initialState: State = {
   screen: 'boot',
@@ -99,5 +101,7 @@ export function reduce(s: State, a: Action): State {
       };
     case 'sendMore':
       return { ...s, screen: 'ready', done: null };
+    case 'pinForgotten':
+      return { ...s, screen: 'pin', session: null, problem: null, restored: false, waitingForPin: false, done: null };
   }
 }

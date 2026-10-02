@@ -13,6 +13,7 @@
   "pin.unlock": "Entsperren",
   "pin.link": "Du hast einen Link? Öffne ihn, dann ist das schon ausgefüllt.",
   "pin.signIn": "Du hast ein Konto? Melde dich an",
+  "pin.useAnother": "Eine andere PIN verwenden",
   "pin.wrong.one": "Diese PIN hat nicht funktioniert. Noch 1 Versuch.",
   "pin.wrong.other": "Diese PIN hat nicht funktioniert. Noch {n} Versuche.",
   "pin.wrongPlain": "Diese PIN hat nicht funktioniert.",

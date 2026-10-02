@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'preact/hooks';
-import { ApiError, getInfo, getSession, unlock, type Info } from './api';
+import { ApiError, endSession, getInfo, getSession, unlock, type Info } from './api';
 import { DropZone } from './components/DropZone';
 import { Page } from './components/Page';
 import { useLeaveWarning } from './device';
@@ -141,6 +141,13 @@ export function App() {
     uploader.current?.clear();
     dispatch({ type: 'sendMore' });
   };
+  // Only between batches. Without the server's answer the old PIN's cookie stays, but the next
+  // PIN replaces it.
+  const forgetPin = async () => {
+    await endSession().catch(() => {});
+    uploader.current?.clear();
+    dispatch({ type: 'pinForgotten' });
+  };
 
   // Where files dropped on the page go: wherever files can be picked, and on screen 5 only the
   // ones to pick again. Never before a PIN works.
@@ -184,7 +191,7 @@ export function App() {
       screen = <PinScreen name={name} problem={state.problem} unlocking={state.unlocking} onSubmit={doUnlock} />;
       break;
     case 'ready':
-      screen = <ReadyScreen name={name} session={state.session!} onFiles={onFiles} />;
+      screen = <ReadyScreen name={name} session={state.session!} onFiles={onFiles} onForgetPin={() => void forgetPin()} />;
       break;
     case 'welcome':
       screen = (
@@ -225,6 +232,7 @@ export function App() {
           bytes={state.done!.bytes}
           offerInstall={state.session?.kind === 'pin' && state.session.pin_kind === 'permanent'}
           onMore={sendMore}
+          onForgetPin={state.session?.kind === 'pin' ? () => void forgetPin() : undefined}
         />
       );
       break;
