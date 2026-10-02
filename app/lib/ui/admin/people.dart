@@ -11,6 +11,7 @@ import '../icons.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'invite_person_screen.dart';
+import 'new_password.dart';
 
 /// Screen 17's people: everyone with an account, then the invites nobody has used yet.
 class PeopleGroup extends StatelessWidget {
@@ -138,6 +139,18 @@ class _PersonSheetState extends State<PersonSheet> {
     }
   }
 
+  Future<void> _newPassword() async {
+    final admin = Services.read(context).admin;
+    await showDialog<void>(context: context, builder: (_) => NewPasswordDialog(person: _person));
+    // The username may be new: the sheet shows it.
+    try {
+      final now = (await admin.people()).users.where((u) => u.id == _person.id).firstOrNull;
+      if (now != null && mounted) setState(() => _person = now);
+    } on Exception {
+      // As it was, then.
+    }
+  }
+
   Future<void> _remove() async {
     final t = AppLocalizations.of(context);
     final admin = Services.read(context).admin;
@@ -184,6 +197,14 @@ class _PersonSheetState extends State<PersonSheet> {
               trailing: const SizedBox(),
               onTap: _busy ? null : () => _role(p.isAdmin ? Role.member : Role.admin),
             ),
+            if (!p.isMe)
+              SettingsRow(
+                leading: SettingsRow.icon(context, AppIcons.key),
+                title: t.personNewPassword,
+                subtitle: p.hasPassword ? t.personNewPasswordForgot(p.name) : t.personNewPasswordFirst,
+                trailing: const SizedBox(),
+                onTap: _busy ? null : _newPassword,
+              ),
             if (!p.isMe)
               SettingsRow(
                 leading: SettingsRow.icon(context, AppIcons.userX),

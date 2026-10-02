@@ -613,6 +613,57 @@
     }
   },
   "personSignOutBody": "To come back it needs a new invite or the password.",
+  "personNewPassword": "Set a new password",
+  "personNewPasswordForgot": "If {name} forgot it",
+  "@personNewPasswordForgot": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "personNewPasswordFirst": "For signing in on other phones and in browsers",
+  "newPasswordTitle": "New password for {name}",
+  "@newPasswordTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "newPasswordLead": "Share makes up a password for this username. The phones and browsers of {name} stay signed in.",
+  "@newPasswordLead": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "newPasswordMake": "Make a password",
+  "newPasswordShownOnce": "Shown only now. Hand it to {name} in person or in a private message; it can be changed in Settings.",
+  "@newPasswordShownOnce": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "newPasswordCopied": "Copied",
+  "newPasswordSend": "Send in a message",
+  "newPasswordShareText": "Your sign-in for {server}: username {username}, password {password}",
+  "@newPasswordShareText": {
+    "placeholders": {
+      "server": {
+        "type": "String"
+      },
+      "username": {
+        "type": "String"
+      },
+      "password": {
+        "type": "String"
+      }
+    }
+  },
   "myDevicesTitle": "Your phones and browsers",
   "myDevicesLead": "Where you're signed in. Sign out a phone or browser you no longer use, or one on someone else's computer.",
   "personRemove": "Remove {name}",

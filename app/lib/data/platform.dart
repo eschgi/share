@@ -238,6 +238,9 @@ abstract class Platform {
   /// Hands text to another app (a messenger, mail), e.g. an invite link.
   Future<void> shareText(String text);
 
+  /// Copies a password: Android 13 and later hide it in the clipboard's preview.
+  Future<void> copySecret(String text);
+
   /// Starts saving files to the phone and returns the batch id.
   Future<String> download(List<FileInfo> files);
   Future<void> cancelDownloads(String batch);
@@ -393,6 +396,9 @@ class ChannelPlatform implements Platform {
 
   @override
   Future<void> shareText(String text) => _soft('text.share', {'text': text});
+
+  @override
+  Future<void> copySecret(String text) => _soft('clipboard.secret', {'text': text});
 
   @override
   Future<String> download(List<FileInfo> files) async =>

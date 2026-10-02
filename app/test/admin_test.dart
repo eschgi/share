@@ -157,6 +157,46 @@ void main() {
     expect(server.myDevices.map((d) => d['name']), ['Pixel 8']);
   });
 
+  testWidgets('a new password for someone: the username first, then shown once', (tester) async {
+    final server = adminServer();
+    final platform = signedInPhone();
+    await startApp(tester, platform, server);
+    await openSettings(tester);
+    await tester.tap(find.text('Maria'));
+    await tester.pumpAndSettle();
+    expect(find.text('For signing in on other phones and in browsers'), findsOneWidget, reason: 'Maria has no password yet');
+    await tester.tap(find.text('Set a new password'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(TextField, 'maria'), findsOneWidget, reason: 'suggested from the name');
+
+    await tester.enterText(find.byType(TextField), 'stefan');
+    await tester.tap(find.text('Make a password'));
+    await tester.pumpAndSettle();
+    expect(find.text('Someone else has that username.'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'maria.rossi');
+    await tester.tap(find.text('Make a password'));
+    await tester.pumpAndSettle();
+    final password = contractResponse('api/user_password.json')['password'] as String;
+    expect(find.text('maria.rossi'), findsOneWidget);
+    expect(find.text(password), findsOneWidget);
+    await tester.tap(find.byTooltip('Password'));
+    await tester.pumpAndSettle();
+    expect(platform.copiedSecrets, [password], reason: 'copied as a secret, hidden in the clipboard preview');
+    await tester.tap(find.text('Send in a message'));
+    expect(platform.sharedTexts.single, 'Your sign-in for share.example.com: username maria.rossi, password $password');
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
+    expect(find.text('@maria.rossi'), findsOneWidget);
+    expect(find.text('If Maria forgot it'), findsOneWidget);
+
+    // Not for oneself.
+    await tester.tapAt(const Offset(10, 10)); // the sheet closes
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Stefan').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Set a new password'), findsNothing);
+  });
+
   testWidgets('the only admin stays one', (tester) async {
     await startApp(tester, signedInPhone(), adminServer());
     await openSettings(tester);

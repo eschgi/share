@@ -37,6 +37,13 @@ class AdminRepository {
 
   Future<void> signOutPhone(String phoneId) => api.delete('/api/devices/$phoneId');
 
+  /// Makes up a new password for someone else, shown once; [username] is needed if they have
+  /// none. Throws ApiException username_taken or bad_request for a username that won't do.
+  Future<({String username, String password})> newPassword(String userId, {String? username}) async {
+    final r = await api.post('/api/users/$userId/password', {'username': ?username});
+    return (username: r['username'] as String? ?? '', password: r['password'] as String? ?? '');
+  }
+
   Future<NewInvite> invite(String name, Role role) async =>
       NewInvite.fromJson(await api.post('/api/invites', {'name': name.trim(), 'role': role.name}));
 

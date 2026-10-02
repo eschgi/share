@@ -85,6 +85,11 @@ class FakePlatform implements Platform {
   @override
   Future<void> shareText(String text) async => sharedTexts.add(text);
 
+  final copiedSecrets = <String>[];
+
+  @override
+  Future<void> copySecret(String text) async => copiedSecrets.add(text);
+
   @override
   Future<String> download(List<FileInfo> files) async {
     downloads.add(files);

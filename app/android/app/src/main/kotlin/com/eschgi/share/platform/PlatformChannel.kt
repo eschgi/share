@@ -4,12 +4,15 @@ import android.Manifest
 import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.ClipData
+import android.content.ClipDescription
+import android.content.ClipboardManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.PersistableBundle
 import android.provider.Settings
 import android.util.Log
 import android.view.WindowManager
@@ -141,6 +144,15 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
                 } catch (e: ActivityNotFoundException) {
                     result.error("no_app", e.message, null)
                 }
+            }
+            "clipboard.secret" -> {
+                // A password: Android 13 and later don't show it in the clipboard's preview.
+                val clip = ClipData.newPlainText("", call.argument<String>("text"))
+                clip.description.extras = PersistableBundle().apply {
+                    putBoolean(if (Build.VERSION.SDK_INT >= 33) ClipDescription.EXTRA_IS_SENSITIVE else "android.content.extra.IS_SENSITIVE", true)
+                }
+                app.getSystemService(ClipboardManager::class.java).setPrimaryClip(clip)
+                result.success(null)
             }
             "text.share" -> {
                 val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, call.argument<String>("text"))

@@ -25,6 +25,7 @@ const icons = {
   clipboard: 'clipboard-paste',
   clock: 'clock',
   cloud: 'cloud',
+  copy: 'copy',
   crown: 'crown',
   download: 'download',
   eye: 'eye',

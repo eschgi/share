@@ -23,6 +23,8 @@ abstract final class AppIcons {
   static const IconData clock = IconData(0xe087, fontFamily: 'Lucide');
   /// cloud
   static const IconData cloud = IconData(0xe088, fontFamily: 'Lucide');
+  /// copy
+  static const IconData copy = IconData(0xe09e, fontFamily: 'Lucide');
   /// crown
   static const IconData crown = IconData(0xe1d6, fontFamily: 'Lucide');
   /// download

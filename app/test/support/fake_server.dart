@@ -156,6 +156,17 @@ class FakeServer {
       pins.insert(i, pin);
       return json(pin);
     }
+    final password = RegExp(r'^/api/users/([^/]+)/password$').firstMatch(path);
+    if (req.method == 'POST' && password != null) {
+      final u = _users.where((u) => u['id'] == password.group(1)).firstOrNull;
+      if (u == null) return _error(404, 'not_found');
+      if (u['me'] == true) return _error(403, 'forbidden');
+      final username = (_body(req)['username'] as String?)?.trim() ?? u['username'] as String?;
+      if (username == null || username.isEmpty) return _error(400, 'bad_request');
+      if (_users.any((x) => x['id'] != u['id'] && x['username'] == username)) return _error(409, 'username_taken');
+      people['users'] = [for (final x in _users) x['id'] == u['id'] ? {...x, 'username': username, 'has_password': true} : x];
+      return json({...contractResponse('api/user_password.json'), 'username': username});
+    }
     final user = RegExp(r'^/api/users/([^/]+)(/invites)?$').firstMatch(path);
     if (user != null) {
       final id = user.group(1);

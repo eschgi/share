@@ -6,6 +6,7 @@ import '../app.dart';
 import '../data/api.dart';
 import '../data/models.dart';
 import '../data/platform.dart';
+import '../data/username.dart';
 import '../l10n/app_localizations.dart';
 import 'admin/invite_person_screen.dart';
 import 'admin/people.dart';
@@ -302,7 +303,7 @@ class _PasswordDialog extends StatefulWidget {
 }
 
 class _PasswordDialogState extends State<_PasswordDialog> {
-  late final _username = TextEditingController(text: widget.user.username ?? widget.user.name.toLowerCase().replaceAll(' ', '.'));
+  late final _username = TextEditingController(text: widget.user.username ?? suggestedUsername(widget.user.name));
   final _current = TextEditingController();
   final _password = TextEditingController();
   String? _usernameError, _currentError, _passwordError;
