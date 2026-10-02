@@ -74,5 +74,7 @@ void main() {
     expect(storage.storageDir, '/mnt/usb/share');
     expect(storage.freeBytes, lessThan(storage.totalBytes));
     expect(storage.trashFiles, 12);
+    expect(storage.warnings.single.code, 'ignores_case');
+    expect(storage.warnings.single.problem, isFalse);
   });
 }

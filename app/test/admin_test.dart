@@ -44,6 +44,8 @@ void main() {
     expect(find.text('Invited'), findsOneWidget);
     await tester.scrollUntilVisible(find.text('/mnt/usb/share'), 200, scrollable: settingsList);
     expect(find.text('Recently deleted'), findsOneWidget);
+    expect(find.text('The drive is exFAT or NTFS: it ignores capitals in names and is slower than ext4.'), findsOneWidget,
+        reason: "the storage fixture's warning");
 
     await tester.pumpWidget(const SizedBox());
     await startApp(tester, signedInPhone(), FakeServer());

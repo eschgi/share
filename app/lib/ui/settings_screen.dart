@@ -20,6 +20,24 @@ import 'theme_sheet.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
+/// What share check found about the drive, in the admin's words; a code from a newer server
+/// gets a general line.
+String storageWarningText(AppLocalizations t, String code) => switch (code) {
+      'marker_missing' => t.storageWarnMarkerMissing,
+      'storage_unreadable' => t.storageWarnStorageUnreadable,
+      'folder_missing' => t.storageWarnFolderMissing,
+      'other_drive' => t.storageWarnOtherDrive,
+      'not_a_drive' => t.storageWarnNotADrive,
+      'data_unreadable' => t.storageWarnDataUnreadable,
+      'data_unsafe' => t.storageWarnDataUnsafe,
+      'data_in_memory' => t.storageWarnDataInMemory,
+      'drive_full' => t.storageWarnDriveFull,
+      'fat32' => t.storageWarnFat32,
+      'ignores_case' => t.storageWarnIgnoresCase,
+      'low_space' => t.storageWarnLowSpace,
+      _ => t.storageWarnUnknown,
+    };
+
 /// Screen 17: profile, language, server, password, signing out and deleting the account;
 /// admins also get the upload PINs, the people and the storage.
 class SettingsScreen extends StatefulWidget {
@@ -193,6 +211,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
               if (storage.totalBytes > 0) t.storageFree(formatBytes(storage.freeBytes, locale), formatBytes(storage.totalBytes, locale)),
             ].join('\n'),
           ),
+          for (final w in storage.warnings)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Icon(AppIcons.alert, size: 18, color: w.problem ? c.danger : c.warn),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(storageWarningText(t, w.code), style: TextStyle(fontSize: 14, height: 1.45, color: w.problem ? c.danger : c.warn)),
+                ),
+              ]),
+            ),
           SettingsRow(
             leading: SettingsRow.icon(context, AppIcons.trash),
             title: t.trashTitle,

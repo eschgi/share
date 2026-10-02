@@ -416,6 +416,7 @@ class StorageInfo {
     this.trashFiles = 0,
     this.trashBytes = 0,
     this.trashDays = 30,
+    this.warnings = const [],
   });
 
   factory StorageInfo.fromJson(Json j) => StorageInfo(
@@ -427,6 +428,7 @@ class StorageInfo {
         trashFiles: _int(j['trash_files']),
         trashBytes: _int(j['trash_bytes']),
         trashDays: _int(j['trash_days'], 30),
+        warnings: [for (final w in _list(j['warnings'])) StorageWarning.fromJson(_obj(w))],
       );
 
   final String storageDir;
@@ -434,4 +436,17 @@ class StorageInfo {
   final int files, bytes; // the library
   final int trashFiles, trashBytes;
   final int trashDays;
+
+  /// What share check finds about the drive, problems first.
+  final List<StorageWarning> warnings;
+}
+
+/// A problem keeps Share from working well, a warning is worth knowing (contract/storage_warnings.json).
+class StorageWarning {
+  const StorageWarning({required this.code, this.problem = false});
+
+  factory StorageWarning.fromJson(Json j) => StorageWarning(code: _str(j['code']), problem: j['level'] == 'problem');
+
+  final String code;
+  final bool problem;
 }
