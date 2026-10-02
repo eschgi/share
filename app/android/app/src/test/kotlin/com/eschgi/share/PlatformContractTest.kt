@@ -7,6 +7,7 @@ import com.eschgi.share.net.RouteStatus
 import com.eschgi.share.transfer.BatchSnapshot
 import com.eschgi.share.transfer.FileRef
 import com.eschgi.share.transfer.Picked
+import com.eschgi.share.transfer.Playback
 import com.eschgi.share.transfer.TransferItem
 import com.eschgi.share.transfer.UploadBatch
 import com.eschgi.share.transfer.UploadRow
@@ -107,6 +108,19 @@ class PlatformContractTest {
         assertEquals(expected.toMap(), snapshot.toMap().numbersAsLong())
         val paused = fixture.getJSONArray("upload_paused")
         assertEquals(listOf("pin_ended", "signed_out", "user"), List(paused.length()) { paused.getString(it) })
+    }
+
+    @Test
+    fun playAnswersAreWhatDartReads() {
+        val stream = fixture.getJSONObject("play_stream")
+        val answer = Playback.streamOf("https://share.example.com", "bbbbbbbbbbbbbbbbbbbbbbbbbb", "shd_0123456789abcdefghijklmnopqrstuvwxyzABCDEFG")
+        assertEquals(stream.getString("uri"), answer["uri"])
+        val headers = stream.getJSONObject("headers")
+        @Suppress("UNCHECKED_CAST")
+        val sent = answer["headers"] as Map<String, String>
+        assertEquals(headers.keys().asSequence().toSet(), sent.keys)
+        assertEquals(headers.getString("Authorization"), sent["Authorization"])
+        assertEquals(fixture.getJSONObject("play_copy").keys().asSequence().toSet(), answer.keys)
     }
 
     @Test

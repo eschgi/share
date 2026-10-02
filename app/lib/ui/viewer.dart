@@ -13,6 +13,7 @@ import 'fetch.dart';
 import 'format.dart';
 import 'icons.dart';
 import 'library/tiles.dart';
+import 'media_page.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
@@ -158,7 +159,16 @@ class _ViewerScreenState extends State<ViewerScreen> {
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, fontFamily: null)),
           Text(formatTime(f.uploadedAt, locale), style: TextStyle(fontSize: 12.5, color: c.text3)),
         ]),
-        actions: [IconButton(icon: const Icon(AppIcons.more), onPressed: _details)],
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(AppIcons.more),
+            onSelected: (choice) => choice == 'open' ? withFetch(context, 1, () => Services.read(context).platform.openFile(f)) : _details(),
+            itemBuilder: (_) => [
+              PopupMenuItem(value: 'details', child: Text(t.viewerDetails)),
+              PopupMenuItem(value: 'open', child: Text(t.viewerOpenElsewhere)),
+            ],
+          ),
+        ],
       ),
       body: Column(children: [
         Expanded(
@@ -166,7 +176,7 @@ class _ViewerScreenState extends State<ViewerScreen> {
             controller: _pages,
             itemCount: _files.length,
             onPageChanged: (i) => setState(() => _index = i),
-            itemBuilder: (context, i) => _Page(key: ValueKey(_files[i].id), file: _files[i]),
+            itemBuilder: (context, i) => _Page(key: ValueKey(_files[i].id), file: _files[i], active: i == _index),
             findChildIndexCallback: (key) {
               final i = _files.indexWhere((f) => ValueKey(f.id) == key);
               return i < 0 ? null : i;
@@ -194,8 +204,11 @@ class _ViewerScreenState extends State<ViewerScreen> {
 }
 
 class _Page extends StatefulWidget {
-  const _Page({super.key, required this.file});
+  const _Page({super.key, required this.file, required this.active});
   final FileInfo file;
+
+  /// The page in view.
+  final bool active;
 
   @override
   State<_Page> createState() => _PageState();
@@ -231,18 +244,9 @@ class _PageState extends State<_Page> {
           ),
         );
       case FileKind.video:
-        return Stack(fit: StackFit.expand, children: [
-          ThumbImage(file: f, fit: BoxFit.contain),
-          Center(
-            child: IconButton.filled(
-              iconSize: 40,
-              style: IconButton.styleFrom(backgroundColor: Colors.black54, padding: const EdgeInsets.all(18)),
-              tooltip: t.viewerOpenVideo,
-              icon: const Icon(AppIcons.play, color: Colors.white),
-              onPressed: () => withFetch(context, 1, () => Services.read(context).platform.openFile(f)),
-            ),
-          ),
-        ]);
+        return MediaPage(file: f, active: widget.active);
+      case FileKind.document when f.isAudio:
+        return MediaPage(file: f, active: widget.active);
       case FileKind.document:
         return Center(
           child: Padding(

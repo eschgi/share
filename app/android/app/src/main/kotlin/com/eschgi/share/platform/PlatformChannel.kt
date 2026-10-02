@@ -13,6 +13,7 @@ import android.os.Looper
 import android.provider.OpenableColumns
 import android.provider.Settings
 import android.util.Log
+import android.view.WindowManager
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityCompat
@@ -27,6 +28,7 @@ import com.eschgi.share.transfer.Downloads
 import com.eschgi.share.transfer.Fetcher
 import com.eschgi.share.transfer.FileRef
 import com.eschgi.share.transfer.Picked
+import com.eschgi.share.transfer.Playback
 import com.eschgi.share.transfer.UploadBatch
 import com.eschgi.share.transfer.Uploads
 import io.flutter.plugin.common.BinaryMessenger
@@ -178,6 +180,18 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
                         main.post { result.error("failed", e.message, null) }
                     }
                 }
+            }
+            "file.play" -> background(result) {
+                Playback.source(app, FileRef.parseList("[" + call.argument<String>("file") + "]").single())
+            }
+            "screen.awake" -> {
+                // While something plays, the screen stays on.
+                if (call.argument<Boolean>("on") == true) {
+                    activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                } else {
+                    activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                }
+                result.success(null)
             }
             "cache.dir" -> result.success(app.cacheDir.absolutePath)
             else -> result.notImplemented()

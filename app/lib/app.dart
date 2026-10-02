@@ -13,6 +13,7 @@ import 'l10n/app_localizations.dart';
 import 'ui/first_start.dart';
 import 'ui/home.dart';
 import 'ui/invite.dart';
+import 'ui/player.dart';
 import 'ui/send/pin_entry_screen.dart';
 import 'ui/send/send_screen.dart';
 import 'ui/theme.dart';
@@ -20,7 +21,9 @@ import 'ui/theme.dart';
 /// Everything the screens use, made once. Tests build it with a fake platform and a mock
 /// HTTP client.
 class AppServices {
-  AppServices({required this.platform, Api? api}) : api = api ?? Api(platform: platform) {
+  AppServices({required this.platform, Api? api, MediaPlayerFactory? player})
+      : api = api ?? Api(platform: platform),
+        player = player ?? videoPlayer {
     session = SessionRepository(api: this.api, platform: platform);
     library = LibraryRepository(api: this.api, platform: platform);
     admin = AdminRepository(api: this.api);
@@ -29,6 +32,9 @@ class AppServices {
 
   final Platform platform;
   final Api api;
+
+  /// Plays videos and sound in the viewer.
+  final MediaPlayerFactory player;
   late final SessionRepository session;
   late final LibraryRepository library;
   late final AdminRepository admin;

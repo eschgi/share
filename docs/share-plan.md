@@ -71,6 +71,10 @@ app will go on Google Play later.
 - **Cloudflare's terms** want video and other large files served through its paid products, not the
   normal proxy. Downloads over the local address avoid it at home. On a VPS, Cloudflare can be DNS-only,
   which also removes the 100 MB limit.
+- **Videos and sound play in the app.** A copy on the phone plays first. Otherwise the player streams
+  with the phone's key: at home over the local address (plain http after the proof), away through the
+  public address, which loads only what is watched rather than the whole file. Over the https port at
+  home the file is fetched first, because the player can't pin Share's own certificate.
 
 ## Languages
 

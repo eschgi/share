@@ -166,6 +166,10 @@ class FileInfo {
     return dot > 0 && name.length - dot <= 6 ? name.substring(dot + 1).toUpperCase() : '';
   }
 
+  /// Sound, which the viewer plays: by its type, or by its name when the type says nothing.
+  bool get isAudio => kind == FileKind.document && (mime.startsWith('audio/') || _audioExt.contains(ext));
+  static const _audioExt = {'MP3', 'M4A', 'AAC', 'WAV', 'OGG', 'OGA', 'OPUS', 'FLAC'};
+
   Json toJson() => {'id': id, 'name': name, 'size': size, 'mime': mime, 'kind': kind.name, 'day': day};
 }
 

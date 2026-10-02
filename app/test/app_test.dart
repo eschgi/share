@@ -7,9 +7,11 @@ import 'package:share_app/data/platform.dart';
 import 'package:share_app/data/server.dart';
 import 'package:share_app/ui/icons.dart';
 import 'package:share_app/ui/library/tiles.dart';
+import 'package:share_app/ui/player.dart';
 
 import 'support/contract.dart';
 import 'support/fake_platform.dart';
+import 'support/fake_player.dart';
 import 'support/fake_server.dart';
 import 'support/fonts.dart';
 
@@ -18,13 +20,14 @@ String daysAgo(int n) => clock.now().subtract(Duration(days: n)).toIso8601String
 
 const inviteToken = 'shi_0123456789abcdefghijklmnopqrstuvwxyzABCDEFG';
 
-Future<AppServices> startApp(WidgetTester tester, FakePlatform platform, FakeServer server) async {
+Future<AppServices> startApp(WidgetTester tester, FakePlatform platform, FakeServer server, {MediaPlayerFactory? player}) async {
   tester.view.physicalSize = const Size(780, 1688);
   tester.view.devicePixelRatio = 2;
   addTearDown(tester.view.reset);
   final services = AppServices(
     platform: platform,
     api: Api(platform: platform, publicClient: server.client, localClient: (_) => server.client),
+    player: player ?? FakeMediaPlayer.new,
   );
   await tester.pumpWidget(ShareApp(services: services));
   await tester.pumpAndSettle();
@@ -148,6 +151,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining(RegExp(r'^VID_2\.mp4 · .+ · 0:18$')), findsOneWidget);
     await tester.tap(find.byIcon(AppIcons.more));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Details').last);
     await tester.pumpAndSettle();
     expect(find.textContaining(RegExp(r' · 0:18 · video/mp4$')), findsOneWidget);
   });

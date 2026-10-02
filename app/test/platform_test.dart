@@ -53,4 +53,14 @@ void main() {
     expect(u.items[1].bytes, 33280000);
     expect(fixture['upload_paused'], ['pin_ended', 'signed_out', 'user']);
   });
+
+  test('where the player plays from', () {
+    final copy = PlaySource.fromMap(fixture['play_copy'] as Map);
+    expect(copy.isCopy, isTrue);
+    expect(copy.headers, isEmpty);
+    final stream = PlaySource.fromMap(fixture['play_stream'] as Map);
+    expect(stream.isCopy, isFalse);
+    expect(stream.uri.path, '/api/files/bbbbbbbbbbbbbbbbbbbbbbbbbb/content');
+    expect(stream.headers['Authorization'], startsWith('Bearer shd_'));
+  });
 }

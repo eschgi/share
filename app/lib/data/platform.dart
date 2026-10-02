@@ -177,6 +177,21 @@ class OpenFailed implements Exception {
   final bool noApp;
 }
 
+/// Where the player plays a video or sound from: a copy on the phone (content://), or the
+/// server, with the [headers] that carry the phone's key (contract/app/platform.json play_*).
+class PlaySource {
+  const PlaySource(this.uri, {this.headers = const {}});
+
+  factory PlaySource.fromMap(Map<Object?, Object?> m) =>
+      PlaySource(Uri.parse(m['uri'] as String? ?? ''), headers: {for (final e in (m['headers'] as Map? ?? const {}).entries) '${e.key}': '${e.value}'});
+
+  final Uri uri;
+  final Map<String, String> headers;
+
+  /// On the phone already, rather than from the server.
+  bool get isCopy => uri.scheme == 'content' || uri.scheme == 'file';
+}
+
 /// The batch whose progress [Platform.transfers] reports while files are fetched for
 /// [Platform.shareFiles] and [Platform.openFile]; [Platform.cancelDownloads] stops it.
 const fetchBatch = 'fetch';
@@ -223,6 +238,13 @@ abstract class Platform {
   /// fetching them into the cache. Both throw [OpenFailed].
   Future<void> shareFiles(List<FileInfo> files);
   Future<void> openFile(FileInfo file);
+
+  /// Where to play a video or sound from; null if fetching it first was cancelled. Throws
+  /// [OpenFailed]. Over the https port at home it is fetched first, with the same progress.
+  Future<PlaySource?> play(FileInfo file);
+
+  /// Keeps the screen on while something plays.
+  Future<void> keepScreenOn(bool on);
 
   Future<String> cacheDir();
 
@@ -371,6 +393,19 @@ class ChannelPlatform implements Platform {
 
   @override
   Future<void> openFile(FileInfo file) => _opening(() => _invoke('file.open', {'file': jsonEncode(file.toJson())}));
+
+  @override
+  Future<PlaySource?> play(FileInfo file) async {
+    try {
+      final m = await _invoke<Map<Object?, Object?>>('file.play', {'file': jsonEncode(file.toJson())});
+      return m == null ? null : PlaySource.fromMap(m);
+    } on PlatformException {
+      throw const OpenFailed();
+    }
+  }
+
+  @override
+  Future<void> keepScreenOn(bool on) => _soft('screen.awake', {'on': on});
 
   Future<void> _opening(Future<void> Function() call) async {
     try {

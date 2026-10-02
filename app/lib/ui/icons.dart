@@ -31,6 +31,8 @@ abstract final class AppIcons {
   static const IconData eye = IconData(0xe0ba, fontFamily: 'Lucide');
   /// eye-off
   static const IconData eyeOff = IconData(0xe0bb, fontFamily: 'Lucide');
+  /// external-link
+  static const IconData externalLink = IconData(0xe0b9, fontFamily: 'Lucide');
   /// file
   static const IconData file = IconData(0xe0c0, fontFamily: 'Lucide');
   /// file-text
@@ -71,8 +73,12 @@ abstract final class AppIcons {
   static const IconData monitor = IconData(0xe11d, fontFamily: 'Lucide');
   /// ellipsis-vertical
   static const IconData more = IconData(0xe0b7, fontFamily: 'Lucide');
+  /// music
+  static const IconData music = IconData(0xe122, fontFamily: 'Lucide');
   /// palette
   static const IconData palette = IconData(0xe1dd, fontFamily: 'Lucide');
+  /// pause
+  static const IconData pause = IconData(0xe12e, fontFamily: 'Lucide');
   /// play
   static const IconData play = IconData(0xe13c, fontFamily: 'Lucide');
   /// circle-play

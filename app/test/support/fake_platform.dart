@@ -112,6 +112,23 @@ class FakePlatform implements Platform {
     opened.add('file:${file.id}');
   }
 
+  /// What play answers: a stream from the server unless a test says otherwise.
+  PlaySource? Function(FileInfo file)? playSource;
+  final played = <String>[];
+  bool screenOn = false;
+
+  @override
+  Future<PlaySource?> play(FileInfo file) async {
+    if (openError != null) throw openError!;
+    played.add(file.id);
+    return playSource != null
+        ? playSource!(file)
+        : PlaySource(Uri.parse('https://share.example.com/api/files/${file.id}/content'), headers: const {'Authorization': 'Bearer shd_x'});
+  }
+
+  @override
+  Future<void> keepScreenOn(bool on) async => screenOn = on;
+
   @override
   Future<String> cacheDir() async => '';
 

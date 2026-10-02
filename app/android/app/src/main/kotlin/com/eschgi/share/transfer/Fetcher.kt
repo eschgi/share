@@ -74,6 +74,15 @@ object Fetcher {
         }
     }
 
+    /** The copy fetched into the cache earlier, if it is there whole. */
+    fun cached(context: Context, file: FileRef): Uri? {
+        val app = context.applicationContext
+        val target = File(File(File(app.cacheDir, "fetch"), file.id), safeName(file))
+        if (!(target.exists() && target.length() == file.size)) return null
+        target.setLastModified(System.currentTimeMillis())
+        return FileProvider.getUriForFile(app, "${app.packageName}.files", target)
+    }
+
     /** False if it was cancelled. */
     private fun download(
         app: Context,
