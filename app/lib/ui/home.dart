@@ -32,10 +32,15 @@ class _HomeShellState extends State<HomeShell> {
       ],
     );
     void toSettings() => setState(() => _tab = 2);
-    return IndexedStack(index: _tab, children: [
+    final tabs = [
       LibraryScreen(user: widget.user, navigation: nav, onAvatar: toSettings),
       SendScreen(user: widget.user, navigation: nav, onAvatar: toSettings),
       SettingsScreen(user: widget.user, navigation: nav),
+    ];
+    // Every tab's Scaffold shows the app's snack bar, each in a Hero of the same tag; only the
+    // tab in view may take part when a screen opens or closes on top.
+    return IndexedStack(index: _tab, children: [
+      for (final (i, tab) in tabs.indexed) HeroMode(enabled: i == _tab, child: tab),
     ]);
   }
 }

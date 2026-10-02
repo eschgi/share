@@ -197,7 +197,14 @@ class _LibraryScreenState extends State<LibraryScreen> with WidgetsBindingObserv
   void _open(int index) {
     Navigator.push(
       context,
-      MaterialPageRoute<void>(builder: (_) => ViewerScreen(files: List.of(_c.files), initial: index)),
+      MaterialPageRoute<void>(
+        builder: (_) => ViewerScreen(
+          files: List.of(_c.files),
+          initial: index,
+          onDeleted: widget.user.isAdmin ? (id) => _c.remove([id]) : null,
+          onRestored: _c.reload,
+        ),
+      ),
     );
   }
 

@@ -126,6 +126,22 @@ class LibraryController extends ChangeNotifier {
     }
   }
 
+  /// Files gone from the library, such as one deleted in the viewer: off the list and the
+  /// selection at once; the days' totals follow from the server.
+  void remove(Iterable<String> ids) {
+    final gone = ids.toSet();
+    files.removeWhere((f) => gone.contains(f.id));
+    _shown.removeAll(gone);
+    selected.removeAll(gone);
+    notifyListeners();
+    final gen = _generation;
+    repo.overview(_filter).then((o) {
+      if (gen != _generation) return;
+      overview = o;
+      notifyListeners();
+    }, onError: (Object _) {});
+  }
+
   /// Marks files as saved on this phone after a download.
   Future<void> refreshSaved() async {
     saved = await platform.savedIds(files.map((f) => f.id));

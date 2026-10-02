@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../app.dart';
 import '../data/models.dart';
 import '../l10n/app_localizations.dart';
+import 'admin/delete.dart';
 import 'download_sheet.dart';
 import 'fetch.dart';
 import 'format.dart';
@@ -15,11 +16,18 @@ import 'library/tiles.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
-/// Screen 14: one file at a time, at original size; swipe to the next.
+/// Screen 14: one file at a time, at original size; swipe to the next. Admins can delete the file
+/// shown.
 class ViewerScreen extends StatefulWidget {
-  const ViewerScreen({super.key, required this.files, required this.initial});
+  const ViewerScreen({super.key, required this.files, required this.initial, this.onDeleted, this.onRestored});
   final List<FileInfo> files;
   final int initial;
+
+  /// Admins: a file was deleted here, the library drops it. Without it, there is no Delete.
+  final void Function(String id)? onDeleted;
+
+  /// Undo brought a deleted file back.
+  final VoidCallback? onRestored;
 
   @override
   State<ViewerScreen> createState() => _ViewerScreenState();
@@ -28,8 +36,11 @@ class ViewerScreen extends StatefulWidget {
 class _ViewerScreenState extends State<ViewerScreen> {
   late final PageController _pages = PageController(initialPage: widget.initial);
   late int _index = widget.initial;
+  // The viewer's own list: a deleted file leaves it. Pages are keyed by file, so the page of the
+  // next one isn't the deleted one's.
+  late final List<FileInfo> _files = List.of(widget.files);
 
-  FileInfo get _file => widget.files[_index];
+  FileInfo get _file => _files[_index];
 
   @override
   void dispose() {
@@ -47,6 +58,48 @@ class _ViewerScreenState extends State<ViewerScreen> {
       return;
     }
     if (mounted) await showDownloadSheet(context, batch: batch, files: [_file]);
+  }
+
+  Future<void> _delete() async {
+    final t = AppLocalizations.of(context);
+    final admin = Services.read(context).admin;
+    final f = _file;
+    if (!await confirmDelete(context, 1, admin.trashDays) || !mounted) return;
+    // The app's messenger: the Undo stays when the viewer closes.
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    try {
+      await admin.deleteFiles([f.id]);
+    } on Exception {
+      messenger.showSnackBar(SnackBar(content: Text(t.commonFailed)));
+      return;
+    }
+    widget.onDeleted?.call(f.id);
+    final restored = widget.onRestored;
+    // It goes by itself: staying, it would cover the viewer's buttons.
+    messenger.showSnackBar(SnackBar(
+      content: Text(t.deletedSnack(1)),
+      persist: false,
+      duration: const Duration(seconds: 6),
+      action: SnackBarAction(
+        label: t.commonUndo,
+        onPressed: () async {
+          await admin.restore([f.id]);
+          restored?.call();
+        },
+      ),
+    ));
+    if (!mounted) return;
+    if (_files.length == 1) {
+      navigator.pop();
+      return;
+    }
+    setState(() {
+      _files.removeAt(_index);
+      _index = _index.clamp(0, _files.length - 1);
+    });
+    // The last file went: show the one before it.
+    if (_pages.hasClients && (_pages.page?.round() ?? _index) != _index) _pages.jumpToPage(_index);
   }
 
   void _details() {
@@ -111,12 +164,16 @@ class _ViewerScreenState extends State<ViewerScreen> {
         Expanded(
           child: PageView.builder(
             controller: _pages,
-            itemCount: widget.files.length,
+            itemCount: _files.length,
             onPageChanged: (i) => setState(() => _index = i),
-            itemBuilder: (context, i) => _Page(file: widget.files[i]),
+            itemBuilder: (context, i) => _Page(key: ValueKey(_files[i].id), file: _files[i]),
+            findChildIndexCallback: (key) {
+              final i = _files.indexWhere((f) => ValueKey(f.id) == key);
+              return i < 0 ? null : i;
+            },
           ),
         ),
-        _Filmstrip(files: widget.files, index: _index, onTap: (i) => _pages.jumpToPage(i)),
+        _Filmstrip(files: _files, index: _index, onTap: (i) => _pages.jumpToPage(i)),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
           child: Text(meta, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: c.text2)),
@@ -128,6 +185,7 @@ class _ViewerScreenState extends State<ViewerScreen> {
             _Action(icon: AppIcons.download, label: t.viewerDownload, onTap: _download),
             _Action(icon: AppIcons.share, label: t.viewerShare, onTap: () => withFetch(context, 1, () => Services.read(context).platform.shareFiles([f]))),
             _Action(icon: AppIcons.info, label: t.viewerDetails, onTap: _details),
+            if (widget.onDeleted != null) _Action(icon: AppIcons.trash, label: t.deleteSelected, onTap: _delete),
           ]),
         ),
       ]),
@@ -136,7 +194,7 @@ class _ViewerScreenState extends State<ViewerScreen> {
 }
 
 class _Page extends StatefulWidget {
-  const _Page({required this.file});
+  const _Page({super.key, required this.file});
   final FileInfo file;
 
   @override

@@ -187,11 +187,50 @@ void main() {
     expect(find.byType(LibraryTile), findsNWidgets(6));
   });
 
+  testWidgets('deleting in the viewer goes on to the next file, and Undo brings it back', (tester) async {
+    final server = adminServer()..addDay(today(), 3);
+    await startApp(tester, signedInPhone(), server);
+    await tester.tap(find.byType(LibraryTile).at(1));
+    await tester.pumpAndSettle();
+    expect(find.textContaining(RegExp(r'^IMG_1\.jpg · ')), findsOneWidget);
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete 1 file?'), findsOneWidget);
+    await tester.tap(find.text('Delete 1 file'));
+    await tester.pumpAndSettle();
+    expect(server.files.map((f) => f['name']), ['IMG_0.jpg', 'VID_2.mp4']);
+    expect(find.text('1 file deleted'), findsOneWidget);
+    expect(find.textContaining(RegExp(r'^VID_2\.mp4 · ')), findsOneWidget, reason: 'the next file shows in its place');
+    await tester.pump(const Duration(seconds: 7));
+    await tester.pumpAndSettle();
+    expect(find.text('1 file deleted'), findsNothing, reason: 'it goes by itself, uncovering the buttons');
+
+    // The last one: the one before it shows.
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete 1 file'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining(RegExp(r'^IMG_0\.jpg · ')), findsOneWidget);
+
+    await tester.tap(find.byType(ShareBackButton));
+    await tester.pumpAndSettle();
+    expect(find.byType(LibraryTile), findsOneWidget, reason: 'the library dropped both');
+    await tester.tap(find.text('Undo'));
+    await tester.pumpAndSettle();
+    expect(server.files.map((f) => f['name']), contains('VID_2.mp4'));
+    expect(find.byType(LibraryTile), findsNWidgets(2));
+  });
+
   testWidgets('members can\'t delete', (tester) async {
     await startApp(tester, signedInPhone(), FakeServer()..addDay(today(), 3));
     await tester.tap(find.bySemanticsLabel('Select the day').first);
     await tester.pumpAndSettle();
     expect(find.byIcon(AppIcons.trash), findsNothing);
+    await tester.tap(find.byIcon(AppIcons.x));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(LibraryTile).first);
+    await tester.pumpAndSettle();
+    expect(find.text('Delete'), findsNothing, reason: 'nor in the viewer');
   });
 
   testWidgets('recently deleted: bringing back, and deleting for good', (tester) async {
