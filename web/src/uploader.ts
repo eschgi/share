@@ -47,6 +47,8 @@ export interface UploaderEvents {
   onRestored(): void;
   /** A file shared from another app was sent, or given up: it can leave the inbox. */
   onSharedGone?(key: number): void;
+  /** Nothing is on its way any more, and some files didn't go. */
+  onFailed?(failed: number): void;
 }
 
 const MiB = 1 << 20;
@@ -89,6 +91,8 @@ export class Uploader {
   readonly uppy: Uppy<Meta, Body>;
   private sessionEnded = false;
   private doneReported = false;
+  /** How many failed files were last reported, so each change is told once. */
+  private failedReported = 0;
   /** A redraw is due with the next frame (or timer, see changed()). */
   private redrawDue = false;
   /** Golden Retriever is still looking for a saved queue; files picked meanwhile wait. */
@@ -174,7 +178,11 @@ export class Uploader {
       if (typeof key === 'string') events.onSharedGone?.(Number(key));
       this.checkDone();
     });
-    this.uppy.on('complete', () => this.checkDone());
+    this.uppy.on('complete', () => {
+      this.checkDone();
+      this.checkFailed();
+    });
+    this.uppy.on('upload-error', () => this.checkFailed());
   }
 
   /** Queues files shared from other apps; each leaves the inbox once it is sent. */
@@ -370,6 +378,15 @@ export class Uploader {
     // still shows the progress, so a timer stands in.
     requestAnimationFrame(redraw);
     setTimeout(redraw, 1000);
+  }
+
+  private checkFailed(): void {
+    const files = this.uppy.getFiles().filter((f) => !f.isGhost);
+    const failed = files.filter((f) => f.error).length;
+    if (failed === 0) this.failedReported = 0;
+    if (failed === 0 || failed === this.failedReported || !files.every((f) => f.progress.uploadComplete || f.error)) return;
+    this.failedReported = failed;
+    this.events.onFailed?.(failed);
   }
 
   private checkDone(): void {

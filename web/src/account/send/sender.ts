@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { getInfo } from '../../api';
 import { claimShared, sharedGone } from '../../incoming';
+import { notify } from '../../notify';
 import { initialState, reduce, type Action, type State } from '../../state';
 import { holdQueueLock, Uploader, type Snapshot } from '../../uploader';
 
@@ -28,9 +29,13 @@ export function startSender(signedOut: () => void): void {
       info,
       {
         onChange: changed,
-        onAllDone: (files, bytes) => dispatch({ type: 'allDone', files, bytes }),
+        onAllDone: (files, bytes) => {
+          dispatch({ type: 'allDone', files, bytes });
+          void notify({ kind: 'sent', files, bytes });
+        },
         // The uploads were refused: this browser was signed out.
-        onSessionEnded: () => whenSignedOut(),
+        onSessionEnded: () => void notify({ kind: 'signedOut' }).finally(() => whenSignedOut()),
+        onFailed: (failed) => void notify({ kind: 'failed', failed }),
         onRejected: (name) => {
           if (!rejected.includes(name)) rejected = [...rejected, name];
           changed();

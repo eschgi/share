@@ -6,6 +6,7 @@ import { getInfo, getMe, onSignedOut, type Info, type Me } from '../api';
 import { Icon } from '../components/Icon';
 import { Page } from '../components/Page';
 import { setSignedInHint } from '../hint';
+import { noticeLanguage } from '../notify';
 import {
   addDictionaries,
   clearStoredLanguage,
@@ -63,6 +64,7 @@ export function Account({ me: first, notice }: AccountProps) {
 
   useEffect(() => {
     document.documentElement.lang = lang;
+    noticeLanguage(lang);
   }, [lang]);
 
   useEffect(() => {

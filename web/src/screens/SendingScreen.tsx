@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'preact/hooks';
 import { Bold, Note, Tile } from '../components/Bits';
 import { GhostCard } from '../components/GhostCard';
 import { Icon } from '../components/Icon';
+import { NotifyOffer } from '../components/NotifyOffer';
 import { Page } from '../components/Page';
 import { touchFirst, useMedia, useOnWifi, useWakeLock } from '../device';
 import { RateMeter, formatBytes, formatCount, formatETA } from '../format';
@@ -56,6 +57,7 @@ export function SendingScreen({ name, snapshot: s, online, rejected, onFiles, on
         ) : (
           <Note icon="wifi">{t('sending.offline')}</Note>
         )}
+        <NotifyOffer bytes={s.bytesTotal} />
         {s.failed > 0 && (
           <div class="failed" role="alert">
             <Icon name="alert" />

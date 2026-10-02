@@ -6,6 +6,7 @@ import { useLeaveWarning } from './device';
 import { formatPercent } from './format';
 import { I18nContext, isLang, languages, makeI18n, pickLanguage, storeLanguage, storedLanguage, type Lang } from './i18n';
 import { claimShared, dropShared, shareFailed, sharedGone, type Shared } from './incoming';
+import { noticeLanguage, notify } from './notify';
 import { pinFromHash } from './pin';
 import { DoneScreen } from './screens/DoneScreen';
 import { PinScreen } from './screens/PinScreen';
@@ -45,6 +46,7 @@ export function App() {
 
   useEffect(() => {
     document.documentElement.lang = lang;
+    noticeLanguage(lang);
   }, [lang]);
 
   useEffect(() => {
@@ -91,8 +93,15 @@ export function App() {
         setLang(pickLanguage(i.languages, storedLanguage(), navigator.languages, i.default_language));
         uploader.current = new Uploader(i, {
           onChange: redraw,
-          onAllDone: (files, bytes) => dispatch({ type: 'allDone', files, bytes }),
-          onSessionEnded: (lost) => dispatch({ type: 'sessionEnded', lost }),
+          onAllDone: (files, bytes) => {
+            dispatch({ type: 'allDone', files, bytes });
+            void notify({ kind: 'sent', files, bytes });
+          },
+          onSessionEnded: (lost) => {
+            dispatch({ type: 'sessionEnded', lost });
+            void notify({ kind: lost ? 'pinLost' : 'pinEnded' });
+          },
+          onFailed: (failed) => void notify({ kind: 'failed', failed }),
           onRejected: (name) => setRejected((r) => (r.includes(name) ? r : [...r, name])),
           onRestored: () => dispatch({ type: 'restored' }),
           onSharedGone: sharedGone,

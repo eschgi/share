@@ -35,6 +35,20 @@ self.addEventListener('fetch', (event) => {
   }
 });
 
+// A tap on a notification (notify.ts) brings the page back, or opens it.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const path = (event.notification.data as { url?: string } | null)?.url ?? '/';
+  event.waitUntil(
+    (async () => {
+      const tabs = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      const tab = tabs.find((c) => new URL(c.url).pathname === path) ?? tabs[0];
+      if (tab) await tab.focus();
+      else await self.clients.openWindow(path);
+    })(),
+  );
+});
+
 /**
  * Files from Android's share sheet: kept in the inbox, all of them or none, and the Send page
  * sends them. They never go to the server this way.

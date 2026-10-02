@@ -1,5 +1,6 @@
 import './save.css';
 import { Icon } from '../../components/Icon';
+import { NotifyOffer } from '../../components/NotifyOffer';
 import { useLeaveWarning, useWakeLock } from '../../device';
 import { formatBytes, formatPercent } from '../../format';
 import { useI18n } from '../../i18n';
@@ -80,6 +81,7 @@ export function SavePanel() {
           <p>{note}</p>
         </div>
       )}
+      {active && <NotifyOffer bytes={s.bytesTotal} />}
       <div class="btnrow">
         {active ? (
           <>

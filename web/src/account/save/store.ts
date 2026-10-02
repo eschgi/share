@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { saveFiles, type SaveItem, type SaveState } from './engine';
 import { fetchFile, folderOf } from './folder';
+import { notify } from '../../notify';
 import { markSaved } from './marks';
 
 export interface SaveRun {
@@ -46,6 +47,7 @@ export function startSave(items: SaveItem[], dir: FileSystemDirectoryHandle): vo
     onChange: (state) => {
       if (!run || controller !== ctl) return;
       run = { ...run, state };
+      if (state.finished) told(state, dir.name);
       // Many small steps a second: drawn at most once a frame, and the end at once.
       if (state.finished) changed();
       else frame ||= requestAnimationFrame(() => {
@@ -54,6 +56,12 @@ export function startSave(items: SaveItem[], dir: FileSystemDirectoryHandle): vo
       });
     },
   });
+}
+
+/** Says how saving ended, if the page is in the background; not when it was cancelled here. */
+function told(s: SaveState, folder: string): void {
+  if (s.stopped === 'cancelled') return;
+  void notify(s.stopped ? { kind: 'saveStopped', why: s.stopped } : { kind: 'saved', saved: s.done - s.skipped, folder });
 }
 
 /** Stops saving and puts the panel away. */
