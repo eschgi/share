@@ -32,5 +32,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['test/**/*.test.ts'],
+    // Vitest empties CSS files, even read ?raw; the theme tests read themes.css.
+    css: { include: [/themes\.css/] },
   },
 });
