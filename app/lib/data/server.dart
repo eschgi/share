@@ -133,7 +133,7 @@ class InviteLink extends ShareLink {
   final String token;
 }
 
-/// A PIN link, `<server>/#K7M2Q`: it opens sending on the website.
+/// A PIN link, `<server>/#K7M2Q`: the app sends with that PIN, as the website does.
 class PinLink extends ShareLink {
   const PinLink(this.server, this.code);
   final Uri server;

@@ -24,7 +24,7 @@
   "firstStartScan": "Got an invite? Scan it",
   "sendServerTitle": "Where do you want to send?",
   "@sendServerTitle": {
-    "description": "Asks for the server before opening the website for sending with a PIN."
+    "description": "Asks for the server before the PIN, for sending with a PIN."
   },
   "sendServerLead": "Enter the address you were given. Then your PIN, and you can send.",
   "sendServerOpen": "Next",

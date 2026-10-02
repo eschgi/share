@@ -11,8 +11,7 @@ import 'sign_in.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
-/// Screen 7: two doors. Sending needs only a PIN (on the website for now), seeing needs an
-/// account or an invite.
+/// Screen 7: two doors. Sending needs only a PIN, seeing needs an account or an invite.
 class FirstStartScreen extends StatelessWidget {
   const FirstStartScreen({super.key, this.signedOutByServer = false});
   final bool signedOutByServer;
@@ -70,7 +69,7 @@ class FirstStartScreen extends StatelessWidget {
 }
 
 /// Scans an invite's QR code, or, without Google Play services, asks for the link, and opens
-/// what it was: an invite (screen 10), or a PIN link (sending on the website).
+/// what it was: an invite (screen 10), or a PIN link (sending with that PIN, screen 1).
 Future<void> scanInvite(BuildContext context) async {
   final services = Services.read(context);
   final t = AppLocalizations.of(context);
