@@ -27,7 +27,8 @@ export async function download(ids: string[], one?: FileInfo): Promise<ZipDownlo
   return zip;
 }
 
-async function inParts(ids: string[], send: (part: string[]) => Promise<{ changed: number }>): Promise<number> {
+/** Sends ids in parts of 1000, the most the server takes at once; says how many changed. */
+export async function inParts(ids: string[], send: (part: string[]) => Promise<{ changed: number }>): Promise<number> {
   let changed = 0;
   for (let i = 0; i < ids.length; i += 1000) changed += (await send(ids.slice(i, i + 1000))).changed;
   return changed;

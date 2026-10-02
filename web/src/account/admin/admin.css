@@ -1,0 +1,467 @@
+/* Running Share (screens 30–35): settings in two panes on a computer, the PINs, people, invites
+   and Recently deleted. */
+
+/* A computer: the list on the left, the chosen page on the right. */
+.dset {
+  display: grid;
+  grid-template-columns: 380px minmax(0, 1fr);
+  gap: 44px;
+  align-items: start;
+  width: min(1200px, calc(100% - 64px));
+  margin: 6px auto 0;
+  padding-bottom: 32px;
+}
+.dset > .pane:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.adminpage {
+  min-width: 0;
+}
+/* A page's title, where the header has taken the title bar's place (tablets and computers). */
+.phead {
+  display: none;
+  align-items: center;
+  gap: 12px;
+  min-height: 50px;
+  margin-bottom: 8px;
+}
+.phead h2 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 27px;
+  font-weight: 700;
+}
+.phead .btn,
+.ab .btn.xs {
+  margin: 0;
+  padding: 0 16px;
+}
+.lead.sm {
+  margin: 0 4px 14px;
+  font-size: 15.5px;
+  text-wrap: pretty;
+}
+.glabel .gact {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--accent-text);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.glabel:has(.gact) {
+  display: flex;
+  align-items: center;
+}
+.gact .ic {
+  width: 17px;
+  height: 17px;
+}
+.rt > b.mono {
+  font-family: var(--mono);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.mt12 {
+  margin-top: 12px;
+}
+.row:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* A person (screen 31): picture, name, username and role at the top of the dialog. */
+.pdh {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.pdh > div {
+  flex: 1;
+  min-width: 0;
+}
+.pdh b {
+  display: block;
+  overflow: hidden;
+  font-size: 20px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pdh div span {
+  color: var(--text-3);
+  font-size: 13.5px;
+}
+.row.acc .rt > b {
+  color: var(--accent-text);
+}
+.label.first {
+  margin-top: 4px;
+}
+
+/* Inviting (screen 32): member or admin, then the code and the link. */
+.seg {
+  display: flex;
+  flex: none;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--s1);
+}
+.modal-panel .seg {
+  background: var(--s2);
+}
+.seg > button {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 44px;
+  border: 0;
+  border-radius: 11px;
+  background: none;
+  color: var(--text-2);
+  font-size: 15.5px;
+  font-weight: 500;
+}
+.seg > button.on {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+.seg .ic {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2.6;
+}
+.seg > button:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: -2px;
+}
+.qrrow {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  margin-top: 20px;
+  padding: 16px;
+  border-radius: 20px;
+  background: var(--s2);
+}
+.qrrow .qr {
+  width: 164px;
+  height: 164px;
+  flex: none;
+}
+.qrrow b {
+  display: block;
+  font-size: 15.5px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.qrrow .exp {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  color: var(--text-3);
+  font-size: 13px;
+}
+.qrrow .exp .ic {
+  width: 15px;
+  height: 15px;
+}
+.qrrow .btn {
+  display: inline-flex;
+  width: auto;
+  margin-top: 14px;
+  padding: 0 18px;
+}
+
+/* Upload PINs (screens 33 and 34). */
+.pgrid {
+  display: grid;
+  gap: 0 20px;
+}
+.pgrid .glabel {
+  margin-top: 6px;
+}
+.pincard {
+  margin-bottom: 12px;
+  padding: 16px;
+  border: 1px solid var(--line-soft);
+  border-radius: 20px;
+  background: var(--s1);
+}
+.pc-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pcico {
+  width: 22px;
+  height: 22px;
+  margin-left: auto;
+  color: var(--text-3);
+}
+.code {
+  display: flex;
+  gap: 8px;
+}
+.code b {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 52px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--s2);
+  font-family: var(--mono);
+  font-size: 23px;
+  font-weight: 600;
+}
+.pc-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin-top: 12px;
+  color: var(--text-3);
+  font-size: 13px;
+}
+.timepill.sm {
+  min-height: 28px;
+  margin: 0;
+  padding: 0 10px;
+  gap: 6px;
+  font-size: 12.5px;
+}
+.timepill.sm .ic {
+  width: 14px;
+  height: 14px;
+}
+.pc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 14px -6px 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--line-soft);
+}
+.pc-actions > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--accent-text);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.pc-actions > button .ic {
+  width: 18px;
+  height: 18px;
+}
+.pc-actions > button.danger {
+  margin-left: auto;
+  color: var(--danger);
+}
+.pc-actions > button:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: -2px;
+}
+@media (hover: hover) {
+  .pc-actions > button:hover {
+    background: var(--accent-soft);
+  }
+  .pc-actions > button.danger:hover {
+    background: var(--danger-soft);
+  }
+}
+.pinqr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+.pinqr .qr {
+  width: 220px;
+  height: 220px;
+}
+.pinqr .small {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.opts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.opt {
+  position: relative;
+  display: block;
+  padding: 14px;
+  border: 1.5px solid var(--line);
+  border-radius: 16px;
+  background: none;
+  text-align: left;
+}
+.opt > .ic {
+  width: 22px;
+  height: 22px;
+  color: var(--text-2);
+}
+.opt b {
+  display: block;
+  margin-top: 8px;
+  font-size: 15.5px;
+  font-weight: 600;
+}
+.opt .sub {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+.opt.on {
+  border-color: var(--accent-text);
+  background: var(--accent-soft);
+}
+.opt.on > .ic {
+  color: var(--accent-text);
+}
+.opt .radio {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+}
+.opt.on .radio {
+  border-color: var(--accent-text);
+  background: radial-gradient(var(--accent-text) 0 4.5px, transparent 5px);
+}
+.opt:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
+.coderow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pin.code-in {
+  flex: 1;
+  margin: 0;
+}
+.pin.code-in b {
+  height: 58px;
+  border-radius: 13px;
+  background: var(--s2);
+  font-size: 25px;
+}
+.ib.tonal {
+  width: 52px;
+  height: 58px;
+  border-radius: 14px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+.ab .ib.tonal {
+  width: 46px;
+  height: 46px;
+}
+
+/* Recently deleted (screen 35): rows that toggle, then what to do with them. */
+.trow .tmini {
+  width: 52px;
+  height: 52px;
+  flex: none;
+  overflow: hidden;
+  border-radius: 10px;
+}
+.trow .rt > b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.trow .dsel {
+  margin: 0;
+  pointer-events: none;
+}
+.trbar {
+  position: sticky;
+  bottom: calc(92px + env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+  padding: 10px 0;
+  background: var(--bg);
+}
+.trbar > span:first-child {
+  color: var(--text-2);
+  font-size: 15px;
+}
+.trbar .gap {
+  flex: 1;
+}
+.trbar .btn {
+  width: auto;
+  margin: 0;
+  padding: 0 18px;
+}
+.btn.dout {
+  border: 1.5px solid var(--line);
+  background: none;
+  color: var(--danger);
+}
+
+@media (min-width: 640px) and (min-height: 540px) {
+  .phead {
+    display: flex;
+  }
+  .trbar {
+    bottom: 0;
+  }
+}
+@media (min-width: 1024px) and (min-height: 540px) {
+  .pgrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-width: 860px;
+  }
+  /* Beside the list, a page has no way back of its own. */
+  .dset .phead > .ib {
+    display: none;
+  }
+}
+@media (max-width: 420px) {
+  .qrrow {
+    flex-direction: column;
+    text-align: center;
+  }
+  .qrrow .exp {
+    justify-content: center;
+  }
+  .code b {
+    width: 40px;
+    height: 46px;
+    font-size: 20px;
+  }
+}

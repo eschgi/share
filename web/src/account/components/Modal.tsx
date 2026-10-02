@@ -11,6 +11,8 @@ interface Props {
   title: string;
   /** A picture before the title, such as the bin when deleting. */
   icon?: IconName;
+  /** Shown instead of the title, which stays for screen readers: a person's picture and name. */
+  head?: ComponentChildren;
   onClose: () => void;
   wide?: boolean;
   children: ComponentChildren;
@@ -21,7 +23,7 @@ interface Props {
  * bigger screens. Render it only while open. It is a real <dialog>, so the page behind is out
  * of reach and Escape closes it; Back closes it too, and the focus goes back where it was.
  */
-export function Modal({ title, icon, onClose, wide, children }: Props) {
+export function Modal({ title, icon, head, onClose, wide, children }: Props) {
   const { t } = useI18n();
   const ref = useRef<HTMLDialogElement>(null);
   const id = useId();
@@ -56,7 +58,10 @@ export function Modal({ title, icon, onClose, wide, children }: Props) {
               <Icon name={icon} />
             </span>
           )}
-          <h2 id={id}>{title}</h2>
+          <h2 id={id} class={head ? 'sr-only' : undefined}>
+            {title}
+          </h2>
+          {head}
           <button type="button" class="ib" aria-label={t('common.close')} onClick={onClose}>
             <Icon name="x" />
           </button>

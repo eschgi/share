@@ -67,6 +67,8 @@ export function Shell({ tab, tools, selecting, children }: Props) {
 
 interface TitleBarProps {
   title: string;
+  /** A page of its own on a phone: the arrow back goes here. */
+  back?: string;
   /** Takes the title's place, such as a search field; the title stays for screen readers. */
   field?: ComponentChildren;
   children?: ComponentChildren;
@@ -75,9 +77,15 @@ interface TitleBarProps {
 
 /** A page's title bar on a phone: the title, and buttons on the right. Bigger screens have the
  * header instead, and show only what the page asks for (wide). */
-export function TitleBar({ title, field, children, wide }: TitleBarProps) {
+export function TitleBar({ title, back, field, children, wide }: TitleBarProps) {
+  const { t } = useI18n();
   return (
-    <header class={`ab${wide ? ' wide' : ''}`}>
+    <header class={`ab${wide ? ' wide' : ''}${back ? ' back' : ''}`}>
+      {back && (
+        <Link href={back} class="ib" aria-label={t('common.back')}>
+          <Icon name="back" />
+        </Link>
+      )}
       <h1 class={field ? 'sr-only' : undefined}>{title}</h1>
       {field}
       {children}

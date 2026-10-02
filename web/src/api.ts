@@ -282,3 +282,73 @@ export interface Storage {
 }
 
 export const getStorage = () => request<Storage>('GET', '/api/admin/storage');
+
+// Admins: upload PINs, people and invites, Recently deleted.
+
+export interface PinInfo {
+  id: string;
+  code: string;
+  kind: 'permanent' | 'day';
+  created_at: string;
+  expires_at: string | null;
+  /** The website with the PIN filled in, for sharing. */
+  link: string;
+  /** Files sent with it that are still in the library. */
+  files: number;
+  /** Phones and browsers that unlocked it in the last 30 days. */
+  phones: number;
+}
+
+export const getPins = () => request<{ pins: PinInfo[] }>('GET', '/api/pins');
+export const suggestPin = () => request<{ code: string }>('GET', '/api/pins/suggest');
+export const createPin = (kind: PinInfo['kind'], code: string) => request<PinInfo>('POST', '/api/pins', { kind, code });
+export const newPinCode = (id: string) => request<PinInfo>('POST', `/api/pins/${encodeURIComponent(id)}/new-code`, {});
+export const endPin = (id: string) => request<void>('POST', `/api/pins/${encodeURIComponent(id)}/end`, {});
+
+/** Someone with an account, with their signed-in phones and browsers, most recently used first. */
+export interface Person extends User {
+  /** The admin asking. */
+  me: boolean;
+  created_at: string;
+  last_seen_at: string | null;
+  phones: ListedDevice[];
+}
+
+/** An invite nobody has used yet; with user_id it adds a phone or browser for that person. */
+export interface OpenInvite {
+  id: string;
+  name: string;
+  role: Role;
+  user_id: string | null;
+  created_at: string;
+  expires_at: string;
+}
+
+export interface People {
+  users: Person[];
+  invites: OpenInvite[];
+}
+
+/** A new invite: the link is only in this answer. */
+export interface NewInvite {
+  token: string;
+  link: string;
+  invite: OpenInvite;
+}
+
+export const getPeople = () => request<People>('GET', '/api/users');
+export const setRole = (id: string, role: Role) => request<void>('PATCH', `/api/users/${encodeURIComponent(id)}`, { role });
+export const removePerson = (id: string) => request<void>('DELETE', `/api/users/${encodeURIComponent(id)}`);
+export const createInvite = (name: string, role: Role) => request<NewInvite>('POST', '/api/invites', { name, role });
+export const inviteDevice = (userId: string) => request<NewInvite>('POST', `/api/users/${encodeURIComponent(userId)}/invites`, {});
+export const withdrawInvite = (id: string) => request<void>('DELETE', `/api/invites/${encodeURIComponent(id)}`);
+
+export interface TrashedFile extends FileInfo {
+  deleted_at: string;
+  /** The admin who deleted it, or null if they are gone. */
+  deleted_by: string | null;
+  purge_at: string;
+}
+
+export const getTrash = () => request<{ files: TrashedFile[]; trash_days: number }>('GET', '/api/trash');
+export const purgeFiles = (ids: string[]) => request<{ changed: number }>('POST', '/api/trash/purge', { ids });
