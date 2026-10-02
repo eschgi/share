@@ -50,7 +50,16 @@
   justify-content: center;
   gap: 30px;
   min-height: 0;
+  overflow: hidden;
   touch-action: pan-y pinch-zoom;
+}
+/* Photos zoom with the viewer's own gestures, not the page's. */
+.vstage.zoomable {
+  touch-action: none;
+  user-select: none;
+}
+.vstage.zoomed {
+  cursor: grab;
 }
 .vmedia {
   position: relative;
@@ -71,6 +80,14 @@
   position: absolute;
   opacity: 0;
   pointer-events: none;
+}
+.vpic.eased {
+  transition: transform 0.2s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .vpic.eased {
+    transition: none;
+  }
 }
 video.vpic {
   width: 100%;
@@ -192,6 +209,8 @@ video.vpic {
   background: rgba(255, 255, 255, 0.13);
 }
 .varr {
+  position: relative;
+  z-index: 1;
   display: grid;
   place-items: center;
   width: 52px;

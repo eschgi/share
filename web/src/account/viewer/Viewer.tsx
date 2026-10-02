@@ -10,7 +10,9 @@ import { Modal } from '../components/Modal';
 import { Thumb } from '../library/Tile';
 import { ToastContext, useLayer } from '../layers';
 import { lockScroll } from '../scroll';
-import { filmRange, previewOf, swipeStep } from './view';
+import { useZoom } from './useZoom';
+import { filmRange, previewOf } from './view';
+import { isZoomed, type Zoom } from './zoom';
 
 interface Props {
   /** The library's loaded files, in its order; id is the one shown. */
@@ -39,7 +41,7 @@ export function Viewer({ files, id, more, onMove, onClose, onDelete }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
   const wide = useMedia(wideQuery);
   const [details, setDetails] = useState(() => detailsOpen ?? matchMedia(wideQuery).matches);
-  const start = useRef<{ x: number; y: number } | null>(null);
+  const stage = useRef<HTMLDivElement>(null);
   const top = useLayer();
   const toast = useContext(ToastContext);
   useOverlay(true, onClose);
@@ -60,12 +62,13 @@ export function Viewer({ files, id, more, onMove, onClose, onDelete }: Props) {
     if (index < 0) onClose();
     else if (more && index >= files.length - 3) more();
   }, [index, files.length]);
-  if (!file) return null;
-
   const go = (step: number) => {
     const next = files[index + step];
     if (next) onMove(next.id);
   };
+  const zoomable = file !== undefined && previewOf(file) === 'image';
+  const zoom = useZoom(stage, { id, zoomable, onSwipe: go });
+  if (!file) return null;
   const toggleDetails = () => {
     detailsOpen = !details;
     setDetails(!details);
@@ -126,7 +129,8 @@ export function Viewer({ files, id, more, onMove, onClose, onDelete }: Props) {
       }}
       onKeyDown={(e) => {
         if ((e.target as Element).closest('input, video, audio')) return;
-        if (e.key === 'ArrowLeft') go(-1);
+        if (zoom.key(e)) e.preventDefault();
+        else if (e.key === 'ArrowLeft') go(-1);
         else if (e.key === 'ArrowRight') go(1);
         else return;
         e.preventDefault();
@@ -157,24 +161,11 @@ export function Viewer({ files, id, more, onMove, onClose, onDelete }: Props) {
           <Icon name="x" />
         </button>
       </header>
-      <div
-        class="vstage"
-        onPointerDown={(e) => {
-          start.current = e.pointerType === 'touch' && !(e.target as Element).closest('video, audio') ? { x: e.clientX, y: e.clientY } : null;
-        }}
-        onPointerUp={(e) => {
-          const s = start.current;
-          start.current = null;
-          if (!s || (visualViewport && visualViewport.scale > 1.01)) return; // zoomed in: the finger moves the picture
-          const step = swipeStep(e.clientX - s.x, e.clientY - s.y);
-          if (step) go(step);
-        }}
-        onPointerCancel={() => (start.current = null)}
-      >
+      <div ref={stage} class={`vstage${zoomable ? ' zoomable' : ''}${isZoomed(zoom.zoom) ? ' zoomed' : ''}`}>
         <button type="button" class="varr wide-only" aria-label={t('viewer.previous')} disabled={index === 0} onClick={() => go(-1)}>
           <Icon name="chev-left" />
         </button>
-        <Media key={file.id} file={file} />
+        <Media key={file.id} file={file} zoom={zoom.zoom} moving={zoom.moving} />
         <button type="button" class="varr wide-only" aria-label={t('viewer.next')} disabled={index === files.length - 1} onClick={() => go(1)}>
           <Icon name="chev" />
         </button>
@@ -229,19 +220,24 @@ export function Viewer({ files, id, more, onMove, onClose, onDelete }: Props) {
 }
 
 /** The file itself: the photo, the video or the sound, or why it isn't shown. */
-function Media({ file }: { file: FileInfo }) {
+function Media({ file, zoom, moving }: { file: FileInfo; zoom: Zoom; moving: boolean }) {
   const { t } = useI18n();
   const kind = previewOf(file);
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
 
   if (kind === 'image') {
+    const rest = zoom.scale === 1 && zoom.x === 0 && zoom.y === 0;
+    const transform = rest ? undefined : `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.scale})`;
+    const zoomClass = moving ? '' : ' eased';
     return (
       <div class="vmedia">
-        {file.has_thumb && !loaded && <img class="vpic" src={thumbUrl(file)} alt="" />}
+        {file.has_thumb && !loaded && <img class={`vpic${zoomClass}`} src={thumbUrl(file)} alt="" draggable={false} style={{ transform }} />}
         {!failed && (
           <img
-            class={`vpic${loaded ? '' : ' loading'}`}
+            class={`vpic${zoomClass}${loaded ? '' : ' loading'}`}
+            draggable={false}
+            style={{ transform }}
             src={contentUrl(file)}
             alt={file.name}
             onLoad={() => setLoaded(true)}
