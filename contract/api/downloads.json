@@ -1,0 +1,31 @@
+{
+  "method": "POST",
+  "path": "/api/downloads",
+  "auth": "device",
+  "request": {
+    "ids": [
+      "q3ld5x2k7mbqz4bwdbyj6qsqxa",
+      "q4ld5x2k7mbqz4bwdbyj6qsqxa"
+    ]
+  },
+  "status": 201,
+  "response": {
+    "id": "z7ld5x2k7mbqz4bwdbyj6qsqxa",
+    "name": "Share 2026-09-27.zip",
+    "size": 6291766,
+    "count": 2,
+    "files": [
+      {
+        "id": "q3ld5x2k7mbqz4bwdbyj6qsqxa",
+        "path": "2026-09-27/IMG_0001.jpg",
+        "size": 3145728
+      },
+      {
+        "id": "q4ld5x2k7mbqz4bwdbyj6qsqxa",
+        "path": "2026-09-27/IMG_0001 (2).jpg",
+        "size": 3145728
+      }
+    ]
+  },
+  "notes": "Several files as one ZIP. 1 to 10000 ids (400 bad_request otherwise); files not in the library are left out, and with none left 404 not_found. files is the archive's order, with each file's path inside it, its day folder as on the server; saving into a folder uses the same paths. name is the server's name and the day the files arrived, or today. GET /api/downloads/{id} (also HEAD) sends the ZIP: application/zip, stored without compression, Zip64 when needed, exactly size bytes, a strong ETag, Range and If-Range; Cache-Control private, no-store, no-transform. Only the person who asked can fetch it; it is gone a day after its last use or after a restart (404 not_found). A file deleted meanwhile is left out, which changes the ETag, so a resumed download starts over. When two of the person's ZIPs or four in all are being sent, 503 busy with Retry-After."
+}

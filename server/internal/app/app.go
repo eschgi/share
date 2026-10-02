@@ -16,8 +16,10 @@ import (
 
 	"github.com/eschgi/share/server/internal/api"
 	"github.com/eschgi/share/server/internal/auth"
+	"github.com/eschgi/share/server/internal/checksum"
 	"github.com/eschgi/share/server/internal/config"
 	"github.com/eschgi/share/server/internal/db"
+	"github.com/eschgi/share/server/internal/downloads"
 	"github.com/eschgi/share/server/internal/jobs"
 	"github.com/eschgi/share/server/internal/localtls"
 	"github.com/eschgi/share/server/internal/storage"
@@ -41,6 +43,7 @@ type App struct {
 	Auth   *auth.Service
 	Upload *upload.Handler
 	Thumbs *thumbs.Store
+	CRCs   *checksum.Store
 	UI     *webui.UI
 	Local  *localtls.Loader // Share's own certificate on the https port; nil without one
 	// Handler answers on both ports, http and https.
@@ -109,6 +112,9 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 	}
 	th := &thumbs.Store{DB: d, Dir: layout.ThumbsDir(), Root: lib.Root(), Now: now, Logf: log.Printf}
 	lib.OnPurged = th.Remove
+	crcs := &checksum.Store{DB: d, Root: lib.Root(), Pace: checksum.Pace, Logf: log.Printf}
+	lib.OnReady = crcs.Wake
+	dl := &downloads.Store{Now: now}
 	ui := webui.New(cfg)
 	if !ui.Built() {
 		log.Printf("webui: the website isn't built into this binary; serving a placeholder")
@@ -128,7 +134,7 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 	}
 	apiHandlers := &api.API{
 		Cfg: cfg, Auth: authSvc, ServerID: serverID, MaxFileSize: maxFile, Lib: lib, Thumbs: th, Local: local,
-		APK: &api.APK{Path: cfg.App.APKFile}, Now: now,
+		APK: &api.APK{Path: cfg.App.APKFile}, Downloads: dl, Checksums: crcs, Now: now,
 	}
 
 	mux := http.NewServeMux()
@@ -136,13 +142,14 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 	apiHandlers.Register(mux)
 	mux.Handle("/", ui)
 
-	a := &App{Cfg: cfg, DB: d, Lib: lib, Auth: authSvc, Upload: up, Thumbs: th, UI: ui, Local: local, now: now}
+	a := &App{Cfg: cfg, DB: d, Lib: lib, Auth: authSvc, Upload: up, Thumbs: th, CRCs: crcs, UI: ui, Local: local, now: now}
 	// Browsers may only change state from this site itself; the app sends no Origin.
 	a.Handler = a.guard(sameOrigin(mux))
 	a.sched = &jobs.Scheduler{Now: now, Logf: log.Printf, Tasks: []jobs.Task{
 		{Name: "reconcile uploads", Every: 5 * time.Minute, Run: func(ctx context.Context) error {
 			authSvc.PruneLimits()
 			up.PruneQueues()
+			dl.Prune()
 			return lib.Reconcile(ctx, cfg.IncompleteTTL())
 		}},
 		{Name: "expire PINs and sessions", Every: time.Hour, Run: func(ctx context.Context) error {
@@ -227,6 +234,7 @@ func (a *App) Serve(ctx context.Context) error {
 	}()
 	workers.Go(func() { a.sched.Run(jobsCtx) })
 	workers.Go(func() { a.Thumbs.Run(jobsCtx) })
+	workers.Go(func() { a.CRCs.Run(jobsCtx) })
 
 	errCh := make(chan error, len(servers))
 	for _, start := range starts {

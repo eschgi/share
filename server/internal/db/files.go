@@ -47,20 +47,21 @@ type File struct {
 	DeviceID         string
 	DeletedAt        *time.Time
 	DeletedBy        string
+	CRC32            *uint32 // known once the checksum worker or a download worked it out
 }
 
 const fileColumns = `id, state, name, size, received, mime, kind, rel_path, upload_day, created_at, updated_at,
 	uploaded_at, client_modified_at, width, height, duration_ms, thumb, pin_id, pin_session_id, user_id,
-	device_id, deleted_at, deleted_by`
+	device_id, deleted_at, deleted_by, crc32`
 
 func scanFile(row interface{ Scan(...any) error }) (File, error) {
 	var f File
 	var relPath, day, pinID, sessionID, userID, deviceID, deletedBy sql.NullString
 	var created, updated int64
-	var uploaded, clientModified, deleted, width, height, duration sql.NullInt64
+	var uploaded, clientModified, deleted, width, height, duration, crc sql.NullInt64
 	err := row.Scan(&f.ID, &f.State, &f.Name, &f.Size, &f.Received, &f.Mime, &f.Kind, &relPath, &day,
 		&created, &updated, &uploaded, &clientModified, &width, &height, &duration, &f.Thumb,
-		&pinID, &sessionID, &userID, &deviceID, &deleted, &deletedBy)
+		&pinID, &sessionID, &userID, &deviceID, &deleted, &deletedBy, &crc)
 	if errors.Is(err, sql.ErrNoRows) {
 		return f, ErrNotFound
 	}
@@ -73,6 +74,10 @@ func scanFile(row interface{ Scan(...any) error }) (File, error) {
 	f.Width, f.Height, f.DurationMS = optInt(width), optInt(height), optInt(duration)
 	f.PinID, f.PinSessionID, f.UserID, f.DeviceID, f.DeletedBy =
 		pinID.String, sessionID.String, userID.String, deviceID.String, deletedBy.String
+	if crc.Valid {
+		v := uint32(crc.Int64)
+		f.CRC32 = &v
+	}
 	return f, nil
 }
 

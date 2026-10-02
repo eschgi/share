@@ -34,6 +34,6 @@
     "pin_locked":             {"status": 429, "meaning": "Too many wrong PINs; wait retry_after_seconds."},
     "finalize_failed":        {"status": 500, "meaning": "tus: all bytes arrived but the file couldn't be stored yet; the client retries with HEAD."},
     "internal":               {"status": 500, "meaning": "Something failed on the server."},
-    "busy":                   {"status": 503, "meaning": "tus: too many uploads running; retry after the Retry-After header."}
+    "busy":                   {"status": 503, "meaning": "Too many uploads (tus) or ZIP downloads running at once; retry after the Retry-After header."}
   }
 }

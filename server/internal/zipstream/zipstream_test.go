@@ -418,8 +418,10 @@ func TestTimes(t *testing.T) {
 		{time.Date(2026, 9, 27, 22, 15, 3, 0, time.UTC), 15<<5 | 1, 46<<9 | 9<<5 | 28, 1_790_547_303},
 		{time.Date(1969, 7, 20, 20, 17, 40, 0, time.UTC), 0, 1<<5 | 1, 0},
 		{time.Unix(10_000_000, 0), 0, 1<<5 | 1, 10_000_000},
-		{time.Date(2107, 12, 31, 23, 59, 59, 0, rome), last, lastDate, 0xFFFFFFFF},
-		{time.Date(2200, 1, 1, 0, 0, 0, 0, time.UTC), last, lastDate, 0xFFFFFFFF},
+		// The extended timestamp stops in 2038, where Java's and Android's signed reading does.
+		{time.Date(2038, 1, 19, 3, 14, 8, 0, time.UTC), 5<<11 | 14<<5 | 4, 58<<9 | 1<<5 | 19, 0x7FFFFFFF},
+		{time.Date(2107, 12, 31, 23, 59, 59, 0, rome), last, lastDate, 0x7FFFFFFF},
+		{time.Date(2200, 1, 1, 0, 0, 0, 0, time.UTC), last, lastDate, 0x7FFFFFFF},
 	}
 	entries := make([]Entry, len(cases))
 	for i, tc := range cases {

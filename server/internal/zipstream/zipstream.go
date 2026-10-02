@@ -15,6 +15,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -162,8 +163,9 @@ func msDOSTime(t time.Time) (tm, date uint16) {
 }
 
 // unixTime is t for the extended timestamp, which has 32 bits for the seconds since 1970.
-// Times it can't hold get the nearest one it can.
-func unixTime(t time.Time) uint32 { return uint32(min(max(t.Unix(), 0), uint32max)) }
+// Java and Android read them as a signed number, so times stop at January 2038 rather than
+// 2106; earlier ones get 1970.
+func unixTime(t time.Time) uint32 { return uint32(min(max(t.Unix(), 0), math.MaxInt32)) }
 
 // zip64 reports whether the sizes go into a Zip64 extra. A size of 0xFFFFFFFF does too,
 // since that value in a size field means "look in the extra".

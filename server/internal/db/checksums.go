@@ -1,0 +1,61 @@
+package db
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"strings"
+)
+
+// CRCCandidates lists files in the library whose CRC-32 isn't known yet, the newest first:
+// those are the likeliest to be downloaded soon.
+func (d *DB) CRCCandidates(ctx context.Context, limit int) ([]File, error) {
+	return queryFiles(ctx, d, "SELECT "+fileColumns+` FROM files WHERE state = 'ready' AND crc32 IS NULL
+		ORDER BY uploaded_at DESC, id LIMIT ?`, limit)
+}
+
+// FileCRC32 returns a file's CRC-32, and whether it is known yet.
+func (d *DB) FileCRC32(ctx context.Context, id string) (uint32, bool, error) {
+	var v sql.NullInt64
+	err := d.QueryRowContext(ctx, "SELECT crc32 FROM files WHERE id = ?", id).Scan(&v)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, false, ErrNotFound
+	}
+	return uint32(v.Int64), v.Valid, err
+}
+
+// SetCRC32 records a file's CRC-32. A file's bytes never change, so one that is known stays.
+// It doesn't count as a change of the file: thumbnails and the library's version stay.
+func (d *DB) SetCRC32(ctx context.Context, id string, crc uint32) error {
+	_, err := d.ExecContext(ctx, "UPDATE files SET crc32 = ? WHERE id = ? AND crc32 IS NULL", int64(crc), id)
+	return err
+}
+
+// ReadyFiles returns the files among ids that are in the library, once each, in the order of
+// ids.
+func (d *DB) ReadyFiles(ctx context.Context, ids []string) ([]File, error) {
+	byID := make(map[string]File, len(ids))
+	for start := 0; start < len(ids); start += 500 {
+		part := ids[start:min(start+500, len(ids))]
+		args := make([]any, len(part))
+		for i, id := range part {
+			args[i] = id
+		}
+		files, err := queryFiles(ctx, d, "SELECT "+fileColumns+" FROM files WHERE state = 'ready' AND id IN (?"+
+			strings.Repeat(", ?", len(part)-1)+")", args...)
+		if err != nil {
+			return nil, err
+		}
+		for _, f := range files {
+			byID[f.ID] = f
+		}
+	}
+	out := make([]File, 0, len(byID))
+	for _, id := range ids {
+		if f, ok := byID[id]; ok {
+			out = append(out, f)
+			delete(byID, id)
+		}
+	}
+	return out, nil
+}

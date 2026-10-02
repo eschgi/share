@@ -81,12 +81,17 @@ const MaxJSONBody = 64 << 10
 // browsers can't send cross-site without asking first) and rejects unknown fields. On
 // failure it has already answered the request.
 func DecodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
+	return DecodeJSONLimit(w, r, dst, MaxJSONBody)
+}
+
+// DecodeJSONLimit is DecodeJSON for a body of up to max bytes, e.g. a long list of ids.
+func DecodeJSONLimit(w http.ResponseWriter, r *http.Request, dst any, max int64) bool {
 	mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	if err != nil || mt != "application/json" {
 		WriteError(w, http.StatusUnsupportedMediaType, "unsupported_media_type", "Send the request body as application/json.")
 		return false
 	}
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, MaxJSONBody))
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, max))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(dst); err != nil {
 		WriteError(w, http.StatusBadRequest, "bad_request", fmt.Sprintf("Invalid request body: %v", err))

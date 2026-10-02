@@ -12,7 +12,9 @@ import (
 	"time"
 
 	"github.com/eschgi/share/server/internal/auth"
+	"github.com/eschgi/share/server/internal/checksum"
 	"github.com/eschgi/share/server/internal/config"
+	"github.com/eschgi/share/server/internal/downloads"
 	"github.com/eschgi/share/server/internal/httpx"
 	"github.com/eschgi/share/server/internal/localtls"
 	"github.com/eschgi/share/server/internal/storage"
@@ -32,6 +34,8 @@ type API struct {
 	Thumbs      *thumbs.Store
 	Local       *localtls.Loader // Share's own certificate on the https port; nil without one
 	APK         *APK
+	Downloads   *downloads.Store
+	Checksums   *checksum.Store
 	Now         func() time.Time
 }
 
@@ -64,6 +68,8 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/files/{id}/content", a.content)
 	mux.HandleFunc("GET /api/files/{id}/thumb", a.thumb)
 	mux.HandleFunc("PUT /api/files/{id}/thumb", a.putThumb)
+	mux.HandleFunc("POST /api/downloads", a.createDownload)
+	mux.HandleFunc("GET /api/downloads/{id}", a.download)
 	a.registerAdmin(mux)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusNotFound, "not_found", "No such API endpoint.")

@@ -375,10 +375,14 @@ func (d deadlineWriter) Write(p []byte) (int, error) {
 
 // ReadFrom sends a file in 4 MiB pieces, with a fresh deadline for each. It keeps the file
 // itself in view of the connection, so the kernel's sendfile can still do the copying.
+// Anything else, such as a ZIP, goes out piece by piece as it is read.
 func (d deadlineWriter) ReadFrom(src io.Reader) (int64, error) {
 	limit := int64(-1)
 	if lr, ok := src.(*io.LimitedReader); ok {
 		limit, src = lr.N, lr.R
+	}
+	if _, file := src.(*os.File); !file {
+		return d.copyRead(src, limit)
 	}
 	var total int64
 	for limit < 0 || total < limit {
@@ -391,6 +395,35 @@ func (d deadlineWriter) ReadFrom(src io.Reader) (int64, error) {
 		total += c
 		if err != nil || c < n {
 			return total, err
+		}
+	}
+	return total, nil
+}
+
+// copyRead sends what src gives, 256 KiB at a time, and sets the deadline only once a piece
+// has been read: reading may wait, e.g. for a checksum, and that time isn't the line's fault.
+func (d deadlineWriter) copyRead(src io.Reader, limit int64) (int64, error) {
+	buf := make([]byte, 256<<10)
+	var total int64
+	for limit < 0 || total < limit {
+		b := buf
+		if limit >= 0 && int64(len(b)) > limit-total {
+			b = b[:limit-total]
+		}
+		n, rerr := src.Read(b)
+		if n > 0 {
+			d.rc.SetWriteDeadline(time.Now().Add(writeTimeout))
+			w, werr := d.ResponseWriter.Write(b[:n])
+			total += int64(w)
+			if werr != nil {
+				return total, werr
+			}
+		}
+		if errors.Is(rerr, io.EOF) {
+			return total, nil
+		}
+		if rerr != nil {
+			return total, rerr
 		}
 	}
 	return total, nil

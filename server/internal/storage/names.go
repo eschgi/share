@@ -81,8 +81,10 @@ func splitExt(name string) (stem, ext string) {
 	return strings.TrimSuffix(name, ext), ext
 }
 
-// numbered gives the n-th alternative for a taken name: "IMG_1 (2).jpg", still at most
+// Numbered gives the n-th alternative for a taken name: "IMG_1 (2).jpg", still at most
 // maxNameBytes long.
+func Numbered(name string, n int) string { return numbered(name, n) }
+
 func numbered(name string, n int) string {
 	stem, ext := splitExt(name)
 	if len(ext) > 16 {
