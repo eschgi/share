@@ -10,7 +10,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.provider.OpenableColumns
 import android.provider.Settings
 import android.util.Log
 import android.view.WindowManager
@@ -27,6 +26,7 @@ import com.eschgi.share.net.RouteStatus
 import com.eschgi.share.transfer.Downloads
 import com.eschgi.share.transfer.Fetcher
 import com.eschgi.share.transfer.FileRef
+import com.eschgi.share.transfer.Outbox
 import com.eschgi.share.transfer.Picked
 import com.eschgi.share.transfer.Playback
 import com.eschgi.share.transfer.UploadBatch
@@ -83,9 +83,32 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
         if (intent == null) return
         if (intent.action == MainActivity.ACTION_RETRY_DOWNLOADS) io.execute { Downloads.retry(app) }
         if (intent.action == MainActivity.ACTION_RETRY_UPLOADS) io.execute { Uploads.retry(app) }
+        if (Outbox.isShare(intent)) return receiveShare(intent, initial)
         val link = linkOf(intent) ?: return
         if (initial) initialLink = link else send(mapOf("type" to "link", "url" to link))
     }
+
+    /** "Send with Share": the files wait in the outbox for the Dart side; a shared text with a link opens it. */
+    private fun receiveShare(intent: Intent, initial: Boolean) {
+        val uris = Outbox.uris(intent)
+        if (uris.isEmpty()) {
+            val link = Outbox.text(intent)?.let { Outbox.linkIn(it) } ?: return
+            if (initial) initialLink = link else send(mapOf("type" to "link", "url" to link))
+            return
+        }
+        // The sharing app lends the files while this screen lasts: keep or copy them now.
+        io.execute {
+            val received = try {
+                Outbox.receive(app, uris)
+            } catch (e: Exception) {
+                Log.w(TAG, "shared files", e)
+                Outbox.Received(0, uris.size)
+            }
+            send(sharedEvent(received.skipped))
+        }
+    }
+
+    private fun sharedEvent(skipped: Int = 0): Map<String, Any?> = mapOf("type" to "shared", "count" to Outbox.pending(app).size, "skipped" to skipped)
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
@@ -141,6 +164,15 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
                 }
             }
             "upload.pick" -> pick(call.argument<String>("what"), call.argument<String>("auth") ?: UploadBatch.DEVICE, result)
+            "shared.count" -> background(result) { Outbox.pending(app).size }
+            "shared.send" -> background(result) {
+                val auth = call.argument<String>("auth") ?: UploadBatch.DEVICE
+                Outbox.sendWith(app) { files -> Uploads.enqueue(app, auth, files) }
+            }
+            "shared.drop" -> background(result) {
+                Outbox.drop(app)
+                null
+            }
             "upload.cancel" -> background(result) {
                 Uploads.cancel(app, call.argument<String>("batch") ?: "")
                 null
@@ -208,6 +240,7 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
             send(RouteMonitor.current(app).toMap() + ("type" to "route"))
             Downloads.snapshots(app).forEach { send(it.toMap()) }
             Uploads.snapshots(app).forEach { send(it.toMap()) }
+            if (Outbox.pending(app).isNotEmpty()) send(sharedEvent())
         }
     }
 
@@ -265,23 +298,12 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
 
     /** Name, size and type of a picked file, keeping the permission to read it after a restart. */
     private fun describe(uri: Uri): Picked? {
-        val resolver = app.contentResolver
         try {
-            resolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            app.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
         } catch (e: SecurityException) {
             // Not every picker allows it; then it only works until the phone restarts.
         }
-        var name: String? = null
-        var size: Long? = null
-        resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { c ->
-            if (c.moveToFirst()) {
-                name = c.getString(0)
-                if (!c.isNull(1)) size = c.getLong(1)
-            }
-        }
-        if (size == null) size = runCatching { resolver.openAssetFileDescriptor(uri, "r")?.use { it.length.takeIf { n -> n >= 0 } } }.getOrNull()
-        val length = size ?: return null // tus has to know it
-        return Picked(uri.toString(), name ?: uri.lastPathSegment ?: "file", length, resolver.getType(uri) ?: "application/octet-stream")
+        return Outbox.describe(app, uri)
     }
 
     fun onRequestPermissionsResult(requestCode: Int) {

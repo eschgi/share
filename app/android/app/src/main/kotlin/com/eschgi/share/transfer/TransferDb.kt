@@ -45,10 +45,26 @@ class TransferDb private constructor(context: Context) : SQLiteOpenHelper(contex
         db.execSQL("CREATE INDEX items_queued ON items (state, batch)")
         db.execSQL("CREATE TABLE saved (file_id TEXT PRIMARY KEY, uri TEXT NOT NULL, saved_at INTEGER NOT NULL)")
         createUploads(db)
+        createShared(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         if (oldVersion < 2) createUploads(db)
+        if (oldVersion < 3) createShared(db)
+    }
+
+    /** Version 3: files shared into the app, waiting to be sent (Outbox). */
+    private fun createShared(db: SQLiteDatabase) {
+        db.execSQL(
+            """CREATE TABLE shared (
+                seq INTEGER PRIMARY KEY AUTOINCREMENT,
+                uri TEXT NOT NULL, -- the sharing app's, or the copy's
+                name TEXT NOT NULL,
+                size INTEGER NOT NULL,
+                mime TEXT NOT NULL,
+                shared_at INTEGER NOT NULL
+            )""",
+        )
     }
 
     /** Version 2: sending from the phone. */
@@ -268,7 +284,7 @@ class TransferDb private constructor(context: Context) : SQLiteOpenHelper(contex
     )
 
     companion object {
-        private const val VERSION = 2
+        private const val VERSION = 3
         private const val ITEM_COLUMNS = "i.batch, i.file_id, i.name, i.size, i.mime, i.kind, i.state, i.bytes, i.target"
 
         @Volatile private var instance: TransferDb? = null

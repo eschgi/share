@@ -57,6 +57,14 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="${linkScheme}" android:host="join" />
             </intent-filter>
+            <!-- "Send with Share" in other apps' share sheets: files, and texts with a Share link
+                 in them (Outbox.kt). -->
+            <intent-filter android:label="@string/send_with_share">
+                <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
         </activity>
 
         <!-- Android 14+: the host of downloads and uploads. Only the system binds it, and it is only ever

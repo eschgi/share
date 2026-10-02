@@ -46,7 +46,12 @@ class AppServices {
   /// The theme the person picked (ThemeChoice), or null for Ember.
   final theme = ValueNotifier<String?>(null);
 
+  /// How many files shared from other apps wait to be sent (SharedSender).
+  final shared = ValueNotifier<int>(0);
+
   Future<void> start() async {
+    platform.sharedChanges.listen((s) => shared.value = s.count);
+    shared.value = await platform.sharedCount();
     theme.value = await platform.readSecret('theme');
     language.value = await platform.readSecret('language');
     await session.restore();
@@ -87,7 +92,9 @@ class ShareApp extends StatefulWidget {
 
 class _ShareAppState extends State<ShareApp> {
   final _navigator = GlobalKey<NavigatorState>();
+  final _messenger = GlobalKey<ScaffoldMessengerState>();
   StreamSubscription<String>? _links;
+  StreamSubscription<SharedFiles>? _shared;
 
   @override
   void initState() {
@@ -95,13 +102,22 @@ class _ShareAppState extends State<ShareApp> {
     final s = widget.services;
     unawaited(s.start());
     _links = s.platform.links.listen(_open);
+    _shared = s.platform.sharedChanges.listen(_sharedChanged);
     unawaited(s.platform.initialLink().then((l) => l == null ? null : _open(l)));
   }
 
   @override
   void dispose() {
     _links?.cancel();
+    _shared?.cancel();
     super.dispose();
+  }
+
+  /// Files shared from another app that couldn't be taken, e.g. without room for a copy.
+  void _sharedChanged(SharedFiles shared) {
+    final messenger = _messenger.currentState;
+    if (shared.skipped == 0 || messenger == null) return;
+    messenger.showSnackBar(SnackBar(content: Text(AppLocalizations.of(messenger.context).sharedSkipped(shared.skipped))));
   }
 
   /// A link that opened the app: an invite (from the invite page or a scan), or a PIN link.
@@ -126,6 +142,7 @@ class _ShareAppState extends State<ShareApp> {
             final (light, dark, mode) = ThemeChoice.resolve(widget.services.theme.value);
             return MaterialApp(
               navigatorKey: _navigator,
+              scaffoldMessengerKey: _messenger,
               onGenerateTitle: (_) => 'Share',
               debugShowCheckedModeBanner: false,
               theme: shareTheme(light),

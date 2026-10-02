@@ -58,7 +58,11 @@ object UploadThumbs {
             "video" -> videoSize(context, uri)
             else -> Triple(null, null, null)
         }
-        val bitmap = system(resolver, uri) ?: if (kind == "photo") decode(resolver, uri) else null
+        val bitmap = system(resolver, uri) ?: when (kind) {
+            "photo" -> decode(resolver, uri)
+            "video" -> frame(context, uri)
+            else -> null
+        }
         val jpeg = bitmap?.let {
             ByteArrayOutputStream().use { out ->
                 it.compress(Bitmap.CompressFormat.JPEG, 80, out)
@@ -94,6 +98,29 @@ object UploadThumbs {
         null
     } catch (e: OutOfMemoryError) {
         null
+    }
+
+    /** A video without a system thumbnail, such as a copy of a shared one: a frame of its first second, small. */
+    private fun frame(context: Context, uri: Uri): Bitmap? {
+        val retriever = MediaMetadataRetriever()
+        return try {
+            retriever.setDataSource(context, uri)
+            val frame = retriever.getFrameAtTime(1_000_000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC) ?: return null
+            val scale = SIZE.toFloat() / maxOf(frame.width, frame.height)
+            if (scale >= 1f) {
+                frame
+            } else {
+                val small = Bitmap.createScaledBitmap(frame, (frame.width * scale).toInt().coerceAtLeast(1), (frame.height * scale).toInt().coerceAtLeast(1), true)
+                if (small !== frame) frame.recycle()
+                small
+            }
+        } catch (e: RuntimeException) {
+            null
+        } catch (e: OutOfMemoryError) {
+            null
+        } finally {
+            runCatching { retriever.release() }
+        }
     }
 
     private fun orientation(resolver: ContentResolver, uri: Uri): Int = try {

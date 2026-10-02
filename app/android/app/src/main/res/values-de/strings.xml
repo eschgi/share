@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- The app in other apps' share sheets. -->
+    <string name="send_with_share">Mit Share senden</string>
+
     <string name="downloads_channel">Downloads</string>
     <string name="downloads_saving">Wird auf diesem Handy gespeichert</string>
     <string name="downloads_progress">%1$d von %2$d · %3$s von %4$s</string>

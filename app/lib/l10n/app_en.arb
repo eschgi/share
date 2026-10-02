@@ -676,6 +676,23 @@
     }
   },
   "commonUndo": "Undo",
+  "sharedWaiting": "{count, plural, =1{1 shared file is waiting. Sign in or enter a PIN to send it.} other{{count} shared files are waiting. Sign in or enter a PIN to send them.}}",
+  "@sharedWaiting": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sharedDontSend": "Don't send",
+  "sharedSkipped": "{count, plural, =1{1 shared file couldn't be taken. There may be no room for it on this phone.} other{{count} shared files couldn't be taken. There may be no room for them on this phone.}}",
+  "@sharedSkipped": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "trashLead": "Deleted files stay here for {days} days. Then they're gone for good.",
   "@trashLead": {
     "placeholders": {

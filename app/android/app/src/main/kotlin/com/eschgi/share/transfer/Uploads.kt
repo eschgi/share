@@ -1,7 +1,6 @@
 package com.eschgi.share.transfer
 
 import android.content.Context
-import android.content.Intent
 import android.util.Log
 import androidx.core.net.toUri
 import com.eschgi.share.data.SecretStore
@@ -57,9 +56,7 @@ object Uploads {
         val auth = queue.batch(batch)?.auth ?: return
         val open = queue.cancel(batch)
         UploadEngine.abort(batch)
-        for (item in open) {
-            runCatching { app.contentResolver.releasePersistableUriPermission(item.file.uri.toUri(), Intent.FLAG_GRANT_READ_URI_PERMISSION) }
-        }
+        for (item in open) Outbox.release(app, item.file.uri.toUri())
         publish(app, HashMap(), null, false)
         // The server drops unfinished uploads after a week anyway; saying so now frees the space.
         val started = open.mapNotNull { it.uploadId }

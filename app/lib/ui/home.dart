@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import '../data/models.dart';
 import '../l10n/app_localizations.dart';
 import 'icons.dart';
+import '../data/platform.dart';
 import 'library/library_screen.dart';
 import 'send/send_screen.dart';
+import 'send/shared.dart';
 import 'settings_screen.dart';
 
 /// Signed in: the library, sending, and the settings.
@@ -37,10 +39,18 @@ class _HomeShellState extends State<HomeShell> {
       SendScreen(user: widget.user, navigation: nav, onAvatar: toSettings),
       SettingsScreen(user: widget.user, navigation: nav),
     ];
-    // Every tab's Scaffold shows the app's snack bar, each in a Hero of the same tag; only the
-    // tab in view may take part when a screen opens or closes on top.
-    return IndexedStack(index: _tab, children: [
-      for (final (i, tab) in tabs.indexed) HeroMode(enabled: i == _tab, child: tab),
-    ]);
+    // Files shared from another app go out at once, on the Send tab.
+    return SharedSender(
+      auth: SendAuth.device,
+      onShared: () {
+        Navigator.of(context).popUntil((r) => r.isFirst);
+        setState(() => _tab = 1);
+      },
+      // Every tab's Scaffold shows the app's snack bar, each in a Hero of the same tag; only the
+      // tab in view may take part when a screen opens or closes on top.
+      child: IndexedStack(index: _tab, children: [
+        for (final (i, tab) in tabs.indexed) HeroMode(enabled: i == _tab, child: tab),
+      ]),
+    );
   }
 }

@@ -1,7 +1,6 @@
 package com.eschgi.share.transfer
 
 import android.content.Context
-import android.content.Intent
 import android.util.Log
 import androidx.core.net.toUri
 import com.eschgi.share.data.SecretStore
@@ -218,9 +217,9 @@ object UploadEngine {
         }
     }
 
-    /** Sent (or refused for good): the picked file's grant isn't needed any more. */
+    /** Sent (or refused for good): the picked file's grant isn't needed any more, nor a copy of a shared one. */
     private fun release(app: Context, item: UploadRow) {
-        runCatching { app.contentResolver.releasePersistableUriPermission(item.file.uri.toUri(), Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+        Outbox.release(app, item.file.uri.toUri())
     }
 
     /** Waits [ms]; false if the host stopped meanwhile. */

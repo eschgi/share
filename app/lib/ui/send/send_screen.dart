@@ -12,6 +12,7 @@ import '../theme.dart';
 import '../widgets.dart';
 import 'pin_entry_screen.dart';
 import 'send_panel.dart';
+import 'shared.dart';
 
 /// Screen 15 for someone signed in: no PIN needed.
 class SendScreen extends StatelessWidget {
@@ -60,51 +61,56 @@ class PinSendScreen extends StatelessWidget {
     final c = context.colors;
     final locale = Localizations.localeOf(context).languageCode;
     final expires = session.expiresAt;
-    return Scaffold(
-      appBar: AppBar(
-        titleSpacing: 22,
-        title: Text(t.sendTitle),
-        actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(AppIcons.more),
-            onSelected: (choice) async {
-              if (choice == 'pin') return _newPin(context);
-              await Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const SignInScreen()));
-            },
-            itemBuilder: (_) => [
-              PopupMenuItem(value: 'pin', child: Text(t.pinOther)),
-              PopupMenuItem(value: 'sign-in', child: Text(t.pinSignIn)),
-            ],
-          ),
-        ],
-      ),
-      body: ListView(padding: const EdgeInsets.fromLTRB(16, 0, 16, 24), children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(6, 0, 6, 18),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(t.pinSendTo(session.server.host), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-            if (session.kind == PinKind.day && expires != null) ...[
-              const SizedBox(height: 4),
-              Text(t.pinValidUntil(formatWhen(expires, clock.now(), locale)), style: TextStyle(fontSize: 14.5, color: c.warn)),
-            ],
-            const SizedBox(height: 8),
-            Text(t.pinSendLead, style: TextStyle(fontSize: 16, height: 1.5, color: c.text2)),
-          ]),
+    // Files shared from another app go out with the PIN.
+    return SharedSender(
+      auth: SendAuth.pin,
+      onShared: () => Navigator.of(context).popUntil((r) => r.isFirst),
+      child: Scaffold(
+        appBar: AppBar(
+          titleSpacing: 22,
+          title: Text(t.sendTitle),
+          actions: [
+            PopupMenuButton<String>(
+              icon: const Icon(AppIcons.more),
+              onSelected: (choice) async {
+                if (choice == 'pin') return _newPin(context);
+                await Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const SignInScreen()));
+              },
+              itemBuilder: (_) => [
+                PopupMenuItem(value: 'pin', child: Text(t.pinOther)),
+                PopupMenuItem(value: 'sign-in', child: Text(t.pinSignIn)),
+              ],
+            ),
+          ],
         ),
-        if (session.ended) ...[
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: c.s1, borderRadius: BorderRadius.circular(18), border: Border.all(color: c.lineSoft)),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Text(t.sendPinEnded, style: TextStyle(fontSize: 15.5, height: 1.5, color: c.text2)),
-              const SizedBox(height: 12),
-              FilledButton(onPressed: () => _newPin(context), child: Text(t.sendNewPin)),
+        body: ListView(padding: const EdgeInsets.fromLTRB(16, 0, 16, 24), children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(6, 0, 6, 18),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(t.pinSendTo(session.server.host), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              if (session.kind == PinKind.day && expires != null) ...[
+                const SizedBox(height: 4),
+                Text(t.pinValidUntil(formatWhen(expires, clock.now(), locale)), style: TextStyle(fontSize: 14.5, color: c.warn)),
+              ],
+              const SizedBox(height: 8),
+              Text(t.pinSendLead, style: TextStyle(fontSize: 16, height: 1.5, color: c.text2)),
             ]),
           ),
-          const SizedBox(height: 16),
-        ],
-        SendPanel(auth: SendAuth.pin, onNewPin: () => _newPin(context)),
-      ]),
+          if (session.ended) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(color: c.s1, borderRadius: BorderRadius.circular(18), border: Border.all(color: c.lineSoft)),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Text(t.sendPinEnded, style: TextStyle(fontSize: 15.5, height: 1.5, color: c.text2)),
+                const SizedBox(height: 12),
+                FilledButton(onPressed: () => _newPin(context), child: Text(t.sendNewPin)),
+              ]),
+            ),
+            const SizedBox(height: 16),
+          ],
+          SendPanel(auth: SendAuth.pin, onNewPin: () => _newPin(context)),
+        ]),
+      ),
     );
   }
 }

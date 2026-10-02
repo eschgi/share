@@ -192,6 +192,18 @@ class PlaySource {
   bool get isCopy => uri.scheme == 'content' || uri.scheme == 'file';
 }
 
+/// Files shared into the app from another app's share sheet: how many wait to be sent, and how
+/// many of the last share couldn't be taken (no room for a copy, or unreadable).
+class SharedFiles {
+  const SharedFiles({required this.count, this.skipped = 0});
+
+  factory SharedFiles.fromMap(Map<Object?, Object?> m) =>
+      SharedFiles(count: (m['count'] as num?)?.toInt() ?? 0, skipped: (m['skipped'] as num?)?.toInt() ?? 0);
+
+  final int count;
+  final int skipped;
+}
+
 /// The batch whose progress [Platform.transfers] reports while files are fetched for
 /// [Platform.shareFiles] and [Platform.openFile]; [Platform.cancelDownloads] stops it.
 const fetchBatch = 'fetch';
@@ -256,6 +268,14 @@ abstract class Platform {
   /// What waited for a new PIN or a sign-in goes on.
   Future<void> resumeUploads(SendAuth auth);
   Stream<UploadState> get uploads;
+
+  /// Files shared into the app wait until they are sent, or dropped ("Send with Share").
+  Future<int> sharedCount();
+  Stream<SharedFiles> get sharedChanges;
+
+  /// Sends the files waiting, with the phone's key or the PIN; the upload batch, or null.
+  Future<String?> sendShared(SendAuth auth);
+  Future<void> dropShared();
 }
 
 /// The real platform: MethodChannel com.eschgi.share/platform, and one event channel for
@@ -275,6 +295,8 @@ class ChannelPlatform implements Platform {
           final u = UploadState.fromMap(e);
           _lastUploads[u.batch] = u;
           _uploads.add(u);
+        case 'shared':
+          _shared.add(SharedFiles.fromMap(e));
       }
     }, onError: (Object _) {});
   }
@@ -287,6 +309,7 @@ class ChannelPlatform implements Platform {
   final _transfers = StreamController<TransferState>.broadcast();
   final _uploads = StreamController<UploadState>.broadcast();
   final _lastUploads = <String, UploadState>{};
+  final _shared = StreamController<SharedFiles>.broadcast();
 
   Future<T?> _invoke<T>(String method, [Object? args]) async {
     try {
@@ -427,6 +450,18 @@ class ChannelPlatform implements Platform {
 
   @override
   Future<void> resumeUploads(SendAuth auth) => _soft('upload.resume', {'auth': auth.name});
+
+  @override
+  Future<int> sharedCount() async => await _soft<int>('shared.count') ?? 0;
+
+  @override
+  Stream<SharedFiles> get sharedChanges => _shared.stream;
+
+  @override
+  Future<String?> sendShared(SendAuth auth) => _invoke<String>('shared.send', {'auth': auth.name});
+
+  @override
+  Future<void> dropShared() => _soft('shared.drop');
 
   /// Starts with how each batch stood last: the send screen may open long after the change.
   @override

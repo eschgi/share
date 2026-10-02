@@ -33,6 +33,7 @@ class FirstStartScreen extends StatelessWidget {
                     const SizedBox(height: 12),
                     NoteCard(icon: AppIcons.logOut, text: t.commonSignedOut),
                   ],
+                  const _SharedWaiting(),
                   const SizedBox(height: 14),
                   const PhotoStack(left: 3, right: 2),
                   const SizedBox(height: 26),
@@ -64,6 +65,35 @@ class FirstStartScreen extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Files shared from another app, waiting for a sign-in or a PIN; or they can go.
+class _SharedWaiting extends StatelessWidget {
+  const _SharedWaiting();
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final services = Services.of(context);
+    return ValueListenableBuilder<int>(
+      valueListenable: services.shared,
+      builder: (context, count, _) => count == 0
+          ? const SizedBox()
+          : Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                NoteCard(icon: AppIcons.upload, text: t.sharedWaiting(count)),
+                TextButton(
+                  onPressed: () async {
+                    await services.platform.dropShared();
+                    services.shared.value = 0;
+                  },
+                  child: Text(t.sharedDontSend),
+                ),
+              ]),
+            ),
     );
   }
 }

@@ -153,4 +153,36 @@ class FakePlatform implements Platform {
 
   @override
   Stream<UploadState> get uploads => uploadEvents.stream;
+
+  /// Files shared into the app, waiting; what was done with them.
+  int sharedWaiting = 0;
+  final sharedSent = <SendAuth>[];
+  int sharedDropped = 0;
+  final sharedEvents = StreamController<SharedFiles>.broadcast();
+
+  /// Another app shares files with the app.
+  void share(int count, {int skipped = 0}) {
+    sharedWaiting += count;
+    sharedEvents.add(SharedFiles(count: sharedWaiting, skipped: skipped));
+  }
+
+  @override
+  Future<int> sharedCount() async => sharedWaiting;
+
+  @override
+  Stream<SharedFiles> get sharedChanges => sharedEvents.stream;
+
+  @override
+  Future<String?> sendShared(SendAuth auth) async {
+    if (sharedWaiting == 0) return null;
+    sharedWaiting = 0;
+    sharedSent.add(auth);
+    return 'up-shared';
+  }
+
+  @override
+  Future<void> dropShared() async {
+    sharedWaiting = 0;
+    sharedDropped++;
+  }
 }
