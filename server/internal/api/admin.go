@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"log"
 	"net/http"
 	"sort"
 	"time"
@@ -27,6 +28,7 @@ func (a *API) registerAdmin(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/users", a.people)
 	mux.HandleFunc("PATCH /api/users/{id}", a.changeRole)
 	mux.HandleFunc("DELETE /api/users/{id}", a.removePerson)
+	mux.HandleFunc("POST /api/users/{id}/password", a.newPassword)
 	mux.HandleFunc("DELETE /api/devices/{id}", a.signOutPhone)
 	mux.HandleFunc("POST /api/invites", a.invite)
 	mux.HandleFunc("POST /api/users/{id}/invites", a.invitePhone)
@@ -337,6 +339,50 @@ func (a *API) personChange(w http.ResponseWriter, what string, err error) {
 		httpx.WriteError(w, http.StatusConflict, "last_admin", "This is the only admin. Make someone else admin first.")
 	default:
 		internal(w, what, err)
+	}
+}
+
+type newPasswordRequest struct {
+	Username string `json:"username"`
+}
+
+// NewPassword is a password made up for someone, shown only now; the server keeps only its
+// hash.
+type NewPassword struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+// newPassword gives someone who forgot their password a new one, for the admin to hand over.
+// Admins change their own in Settings, with the current one.
+func (a *API) newPassword(w http.ResponseWriter, r *http.Request) {
+	p, ok := a.admin(w, r)
+	if !ok {
+		return
+	}
+	id := r.PathValue("id")
+	if id == p.UserID {
+		httpx.WriteError(w, http.StatusForbidden, "forbidden", "Change your own password in Settings, with the current one.")
+		return
+	}
+	var req newPasswordRequest
+	if !httpx.DecodeJSON(w, r, &req) {
+		return
+	}
+	username, password, err := a.Auth.ResetPassword(r.Context(), id, req.Username)
+	var input *auth.InputError
+	switch {
+	case err == nil:
+		log.Printf("api: admin %s gave %s a new password", p.UserID, id)
+		httpx.WriteJSON(w, http.StatusOK, NewPassword{Username: username, Password: password})
+	case errors.As(err, &input):
+		httpx.WriteError(w, http.StatusBadRequest, "bad_request", "The "+input.Field+" "+input.Problem+".")
+	case errors.Is(err, db.ErrNotFound):
+		httpx.WriteError(w, http.StatusNotFound, "not_found", "No such person.")
+	case errors.Is(err, auth.ErrUsernameTaken):
+		httpx.WriteError(w, http.StatusConflict, "username_taken", "Someone else has that username.")
+	default:
+		internal(w, "new password", err)
 	}
 }
 

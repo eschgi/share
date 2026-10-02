@@ -330,6 +330,14 @@ func (s *Service) DeleteAccount(ctx context.Context, p *Principal) error {
 
 var usernamePattern = regexp.MustCompile(`^[\p{L}\p{N}._-]{3,32}$`)
 
+// CheckUsername tells whether a username can be used (contract/usernames.json).
+func CheckUsername(username string) error {
+	if !usernamePattern.MatchString(username) {
+		return &InputError{"username", "needs 3 to 32 letters, digits, dots, dashes or underscores"}
+	}
+	return nil
+}
+
 // SetPassword gives the caller a username and password, for signing in on other phones and in
 // browsers. With a password already set, the current one is needed.
 func (s *Service) SetPassword(ctx context.Context, p *Principal, username, current, password string) error {
@@ -341,8 +349,8 @@ func (s *Service) SetPassword(ctx context.Context, p *Principal, username, curre
 		return err
 	}
 	username = strings.TrimSpace(username)
-	if !usernamePattern.MatchString(username) {
-		return &InputError{"username", "needs 3 to 32 letters, digits, dots, dashes or underscores"}
+	if err := CheckUsername(username); err != nil {
+		return err
 	}
 	if n := utf8.RuneCountInString(password); n < 8 || n > 200 {
 		return &InputError{"password", "needs at least 8 characters"}
@@ -377,21 +385,41 @@ func (s *Service) SetPassword(ctx context.Context, p *Principal, username, curre
 	return nil
 }
 
-// SetLoginFor gives someone a username and password from the server's console.
-func (s *Service) SetLoginFor(ctx context.Context, userID, username, password string) error {
-	if !usernamePattern.MatchString(username) {
-		return &InputError{"username", "needs 3 to 32 letters, digits, dots, dashes or underscores"}
+// ResetPassword makes up a new password for someone who forgot theirs, for an admin to hand
+// over, and returns it with the username to sign in with. username changes the person's
+// username; empty keeps theirs, and someone without one needs it. Their phones and browsers
+// stay signed in, and pauses after wrong passwords end, so the new one works at once.
+func (s *Service) ResetPassword(ctx context.Context, userID, username string) (string, string, error) {
+	u, err := s.DB.UserByID(ctx, userID)
+	if err != nil {
+		return "", "", err
 	}
+	if username = strings.TrimSpace(username); username == "" {
+		username = u.Username
+	}
+	if username == "" {
+		return "", "", &InputError{"username", "is needed: this person has none yet"}
+	}
+	if err := CheckUsername(username); err != nil {
+		return "", "", err
+	}
+	password := NewPassword()
 	hash, err := HashPassword(ctx, password)
 	if err != nil {
-		return err
+		return "", "", err
 	}
-	if err := s.DB.SetLogin(ctx, userID, username, hash); errors.Is(err, db.ErrConflict) {
-		return ErrUsernameTaken
+	if err := s.DB.SetLogin(ctx, u.ID, username, hash); errors.Is(err, db.ErrConflict) {
+		return "", "", ErrUsernameTaken
 	} else if err != nil {
-		return err
+		return "", "", err
 	}
-	return nil
+	for _, name := range []string{u.Username, username} {
+		if name != "" {
+			s.loginPerUser.Reset("user:" + strings.ToLower(name))
+		}
+	}
+	s.passwordPerUser.Reset("user:" + u.ID)
+	return username, password, nil
 }
 
 // authenticateDevice checks a phone's or browser's key; viaCookie says it came in the

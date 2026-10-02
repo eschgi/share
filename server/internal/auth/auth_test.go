@@ -48,6 +48,67 @@ func TestNormalizeCodeMatchesContract(t *testing.T) {
 	}
 }
 
+func TestUsernamesMatchContract(t *testing.T) {
+	raw, err := os.ReadFile("../../../contract/usernames.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fixture struct {
+		Pattern        string
+		Valid, Invalid []string
+		Suggestions    []struct{ Name, Username string }
+	}
+	if err := json.Unmarshal(raw, &fixture); err != nil {
+		t.Fatal(err)
+	}
+	if fixture.Pattern != usernamePattern.String() {
+		t.Errorf("contract pattern %s, the server's %s", fixture.Pattern, usernamePattern)
+	}
+	for _, u := range fixture.Valid {
+		if err := CheckUsername(u); err != nil {
+			t.Errorf("%q: %v, but the contract calls it valid", u, err)
+		}
+	}
+	for _, u := range fixture.Invalid {
+		if CheckUsername(u) == nil {
+			t.Errorf("%q is accepted, but the contract calls it invalid", u)
+		}
+	}
+	for _, s := range fixture.Suggestions {
+		if s.Username != "" && CheckUsername(s.Username) != nil {
+			t.Errorf("the suggestion %q for %q can't be used", s.Username, s.Name)
+		}
+	}
+}
+
+func TestNewPassword(t *testing.T) {
+	seen := map[string]bool{}
+	counts := map[rune]int{}
+	for range 20000 {
+		p := NewPassword()
+		if len(p) != 19 || strings.Count(p, "-") != 3 || p[4] != '-' || p[9] != '-' || p[14] != '-' {
+			t.Fatalf("NewPassword() = %q", p)
+		}
+		for _, c := range strings.ReplaceAll(p, "-", "") {
+			if !strings.ContainsRune("23456789abcdefghjkmnpqrstuvwxyz", c) {
+				t.Fatalf("%q has %q", p, c)
+			}
+			counts[c]++
+		}
+		if seen[p] {
+			t.Fatalf("%q twice", p)
+		}
+		seen[p] = true
+	}
+	// 320000 characters, 10323 ± 100 of each. With a byte modulo 31, the first 8 would come
+	// 11250 times.
+	for c, n := range counts {
+		if n < 9820 || n > 10820 {
+			t.Errorf("%q came %d times of 320000", c, n)
+		}
+	}
+}
+
 func TestGenerateCode(t *testing.T) {
 	for range 200 {
 		c := GenerateCode()

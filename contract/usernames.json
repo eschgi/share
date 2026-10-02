@@ -1,0 +1,20 @@
+{
+  "description": "Usernames: what the server accepts, and the username the website and the app suggest for someone without one. The suggestion is the name trimmed and in small letters, with dots for spaces; other characters than letters, digits, dots, dashes and underscores go, so do repeated dots and dots, dashes and underscores at either end; it is cut to 32 characters, again without those at the end. If that leaves fewer than 3, there is no suggestion (empty).",
+  "pattern": "^[\\p{L}\\p{N}._-]{3,32}$",
+  "valid": ["maria", "maria.rossi", "anna-lena", "jürgen_m", "Stefan", "李小龙", "abc", "a2345678901234567890123456789012"],
+  "invalid": ["jo", "maria rossi", "maria@home", "d'angelo", "oma👵", "", "a23456789012345678901234567890123"],
+  "suggestions": [
+    {"name": "Maria", "username": "maria"},
+    {"name": "Maria Rossi", "username": "maria.rossi"},
+    {"name": "  Anna   Lena ", "username": "anna.lena"},
+    {"name": "Jürgen Müller", "username": "jürgen.müller"},
+    {"name": "D'Angelo", "username": "dangelo"},
+    {"name": "Anna-Lena O'Brien", "username": "anna-lena.obrien"},
+    {"name": "Oma 👵", "username": "oma"},
+    {"name": "Maria . Rossi", "username": "maria.rossi"},
+    {"name": "-Max_", "username": "max"},
+    {"name": "Maximilian Alexander von Hohenberg-Schwarzenstein", "username": "maximilian.alexander.von.hohenbe"},
+    {"name": "Jo", "username": ""},
+    {"name": "👵 👴", "username": ""}
+  ]
+}

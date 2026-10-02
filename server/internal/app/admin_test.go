@@ -174,6 +174,63 @@ func TestAdminsManagePeople(t *testing.T) {
 	wantStatus(t, "Rosa again", e.do(nil, "DELETE", "/api/users/"+rosa.userID, maria.token, nil, nil), http.StatusNotFound, "not_found")
 }
 
+func TestAdminsSetNewPasswords(t *testing.T) {
+	e := newEnv(t)
+	admin := e.admin()
+	e.setPassword(admin.token, "stefan", "correct horse")
+	maria := e.accept(e.invite(admin, "Maria", "member"), "Pixel 8")
+	reset := func(by signedIn, userID string, v any) response {
+		return e.postJSON(nil, "/api/users/"+userID+"/password", by.token, v, nil)
+	}
+	login := func(user, pass string) response {
+		return e.postJSON(nil, "/api/auth/login", "", map[string]string{"username": user, "password": pass, "device_name": "Laptop"}, nil)
+	}
+
+	wantStatus(t, "a member", reset(maria, admin.userID, map[string]string{}), http.StatusForbidden, "forbidden")
+	wantStatus(t, "for oneself", reset(admin, admin.userID, map[string]string{}), http.StatusForbidden, "forbidden")
+	wantStatus(t, "nobody", reset(admin, "u7ld5x2k7mbqz4bwdbyj6qsqxa", map[string]string{"username": "nobody"}), http.StatusNotFound, "not_found")
+	wantStatus(t, "Maria has no username yet", reset(admin, maria.userID, map[string]string{}), http.StatusBadRequest, "bad_request")
+	wantStatus(t, "a username with a space", reset(admin, maria.userID, map[string]string{"username": "maria rossi"}), http.StatusBadRequest, "bad_request")
+	wantStatus(t, "Stefan's username", reset(admin, maria.userID, map[string]string{"username": "Stefan"}), http.StatusConflict, "username_taken")
+
+	r := reset(admin, maria.userID, map[string]string{"username": " maria.rossi "})
+	wantStatus(t, "a first password", r, http.StatusOK, "")
+	assertShape(t, "new password", readFixture(t, "api/user_password.json")["response"], r.json(t))
+	if cc := r.header.Get("Cache-Control"); !strings.Contains(cc, "no-store") {
+		t.Errorf("Cache-Control %q", cc)
+	}
+	first := r.json(t)
+	if first["username"] != "maria.rossi" || len(first["password"].(string)) != 19 {
+		t.Fatalf("new password: %v", first)
+	}
+	wantStatus(t, "Maria signs in with it", login("maria.rossi", first["password"].(string)), http.StatusOK, "")
+	if me := e.get("/api/me", maria.token).json(t)["user"].(map[string]any); me["username"] != "maria.rossi" || me["has_password"] != true {
+		t.Errorf("Maria: %v", me)
+	}
+
+	// Maria forgot it, tried too often, and is paused; a new one works at once, and her
+	// phones stay signed in.
+	for range 10 {
+		login("maria.rossi", "guess")
+	}
+	wantStatus(t, "paused", login("maria.rossi", first["password"].(string)), http.StatusTooManyRequests, "login_locked")
+	again := reset(admin, maria.userID, map[string]string{})
+	wantStatus(t, "another one", again, http.StatusOK, "")
+	second := again.json(t)
+	if second["username"] != "maria.rossi" || second["password"] == first["password"] {
+		t.Fatalf("another one: %v", second)
+	}
+	wantStatus(t, "the old one", login("maria.rossi", first["password"].(string)), http.StatusUnauthorized, "login_wrong")
+	wantStatus(t, "the new one", login("maria.rossi", second["password"].(string)), http.StatusOK, "")
+	wantStatus(t, "her phone", e.get("/api/me", maria.token), http.StatusOK, "")
+	wantStatus(t, "Stefan's password", login("stefan", "correct horse"), http.StatusOK, "")
+
+	renamed := reset(admin, maria.userID, map[string]string{"username": "mrossi"})
+	wantStatus(t, "with another username", renamed, http.StatusOK, "")
+	wantStatus(t, "the old username", login("maria.rossi", renamed.json(t)["password"].(string)), http.StatusUnauthorized, "login_wrong")
+	wantStatus(t, "the new username", login("mrossi", renamed.json(t)["password"].(string)), http.StatusOK, "")
+}
+
 func TestDeleteRestoreAndPurge(t *testing.T) {
 	e := newEnv(t)
 	admin := e.admin()

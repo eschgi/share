@@ -94,14 +94,22 @@ func (d *DB) UserCount(ctx context.Context) (int, error) {
 }
 
 // SetLogin gives a person a username and password hash. It returns ErrConflict if the
-// username belongs to someone else.
+// username belongs to someone else, and ErrNotFound if there is no such person.
 func (d *DB) SetLogin(ctx context.Context, userID, username, passwordHash string) error {
-	_, err := d.ExecContext(ctx, "UPDATE users SET username = ?, password_hash = ? WHERE id = ?",
+	res, err := d.ExecContext(ctx, "UPDATE users SET username = ?, password_hash = ? WHERE id = ?",
 		nullString(username), nullString(passwordHash), userID)
 	if isUniqueViolation(err) {
 		return ErrConflict
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err != nil {
+		return err
+	} else if n == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 // DeleteUser removes a person together with their phones and open invites. Files they sent

@@ -65,6 +65,27 @@ func derive(ctx context.Context, password string, salt []byte, iter int) ([]byte
 	return pbkdf2.Key(sha256.New, password, salt, iter, 32)
 }
 
+// NewPassword makes up a password for someone, for an admin to hand over: 16 characters in
+// four groups, without look-alikes, easy to read out (79 bits).
+func NewPassword() string {
+	const alphabet = "23456789abcdefghjkmnpqrstuvwxyz"
+	const limit = 256 - 256%len(alphabet) // bytes from here on would favour the first characters
+	var out strings.Builder
+	var b [1]byte
+	for n := 0; n < 16; {
+		rand.Read(b[:])
+		if int(b[0]) >= limit {
+			continue
+		}
+		if n > 0 && n%4 == 0 {
+			out.WriteByte('-')
+		}
+		out.WriteByte(alphabet[int(b[0])%len(alphabet)])
+		n++
+	}
+	return out.String()
+}
+
 // decoyHash is checked when a username doesn't exist, so that answer takes as long as a
 // wrong password and doesn't tell which usernames exist.
 var decoyHash = sync.OnceValue(func() string {

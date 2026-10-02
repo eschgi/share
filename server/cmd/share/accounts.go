@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"os"
@@ -164,6 +163,10 @@ func password(args []string) error {
 	u, err := d.UserByUsername(ctx, username)
 	switch {
 	case errors.Is(err, db.ErrNotFound):
+		// A new account: only with a username it can sign in with.
+		if err := auth.CheckUsername(username); err != nil {
+			return err
+		}
 		role := db.RoleMember
 		if *admin {
 			role = db.RoleAdmin
@@ -180,28 +183,13 @@ func password(args []string) error {
 	case err != nil:
 		return err
 	}
-	pass := randomPassword()
-	if err := svc.SetLoginFor(ctx, u.ID, username, pass); err != nil {
+	username, pass, err := svc.ResetPassword(ctx, u.ID, username)
+	if err != nil {
 		return err
 	}
 	fmt.Printf("Username: %s\nPassword: %s\n", username, pass)
-	fmt.Println("Sign in with these in the app; the password can be changed there.")
+	fmt.Println("Sign in with these in the app or on the website; the password can be changed in Settings.")
 	return nil
-}
-
-// randomPassword is 16 characters in four groups, without look-alikes, easy to read out.
-func randomPassword() string {
-	const alphabet = "23456789abcdefghjkmnpqrstuvwxyz"
-	b := make([]byte, 16)
-	rand.Read(b)
-	var out strings.Builder
-	for i, c := range b {
-		if i > 0 && i%4 == 0 {
-			out.WriteByte('-')
-		}
-		out.WriteByte(alphabet[int(c)%len(alphabet)])
-	}
-	return out.String()
 }
 
 func cert(args []string) error {
