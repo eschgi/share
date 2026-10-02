@@ -11,6 +11,7 @@ import 'admin/invite_person_screen.dart';
 import 'admin/people.dart';
 import 'admin/pins_screen.dart';
 import 'admin/trash_screen.dart';
+import 'devices.dart';
 import 'format.dart';
 import 'icons.dart';
 import 'server_screen.dart';
@@ -214,24 +215,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
       appBar: AppBar(titleSpacing: 22, title: Text(t.settingsTitle)),
       bottomNavigationBar: widget.navigation,
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 24), children: [
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(color: c.s1, borderRadius: BorderRadius.circular(20), border: Border.all(color: c.lineSoft)),
-          child: Row(children: [
-            Avatar(name: u.name, id: u.id, size: 52),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
-                  Flexible(child: Text(u.name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600))),
-                  const SizedBox(width: 8),
-                  RoleBadge(label: u.isAdmin ? t.roleAdmin : t.roleMember, admin: u.isAdmin),
-                ]),
-                const SizedBox(height: 2),
-                Text(t.settingsSignedInHere, style: TextStyle(fontSize: 13, color: c.text3)),
+        // The profile opens one's phones and browsers, as on the website.
+        Material(
+          color: c.s1,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: c.lineSoft)),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () => showModalBottomSheet<void>(context: context, isScrollControlled: true, builder: (_) => const MyDevicesSheet()),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(children: [
+                Avatar(name: u.name, id: u.id, size: 52),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Row(children: [
+                      Flexible(child: Text(u.name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600))),
+                      const SizedBox(width: 8),
+                      RoleBadge(label: u.isAdmin ? t.roleAdmin : t.roleMember, admin: u.isAdmin),
+                    ]),
+                    const SizedBox(height: 2),
+                    Text(t.settingsSignedInHere, style: TextStyle(fontSize: 13, color: c.text3)),
+                  ]),
+                ),
+                Icon(AppIcons.chevronRight, size: 20, color: c.text3),
               ]),
             ),
-          ]),
+          ),
         ),
         const SizedBox(height: 14),
         SettingsGroup(children: [

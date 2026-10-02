@@ -139,6 +139,24 @@ void main() {
     expect(find.text('Maria'), findsNothing);
   });
 
+  testWidgets('everyone signs out their own phones and browsers from the profile', (tester) async {
+    final server = FakeServer(); // a member
+    await startApp(tester, signedInPhone(), server);
+    await openSettings(tester);
+    await tester.tap(find.text('Signed in on this phone'));
+    await tester.pumpAndSettle();
+    expect(find.text('Your phones and browsers'), findsOneWidget);
+    expect(find.text('This phone'), findsOneWidget);
+    expect(find.textContaining('only at home'), findsOneWidget);
+    await tester.tap(find.text('Sign out').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Sign out Chrome · Windows?'), findsOneWidget);
+    await tester.tap(find.text('Sign out').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Chrome · Windows'), findsNothing);
+    expect(server.myDevices.map((d) => d['name']), ['Pixel 8']);
+  });
+
   testWidgets('the only admin stays one', (tester) async {
     await startApp(tester, signedInPhone(), adminServer());
     await openSettings(tester);

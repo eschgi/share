@@ -5,6 +5,7 @@ import '../../app.dart';
 import '../../data/api.dart';
 import '../../data/models.dart';
 import '../../l10n/app_localizations.dart';
+import '../devices.dart';
 import '../format.dart';
 import '../icons.dart';
 import '../theme.dart';
@@ -130,9 +131,8 @@ class _PersonSheetState extends State<PersonSheet> {
   }
 
   Future<void> _signOut(Phone phone) async {
-    final t = AppLocalizations.of(context);
     final admin = Services.read(context).admin;
-    if (!await _confirm(t.personSignOutTitle(phone.name), t.personSignOutBody, t.personSignOutPhone)) return;
+    if (!await askToSignOut(context, phone)) return;
     if (await _do(() => admin.signOutPhone(phone.id)) && mounted) {
       setState(() => _person = _person.copyWith(phones: [for (final p in _person.phones) if (p.id != phone.id) p]));
     }
@@ -150,8 +150,6 @@ class _PersonSheetState extends State<PersonSheet> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final c = context.colors;
-    final locale = Localizations.localeOf(context).languageCode;
-    final now = clock.now();
     final p = _person;
     return SafeArea(
       child: SingleChildScrollView(
@@ -170,22 +168,7 @@ class _PersonSheetState extends State<PersonSheet> {
           ]),
           SectionLabel(t.personPhones),
           SettingsGroup(children: [
-            for (final phone in p.phones)
-              SettingsRow(
-                leading: SettingsRow.icon(context, phone.isBrowser ? AppIcons.monitor : AppIcons.smartphone),
-                title: phone.name,
-                subtitle: [
-                  phone.isThis ? t.personThisPhone : t.personLastUsed(formatWhen(phone.lastSeenAt, now, locale)),
-                  if (phone.homeOnly) t.personAtHome,
-                ].join(' · '),
-                trailing: phone.isThis
-                    ? const SizedBox()
-                    : TextButton(
-                        style: TextButton.styleFrom(foregroundColor: c.danger),
-                        onPressed: _busy ? null : () => _signOut(phone),
-                        child: Text(t.personSignOutPhone),
-                      ),
-              ),
+            for (final phone in p.phones) PhoneRow(phone: phone, onSignOut: _busy ? null : () => _signOut(phone)),
             SettingsRow(
               leading: SettingsRow.icon(context, AppIcons.plus, accent: true),
               title: t.personAddPhone,

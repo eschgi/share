@@ -610,6 +610,8 @@
     }
   },
   "personSignOutBody": "To come back it needs a new invite or the password.",
+  "myDevicesTitle": "Your phones and browsers",
+  "myDevicesLead": "Where you're signed in. Sign out a phone or browser you no longer use, or one on someone else's computer.",
   "personRemove": "Remove {name}",
   "@personRemove": {
     "placeholders": {

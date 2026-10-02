@@ -218,6 +218,8 @@
   "personSignOutPhone": "Disconnetti",
   "personSignOutTitle": "Disconnettere {phone}?",
   "personSignOutBody": "Per tornare servirà un nuovo invito o la password.",
+  "myDevicesTitle": "I tuoi telefoni e browser",
+  "myDevicesLead": "Dove hai effettuato l'accesso. Disconnetti un telefono o un browser che non usi più, o uno sul computer di qualcun altro.",
   "personRemove": "Rimuovi {name}",
   "personRemoveTitle": "Rimuovere {name}?",
   "personRemoveBody": "I suoi telefoni e browser vengono disconnessi. I file inviati restano nella libreria.",

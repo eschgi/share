@@ -17,6 +17,7 @@ class FakeServer {
       'POST /api/invites/accept': (_) => json(contractResponse('api/invite_accept.json')),
       'POST /api/auth/logout': (_) => http.Response('', 204),
       'GET /api/server': (_) => json(contractResponse('api/server.json')),
+      'GET /api/me/devices': (_) => json({'devices': myDevices}),
       'GET /api/library': (req) => json(_library(req.url.queryParameters)),
       'GET /api/files': (req) => json(_files(req.url.queryParameters)),
       'GET /api/files/ids': (req) {
@@ -176,6 +177,7 @@ class FakeServer {
     }
     final device = RegExp(r'^/api/devices/([^/]+)$').firstMatch(path);
     if (req.method == 'DELETE' && device != null) {
+      myDevices = [for (final d in myDevices) if (d['id'] != device.group(1)) d];
       people['users'] = [
         for (final u in _users) {...u, 'phones': [for (final p in u['phones'] as List) if ((p as Map)['id'] != device.group(1)) p]},
       ];
@@ -193,6 +195,11 @@ class FakeServer {
   final requests = <http.Request>[];
 
   Map<String, dynamic> me = contractResponse('api/me.json');
+
+  /// The phones and browsers of the person signed in; the phone asking is the app.
+  List<Map<String, dynamic>> myDevices = [
+    for (final d in contractResponse('api/me_devices.json')['devices'] as List) {...(d as Map).cast<String, dynamic>(), 'this': d['client'] == 'app'},
+  ];
 
   /// Files as the API returns them, newest first.
   List<Map<String, dynamic>> files = [];

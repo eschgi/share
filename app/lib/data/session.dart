@@ -185,6 +185,13 @@ class SessionRepository {
     _set(SignedInState(user));
   }
 
+  /// The phones and browsers signed in as oneself, most recently used first.
+  Future<List<Phone>> myDevices() async =>
+      [for (final d in (await api.get('/api/me/devices'))['devices'] as List? ?? const []) Phone.fromJson((d as Map).cast())];
+
+  /// Signs out one of one's own phones or browsers, such as a lost one.
+  Future<void> signOutDevice(String id) => api.delete('/api/devices/$id');
+
   Future<void> signOut() async {
     try {
       await api.post('/api/auth/logout');
