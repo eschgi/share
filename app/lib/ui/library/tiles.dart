@@ -55,31 +55,37 @@ class _ThumbImageState extends State<ThumbImage> {
       });
     }
     if (f.kind == FileKind.document) {
-      return DecoratedBox(
-        decoration: BoxDecoration(color: c.s1, border: Border.all(color: c.lineSoft)),
-        child: Stack(children: [
-          Center(
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Icon(AppIcons.fileText, size: 26, color: c.text2),
-              const SizedBox(height: 6),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                child: Text(f.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10.5, color: c.text2)),
-              ),
-            ]),
-          ),
-          if (f.ext.isNotEmpty)
-            Positioned(
-              top: 6,
-              right: 6,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                decoration: BoxDecoration(color: c.s3, borderRadius: BorderRadius.circular(4)),
-                child: Text(f.ext, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 0.5, color: c.text2)),
-              ),
+      // The film strip's small tiles have room for the icon only.
+      return LayoutBuilder(builder: (context, box) {
+        final small = box.maxHeight < 64;
+        return DecoratedBox(
+          decoration: BoxDecoration(color: c.s1, border: Border.all(color: c.lineSoft)),
+          child: Stack(children: [
+            Center(
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Icon(AppIcons.fileText, size: small ? 20 : 26, color: c.text2),
+                if (!small) ...[
+                  const SizedBox(height: 6),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: Text(f.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10.5, color: c.text2)),
+                  ),
+                ],
+              ]),
             ),
-        ]),
-      );
+            if (f.ext.isNotEmpty && !small)
+              Positioned(
+                top: 6,
+                right: 6,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  decoration: BoxDecoration(color: c.s3, borderRadius: BorderRadius.circular(4)),
+                  child: Text(f.ext, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 0.5, color: c.text2)),
+                ),
+              ),
+          ]),
+        );
+      });
     }
     return DecoratedBox(
       decoration: BoxDecoration(

@@ -141,6 +141,17 @@ void main() {
     expect(find.text('No app on this phone can open this file.'), findsOneWidget);
   });
 
+  testWidgets('the viewer says how long a video is', (tester) async {
+    final server = FakeServer()..addDay(today(), 6);
+    await startApp(tester, signedInPhone(), server);
+    await tester.tap(find.byType(LibraryTile).at(2)); // the day's third file is a video of 18 seconds
+    await tester.pumpAndSettle();
+    expect(find.textContaining(RegExp(r'^VID_2\.mp4 · .+ · 0:18$')), findsOneWidget);
+    await tester.tap(find.byIcon(AppIcons.more));
+    await tester.pumpAndSettle();
+    expect(find.textContaining(RegExp(r' · 0:18 · video/mp4$')), findsOneWidget);
+  });
+
   testWidgets('signing out goes back to the first screen', (tester) async {
     final platform = signedInPhone();
     await startApp(tester, platform, FakeServer());

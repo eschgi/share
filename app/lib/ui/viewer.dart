@@ -65,7 +65,12 @@ class _ViewerScreenState extends State<ViewerScreen> {
             for (final line in [
               '${formatDay(f.day, clock.now(), locale, today: t.dayToday, yesterday: t.dayYesterday)}, ${formatTime(f.uploadedAt, locale)}',
               f.from == null ? t.viewerFromPin : t.viewerFrom(f.from!),
-              [formatBytes(f.size, locale), if (f.width != null && f.height != null) '${f.width} × ${f.height}', f.mime].join(' · '),
+              [
+                formatBytes(f.size, locale),
+                if (f.width != null && f.height != null) '${f.width} × ${f.height}',
+                if (f.durationMs != null) formatDuration(f.durationMs!),
+                f.mime,
+              ].join(' · '),
             ])
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),
@@ -83,7 +88,12 @@ class _ViewerScreenState extends State<ViewerScreen> {
     final locale = Localizations.localeOf(context).languageCode;
     final f = _file;
     final c = context.colors;
-    final meta = [f.name, formatBytes(f.size, locale), if (f.width != null && f.height != null) '${f.width} × ${f.height}'].join(' · ');
+    final meta = [
+      f.name,
+      formatBytes(f.size, locale),
+      if (f.width != null && f.height != null) '${f.width} × ${f.height}',
+      if (f.durationMs != null) formatDuration(f.durationMs!),
+    ].join(' · ');
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
