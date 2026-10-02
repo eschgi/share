@@ -152,6 +152,9 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 			if _, err := d.DeleteStalePinSessions(ctx, now().Add(-30*24*time.Hour)); err != nil {
 				return err
 			}
+			if _, err := d.DeleteEndedDevices(ctx, now().Add(-30*24*time.Hour), now().Add(-auth.WebSessionIdle)); err != nil {
+				return err
+			}
 			_, err := d.DeleteOldInvites(ctx, now().Add(-30*24*time.Hour))
 			return err
 		}},
@@ -180,7 +183,7 @@ func (a *App) Serve(ctx context.Context) error {
 	if token, err := a.Auth.FirstStartInvite(ctx); err != nil {
 		log.Printf("share: first-start invite: %v", err)
 	} else if token != "" {
-		log.Printf("share: nobody has an account yet. To become the admin, open this link on your phone; it works once, for 7 days:")
+		log.Printf("share: nobody has an account yet. To become the admin, open this link on your phone or computer; it works once, for 7 days:")
 		log.Printf("share:   %s/join#%s", strings.TrimSuffix(a.Cfg.PublicURL, "/"), token)
 		log.Printf("share: or make an invite with your name: share invite --admin --name YOURNAME")
 	}

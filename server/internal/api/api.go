@@ -52,6 +52,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/invites/peek", a.peekInvite)
 	mux.HandleFunc("POST /api/invites/accept", a.acceptInvite)
 	mux.HandleFunc("GET /api/me", a.me)
+	mux.HandleFunc("GET /api/me/devices", a.myDevices)
 	mux.HandleFunc("PUT /api/me/password", a.setPassword)
 	mux.HandleFunc("POST /api/me/delete", a.deleteMe)
 	mux.HandleFunc("GET /api/server", a.serverInfo)
@@ -96,7 +97,8 @@ func (a *API) info(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// Session describes who the caller is.
+// Session describes the caller's PIN session; for the app's bearer token it may also say
+// "device". A browser's account is /api/me.
 type Session struct {
 	Kind      string     `json:"kind"`               // "pin"
 	PinKind   string     `json:"pin_kind,omitempty"` // "permanent" or "day"
@@ -173,18 +175,18 @@ func (a *API) unlock(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) session(w http.ResponseWriter, r *http.Request) {
-	p, err := a.Auth.Authenticate(r.Context(), r)
+	p, err := a.Auth.AuthenticatePin(r.Context(), r)
 	if err != nil {
-		httpx.WriteAuthError(w, err)
+		httpx.WriteAuthError(w, r, err)
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, Session{Kind: p.Kind, PinKind: p.PinKind, ExpiresAt: p.PinExpiresAt})
 }
 
 func (a *API) endSession(w http.ResponseWriter, r *http.Request) {
-	p, err := a.Auth.Authenticate(r.Context(), r)
+	p, err := a.Auth.AuthenticatePin(r.Context(), r)
 	if err != nil && !errors.Is(err, auth.ErrSessionEnded) {
-		httpx.WriteAuthError(w, err)
+		httpx.WriteAuthError(w, r, err)
 		return
 	}
 	if p != nil {
@@ -201,7 +203,7 @@ func (a *API) endSession(w http.ResponseWriter, r *http.Request) {
 func (a *API) putThumb(w http.ResponseWriter, r *http.Request) {
 	p, err := a.Auth.Authenticate(r.Context(), r)
 	if err != nil {
-		httpx.WriteAuthError(w, err)
+		httpx.WriteAuthError(w, r, err)
 		return
 	}
 	if mt, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); mt != "image/jpeg" {

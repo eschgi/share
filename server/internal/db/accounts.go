@@ -130,23 +130,31 @@ func (d *DB) DeleteUser(ctx context.Context, id string) error {
 	})
 }
 
-// Device is a signed-in phone.
+// Device clients: the app on a phone, or a browser with the key in a cookie.
+const (
+	ClientApp = "app"
+	ClientWeb = "web"
+)
+
+// Device is a signed-in phone or browser.
 type Device struct {
 	ID         string
 	UserID     string
 	Name       string
+	Client     string // ClientApp or ClientWeb
+	HomeOnly   bool   // a browser that signed in at home; it works only there
 	CreatedAt  time.Time
 	LastSeenAt time.Time
 	RevokedAt  *time.Time
 }
 
-const deviceColumns = "id, user_id, name, created_at, last_seen_at, revoked_at"
+const deviceColumns = "id, user_id, name, client, home_only, created_at, last_seen_at, revoked_at"
 
 func scanDevice(row interface{ Scan(...any) error }) (Device, error) {
 	var dv Device
 	var created, seen int64
 	var revoked sql.NullInt64
-	err := row.Scan(&dv.ID, &dv.UserID, &dv.Name, &created, &seen, &revoked)
+	err := row.Scan(&dv.ID, &dv.UserID, &dv.Name, &dv.Client, &dv.HomeOnly, &created, &seen, &revoked)
 	if errors.Is(err, sql.ErrNoRows) {
 		return dv, ErrNotFound
 	}
@@ -158,21 +166,24 @@ func scanDevice(row interface{ Scan(...any) error }) (Device, error) {
 }
 
 func insertDevice(ctx context.Context, tx *sql.Tx, dv Device, tokenHash []byte) error {
+	if dv.Client == "" {
+		dv.Client = ClientApp
+	}
 	_, err := tx.ExecContext(ctx,
-		"INSERT INTO devices (id, user_id, token_hash, name, created_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?)",
-		dv.ID, dv.UserID, tokenHash, dv.Name, ms(dv.CreatedAt), ms(dv.LastSeenAt))
+		"INSERT INTO devices (id, user_id, token_hash, name, client, home_only, created_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+		dv.ID, dv.UserID, tokenHash, dv.Name, dv.Client, dv.HomeOnly, ms(dv.CreatedAt), ms(dv.LastSeenAt))
 	return err
 }
 
-// InsertDevice signs a phone in for a person; only the token's hash is kept.
+// InsertDevice signs a phone or browser in for a person; only the token's hash is kept.
 func (d *DB) InsertDevice(ctx context.Context, dv Device, tokenHash []byte) error {
 	return d.Tx(ctx, func(tx *sql.Tx) error { return insertDevice(ctx, tx, dv, tokenHash) })
 }
 
-// DeviceByToken finds a phone and its person by token hash. It doesn't judge validity;
-// callers check RevokedAt.
+// DeviceByToken finds a phone or browser and its person by token hash. It doesn't judge
+// validity; callers check RevokedAt.
 func (d *DB) DeviceByToken(ctx context.Context, tokenHash []byte) (Device, User, error) {
-	row := d.QueryRowContext(ctx, `SELECT d.id, d.user_id, d.name, d.created_at, d.last_seen_at, d.revoked_at,
+	row := d.QueryRowContext(ctx, `SELECT d.id, d.user_id, d.name, d.client, d.home_only, d.created_at, d.last_seen_at, d.revoked_at,
 			u.id, u.name, u.username, u.password_hash, u.role, u.created_at, u.created_by
 		FROM devices d JOIN users u ON u.id = d.user_id WHERE d.token_hash = ?`, tokenHash)
 	var dv Device
@@ -180,7 +191,7 @@ func (d *DB) DeviceByToken(ctx context.Context, tokenHash []byte) (Device, User,
 	var created, seen, uCreated int64
 	var revoked sql.NullInt64
 	var username, hash sql.NullString
-	err := row.Scan(&dv.ID, &dv.UserID, &dv.Name, &created, &seen, &revoked,
+	err := row.Scan(&dv.ID, &dv.UserID, &dv.Name, &dv.Client, &dv.HomeOnly, &created, &seen, &revoked,
 		&u.ID, &u.Name, &username, &hash, &u.Role, &uCreated, &u.CreatedBy)
 	if errors.Is(err, sql.ErrNoRows) {
 		return dv, u, ErrNotFound
@@ -204,7 +215,8 @@ func (d *DB) DeviceTokenHash(ctx context.Context, id string) ([]byte, error) {
 	return hash, err
 }
 
-// DevicesOf lists a person's phones that are still signed in, most recently used first.
+// DevicesOf lists a person's phones and browsers that are still signed in, most recently used
+// first.
 func (d *DB) DevicesOf(ctx context.Context, userID string) ([]Device, error) {
 	rows, err := d.QueryContext(ctx, "SELECT "+deviceColumns+` FROM devices
 		WHERE user_id = ? AND revoked_at IS NULL ORDER BY last_seen_at DESC, id`, userID)
@@ -229,10 +241,22 @@ func (d *DB) TouchDevice(ctx context.Context, id string, at time.Time) error {
 	return err
 }
 
-// RevokeDevice signs a phone out; its token stops working.
+// RevokeDevice signs a phone or browser out; its token stops working.
 func (d *DB) RevokeDevice(ctx context.Context, id string, at time.Time) error {
 	_, err := d.ExecContext(ctx, "UPDATE devices SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL", ms(at), id)
 	return err
+}
+
+// DeleteEndedDevices forgets phones and browsers that were signed out before revokedBefore,
+// and browsers nobody used since idleBefore; their keys can't work any more. Nothing refers to
+// a device by foreign key: files and invites keep the id as plain text.
+func (d *DB) DeleteEndedDevices(ctx context.Context, revokedBefore, idleBefore time.Time) (int64, error) {
+	res, err := d.ExecContext(ctx, `DELETE FROM devices WHERE (revoked_at IS NOT NULL AND revoked_at < ?)
+		OR (client = 'web' AND last_seen_at < ?)`, ms(revokedBefore), ms(idleBefore))
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }
 
 // Invite lets someone sign a phone in without a password.

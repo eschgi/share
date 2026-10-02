@@ -9,7 +9,7 @@
     "pin_ended":              {"status": 401, "meaning": "The code belonged to a PIN that has ended. Counts as a wrong try."},
     "pin_wrong":              {"status": 401, "meaning": "No live PIN with this code. attempts_left says how many tries remain before a pause."},
     "session_ended":          {"status": 401, "meaning": "The PIN session's PIN ended or expired, or the session was signed out. Unlock again; unfinished uploads move to the new session."},
-    "signed_out":             {"status": 401, "meaning": "This phone's token was revoked, or its account deleted. Sign in again."},
+    "signed_out":             {"status": 401, "meaning": "This phone's or browser's key was revoked or its account deleted, a browser went unused for 400 days, or a browser that signed in at home was used from elsewhere. Sign in again. A browser's answer also deletes its cookie."},
     "unauthorized":           {"status": 401, "meaning": "No valid PIN session or device token."},
     "cross_origin":           {"status": 403, "meaning": "A browser request that changes something didn't come from Share's own pages: another site, or a request carrying the website's cookie but saying neither Origin nor Sec-Fetch-Site."},
     "forbidden":              {"status": 403, "meaning": "Not allowed, e.g. deleting a finished upload over tus, or sending a thumbnail more than a day after the upload."},

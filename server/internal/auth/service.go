@@ -20,9 +20,10 @@ import (
 // Cookie and header names. Browsers keep __Host- cookies only from secure pages; over plain
 // http at home (PlainHTTP) the cookies have the same names without the prefix.
 const (
-	CookiePin    = "__Host-share_pin" // the PIN session of the website
-	CookieClient = "__Host-share_cid" // a random browser id, used only to count wrong PINs
-	HeaderClient = "Share-Client"     // the same id, sent by the app
+	CookiePin     = "__Host-share_pin"     // the PIN session of the website
+	CookieSession = "__Host-share_session" // a browser signed in with an account: its device key
+	CookieClient  = "__Host-share_cid"     // a random browser id, used only to count wrong PINs
+	HeaderClient  = "Share-Client"         // the same id, sent by the app
 )
 
 // plainName is a cookie's name over plain http: secure cookies can't be set there.
@@ -50,12 +51,32 @@ func PlainHTTP(r *http.Request) bool {
 	return plain
 }
 
+type homeKey struct{}
+
+// WithHome marks a request that came over https from the home network to an address at home,
+// such as https://192.168.8.1:8443.
+func WithHome(r *http.Request) *http.Request {
+	return r.WithContext(context.WithValue(r.Context(), homeKey{}, true))
+}
+
+// AtHome reports whether a request came from the home network to an address at home: plain
+// http (which only home networks may use), or https marked by WithHome. A browser signing in
+// on such a request gets a session that works only at home, because its cookie belongs to an
+// address that devices on other networks have too.
+func AtHome(r *http.Request) bool {
+	home, _ := r.Context().Value(homeKey{}).(bool)
+	return home || PlainHTTP(r)
+}
+
 const (
 	// DayPinLifetime is how long a 24-hour PIN works.
 	DayPinLifetime = 24 * time.Hour
 	// permanentSessionIdle ends a permanent-PIN session nobody used for this long; the
 	// cookie itself lasts as long.
 	permanentSessionIdle = 400 * 24 * time.Hour
+	// WebSessionIdle ends a browser's account session nobody used for this long. Browsers keep
+	// a cookie at most 400 days; it is set again on each day the browser is used.
+	WebSessionIdle = 400 * 24 * time.Hour
 	// touchEvery limits last-seen writes to one per session per interval.
 	touchEvery = 10 * time.Minute
 )
@@ -190,7 +211,7 @@ func (s *Service) Unlock(ctx context.Context, r *http.Request, input, client str
 	}
 	res := &UnlockResult{Token: token, Session: sess, ExpiresAt: pin.ExpiresAt}
 
-	if old := bearerOrCookie(r); old != "" && ids.TokenHasPrefix(old, ids.PrefixPinSession) {
+	if old := pinToken(r); old != "" {
 		if prev, err := s.DB.PinSessionByToken(ctx, ids.HashToken(old)); err == nil && prev.ID != sess.ID {
 			if res.Moved, err = s.DB.MoveReceivingUploads(ctx, prev.ID, sess.ID, pin.ID, now); err != nil {
 				return nil, err
@@ -255,19 +276,57 @@ func validClientID(v string) bool {
 	return err == nil
 }
 
-// Authenticate returns the principal of a request, from its bearer token or session cookie.
+// Authenticate returns the principal of a request: from its Authorization bearer token (the
+// app), else from the account cookie (a signed-in browser), else from the PIN cookie (the
+// website with a PIN). A dead account cookie is the answer even when a PIN cookie is there
+// too, so the website learns that it was signed out; that answer deletes the cookie
+// (httpx.WriteAuthError), and the next request goes on with the PIN.
 func (s *Service) Authenticate(ctx context.Context, r *http.Request) (*Principal, error) {
-	token := bearerOrCookie(r)
+	if h := r.Header.Get("Authorization"); h != "" {
+		return s.authenticateBearer(ctx, r, h)
+	}
+	if c, err := r.Cookie(cookieName(r, CookieSession)); err == nil {
+		if !ids.TokenHasPrefix(c.Value, ids.PrefixDevice) {
+			return nil, ErrSignedOut
+		}
+		return s.authenticateDevice(ctx, r, c.Value, true)
+	}
+	return s.authenticatePinCookie(ctx, r)
+}
+
+// AuthenticatePin is Authenticate for the endpoints about PIN sessions, which a browser's
+// account cookie has nothing to do with: a bearer token, else the PIN cookie.
+func (s *Service) AuthenticatePin(ctx context.Context, r *http.Request) (*Principal, error) {
+	if h := r.Header.Get("Authorization"); h != "" {
+		return s.authenticateBearer(ctx, r, h)
+	}
+	return s.authenticatePinCookie(ctx, r)
+}
+
+// authenticateBearer checks an Authorization header. Any other kind than Bearer means none of
+// the cookies count either, as before.
+func (s *Service) authenticateBearer(ctx context.Context, r *http.Request, header string) (*Principal, error) {
+	token, ok := strings.CutPrefix(header, "Bearer ")
+	token = strings.TrimSpace(token)
 	switch {
-	case token == "":
+	case !ok || token == "":
 		return nil, ErrUnauthorized
 	case ids.TokenHasPrefix(token, ids.PrefixPinSession):
 		return s.authenticatePin(ctx, token)
 	case ids.TokenHasPrefix(token, ids.PrefixDevice):
-		return s.authenticateDevice(ctx, token)
+		return s.authenticateDevice(ctx, r, token, false)
 	default:
 		return nil, ErrUnauthorized
 	}
+}
+
+// authenticatePinCookie checks the website's PIN cookie, which holds only PIN session keys.
+func (s *Service) authenticatePinCookie(ctx context.Context, r *http.Request) (*Principal, error) {
+	c, err := r.Cookie(cookieName(r, CookiePin))
+	if err != nil || !ids.TokenHasPrefix(c.Value, ids.PrefixPinSession) {
+		return nil, ErrUnauthorized
+	}
+	return s.authenticatePin(ctx, c.Value)
 }
 
 func (s *Service) authenticatePin(ctx context.Context, token string) (*Principal, error) {
@@ -307,19 +366,19 @@ func (s *Service) EndSession(ctx context.Context, p *Principal) error {
 	return s.DB.RevokePinSession(ctx, p.PinSessionID, s.Now())
 }
 
-// bearerOrCookie returns the request's token: an Authorization bearer (the app) or the
-// session cookie (the website).
-func bearerOrCookie(r *http.Request) string {
+// pinToken returns the PIN session key a request carries, if any: as a bearer token (the app)
+// or in the PIN cookie (the website).
+func pinToken(r *http.Request) string {
+	token := ""
 	if h := r.Header.Get("Authorization"); h != "" {
-		if t, ok := strings.CutPrefix(h, "Bearer "); ok {
-			return strings.TrimSpace(t)
-		}
+		token, _ = strings.CutPrefix(h, "Bearer ")
+	} else if c, err := r.Cookie(cookieName(r, CookiePin)); err == nil {
+		token = c.Value
+	}
+	if token = strings.TrimSpace(token); !ids.TokenHasPrefix(token, ids.PrefixPinSession) {
 		return ""
 	}
-	if c, err := r.Cookie(cookieName(r, CookiePin)); err == nil {
-		return c.Value
-	}
-	return ""
+	return token
 }
 
 // SetSessionCookie stores a website PIN session. It lasts as long as the session can.
@@ -336,10 +395,34 @@ func ClearSessionCookie(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, cookie(r, CookiePin, "", -1))
 }
 
+// SetAccountCookie keeps a signed-in browser's device key. It lasts 400 days, the most
+// browsers allow, and is set again on each day the browser is used (RenewAccountCookie).
+func SetAccountCookie(w http.ResponseWriter, r *http.Request, token string) {
+	http.SetCookie(w, cookie(r, CookieSession, token, int(WebSessionIdle/time.Second)))
+}
+
+// RenewAccountCookie sets the request's account cookie again, for another 400 days.
+func RenewAccountCookie(w http.ResponseWriter, r *http.Request) {
+	if c, err := r.Cookie(cookieName(r, CookieSession)); err == nil {
+		SetAccountCookie(w, r, c.Value)
+	}
+}
+
+// ClearAccountCookie removes a signed-in browser's key.
+func ClearAccountCookie(w http.ResponseWriter, r *http.Request) {
+	http.SetCookie(w, cookie(r, CookieSession, "", -1))
+}
+
+// HasAccountCookie reports whether a request carries a signed-in browser's key.
+func HasAccountCookie(r *http.Request) bool {
+	_, err := r.Cookie(cookieName(r, CookieSession))
+	return err == nil
+}
+
 // HasSessionCookie reports whether a request carries one of the website's session cookies,
 // under either name: it comes from a browser, which a page elsewhere could make send it.
 func HasSessionCookie(r *http.Request) bool {
-	for _, name := range []string{CookiePin} {
+	for _, name := range []string{CookiePin, CookieSession} {
 		for _, n := range []string{name, plainName(name)} {
 			if _, err := r.Cookie(n); err == nil {
 				return true

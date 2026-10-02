@@ -1,0 +1,27 @@
+{
+  "method": "POST",
+  "path": "/api/invites/accept",
+  "auth": "none",
+  "request": {
+    "token": "shi_0123456789abcdefghijklmnopqrstuvwxyzABCDEFG",
+    "device_name": "Safari · iPhone",
+    "client": "web"
+  },
+  "status": 200,
+  "response": {
+    "user": {
+      "id": "u7ld5x2k7mbqz4bwdbyj6qsqxa",
+      "name": "Maria",
+      "role": "member",
+      "username": null,
+      "has_password": false
+    },
+    "device": {
+      "id": "d4ld5x2k7mbqz4bwdbyj6qsqxa",
+      "name": "Safari · iPhone",
+      "client": "web",
+      "home_only": false
+    }
+  },
+  "notes": "Accepting an invite in a browser: the key comes as a cookie, as in login_web.json. An invite with adds_phone signs this browser in as that person. The same errors as invite_accept.json and invite_errors.json."
+}

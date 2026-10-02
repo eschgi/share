@@ -105,6 +105,13 @@ The plan and the screens are in [`docs/`](docs/).
 - Each phone has its own key. The server keeps only its SHA-256 hash, as for every token. On the
   phone it's encrypted with a key in the Android KeyStore and left out of backups. Admins can sign
   a phone out.
+- A browser signs in like a phone, with a password or an invite, and keeps its key in a cookie
+  that the page's scripts can't read. It stays signed in until 400 days after it was last used.
+  Admins can sign it out like a phone, and everyone can sign out their own phones and browsers.
+- Cookies belong to an address, not to a network: a browser signed in at `http://192.168.8.1:8080`
+  would hand its key to whatever has that address on someone else's Wi-Fi. So a browser that signs
+  in at home (plain http, or the https port from the home network) gets a session that works only
+  at home; seen anywhere else, it is signed out at once.
 - Plain http works only on a home network and on the server itself; from anywhere else pages are
   sent to the https address and the API turns requests away. At home it is unencrypted, so anyone
   on the same Wi-Fi could read along; an https port avoids that.
@@ -118,8 +125,9 @@ The plan and the screens are in [`docs/`](docs/).
   Cloudflare, and the pages remove them from the address bar.
 - The website loads nothing from elsewhere, fonts included, and has a strict Content Security
   Policy. Its cookies are HttpOnly and SameSite=Strict, and `__Host-` except over plain http at
-  home, where browsers keep no secure ones. Downloads are marked so that
-  Cloudflare neither caches nor changes them.
+  home, where browsers keep no secure ones. Only Share's own pages can change something: a request
+  from another site, or one with the website's cookie that doesn't say where it comes from, is
+  turned away. Downloads are marked so that Cloudflare neither caches nor changes them.
 
 ## Try it locally
 

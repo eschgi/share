@@ -75,6 +75,17 @@ func (d *DB) MoveReceivingUploads(ctx context.Context, fromSession, toSession, t
 	return res.RowsAffected()
 }
 
+// MoveUploadsToPerson hands the unfinished uploads of a browser's PIN session to the person
+// who just signed in in that browser, so they continue instead of starting over.
+func (d *DB) MoveUploadsToPerson(ctx context.Context, fromSession, userID, deviceID string, at time.Time) (int64, error) {
+	res, err := d.ExecContext(ctx, `UPDATE files SET pin_session_id = NULL, pin_id = NULL, user_id = ?, device_id = ?, updated_at = ?
+		WHERE pin_session_id = ? AND state = 'receiving'`, userID, deviceID, ms(at), fromSession)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
 // DeleteStalePinSessions removes sessions that were revoked, or whose PIN ended, before
 // the given time and that no unfinished upload still belongs to.
 func (d *DB) DeleteStalePinSessions(ctx context.Context, before time.Time) (int64, error) {

@@ -14,8 +14,8 @@ import (
 	"github.com/eschgi/share/server/internal/storage"
 )
 
-// The admin API: PINs, people and their phones, deleting files and the trash, storage.
-// Everything here needs an admin's phone.
+// The admin API: PINs, people and their phones and browsers, deleting files and the trash,
+// storage. Everything here needs an admin, except signing out one's own phone or browser.
 
 func (a *API) registerAdmin(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/pins", a.pins)
@@ -39,7 +39,7 @@ func (a *API) registerAdmin(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/admin/storage", a.storageInfo)
 }
 
-// admin authenticates a request that only an admin's phone may make.
+// admin authenticates a request that only an admin's phone or browser may make.
 func (a *API) admin(w http.ResponseWriter, r *http.Request) (*auth.Principal, bool) {
 	p, ok := a.device(w, r)
 	if !ok {
@@ -212,17 +212,26 @@ type PersonInfo struct {
 	HasPassword bool        `json:"has_password"`
 	Me          bool        `json:"me"`
 	CreatedAt   time.Time   `json:"created_at"`
-	LastSeenAt  *time.Time  `json:"last_seen_at"` // on any phone; null without phones
-	Phones      []PhoneInfo `json:"phones"`
+	LastSeenAt  *time.Time  `json:"last_seen_at"` // on any phone or browser; null without one
+	Phones      []PhoneInfo `json:"phones"`       // phones and browsers
 }
 
-// PhoneInfo is one of a person's signed-in phones.
+// PhoneInfo is one of a person's signed-in phones or browsers.
 type PhoneInfo struct {
 	ID         string    `json:"id"`
 	Name       string    `json:"name"`
+	Client     string    `json:"client"`    // "app" or "web"
+	HomeOnly   bool      `json:"home_only"` // a browser that signed in at home; it works only there
 	CreatedAt  time.Time `json:"created_at"`
 	LastSeenAt time.Time `json:"last_seen_at"`
-	This       bool      `json:"this"` // the phone asking
+	This       bool      `json:"this"` // the phone or browser asking
+}
+
+func phoneInfo(dv db.Device, asking string) PhoneInfo {
+	return PhoneInfo{
+		ID: dv.ID, Name: dv.Name, Client: dv.Client, HomeOnly: dv.HomeOnly,
+		CreatedAt: dv.CreatedAt, LastSeenAt: dv.LastSeenAt, This: dv.ID == asking,
+	}
 }
 
 // OpenInvite is an invite nobody has used yet.
@@ -278,9 +287,7 @@ func (a *API) people(w http.ResponseWriter, r *http.Request) {
 			Me: u.ID == p.UserID, CreatedAt: u.CreatedAt, Phones: []PhoneInfo{},
 		}
 		for _, dv := range phones[u.ID] {
-			person.Phones = append(person.Phones, PhoneInfo{
-				ID: dv.ID, Name: dv.Name, CreatedAt: dv.CreatedAt, LastSeenAt: dv.LastSeenAt, This: dv.ID == p.DeviceID,
-			})
+			person.Phones = append(person.Phones, phoneInfo(dv, p.DeviceID))
 			if person.LastSeenAt == nil || dv.LastSeenAt.After(*person.LastSeenAt) {
 				seen := dv.LastSeenAt
 				person.LastSeenAt = &seen
@@ -333,13 +340,15 @@ func (a *API) personChange(w http.ResponseWriter, what string, err error) {
 	}
 }
 
+// signOutPhone signs out a phone or browser: admins anyone's, everyone else their own.
 func (a *API) signOutPhone(w http.ResponseWriter, r *http.Request) {
-	if _, ok := a.admin(w, r); !ok {
+	p, ok := a.device(w, r)
+	if !ok {
 		return
 	}
 	dv, err := a.Auth.DB.DeviceByID(r.Context(), r.PathValue("id"))
-	if errors.Is(err, db.ErrNotFound) || (err == nil && dv.RevokedAt != nil) {
-		httpx.WriteError(w, http.StatusNotFound, "not_found", "No such phone.")
+	if errors.Is(err, db.ErrNotFound) || (err == nil && (dv.RevokedAt != nil || (p.Role != db.RoleAdmin && dv.UserID != p.UserID))) {
+		httpx.WriteError(w, http.StatusNotFound, "not_found", "No such phone or browser.")
 		return
 	}
 	if err == nil {

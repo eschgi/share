@@ -55,13 +55,17 @@ func Seconds(d time.Duration) *int {
 	return &s
 }
 
-// WriteAuthError answers a request that isn't allowed in.
-func WriteAuthError(w http.ResponseWriter, err error) {
+// WriteAuthError answers a request that isn't allowed in. A browser's account cookie that no
+// longer works is deleted with the answer, so a PIN cookie, if there is one, counts again.
+func WriteAuthError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, auth.ErrSessionEnded):
 		WriteError(w, http.StatusUnauthorized, "session_ended", "The PIN you used has ended. Enter a new PIN to continue.")
 	case errors.Is(err, auth.ErrSignedOut):
-		WriteError(w, http.StatusUnauthorized, "signed_out", "This phone was signed out. Sign in again.")
+		if r.Header.Get("Authorization") == "" && auth.HasAccountCookie(r) {
+			auth.ClearAccountCookie(w, r)
+		}
+		WriteError(w, http.StatusUnauthorized, "signed_out", "This phone or browser was signed out. Sign in again.")
 	case errors.Is(err, auth.ErrUnauthorized):
 		WriteError(w, http.StatusUnauthorized, "unauthorized", "Enter a PIN or sign in first.")
 	default:

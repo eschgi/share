@@ -10,7 +10,7 @@ import (
 // Principal kinds.
 const (
 	KindPin    = "pin"    // unlocked with a PIN: may only send
-	KindDevice = "device" // a signed-in phone
+	KindDevice = "device" // a signed-in phone or browser
 )
 
 // Principal is who a request acts for.
@@ -23,14 +23,20 @@ type Principal struct {
 	PinKind      string
 	PinExpiresAt *time.Time
 
-	// Signed-in devices.
+	// Signed-in phones and browsers.
 	UserID   string
 	DeviceID string
 	Role     string
+	Client   string // db.ClientApp or db.ClientWeb
+	HomeOnly bool   // a browser that signed in at home
+	// ViaCookie: the key came in the website's session cookie. RenewCookie: it was first used
+	// today, so the answer should set the cookie again, for another 400 days.
+	ViaCookie   bool
+	RenewCookie bool
 }
 
 // Owns reports whether an upload belongs to this principal: the same PIN session, or the
-// same person (any of their phones).
+// same person (any of their phones and browsers).
 func (p *Principal) Owns(f db.File) bool {
 	switch p.Kind {
 	case KindPin:

@@ -131,7 +131,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	p, err := h.auth.Authenticate(r.Context(), r)
 	if err != nil {
-		httpx.WriteAuthError(w, err)
+		httpx.WriteAuthError(w, r, err)
 		return
 	}
 	ctx := auth.WithPrincipal(r.Context(), p)

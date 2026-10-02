@@ -19,7 +19,9 @@
     },
     "device": {
       "id": "d2ld5x2k7mbqz4bwdbyj6qsqxa",
-      "name": "Pixel 8"
+      "name": "Pixel 8",
+      "client": "app",
+      "home_only": false
     },
     "server": {
       "public_url": "https://share.example.com",
@@ -29,5 +31,5 @@
       ]
     }
   },
-  "notes": "The token is shown once; send it as Authorization: Bearer. Wrong passwords: 401 login_wrong with attempts_left; after 10 per username or 30 per address in 10 minutes, 429 login_locked with retry_after_seconds."
+  "notes": "The app's sign-in (client \"app\", also when client is missing); a browser's is login_web.json. The token is shown once; send it as Authorization: Bearer. Wrong passwords: 401 login_wrong with attempts_left; after 10 per username or 30 per address in 10 minutes, 429 login_locked with retry_after_seconds. Another client than app or web: 400 bad_request."
 }

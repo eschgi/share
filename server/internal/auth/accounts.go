@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -25,7 +26,7 @@ const (
 
 // Errors for accounts and invites. The API layer turns them into error codes.
 var (
-	ErrSignedOut     = errors.New("this phone was signed out")
+	ErrSignedOut     = errors.New("this phone or browser was signed out")
 	ErrInviteUnknown = errors.New("no such invite")
 	ErrInviteUsed    = errors.New("this invite was used already")
 	ErrInviteExpired = errors.New("this invite has expired")
@@ -57,15 +58,28 @@ type InputError struct{ Field, Problem string }
 
 func (e *InputError) Error() string { return e.Field + " " + e.Problem }
 
-// SignedIn is a phone that just signed in: its token, shown once, its person and itself.
+// SignedIn is a phone or browser that just signed in: its token, shown once, its person and
+// itself.
 type SignedIn struct {
 	Token  string
 	User   db.User
 	Device db.Device
 }
 
-// Login signs a phone in with a username and password.
-func (s *Service) Login(ctx context.Context, r *http.Request, username, password, deviceName string) (*SignedIn, error) {
+// checkClient accepts the two kinds of devices: the app, and a browser.
+func checkClient(client string) error {
+	if client != db.ClientApp && client != db.ClientWeb {
+		return &InputError{"client", "must be web or app"}
+	}
+	return nil
+}
+
+// Login signs a phone or browser in with a username and password. client is db.ClientApp or
+// db.ClientWeb.
+func (s *Service) Login(ctx context.Context, r *http.Request, username, password, deviceName, client string) (*SignedIn, error) {
+	if err := checkClient(client); err != nil {
+		return nil, err
+	}
 	username = strings.TrimSpace(username)
 	now := s.Now()
 	userKey := "user:" + strings.ToLower(username)
@@ -100,16 +114,71 @@ func (s *Service) Login(ctx context.Context, r *http.Request, username, password
 		return nil, &WrongLoginError{AttemptsLeft: min(left, leftIP)}
 	}
 	s.loginPerUser.Reset(userKey)
-	return s.signIn(ctx, u, deviceName, now)
-}
-
-func (s *Service) signIn(ctx context.Context, u db.User, deviceName string, now time.Time) (*SignedIn, error) {
-	token, hash := ids.NewToken(ids.PrefixDevice)
-	dv := db.Device{ID: ids.New(), UserID: u.ID, Name: cleanName(deviceName, "Phone"), CreatedAt: now, LastSeenAt: now}
-	if err := s.DB.InsertDevice(ctx, dv, hash); err != nil {
+	token, keyHash := ids.NewToken(ids.PrefixDevice)
+	dv := newDevice(r, u.ID, deviceName, client, now)
+	if err := s.DB.InsertDevice(ctx, dv, keyHash); err != nil {
 		return nil, err
 	}
+	s.browserSignedIn(ctx, r, dv, now)
 	return &SignedIn{Token: token, User: u, Device: dv}, nil
+}
+
+// newDevice is a phone or browser about to be signed in for userID. A browser signing in at
+// home gets a session that works only at home (AtHome).
+func newDevice(r *http.Request, userID, name, client string, now time.Time) db.Device {
+	fallback := "Phone"
+	if client == db.ClientWeb {
+		fallback = "Browser"
+	}
+	return db.Device{
+		ID: ids.New(), UserID: userID, Name: cleanName(name, fallback), Client: client,
+		HomeOnly: client == db.ClientWeb && AtHome(r), CreatedAt: now, LastSeenAt: now,
+	}
+}
+
+// browserSignedIn tidies up after a browser signed in: the session it had before ends, so
+// sessions don't pile up and none can be planted, and what it was still sending with a PIN
+// continues as the person's, instead of starting over. The website drops the PIN cookie.
+// Nothing here can undo the sign-in, so failures are only logged.
+func (s *Service) browserSignedIn(ctx context.Context, r *http.Request, dv db.Device, now time.Time) {
+	if dv.Client != db.ClientWeb {
+		return
+	}
+	if err := s.EndBrowserSession(ctx, r); err != nil {
+		log.Printf("auth: ending the browser's earlier session: %v", err)
+	}
+	c, err := r.Cookie(cookieName(r, CookiePin))
+	if err != nil || !ids.TokenHasPrefix(c.Value, ids.PrefixPinSession) {
+		return
+	}
+	sess, err := s.DB.PinSessionByToken(ctx, ids.HashToken(c.Value))
+	if err != nil {
+		return
+	}
+	if _, err := s.DB.MoveUploadsToPerson(ctx, sess.ID, dv.UserID, dv.ID, now); err != nil {
+		log.Printf("auth: handing the browser's uploads to %s: %v", dv.UserID, err)
+		return
+	}
+	if err := s.DB.RevokePinSession(ctx, sess.ID, now); err != nil {
+		log.Printf("auth: ending the browser's PIN session: %v", err)
+	}
+}
+
+// EndBrowserSession signs out the browser whose account cookie a request carries, whatever
+// state its session is in. Without such a cookie it does nothing.
+func (s *Service) EndBrowserSession(ctx context.Context, r *http.Request) error {
+	c, err := r.Cookie(cookieName(r, CookieSession))
+	if err != nil || !ids.TokenHasPrefix(c.Value, ids.PrefixDevice) {
+		return nil
+	}
+	dv, _, err := s.DB.DeviceByToken(ctx, ids.HashToken(c.Value))
+	if errors.Is(err, db.ErrNotFound) || (err == nil && dv.Client != db.ClientWeb) {
+		return nil // gone already, or an app's key that has no business in a cookie
+	}
+	if err != nil {
+		return err
+	}
+	return s.DB.RevokeDevice(ctx, dv.ID, s.Now())
 }
 
 // CreateInvite makes an invite and returns its token, which is shown once. For a new person
@@ -158,9 +227,12 @@ func (s *Service) PeekInvite(ctx context.Context, r *http.Request, token string)
 	return info, nil
 }
 
-// AcceptInvite uses an invite: the phone is signed in, as a new person or as the one the
-// invite adds a phone for.
-func (s *Service) AcceptInvite(ctx context.Context, r *http.Request, token, deviceName string) (*SignedIn, error) {
+// AcceptInvite uses an invite: the phone or browser is signed in, as a new person or as the
+// one the invite adds a phone or browser for.
+func (s *Service) AcceptInvite(ctx context.Context, r *http.Request, token, deviceName, client string) (*SignedIn, error) {
+	if err := checkClient(client); err != nil {
+		return nil, err
+	}
 	in, err := s.findInvite(ctx, r, token)
 	if err != nil {
 		return nil, err
@@ -178,13 +250,14 @@ func (s *Service) AcceptInvite(ctx context.Context, r *http.Request, token, devi
 		u = db.User{ID: ids.New(), Name: in.Name, Role: in.Role, CreatedAt: now, CreatedBy: in.CreatedBy}
 	}
 	deviceToken, hash := ids.NewToken(ids.PrefixDevice)
-	dv := db.Device{ID: ids.New(), UserID: u.ID, Name: cleanName(deviceName, "Phone"), CreatedAt: now, LastSeenAt: now}
+	dv := newDevice(r, u.ID, deviceName, client, now)
 	if err := s.DB.UseInvite(ctx, in.ID, u, dv, hash, now); err != nil {
 		if errors.Is(err, db.ErrConflict) {
 			return nil, ErrInviteUsed // someone was quicker, a moment ago
 		}
 		return nil, err
 	}
+	s.browserSignedIn(ctx, r, dv, now)
 	return &SignedIn{Token: deviceToken, User: u, Device: dv}, nil
 }
 
@@ -238,7 +311,7 @@ func (s *Service) FirstStartInvite(ctx context.Context) (string, error) {
 	return token, err
 }
 
-// SignOut signs the calling phone out.
+// SignOut signs the calling phone or browser out.
 func (s *Service) SignOut(ctx context.Context, p *Principal) error {
 	if p.Kind != KindDevice {
 		return ErrDevicesOnly
@@ -246,8 +319,8 @@ func (s *Service) SignOut(ctx context.Context, p *Principal) error {
 	return s.DB.RevokeDevice(ctx, p.DeviceID, s.Now())
 }
 
-// DeleteAccount removes the caller's account and signs all their phones out. The files they
-// sent stay. It returns db.ErrLastAdmin for the last admin.
+// DeleteAccount removes the caller's account and signs all their phones and browsers out. The
+// files they sent stay. It returns db.ErrLastAdmin for the last admin.
 func (s *Service) DeleteAccount(ctx context.Context, p *Principal) error {
 	if p.Kind != KindDevice {
 		return ErrDevicesOnly
@@ -257,8 +330,8 @@ func (s *Service) DeleteAccount(ctx context.Context, p *Principal) error {
 
 var usernamePattern = regexp.MustCompile(`^[\p{L}\p{N}._-]{3,32}$`)
 
-// SetPassword gives the caller a username and password, for signing in on other phones. With
-// a password already set, the current one is needed.
+// SetPassword gives the caller a username and password, for signing in on other phones and in
+// browsers. With a password already set, the current one is needed.
 func (s *Service) SetPassword(ctx context.Context, p *Principal, username, current, password string) error {
 	if p.Kind != KindDevice {
 		return ErrDevicesOnly
@@ -321,7 +394,9 @@ func (s *Service) SetLoginFor(ctx context.Context, userID, username, password st
 	return nil
 }
 
-func (s *Service) authenticateDevice(ctx context.Context, token string) (*Principal, error) {
+// authenticateDevice checks a phone's or browser's key; viaCookie says it came in the
+// website's account cookie, which only browsers' keys belong in.
+func (s *Service) authenticateDevice(ctx context.Context, r *http.Request, token string, viaCookie bool) (*Principal, error) {
 	dv, u, err := s.DB.DeviceByToken(ctx, ids.HashToken(token))
 	if errors.Is(err, db.ErrNotFound) {
 		return nil, ErrSignedOut // revoked with the person's account, or never valid
@@ -329,16 +404,40 @@ func (s *Service) authenticateDevice(ctx context.Context, token string) (*Princi
 	if err != nil {
 		return nil, err
 	}
-	if dv.RevokedAt != nil {
+	if dv.RevokedAt != nil || (viaCookie && dv.Client != db.ClientWeb) {
 		return nil, ErrSignedOut
 	}
 	now := s.Now()
+	if dv.HomeOnly && !AtHome(r) {
+		// Browsers send this cookie only to the address at home. Seen anywhere else, it was
+		// taken there, e.g. by a device with the same address on another network: it ends.
+		log.Printf("auth: the browser %s, signed in at home, was used from elsewhere; signing it out", dv.ID)
+		if err := s.DB.RevokeDevice(ctx, dv.ID, now); err != nil {
+			return nil, err
+		}
+		return nil, ErrSignedOut
+	}
+	if dv.Client == db.ClientWeb && now.Sub(dv.LastSeenAt) > WebSessionIdle {
+		return nil, ErrSignedOut
+	}
+	p := &Principal{
+		Kind: KindDevice, UserID: u.ID, DeviceID: dv.ID, Role: u.Role,
+		Client: dv.Client, HomeOnly: dv.HomeOnly, ViaCookie: viaCookie,
+	}
 	if now.Sub(dv.LastSeenAt) >= touchEvery {
 		if err := s.DB.TouchDevice(ctx, dv.ID, now); err != nil {
 			return nil, err
 		}
+		p.RenewCookie = viaCookie && !sameDay(dv.LastSeenAt, now)
 	}
-	return &Principal{Kind: KindDevice, UserID: u.ID, DeviceID: dv.ID, Role: u.Role}, nil
+	return p, nil
+}
+
+// sameDay reports whether a and b fall on the same day in UTC.
+func sameDay(a, b time.Time) bool {
+	ay, am, ad := a.UTC().Date()
+	by, bm, bd := b.UTC().Date()
+	return ay == by && am == bm && ad == bd
 }
 
 // cleanName trims a display name to one line of at most 60 characters.

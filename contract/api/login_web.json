@@ -1,0 +1,28 @@
+{
+  "method": "POST",
+  "path": "/api/auth/login",
+  "auth": "none",
+  "request": {
+    "username": "maria",
+    "password": "correct horse",
+    "device_name": "Chrome · Windows",
+    "client": "web"
+  },
+  "status": 200,
+  "response": {
+    "user": {
+      "id": "u7ld5x2k7mbqz4bwdbyj6qsqxa",
+      "name": "Maria",
+      "role": "member",
+      "username": "maria",
+      "has_password": true
+    },
+    "device": {
+      "id": "d3ld5x2k7mbqz4bwdbyj6qsqxa",
+      "name": "Chrome · Windows",
+      "client": "web",
+      "home_only": false
+    }
+  },
+  "notes": "A browser's sign-in. The key is never in the body: it comes as the HttpOnly, SameSite=Strict cookie __Host-share_session (share_session, without Secure, over plain http at home), for 400 days and set again on each day the browser is used. A browser that signs in at home (plain http, or the https port from the home network) gets home_only: its session works only at home, and seen anywhere else it is signed out. Signing in again in the same browser ends its earlier session. Unfinished uploads of the browser's PIN session become the person's, that PIN session ends and the PIN cookie is deleted. The same errors as login.json."
+}

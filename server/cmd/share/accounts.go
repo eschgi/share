@@ -111,7 +111,7 @@ func users(args []string) error {
 		return nil
 	}
 	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
-	fmt.Fprintln(w, "NAME\tUSERNAME\tROLE\tPHONES\tLAST SEEN\tID")
+	fmt.Fprintln(w, "NAME\tUSERNAME\tROLE\tPHONES\tBROWSERS\tLAST SEEN\tID")
 	for _, u := range list {
 		devices, err := d.DevicesOf(ctx, u.ID)
 		if err != nil {
@@ -121,7 +121,13 @@ func users(args []string) error {
 		if len(devices) > 0 {
 			seen = devices[0].LastSeenAt.In(cfg.Location).Format("2006-01-02 15:04")
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%s\t%s\n", u.Name, orDash(u.Username), u.Role, len(devices), seen, u.ID)
+		browsers := 0
+		for _, dv := range devices {
+			if dv.Client == db.ClientWeb {
+				browsers++
+			}
+		}
+		fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%d\t%s\t%s\n", u.Name, orDash(u.Username), u.Role, len(devices)-browsers, browsers, seen, u.ID)
 	}
 	return w.Flush()
 }

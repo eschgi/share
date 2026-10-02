@@ -78,4 +78,14 @@ func TestUnknownClientIsABadRequest(t *testing.T) {
 	if r.status != http.StatusBadRequest || r.errorCode() != "bad_request" {
 		t.Errorf("unlock for a tv: %d %s, want 400 bad_request", r.status, r.body)
 	}
+	admin := e.admin()
+	e.setPassword(admin.token, "stefan", "correct horse")
+	r = e.postJSON(nil, "/api/auth/login", "", map[string]string{"username": "stefan", "password": "correct horse", "client": "tv"}, nil)
+	if r.status != http.StatusBadRequest || r.errorCode() != "bad_request" {
+		t.Errorf("sign-in for a tv: %d %s, want 400 bad_request", r.status, r.body)
+	}
+	r = e.postJSON(nil, "/api/invites/accept", "", map[string]string{"token": e.invite(admin, "Maria", db.RoleMember), "client": "tv"}, nil)
+	if r.status != http.StatusBadRequest || r.errorCode() != "bad_request" {
+		t.Errorf("an invite for a tv: %d %s, want 400 bad_request", r.status, r.body)
+	}
 }

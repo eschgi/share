@@ -18,6 +18,8 @@
           {
             "id": "d1ld5x2k7mbqz4bwdbyj6qsqxa",
             "name": "Pixel 9",
+            "client": "app",
+            "home_only": false,
             "created_at": "2026-09-10T18:00:00Z",
             "last_seen_at": "2026-09-30T08:02:00Z",
             "this": true
@@ -37,6 +39,8 @@
           {
             "id": "d2ld5x2k7mbqz4bwdbyj6qsqxa",
             "name": "Pixel 8",
+            "client": "app",
+            "home_only": false,
             "created_at": "2026-09-12T19:30:00Z",
             "last_seen_at": "2026-09-30T07:40:00Z",
             "this": false
@@ -44,6 +48,8 @@
           {
             "id": "d3ld5x2k7mbqz4bwdbyj6qsqxa",
             "name": "Galaxy Tab",
+            "client": "app",
+            "home_only": false,
             "created_at": "2026-09-20T10:00:00Z",
             "last_seen_at": "2026-09-28T21:10:00Z",
             "this": false
@@ -62,5 +68,5 @@
       }
     ]
   },
-  "notes": "Everyone with an account (admins first, then by name) with their signed-in phones, most recently used first, and the invites nobody has used yet. me is the admin asking; this is the phone asking. An invite with user_id adds a phone for that person. Also: PATCH /api/users/{id} {role} (204) makes someone admin or member; DELETE /api/users/{id} (204) removes a person and signs out their phones, the files they sent stay; both 409 last_admin when no admin would be left, 404 not_found. DELETE /api/devices/{id} (204) signs one phone out; DELETE /api/invites/{id} (204) withdraws an invite."
+  "notes": "Everyone with an account (admins first, then by name) with their signed-in phones and browsers (client app or web; home_only for a browser that signed in at home), most recently used first, and the invites nobody has used yet. me is the admin asking; this is the phone or browser asking. An invite with user_id adds a phone or browser for that person. Also: PATCH /api/users/{id} {role} (204) makes someone admin or member; DELETE /api/users/{id} (204) removes a person and signs out their phones, the files they sent stay; both 409 last_admin when no admin would be left, 404 not_found. DELETE /api/devices/{id} (204) signs one phone or browser out: admins anyone's, everyone else only their own (404 not_found otherwise); DELETE /api/invites/{id} (204) withdraws an invite."
 }

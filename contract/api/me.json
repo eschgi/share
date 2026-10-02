@@ -13,8 +13,10 @@
     },
     "device": {
       "id": "d2ld5x2k7mbqz4bwdbyj6qsqxa",
-      "name": "Pixel 8"
+      "name": "Pixel 8",
+      "client": "app",
+      "home_only": false
     }
   },
-  "notes": "Also: POST /api/auth/logout (204) signs this phone out; PUT /api/me/password {username, password, current_password?} (204; current_password is needed once there is a password; errors bad_request, password_wrong, username_taken); POST /api/me/delete (204) removes the account and signs out all its phones, 409 last_admin for the only admin. A revoked phone gets 401 signed_out everywhere."
+  "notes": "device is the phone or browser asking: client app or web; home_only for a browser that signed in at home, whose session works only there. Also: POST /api/auth/logout (204) signs this phone or browser out; a browser's logout (no Authorization header) always answers 204 and deletes its cookie, whatever state its session is in. PUT /api/me/password {username, password, current_password?} (204; current_password is needed once there is a password; errors bad_request, password_wrong with attempts_left, after 5 wrong in 15 minutes 429 login_locked, username_taken); POST /api/me/delete (204) removes the account and signs out all its phones and browsers, 409 last_admin for the only admin; a browser sends {} with it. A revoked phone or browser gets 401 signed_out everywhere."
 }

@@ -48,13 +48,20 @@ func userInfo(u db.User) UserInfo {
 	return info
 }
 
-// DeviceInfo is a signed-in phone.
+// DeviceInfo is a signed-in phone or browser.
 type DeviceInfo struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Client   string `json:"client"`    // "app" or "web"
+	HomeOnly bool   `json:"home_only"` // a browser that signed in at home; it works only there
 }
 
-// SignedInResponse is the answer to a login or an accepted invite. The token is shown once.
+func deviceInfo(dv db.Device) DeviceInfo {
+	return DeviceInfo{ID: dv.ID, Name: dv.Name, Client: dv.Client, HomeOnly: dv.HomeOnly}
+}
+
+// SignedInResponse is the app's answer to a login or an accepted invite. The token is shown
+// once.
 type SignedInResponse struct {
 	Token  string     `json:"token"`
 	User   UserInfo   `json:"user"`
@@ -62,16 +69,34 @@ type SignedInResponse struct {
 	Server Server     `json:"server"`
 }
 
-func (a *API) signedIn(w http.ResponseWriter, s *auth.SignedIn) {
+// signedIn answers a login or an accepted invite. A browser gets its key as an HttpOnly
+// cookie, never in the body, and loses its PIN cookie: what it sent with the PIN is the
+// person's now.
+func (a *API) signedIn(w http.ResponseWriter, r *http.Request, s *auth.SignedIn) {
+	if s.Device.Client == db.ClientWeb {
+		auth.SetAccountCookie(w, r, s.Token)
+		auth.ClearSessionCookie(w, r)
+		httpx.WriteJSON(w, http.StatusOK, Me{User: userInfo(s.User), Device: deviceInfo(s.Device)})
+		return
+	}
 	httpx.WriteJSON(w, http.StatusOK, SignedInResponse{
-		Token: s.Token, User: userInfo(s.User), Device: DeviceInfo{ID: s.Device.ID, Name: s.Device.Name}, Server: a.server(),
+		Token: s.Token, User: userInfo(s.User), Device: deviceInfo(s.Device), Server: a.server(),
 	})
+}
+
+// clientOf is the client a sign-in is for: the app, unless it says web.
+func clientOf(c string) string {
+	if c == "" {
+		return db.ClientApp
+	}
+	return c
 }
 
 type loginRequest struct {
 	Username   string `json:"username"`
 	Password   string `json:"password"`
 	DeviceName string `json:"device_name"`
+	Client     string `json:"client,omitempty"` // "app" (also when missing) or "web"
 }
 
 func (a *API) login(w http.ResponseWriter, r *http.Request) {
@@ -79,12 +104,15 @@ func (a *API) login(w http.ResponseWriter, r *http.Request) {
 	if !httpx.DecodeJSON(w, r, &req) {
 		return
 	}
-	res, err := a.Auth.Login(r.Context(), r, req.Username, req.Password, req.DeviceName)
+	res, err := a.Auth.Login(r.Context(), r, req.Username, req.Password, req.DeviceName, clientOf(req.Client))
 	var wrong *auth.WrongLoginError
 	var locked *auth.LockedError
+	var input *auth.InputError
 	switch {
 	case err == nil:
-		a.signedIn(w, res)
+		a.signedIn(w, r, res)
+	case errors.As(err, &input):
+		httpx.WriteError(w, http.StatusBadRequest, "bad_request", "The "+input.Field+" "+input.Problem+".")
 	case errors.As(err, &locked):
 		httpx.WriteErrorDetail(w, http.StatusTooManyRequests, httpx.ErrorDetail{
 			Code: "login_locked", Message: "Too many wrong passwords. Wait a moment and try again.",
@@ -100,8 +128,13 @@ func (a *API) login(w http.ResponseWriter, r *http.Request) {
 }
 
 type inviteRequest struct {
+	Token string `json:"token"`
+}
+
+type acceptRequest struct {
 	Token      string `json:"token"`
 	DeviceName string `json:"device_name,omitempty"`
+	Client     string `json:"client,omitempty"` // "app" (also when missing) or "web"
 }
 
 // InvitePeek is what an invite is for, shown before accepting it.
@@ -131,16 +164,20 @@ func (a *API) peekInvite(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) acceptInvite(w http.ResponseWriter, r *http.Request) {
-	var req inviteRequest
+	var req acceptRequest
 	if !httpx.DecodeJSON(w, r, &req) {
 		return
 	}
-	res, err := a.Auth.AcceptInvite(r.Context(), r, req.Token, req.DeviceName)
-	if err != nil {
+	res, err := a.Auth.AcceptInvite(r.Context(), r, req.Token, req.DeviceName, clientOf(req.Client))
+	var input *auth.InputError
+	switch {
+	case err == nil:
+		a.signedIn(w, r, res)
+	case errors.As(err, &input):
+		httpx.WriteError(w, http.StatusBadRequest, "bad_request", "The "+input.Field+" "+input.Problem+".")
+	default:
 		inviteError(w, err)
-		return
 	}
-	a.signedIn(w, res)
 }
 
 func inviteError(w http.ResponseWriter, err error) {
@@ -164,21 +201,36 @@ func inviteError(w http.ResponseWriter, err error) {
 	}
 }
 
-// device authenticates a request that only a signed-in phone may make.
+// device authenticates a request that only a signed-in phone or browser may make. A browser's
+// cookie is set again on the first request of each day, so it doesn't run out while in use.
 func (a *API) device(w http.ResponseWriter, r *http.Request) (*auth.Principal, bool) {
 	p, err := a.Auth.Authenticate(r.Context(), r)
 	if err != nil {
-		httpx.WriteAuthError(w, err)
+		httpx.WriteAuthError(w, r, err)
 		return nil, false
 	}
 	if p.Kind != auth.KindDevice {
 		httpx.WriteError(w, http.StatusForbidden, "forbidden", "Sign in to do this; a PIN can only send files.")
 		return nil, false
 	}
+	if p.RenewCookie {
+		auth.RenewAccountCookie(w, r)
+	}
 	return p, true
 }
 
+// logout signs the calling phone or browser out. A browser's sign-out always works: whatever
+// state its session is in, it ends, and the cookie goes.
 func (a *API) logout(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("Authorization") == "" {
+		if err := a.Auth.EndBrowserSession(r.Context(), r); err != nil {
+			internal(w, "logout", err)
+			return
+		}
+		auth.ClearAccountCookie(w, r)
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	p, ok := a.device(w, r)
 	if !ok {
 		return
@@ -190,7 +242,7 @@ func (a *API) logout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// Me is the signed-in person and phone.
+// Me is the signed-in person and phone or browser.
 type Me struct {
 	User   UserInfo   `json:"user"`
 	Device DeviceInfo `json:"device"`
@@ -206,18 +258,35 @@ func (a *API) me(w http.ResponseWriter, r *http.Request) {
 		internal(w, "me", err)
 		return
 	}
-	devices, err := a.Auth.DB.DevicesOf(r.Context(), p.UserID)
+	dv, err := a.Auth.DB.DeviceByID(r.Context(), p.DeviceID)
 	if err != nil {
 		internal(w, "me", err)
 		return
 	}
-	me := Me{User: userInfo(u), Device: DeviceInfo{ID: p.DeviceID}}
-	for _, d := range devices {
-		if d.ID == p.DeviceID {
-			me.Device.Name = d.Name
-		}
+	httpx.WriteJSON(w, http.StatusOK, Me{User: userInfo(u), Device: deviceInfo(dv)})
+}
+
+// MyDevices is the caller's own phones and browsers that are signed in, most recently used
+// first, so a forgotten one can be signed out without an admin.
+type MyDevices struct {
+	Devices []PhoneInfo `json:"devices"`
+}
+
+func (a *API) myDevices(w http.ResponseWriter, r *http.Request) {
+	p, ok := a.device(w, r)
+	if !ok {
+		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, me)
+	devices, err := a.Auth.DB.DevicesOf(r.Context(), p.UserID)
+	if err != nil {
+		internal(w, "my devices", err)
+		return
+	}
+	out := MyDevices{Devices: []PhoneInfo{}}
+	for _, dv := range devices {
+		out.Devices = append(out.Devices, phoneInfo(dv, p.DeviceID))
+	}
+	httpx.WriteJSON(w, http.StatusOK, out)
 }
 
 type passwordRequest struct {
@@ -267,6 +336,9 @@ func (a *API) deleteMe(w http.ResponseWriter, r *http.Request) {
 	}
 	switch err := a.Auth.DeleteAccount(r.Context(), p); {
 	case err == nil:
+		if p.ViaCookie {
+			auth.ClearAccountCookie(w, r)
+		}
 		w.WriteHeader(http.StatusNoContent)
 	case errors.Is(err, db.ErrLastAdmin):
 		httpx.WriteError(w, http.StatusConflict, "last_admin", "You are the only admin. Make someone else admin first.")
@@ -277,7 +349,7 @@ func (a *API) deleteMe(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) serverInfo(w http.ResponseWriter, r *http.Request) {
 	if _, err := a.Auth.Authenticate(r.Context(), r); err != nil {
-		httpx.WriteAuthError(w, err)
+		httpx.WriteAuthError(w, r, err)
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, a.server())

@@ -10,6 +10,7 @@ import (
 	"mime"
 	"net/http"
 	"path"
+	"regexp"
 	"strings"
 	"time"
 
@@ -78,7 +79,7 @@ func (u *UI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	p := r.URL.Path
 	switch {
-	case p == "/":
+	case p == "/" || isScreen(p):
 		u.page(w, r, "index.html")
 	case p == "/join":
 		u.page(w, r, "join.html")
@@ -100,6 +101,36 @@ func (u *UI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	default:
 		u.notFound(w)
 	}
+}
+
+// screens are the website's paths besides "/", which its single page routes itself
+// (contract/web_routes.json). All but sign-in may have up to three more segments, such as
+// /settings/people/u7ld…; anything else stays 404.
+var screens = []string{"/sign-in", "/library", "/send", "/settings"}
+
+var screenSegment = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`)
+
+func isScreen(p string) bool {
+	for _, s := range screens {
+		if p == s {
+			return true
+		}
+		rest, ok := strings.CutPrefix(p, s+"/")
+		if !ok || s == "/sign-in" {
+			continue
+		}
+		parts := strings.Split(rest, "/")
+		if len(parts) > 3 {
+			return false
+		}
+		for _, part := range parts {
+			if !screenSegment.MatchString(part) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
 }
 
 // page serves an HTML page with the security headers, and gives the browser its random id

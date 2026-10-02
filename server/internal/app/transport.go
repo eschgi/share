@@ -22,6 +22,11 @@ func (a *App) guard(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.TLS != nil:
+			// https straight from the home network to an address at home, such as the https
+			// port at home: like plain http there, a browser's sign-in works only at home.
+			if homenet.Addr(peer(r)) && homenet.Host(hostOf(r.Host)) {
+				r = auth.WithHome(r)
+			}
 			next.ServeHTTP(w, r)
 		case a.fromTunnel(r):
 			if visitorScheme(r) == "http" {
@@ -59,6 +64,14 @@ func visitorScheme(r *http.Request) string {
 	}
 	json.Unmarshal([]byte(r.Header.Get("Cf-Visitor")), &v)
 	return v.Scheme
+}
+
+// hostOf is the host of a Host header, without the port.
+func hostOf(host string) string {
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		return h
+	}
+	return host
 }
 
 func peer(r *http.Request) netip.Addr {

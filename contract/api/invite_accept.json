@@ -18,7 +18,9 @@
     },
     "device": {
       "id": "d2ld5x2k7mbqz4bwdbyj6qsqxa",
-      "name": "Pixel 8"
+      "name": "Pixel 8",
+      "client": "app",
+      "home_only": false
     },
     "server": {
       "public_url": "https://share.example.com",
@@ -28,5 +30,5 @@
       ]
     }
   },
-  "notes": "Uses the invite: it works once. The phone is signed in as a new person with the invite's name and role, or, with adds_phone, as the existing person."
+  "notes": "The app's answer (client \"app\", also when client is missing); a browser's is invite_accept_web.json. Uses the invite: it works once. The phone is signed in as a new person with the invite's name and role, or, with adds_phone, as the existing person."
 }
