@@ -3,6 +3,7 @@ import { useId, useLayoutEffect, useRef } from 'preact/hooks';
 import { Icon } from '../../components/Icon';
 import { useI18n } from '../../i18n';
 import { useOverlay } from '../../router';
+import { lockScroll } from '../scroll';
 
 interface Props {
   title: string;
@@ -23,8 +24,12 @@ export function Modal({ title, onClose, wide, children }: Props) {
   useOverlay(true, onClose);
   useLayoutEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
+    const unlock = lockScroll();
     ref.current?.showModal();
-    return () => opener?.focus?.();
+    return () => {
+      unlock();
+      opener?.focus?.();
+    };
   }, []);
   return (
     <dialog

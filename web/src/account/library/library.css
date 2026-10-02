@@ -1,0 +1,282 @@
+/* The library (screens 11 and 24): the kinds, the days, and the tiles, four to a row on a
+   phone as in the app, as many as fit on bigger screens. */
+.lib {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 max(16px, env(safe-area-inset-right)) 8px max(16px, env(safe-area-inset-left));
+}
+.chips {
+  display: flex;
+  gap: 8px;
+  margin: 0 -16px;
+  padding: 2px 16px 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.chip {
+  flex: none;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: none;
+  color: var(--text-2);
+  font-size: 13.5px;
+  font-weight: 500;
+}
+.chip.on {
+  border-color: transparent;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+.chip:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
+/* Days far out of view aren't drawn until they come near. */
+.lday {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 480px;
+}
+.dayh {
+  padding: 18px 4px 10px;
+}
+.dayh h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.dayh p {
+  margin: 4px 0 0;
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+.lgrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 3px;
+}
+.ltile {
+  position: relative;
+  aspect-ratio: 1;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 4px;
+  background: var(--s1);
+}
+.ltile:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
+.thumb {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+span.thumb {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+.thumb .tico {
+  width: 28%;
+  height: 28%;
+  color: rgba(255, 255, 255, 0.55);
+}
+.thumb.doc {
+  border: 1px solid var(--line-soft);
+  border-radius: inherit;
+  background: var(--s1);
+}
+.thumb.doc .tico {
+  width: 26%;
+  height: 26%;
+  color: var(--text-2);
+}
+.fname {
+  max-width: 88%;
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: 10.5px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.extb {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  background: var(--s3);
+  color: var(--text-2);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+.dur {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px 2px 5px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.dur::before {
+  content: '';
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 6px solid #fff;
+}
+.lempty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 64px 32px;
+  color: var(--text-2);
+  text-align: center;
+}
+.lempty > .ic {
+  width: 40px;
+  height: 40px;
+  color: var(--text-3);
+}
+.lempty p {
+  max-width: 420px;
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  text-wrap: balance;
+}
+.lmore {
+  margin: 20px 0;
+  color: var(--text-3);
+  font-size: 14px;
+  text-align: center;
+}
+.spinner {
+  display: block;
+  width: 26px;
+  height: 26px;
+  margin: 24px auto;
+  border: 2.5px solid var(--s3);
+  border-top-color: var(--accent-text);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Searching: in the header on bigger screens, in the title bar on a phone. 16px keeps phones
+   from zooming in. */
+.dsearch {
+  display: flex;
+  flex: 0 1 320px;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--s1);
+  color: var(--text-3);
+}
+.dsearch:focus-within {
+  border-color: var(--accent-text);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+.dsearch .ic {
+  width: 18px;
+  height: 18px;
+}
+.search-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  outline: none;
+}
+.ab .search-input {
+  height: 46px;
+  font-size: 17px;
+}
+/* The title bar has its own button to close the search. */
+.ab .search-input::-webkit-search-cancel-button {
+  display: none;
+}
+.ab-me {
+  flex: none;
+  margin-left: 4px;
+  border-radius: 50%;
+}
+.ab-me:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
+
+@media (min-width: 640px) and (min-height: 540px) {
+  .lib {
+    width: min(1200px, calc(100% - 64px));
+    padding: 0 0 8px;
+  }
+  .chips {
+    margin: 0;
+    padding: 6px 0 0;
+  }
+  .dayh {
+    padding: 22px 2px 12px;
+  }
+  .dayh h2 {
+    font-size: 17px;
+  }
+  .dayh p {
+    font-size: 13.5px;
+  }
+  .lgrid {
+    grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
+    gap: 6px;
+  }
+  .ltile {
+    border-radius: 8px;
+  }
+  .fname {
+    font-size: 12.5px;
+  }
+  .extb {
+    top: 7px;
+    right: 7px;
+    font-size: 10px;
+  }
+  .dur {
+    right: 7px;
+    bottom: 7px;
+    font-size: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 2s;
+  }
+}

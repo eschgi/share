@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RateMeter, daysAgo, formatBytes, formatETA, formatPercent, formatWait, formatWhen } from '../src/format';
+import { RateMeter, daysAgo, formatBytes, formatDay, formatDuration, formatETA, formatPercent, formatWait, formatWhen } from '../src/format';
 
 describe('formatPercent', () => {
   it('writes the share the way each language does', () => {
@@ -76,5 +76,33 @@ describe('daysAgo', () => {
   });
   it('says today for times a little ahead', () => {
     expect(daysAgo(new Date(2026, 9, 3, 9, 0), new Date(2026, 9, 2, 9, 0))).toBe(0);
+  });
+});
+
+describe('formatDay', () => {
+  const now = new Date(2026, 9, 2, 9, 0);
+  it('says today and yesterday', () => {
+    expect(formatDay('2026-10-02', now, 'en', 'Today', 'Yesterday')).toBe('Today');
+    expect(formatDay('2026-10-01', now, 'de', 'Heute', 'Gestern')).toBe('Gestern');
+  });
+  it('writes other days the way the app does', () => {
+    expect(formatDay('2026-09-27', now, 'en', 'Today', 'Yesterday')).toBe('Sunday, 27 Sep');
+    expect(formatDay('2026-09-27', now, 'de', 'Heute', 'Gestern')).toBe('Sonntag, 27. September');
+    expect(formatDay('2026-09-27', now, 'it', 'Oggi', 'Ieri')).toBe('Domenica 27 settembre');
+  });
+  it('adds the year when it is another one', () => {
+    expect(formatDay('2025-12-31', now, 'en', 'Today', 'Yesterday')).toBe('Wednesday, 31 Dec 2025');
+    expect(formatDay('2025-12-31', now, 'de', 'Heute', 'Gestern')).toBe('Mittwoch, 31. Dezember 2025');
+  });
+  it('does not call a day ahead of this clock today', () => {
+    expect(formatDay('2026-10-03', now, 'en', 'Today', 'Yesterday')).toBe('Saturday, 3 Oct');
+  });
+});
+
+describe('formatDuration', () => {
+  it('writes minutes and seconds, and hours when there are some', () => {
+    expect(formatDuration(18_000)).toBe('0:18');
+    expect(formatDuration(75_400)).toBe('1:15');
+    expect(formatDuration(3_723_000)).toBe('1:02:03');
   });
 });

@@ -90,3 +90,48 @@ export function daysAgo(when: Date, now: Date): number {
   const day = (d: Date) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
   return Math.max(0, Math.round((day(now) - day(when)) / 86_400_000));
 }
+
+/** 0:18, 1:15, 1:02:03, for a video's length. */
+export function formatDuration(ms: number): string {
+  const s = Math.round(ms / 1000);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const two = (n: number) => String(n).padStart(2, '0');
+  return h > 0 ? `${h}:${two(m)}:${two(s % 60)}` : `${m}:${two(s % 60)}`;
+}
+
+/** The date of an upload day (2026-09-27) here, at midnight. */
+export function dayDate(day: string): Date {
+  const [y, m, d] = day.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+/**
+ * An upload day's heading: today, yesterday, or the date the way each language writes it, as
+ * in the app: "Sunday, 27 Sep", "Sonntag, 27. September", "Domenica 27 settembre"; with the
+ * year when it isn't this one.
+ */
+export function formatDay(day: string, now: Date, lang: Lang, today: string, yesterday: string): string {
+  const d = dayDate(day);
+  if (Number.isNaN(d.getTime())) return day;
+  const ago = daysAgo(d, now);
+  if (ago === 0 && d <= now) return today;
+  if (ago === 1) return yesterday;
+  const month = lang === 'en' ? 'short' : 'long';
+  const year = d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined;
+  const parts: Partial<Record<Intl.DateTimeFormatPartTypes, string>> = {};
+  for (const p of new Intl.DateTimeFormat(lang, { weekday: 'long', day: 'numeric', month, year }).formatToParts(d)) parts[p.type] = p.value;
+  const y = parts.year ? ` ${parts.year}` : '';
+  const text =
+    lang === 'de'
+      ? `${parts.weekday}, ${parts.day}. ${parts.month}${y}`
+      : lang === 'it'
+        ? `${parts.weekday} ${parts.day} ${parts.month}${y}`
+        : `${parts.weekday}, ${parts.day} ${parts.month}${y}`;
+  return text.charAt(0).toLocaleUpperCase(lang) + text.slice(1);
+}
+
+/** "12:32", for when a file came. */
+export function formatTime(when: Date, lang: Lang): string {
+  return new Intl.DateTimeFormat(lang, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(when);
+}

@@ -750,35 +750,33 @@
   margin: -8px -8px -8px 0;
 }
 
-/* Until the library and sending are there (steps 6 and 10). */
-.lib,
+/* Until sending is there (step 10). */
 .send {
   width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));
-}
-.send {
   max-width: 560px;
+  margin: 0 auto;
   padding: 0 24px;
 }
 .send .lead {
   margin-top: 4px;
 }
-.empty {
-  max-width: 420px;
-  margin: 48px auto;
-  color: var(--text-3);
-  font-size: 15px;
-  line-height: 1.55;
-  text-align: center;
-  text-wrap: balance;
+
+/* For screen readers only. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
-/* Parts for one layout only: the sign-in page has a picture beside the form on computers. */
+
+/* Parts for one layout only, such as the picture beside the sign-in form on computers. They
+   win over a part's own display. */
 @media (max-width: 1023.98px), (max-height: 539.98px) {
   .wide-only {
-    display: none;
+    display: none !important;
   }
 }
 
@@ -831,11 +829,12 @@
     color: var(--accent-text);
   }
   .ahd-tools {
+    flex: 1;
     display: flex;
+    justify-content: flex-end;
     align-items: center;
     gap: 10px;
     min-width: 0;
-    margin-left: auto;
   }
   .ahd-me {
     flex: none;
@@ -857,14 +856,9 @@
   .settings {
     padding: 18px 0 24px;
   }
-  .lib,
-  .send {
-    width: min(1200px, calc(100% - 64px));
-    padding: 0;
-  }
   .send {
     width: min(560px, calc(100% - 64px));
-    padding-top: 18px;
+    padding: 18px 0 0;
   }
 
   .modal[open] {
@@ -910,7 +904,7 @@
 /* Computers: the sign-in form is a card beside the picture. */
 @media (min-width: 1024px) and (min-height: 540px) {
   .narrow-only {
-    display: none;
+    display: none !important;
   }
   .split .form {
     padding: 30px 32px;

@@ -1,4 +1,5 @@
 import type { ComponentChildren } from 'preact';
+import { useEffect } from 'preact/hooks';
 import { Icon, type IconName } from '../components/Icon';
 import { useI18n } from '../i18n';
 import { Avatar, Link } from './components/Bits';
@@ -26,6 +27,10 @@ interface Props {
 export function Shell({ tab, tools, children }: Props) {
   const { t } = useI18n();
   const { info, me } = useAccount();
+  const title = `${t(tabs.find((x) => x.tab === tab)!.label)} · ${info?.name ?? 'Share'}`;
+  useEffect(() => {
+    document.title = title;
+  }, [title]);
   const links = (cls: string) =>
     tabs.map((x) => (
       <Link key={x.tab} href={`/${x.tab}`} class={x.tab === tab ? `${cls} on` : cls} aria-current={x.tab === tab ? 'page' : undefined}>
@@ -58,12 +63,21 @@ export function Shell({ tab, tools, children }: Props) {
   );
 }
 
+interface TitleBarProps {
+  title: string;
+  /** Takes the title's place, such as a search field; the title stays for screen readers. */
+  field?: ComponentChildren;
+  children?: ComponentChildren;
+  wide?: boolean;
+}
+
 /** A page's title bar on a phone: the title, and buttons on the right. Bigger screens have the
  * header instead, and show only what the page asks for (wide). */
-export function TitleBar({ title, children, wide }: { title: string; children?: ComponentChildren; wide?: boolean }) {
+export function TitleBar({ title, field, children, wide }: TitleBarProps) {
   return (
     <header class={`ab${wide ? ' wide' : ''}`}>
-      <h1>{title}</h1>
+      <h1 class={field ? 'sr-only' : undefined}>{title}</h1>
+      {field}
       {children}
     </header>
   );

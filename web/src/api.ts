@@ -177,3 +177,69 @@ export const deleteMe = () => request<void>('POST', '/api/me/delete', {});
 export const getMyDevices = () => request<{ devices: ListedDevice[] }>('GET', '/api/me/devices');
 
 export const signOutDevice = (id: string) => request<void>('DELETE', `/api/devices/${encodeURIComponent(id)}`);
+
+// The library: everything that was sent, by upload day, newest first.
+
+export type FileKind = 'photo' | 'video' | 'document';
+
+export interface FileInfo {
+  id: string;
+  name: string;
+  size: number;
+  mime: string;
+  kind: FileKind;
+  /** The upload day, in the server's time zone: 2026-09-27. */
+  day: string;
+  uploaded_at: string;
+  /** Changes with the thumbnail. */
+  updated_at: string;
+  width: number | null;
+  height: number | null;
+  duration_ms: number | null;
+  has_thumb: boolean;
+  /** Who sent it, if they have an account; null for a PIN. */
+  from: string | null;
+}
+
+export interface LibraryDay {
+  day: string;
+  count: number;
+  bytes: number;
+}
+
+/** The days that have files; version grows with every change to the library. */
+export interface LibraryOverview {
+  version: number;
+  days: LibraryDay[];
+}
+
+export interface FilePage {
+  files: FileInfo[];
+  next_cursor: string | null;
+}
+
+/** What the library shows: one kind or all, and part of a file name. */
+export interface LibraryFilter {
+  kind: FileKind | null;
+  q: string;
+}
+
+function libraryQuery(f: LibraryFilter, extra: Record<string, string | undefined> = {}): string {
+  const p = new URLSearchParams();
+  if (f.kind) p.set('kind', f.kind);
+  if (f.q.trim()) p.set('q', f.q.trim());
+  for (const [k, v] of Object.entries(extra)) if (v !== undefined) p.set(k, v);
+  const s = p.toString();
+  return s ? '?' + s : '';
+}
+
+export const getLibrary = (f: LibraryFilter) => request<LibraryOverview>('GET', '/api/library' + libraryQuery(f));
+
+export const getFiles = (f: LibraryFilter, cursor: string | null, limit: number) =>
+  request<FilePage>('GET', '/api/files' + libraryQuery(f, { limit: String(limit), cursor: cursor ?? undefined }));
+
+/** A file as it was sent, as an attachment; it resumes with Range. */
+export const contentUrl = (f: FileInfo) => `/api/files/${encodeURIComponent(f.id)}/content`;
+
+/** A file's thumbnail; its address changes when a better one arrives, so it can be cached. */
+export const thumbUrl = (f: FileInfo) => `/api/files/${encodeURIComponent(f.id)}/thumb?v=${Date.parse(f.updated_at).toString(36)}`;
