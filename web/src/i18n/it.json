@@ -49,6 +49,8 @@
   "drop.pickAgain": "Rilascia per sceglierli di nuovo",
   "ready.tip": "Consiglio: per tanti file usa il Wi-Fi. Se la pagina si chiude, riaprila e si riparte da lì.",
   "ready.private": "Gli altri con questo PIN non vedono quello che invii.",
+  "ready.seen": "Tutti quelli con questo PIN vedono quello che invii.",
+  "ready.into": "Nella cartella “{folder}”",
   "when.today": "oggi alle {time}",
   "when.tomorrow": "domani alle {time}",
   "when.date": "{date} alle {time}",

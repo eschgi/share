@@ -49,6 +49,8 @@
   "drop.pickAgain": "Loslassen, um sie nochmal auszuwählen",
   "ready.tip": "Tipp: Für viele Dateien lieber WLAN nutzen. Geht die Seite zu, öffne sie einfach wieder.",
   "ready.private": "Andere mit dieser PIN sehen nicht, was du schickst.",
+  "ready.seen": "Alle mit dieser PIN sehen, was du schickst.",
+  "ready.into": "In den Ordner „{folder}“",
   "when.today": "heute, {time}",
   "when.tomorrow": "morgen, {time}",
   "when.date": "{date}, {time}",

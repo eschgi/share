@@ -49,6 +49,8 @@
   "drop.pickAgain": "Drop to pick them again",
   "ready.tip": "Tip: use Wi-Fi for big batches. If the page closes, open it again and it carries on.",
   "ready.private": "Others with this PIN can't see what you send.",
+  "ready.seen": "Everyone with this PIN sees what you send.",
+  "ready.into": "Into the folder “{folder}”",
   "when.today": "today, {time}",
   "when.tomorrow": "tomorrow, {time}",
   "when.date": "{date}, {time}",

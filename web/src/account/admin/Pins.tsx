@@ -6,8 +6,11 @@ import { QrCode } from '../../components/QrCode';
 import { formatWhen } from '../../format';
 import { useI18n, type Lang } from '../../i18n';
 import { cleanPinInput, pinLength } from '../../pin';
+import { Switch } from '../components/Bits';
 import { Confirm, Modal } from '../components/Modal';
 import { useAccount } from '../context';
+import { hasChoices } from '../folders/folders';
+import { FolderField, FolderPicker } from '../folders/Folders';
 import { useFolders } from '../folders/store';
 import { copyText, sharesLinks, shareText } from './share';
 
@@ -35,6 +38,9 @@ type Asking = { kind: 'newCode' | 'end'; pin: PinInfo } | null;
 export function PinsList({ pins, onChanged, bare }: { pins: PinInfo[]; onChanged: () => Promise<void>; bare?: boolean }) {
   const { t } = useI18n();
   const { toast } = useAccount();
+  const folders = useFolders();
+  // The folder of each card, where there are several, but not on a folder's own page.
+  const folderOf = (p: PinInfo) => (!bare && hasChoices(folders.list) ? folders.byId(p.folder)?.name : undefined);
   const [qr, setQr] = useState<PinInfo | null>(null);
   const [asking, setAsking] = useState<Asking>(null);
   const [busy, setBusy] = useState(false);
@@ -60,12 +66,22 @@ export function PinsList({ pins, onChanged, bare }: { pins: PinInfo[]; onChanged
 
   const permanent = pins.filter((p) => p.kind === 'permanent');
   const day = pins.filter((p) => p.kind === 'day');
-  const card = (p: PinInfo) => <PinCard key={p.id} pin={p} shares={shares} onHandOn={() => void handOn(p)} onQr={() => setQr(p)} onAsk={(kind) => setAsking({ kind, pin: p })} />;
+  const card = (p: PinInfo) => (
+    <PinCard
+      key={p.id}
+      pin={p}
+      folder={folderOf(p)}
+      shares={shares}
+      onHandOn={() => void handOn(p)}
+      onQr={() => setQr(p)}
+      onAsk={(kind) => setAsking({ kind, pin: p })}
+    />
+  );
   return (
     <>
       {!bare && (
         <p class="lead sm">
-          <Bold text={t('pins.lead')} />
+          <Bold text={t(pins.some((p) => p.shows_folder) ? 'pins.leadShows' : 'pins.lead')} />
         </p>
       )}
       {!bare && pins.length === 0 && <p class="help">{t('pins.none')}</p>}
@@ -101,13 +117,15 @@ export function PinsList({ pins, onChanged, bare }: { pins: PinInfo[]; onChanged
 
 interface CardProps {
   pin: PinInfo;
+  /** Its folder's name, where there are several. */
+  folder?: string;
   shares: boolean;
   onHandOn: () => void;
   onQr: () => void;
   onAsk: (kind: 'newCode' | 'end') => void;
 }
 
-function PinCard({ pin, shares, onHandOn, onQr, onAsk }: CardProps) {
+function PinCard({ pin, folder, shares, onHandOn, onQr, onAsk }: CardProps) {
   const { t, tn, lang } = useI18n();
   const permanent = pin.kind === 'permanent';
   return (
@@ -116,6 +134,22 @@ function PinCard({ pin, shares, onHandOn, onQr, onAsk }: CardProps) {
         <CodeBoxes code={pin.code} />
         {permanent && <Icon name="infinity" class="pcico" />}
       </div>
+      {(folder || pin.shows_folder) && (
+        <div class="pc-tags">
+          {folder && (
+            <span class="ftag">
+              <Icon name="folder" />
+              {folder}
+            </span>
+          )}
+          {pin.shows_folder && (
+            <span class="ftag">
+              <Icon name="eye" />
+              {t('pins.showsFolder')}
+            </span>
+          )}
+        </div>
+      )}
       <div class="pc-meta">
         {permanent ? (
           `${t('pins.since', { date: shortDate(new Date(pin.created_at), lang) })} · ${tn('pins.usedOn', pin.phones)}`
@@ -174,7 +208,9 @@ export function NewPinDialog({ folder, onCreated, onClose }: { folder?: string; 
   const { t, lang } = useI18n();
   const { toast } = useAccount();
   const folders = useFolders();
-  const into = folder ?? folders.sendTo?.id;
+  const [chosen, setChosen] = useState(folder ?? null);
+  const into = chosen ?? folders.sendTo?.id;
+  const [shows, setShows] = useState(false);
   const [kind, setKind] = useState<PinInfo['kind']>('day');
   const [code, setCode] = useState('');
   const [focused, setFocused] = useState(false);
@@ -199,7 +235,7 @@ export function NewPinDialog({ folder, onCreated, onClose }: { folder?: string; 
     setProblem(null);
     let pin: PinInfo;
     try {
-      pin = await createPin(kind, code, into);
+      pin = await createPin(kind, code, into, shows);
     } catch (e) {
       setBusy(false);
       if (!(e instanceof ApiError) || e.status === 0) return setProblem(t('common.offline'));
@@ -214,7 +250,12 @@ export function NewPinDialog({ folder, onCreated, onClose }: { folder?: string; 
   const tomorrow = new Date(Date.now() + 86_400_000);
   return (
     <Modal title={t('pins.newTitle')} onClose={onClose}>
-      <p class="label first">{t('pins.howLong')}</p>
+      {hasChoices(folders.list) && (
+        <FolderField label={t('pins.sendsInto')}>
+          <FolderPicker list={folders.list!} value={folders.byId(into ?? '') ?? null} onChange={setChosen} title={t('pins.sendsInto')} />
+        </FolderField>
+      )}
+      <p class={`label${hasChoices(folders.list) ? '' : ' first'}`}>{t('pins.howLong')}</p>
       <div class="opts" role="radiogroup" aria-label={t('pins.howLong')}>
         {(
           [
@@ -230,6 +271,13 @@ export function NewPinDialog({ folder, onCreated, onClose }: { folder?: string; 
           </button>
         ))}
       </div>
+      <button type="button" class="swrow" role="switch" aria-checked={shows} onClick={() => setShows(!shows)}>
+        <span class="rt">
+          <b>{t('pins.guestsSee')}</b>
+          <span>{t('pins.guestsSeeHelp')}</span>
+        </span>
+        <Switch on={shows} />
+      </button>
       <label class="label" for="new-pin">
         {t('pins.codeLabel')}
       </label>

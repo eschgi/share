@@ -503,6 +503,49 @@ button.small:focus-visible {
   width: 16px;
   height: 16px;
 }
+/* For screen readers only. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The folder a PIN sends into, beside how long it works (screen 45). */
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+.pills > .timepill {
+  margin-top: 0;
+}
+.fpill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  min-height: 34px;
+  padding: 6px 13px;
+  border-radius: 17px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: 14px;
+  font-weight: 600;
+}
+.fpill .ic {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+.fpill > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* Sending */
 .count {

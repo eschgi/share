@@ -801,16 +801,6 @@
   padding: 0 24px;
 }
 
-/* For screen readers only. */
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
 
 /* Parts for one layout only, such as the picture beside the sign-in form on computers. They
    win over a part's own display. */

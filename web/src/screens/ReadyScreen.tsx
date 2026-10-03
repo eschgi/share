@@ -25,6 +25,9 @@ interface Props {
 export function ReadyScreen({ name, session, onFiles, shareFailed, onForgetPin, into }: Props) {
   const { t, lang } = useI18n();
   const until = session.kind === 'pin' && session.pin_kind === 'day' && session.expires_at ? new Date(session.expires_at) : null;
+  // The folder a PIN sends into, once the server has a second one.
+  const folder = session.kind === 'pin' ? session.folder_name : null;
+  const seen = session.kind === 'pin' && session.shows_folder;
   const computer = !useMedia(touchFirst);
   return (
     <Page name={name} languageSwitch layout="split">
@@ -32,10 +35,21 @@ export function ReadyScreen({ name, session, onFiles, shareFailed, onForgetPin, 
         <Stack day={!!until} />
         <h1 class="hero">{t('ready.title')}</h1>
         <p class="lead">{t(session.kind === 'account' ? 'send.lead' : until ? 'ready.leadDay' : 'ready.lead')}</p>
-        {until && (
-          <div class="timepill">
-            <Icon name="clock" />
-            {t('ready.worksUntil', { when: formatWhen(until, new Date(), lang) })}
+        {(until || folder) && (
+          <div class="pills">
+            {folder && (
+              <div class="fpill" title={t('ready.into', { folder })}>
+                <Icon name="folder" />
+                <span aria-hidden="true">{folder}</span>
+                <span class="sr-only">{t('ready.into', { folder })}</span>
+              </div>
+            )}
+            {until && (
+              <div class="timepill">
+                <Icon name="clock" />
+                {t('ready.worksUntil', { when: formatWhen(until, new Date(), lang) })}
+              </div>
+            )}
           </div>
         )}
         {into}
@@ -58,7 +72,7 @@ export function ReadyScreen({ name, session, onFiles, shareFailed, onForgetPin, 
           <FilePicker label={t('ready.choose')} look="primary" onFiles={onFiles} />
           {computer && <FilePicker label={t('ready.chooseFolder')} look="link" icon="folder" directory onFiles={onFiles} />}
         </div>
-        <p class="small">{t(until ? 'ready.private' : 'ready.tip')}</p>
+        <p class="small">{t(seen ? 'ready.seen' : until ? 'ready.private' : 'ready.tip')}</p>
         {session.kind === 'pin' && onForgetPin && (
           <button type="button" class="small link" onClick={onForgetPin}>
             {t('pin.useAnother')}
