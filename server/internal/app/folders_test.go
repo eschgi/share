@@ -295,3 +295,109 @@ func TestAdminsCreateRenameAndDeleteFolders(t *testing.T) {
 		t.Fatalf("folders after the restore: %v", list)
 	}
 }
+
+// person is someone in GET /api/users.
+func person(t *testing.T, people map[string]any, id string) map[string]any {
+	t.Helper()
+	for _, u := range people["users"].([]any) {
+		if u := u.(map[string]any); u["id"] == id {
+			return u
+		}
+	}
+	t.Fatalf("%s isn't in %v", id, people)
+	return nil
+}
+
+func TestAdminsChooseWhoSeesAFolder(t *testing.T) {
+	e := newEnv(t)
+	admin := e.admin()
+	maria := e.accept(e.invite(admin, "Maria", "member"), "Maria's phone")
+	family := e.firstFolder()
+	wedding := e.newFolder("Wedding")
+	e.put(wedding, "IMG_1.jpg", []byte("photo"))
+
+	people := e.get("/api/users", admin.token)
+	assertShape(t, "people", readFixture(t, "api/people.json")["response"], people.json(t))
+	if got := person(t, people.json(t), admin.userID)["folders"].([]any); len(got) != 2 {
+		t.Errorf("the admin sees %v, want every folder", got)
+	}
+	if got := person(t, people.json(t), maria.userID)["folders"].([]any); len(got) != 1 || got[0] != family.ID {
+		t.Errorf("Maria sees %v", got)
+	}
+
+	before := e.get("/api/library", maria.token).json(t)["version"]
+	path := "/api/folders/" + wedding.ID + "/people/" + maria.userID
+	wantStatus(t, "give", e.do(nil, "PUT", path, admin.token, nil, nil), http.StatusNoContent, "")
+	wantStatus(t, "give again", e.do(nil, "PUT", path, admin.token, nil, nil), http.StatusNoContent, "")
+	lib := e.get("/api/library", maria.token).json(t)
+	if lib["version"] == before || len(e.get("/api/files?folder="+wedding.ID, maria.token).json(t)["files"].([]any)) != 1 {
+		t.Fatalf("after giving Maria the folder: %v", lib)
+	}
+	if got := person(t, e.get("/api/users", admin.token).json(t), maria.userID)["folders"].([]any); len(got) != 2 {
+		t.Errorf("Maria sees %v", got)
+	}
+	wantStatus(t, "take away", e.do(nil, "DELETE", path, admin.token, nil, nil), http.StatusNoContent, "")
+	wantStatus(t, "Maria after", e.get("/api/files?folder="+wedding.ID, maria.token), http.StatusNotFound, "not_found")
+
+	wantStatus(t, "a member switching", e.do(nil, "PUT", path, maria.token, nil, nil), http.StatusForbidden, "forbidden")
+	wantStatus(t, "no such person", e.do(nil, "PUT", "/api/folders/"+wedding.ID+"/people/"+ids.New(), admin.token, nil, nil), http.StatusNotFound, "not_found")
+	wantStatus(t, "no such folder", e.do(nil, "PUT", "/api/folders/"+ids.New()+"/people/"+maria.userID, admin.token, nil, nil), http.StatusNotFound, "not_found")
+}
+
+func TestInvitesGiveTheirFolders(t *testing.T) {
+	e := newEnv(t)
+	admin := e.admin()
+	family := e.firstFolder()
+	wedding := e.newFolder("Wedding")
+	kindergarten := e.newFolder("Kindergarten")
+
+	invite := func(body map[string]any) response {
+		return e.sendJSON("POST", "/api/invites", admin.token, body)
+	}
+	r := invite(map[string]any{"name": "Oma Rosa", "role": "member", "folders": []string{kindergarten.ID, wedding.ID}})
+	wantStatus(t, "invite", r, http.StatusCreated, "")
+	assertShape(t, "invite", readFixture(t, "api/invite_create.json")["response"], r.json(t))
+	in := r.json(t)["invite"].(map[string]any)
+	if got := in["folders"].([]any); len(got) != 2 {
+		t.Fatalf("the invite gives %v", got)
+	}
+
+	// The folder's switch for the invite.
+	path := "/api/folders/" + family.ID + "/invites/" + in["id"].(string)
+	wantStatus(t, "give the invite a folder", e.do(nil, "PUT", path, admin.token, nil, nil), http.StatusNoContent, "")
+	wantStatus(t, "and take another", e.do(nil, "DELETE", "/api/folders/"+wedding.ID+"/invites/"+in["id"].(string), admin.token, nil, nil), http.StatusNoContent, "")
+	rosa := e.accept(r.json(t)["token"].(string), "Rosa's tablet")
+	got, _ := e.app.DB.FoldersOf(context.Background(), rosa.userID)
+	if len(got) != 2 || got[0].ID != family.ID || got[1].ID != kindergarten.ID {
+		t.Fatalf("Oma Rosa sees %+v", got)
+	}
+	wantStatus(t, "a used invite", e.do(nil, "PUT", path, admin.token, nil, nil), http.StatusNotFound, "not_found")
+
+	// None at all, the oldest when left out, and none for an admin.
+	for _, tc := range []struct {
+		body map[string]any
+		want int
+	}{
+		{map[string]any{"name": "Peter", "role": "member", "folders": []string{}}, 0},
+		{map[string]any{"name": "Anna", "role": "member"}, 1},
+		{map[string]any{"name": "Marco", "role": "admin", "folders": []string{wedding.ID}}, 3},
+	} {
+		r := invite(tc.body)
+		if got := r.json(t)["invite"].(map[string]any)["folders"].([]any); len(got) != tc.want {
+			t.Errorf("%v gives %v", tc.body, got)
+		}
+	}
+	wantStatus(t, "an unknown folder", invite(map[string]any{"name": "X", "role": "member", "folders": []string{ids.New()}}),
+		http.StatusNotFound, "not_found")
+}
+
+func TestDemotedAdminKeepsSeeingEverything(t *testing.T) {
+	e := newEnv(t)
+	admin := e.admin()
+	peter := e.accept(e.invite(admin, "Peter", "admin"), "Peter's phone")
+	e.newFolder("Wedding")
+	wantStatus(t, "demote", e.sendJSON("PATCH", "/api/users/"+peter.userID, admin.token, map[string]string{"role": "member"}), http.StatusNoContent, "")
+	if list := e.get("/api/folders", peter.token).json(t)["folders"].([]any); len(list) != 2 {
+		t.Fatalf("Peter, a member now, sees %v", list)
+	}
+}

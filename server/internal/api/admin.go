@@ -38,6 +38,10 @@ func (a *API) registerAdmin(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/folders", a.createFolder)
 	mux.HandleFunc("PATCH /api/folders/{id}", a.renameFolder)
 	mux.HandleFunc("DELETE /api/folders/{id}", a.deleteFolder)
+	mux.HandleFunc("PUT /api/folders/{id}/people/{user}", a.folderPerson(true))
+	mux.HandleFunc("DELETE /api/folders/{id}/people/{user}", a.folderPerson(false))
+	mux.HandleFunc("PUT /api/folders/{id}/invites/{invite}", a.folderInvite(true))
+	mux.HandleFunc("DELETE /api/folders/{id}/invites/{invite}", a.folderInvite(false))
 
 	mux.HandleFunc("POST /api/files/delete", a.deleteFiles)
 	mux.HandleFunc("GET /api/trash", a.trash)
@@ -220,6 +224,7 @@ type PersonInfo struct {
 	CreatedAt   time.Time   `json:"created_at"`
 	LastSeenAt  *time.Time  `json:"last_seen_at"` // on any phone or browser; null without one
 	Phones      []PhoneInfo `json:"phones"`       // phones and browsers
+	Folders     []string    `json:"folders"`      // the folders they see: every folder for an admin
 }
 
 // PhoneInfo is one of a person's signed-in phones or browsers.
@@ -248,12 +253,20 @@ type OpenInvite struct {
 	UserID    *string   `json:"user_id"` // set: it adds a phone for this person
 	CreatedAt time.Time `json:"created_at"`
 	ExpiresAt time.Time `json:"expires_at"`
+	Folders   []string  `json:"folders"` // the folders the new person will see; none for an added phone
 }
 
-func openInvite(in db.Invite) OpenInvite {
-	o := OpenInvite{ID: in.ID, Name: in.Name, Role: in.Role, CreatedAt: in.CreatedAt, ExpiresAt: in.ExpiresAt}
-	if in.UserID != "" {
+// openInvite describes an invite; given is what an invite for a new member gives, all the
+// folders that are an admin's.
+func openInvite(in db.Invite, given, all []string) OpenInvite {
+	o := OpenInvite{ID: in.ID, Name: in.Name, Role: in.Role, CreatedAt: in.CreatedAt, ExpiresAt: in.ExpiresAt, Folders: []string{}}
+	switch {
+	case in.UserID != "":
 		o.UserID = &in.UserID
+	case in.Role == db.RoleAdmin:
+		o.Folders = all
+	case given != nil:
+		o.Folders = given
 	}
 	return o
 }
@@ -285,12 +298,31 @@ func (a *API) people(w http.ResponseWriter, r *http.Request) {
 		internal(w, "people", err)
 		return
 	}
+	live, err := a.Auth.DB.LiveFolders(ctx)
+	if err != nil {
+		internal(w, "people", err)
+		return
+	}
+	given, err := a.Auth.DB.PeopleFolders(ctx)
+	if err != nil {
+		internal(w, "people", err)
+		return
+	}
+	invited, err := a.Auth.DB.InviteFolders(ctx)
+	if err != nil {
+		internal(w, "people", err)
+		return
+	}
+	all := folderIDs(live)
 	out := People{Users: []PersonInfo{}, Invites: []OpenInvite{}}
 	for _, u := range users {
 		info := userInfo(u)
 		person := PersonInfo{
 			ID: u.ID, Name: u.Name, Role: u.Role, Username: info.Username, HasPassword: info.HasPassword,
-			Me: u.ID == p.UserID, CreatedAt: u.CreatedAt, Phones: []PhoneInfo{},
+			Me: u.ID == p.UserID, CreatedAt: u.CreatedAt, Phones: []PhoneInfo{}, Folders: all,
+		}
+		if u.Role != db.RoleAdmin {
+			person.Folders = append([]string{}, given[u.ID]...)
 		}
 		for _, dv := range phones[u.ID] {
 			person.Phones = append(person.Phones, phoneInfo(dv, p.DeviceID))
@@ -302,7 +334,7 @@ func (a *API) people(w http.ResponseWriter, r *http.Request) {
 		out.Users = append(out.Users, person)
 	}
 	for _, in := range invites {
-		out.Invites = append(out.Invites, openInvite(in))
+		out.Invites = append(out.Invites, openInvite(in, append([]string{}, invited[in.ID]...), all))
 	}
 	httpx.WriteJSON(w, http.StatusOK, out)
 }
@@ -412,8 +444,9 @@ func (a *API) signOutPhone(w http.ResponseWriter, r *http.Request) {
 }
 
 type newInviteRequest struct {
-	Name string `json:"name"`
-	Role string `json:"role"`
+	Name    string   `json:"name"`
+	Role    string   `json:"role"`
+	Folders []string `json:"folders"` // for a member; left out: the oldest folder
 }
 
 // NewInvite is a fresh invite. The token and the link are shown only now; the server keeps
@@ -433,7 +466,7 @@ func (a *API) invite(w http.ResponseWriter, r *http.Request) {
 	if !httpx.DecodeJSON(w, r, &req) {
 		return
 	}
-	a.newInvite(w, r, p, req.Name, req.Role, "")
+	a.newInvite(w, r, p, req.Name, req.Role, "", req.Folders)
 }
 
 func (a *API) invitePhone(w http.ResponseWriter, r *http.Request) {
@@ -441,17 +474,25 @@ func (a *API) invitePhone(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	a.newInvite(w, r, p, "", "", r.PathValue("id"))
+	a.newInvite(w, r, p, "", "", r.PathValue("id"), nil)
 }
 
-func (a *API) newInvite(w http.ResponseWriter, r *http.Request, p *auth.Principal, name, role, forUser string) {
-	token, in, err := a.Auth.CreateInvite(r.Context(), name, role, forUser, p.UserID, nil, auth.InviteLifetime)
+func (a *API) newInvite(w http.ResponseWriter, r *http.Request, p *auth.Principal, name, role, forUser string, folders []string) {
+	token, in, err := a.Auth.CreateInvite(r.Context(), name, role, forUser, p.UserID, folders, auth.InviteLifetime)
 	var input *auth.InputError
 	switch {
 	case err == nil:
-		httpx.WriteJSON(w, http.StatusCreated, NewInvite{Token: token, Link: a.Cfg.PublicURL + "/join#" + token, Invite: openInvite(in)})
+		live, err := a.Auth.DB.LiveFolders(r.Context())
+		if err != nil {
+			internal(w, "invite", err)
+			return
+		}
+		invite := openInvite(in, in.Folders, folderIDs(live))
+		httpx.WriteJSON(w, http.StatusCreated, NewInvite{Token: token, Link: a.Cfg.PublicURL + "/join#" + token, Invite: invite})
 	case errors.As(err, &input):
 		httpx.WriteError(w, http.StatusBadRequest, "bad_request", "The "+input.Field+" "+input.Problem+".")
+	case errors.Is(err, auth.ErrFolderGone):
+		httpx.WriteError(w, http.StatusNotFound, "not_found", "No such folder.")
 	case errors.Is(err, db.ErrNotFound):
 		httpx.WriteError(w, http.StatusNotFound, "not_found", "No such person.")
 	default:

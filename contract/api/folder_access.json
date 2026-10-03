@@ -1,0 +1,8 @@
+{
+  "method": "PUT",
+  "path": "/api/folders/w3dding5x2k7mbqz4bwdbyj6qs/people/u7ld5x2k7mbqz4bwdbyj6qsqxa",
+  "auth": "admin",
+  "status": 204,
+  "response": null,
+  "notes": "Gives a person a folder: from now on they see its files and can send into it. DELETE takes it away. Admins see every folder whatever this says; it counts again if they become members (an admin who becomes a member keeps every folder until some are taken away). PUT and DELETE /api/folders/{id}/invites/{invite_id} do the same for an open invite for a new member. Both 204, also when nothing changed; 404 not_found for no such folder, person or open invite for a new member."
+}

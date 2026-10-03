@@ -245,3 +245,66 @@ func (a *API) folderError(w http.ResponseWriter, what string, err error) bool {
 	}
 	return false
 }
+
+// folderPerson gives a person a folder (sees) or takes it away. Admins see every folder
+// whatever this says; it counts again if they become members.
+func (a *API) folderPerson(sees bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := a.admin(w, r); !ok {
+			return
+		}
+		folder, ok := a.liveFolder(w, r)
+		if !ok {
+			return
+		}
+		ctx := r.Context()
+		if _, err := a.Auth.DB.UserByID(ctx, r.PathValue("user")); errors.Is(err, db.ErrNotFound) {
+			httpx.WriteError(w, http.StatusNotFound, "not_found", "No such person.")
+			return
+		} else if err != nil {
+			internal(w, "folder person", err)
+			return
+		}
+		if err := a.Auth.DB.SetFolderPerson(ctx, folder.ID, r.PathValue("user"), sees); err != nil {
+			internal(w, "folder person", err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// folderInvite lets an open invite for a new member give a folder (gets), or not.
+func (a *API) folderInvite(gets bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := a.admin(w, r); !ok {
+			return
+		}
+		folder, ok := a.liveFolder(w, r)
+		if !ok {
+			return
+		}
+		err := a.Auth.DB.SetFolderInvite(r.Context(), folder.ID, r.PathValue("invite"), gets, a.Now())
+		switch {
+		case errors.Is(err, db.ErrNotFound):
+			httpx.WriteError(w, http.StatusNotFound, "not_found", "No such invite for a new member, or it was used or has ended.")
+		case err != nil:
+			internal(w, "folder invite", err)
+		default:
+			w.WriteHeader(http.StatusNoContent)
+		}
+	}
+}
+
+// liveFolder loads the folder a request is about, if it isn't deleted.
+func (a *API) liveFolder(w http.ResponseWriter, r *http.Request) (db.Folder, bool) {
+	f, err := a.Auth.DB.FolderByID(r.Context(), r.PathValue("id"))
+	if errors.Is(err, db.ErrNotFound) || (err == nil && f.DeletedAt != nil) {
+		httpx.WriteError(w, http.StatusNotFound, "not_found", "No such folder.")
+		return f, false
+	}
+	if err != nil {
+		internal(w, "folder", err)
+		return f, false
+	}
+	return f, true
+}

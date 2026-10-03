@@ -24,6 +24,11 @@
             "last_seen_at": "2026-09-30T08:02:00Z",
             "this": true
           }
+        ],
+        "folders": [
+          "f4mily5x2k7mbqz4bwdbyj6qsq",
+          "w3dding5x2k7mbqz4bwdbyj6qs",
+          "t4xes5x2k7mbqz4bwdbyj6qsqx"
         ]
       },
       {
@@ -54,6 +59,10 @@
             "last_seen_at": "2026-09-28T21:10:00Z",
             "this": false
           }
+        ],
+        "folders": [
+          "f4mily5x2k7mbqz4bwdbyj6qsq",
+          "w3dding5x2k7mbqz4bwdbyj6qs"
         ]
       }
     ],
@@ -64,9 +73,12 @@
         "role": "member",
         "user_id": null,
         "created_at": "2026-09-29T21:00:00Z",
-        "expires_at": "2026-09-30T21:00:00Z"
+        "expires_at": "2026-09-30T21:00:00Z",
+        "folders": [
+          "f4mily5x2k7mbqz4bwdbyj6qsq"
+        ]
       }
     ]
   },
-  "notes": "Everyone with an account (admins first, then by name) with their signed-in phones and browsers (client app or web; home_only for a browser that signed in at home), most recently used first, and the invites nobody has used yet. me is the admin asking; this is the phone or browser asking. An invite with user_id adds a phone or browser for that person. Also: PATCH /api/users/{id} {role} (204) makes someone admin or member; DELETE /api/users/{id} (204) removes a person and signs out their phones, the files they sent stay; both 409 last_admin when no admin would be left, 404 not_found. DELETE /api/devices/{id} (204) signs one phone or browser out: admins anyone's, everyone else only their own (404 not_found otherwise); DELETE /api/invites/{id} (204) withdraws an invite."
+  "notes": "Everyone with an account (admins first, then by name) with their signed-in phones and browsers (client app or web; home_only for a browser that signed in at home), most recently used first, and the invites nobody has used yet. me is the admin asking; this is the phone or browser asking. An invite with user_id adds a phone or browser for that person. folders are the ids of the folders each person sees: every folder for an admin, the ones they were given for a member; an invite's are the ones the new person will see (none for an added phone, every folder for a new admin). PUT and DELETE /api/folders/{id}/people/{user_id} and /api/folders/{id}/invites/{invite_id} change that (folder_access.json). Also: PATCH /api/users/{id} {role} (204) makes someone admin or member; DELETE /api/users/{id} (204) removes a person and signs out their phones, the files they sent stay; both 409 last_admin when no admin would be left, 404 not_found. DELETE /api/devices/{id} (204) signs one phone or browser out: admins anyone's, everyone else only their own (404 not_found otherwise); DELETE /api/invites/{id} (204) withdraws an invite."
 }

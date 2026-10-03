@@ -167,8 +167,64 @@ func (d *DB) SetFolderPerson(ctx context.Context, folderID, userID string, sees 
 	if !sees {
 		q = "DELETE FROM folder_people WHERE folder_id = ? AND user_id = ?"
 	}
-	_, err := d.ExecContext(ctx, q, folderID, userID)
+	return d.Tx(ctx, func(tx *sql.Tx) error {
+		res, err := tx.ExecContext(ctx, q, folderID, userID)
+		if err != nil {
+			return err
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			return nil
+		}
+		return bumpLibraryVersion(ctx, tx) // what the person's library shows changed
+	})
+}
+
+// SetFolderInvite lets an open invite for a new member give a folder, or not. It returns
+// ErrNotFound for any other invite.
+func (d *DB) SetFolderInvite(ctx context.Context, folderID, inviteID string, gets bool, now time.Time) error {
+	var n int
+	if err := d.QueryRowContext(ctx, `SELECT COUNT(*) FROM invites WHERE id = ? AND user_id IS NULL AND role = 'member'
+		AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ?`, inviteID, ms(now)).Scan(&n); err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrNotFound
+	}
+	q := "INSERT OR IGNORE INTO invite_folders (folder_id, invite_id) VALUES (?, ?)"
+	if !gets {
+		q = "DELETE FROM invite_folders WHERE folder_id = ? AND invite_id = ?"
+	}
+	_, err := d.ExecContext(ctx, q, folderID, inviteID)
 	return err
+}
+
+// PeopleFolders lists, by member, the live folders they were given, the oldest first.
+func (d *DB) PeopleFolders(ctx context.Context) (map[string][]string, error) {
+	return d.folderLists(ctx, `SELECT fp.user_id, f.id FROM folder_people fp JOIN folders f ON f.id = fp.folder_id
+		WHERE f.deleted_at IS NULL ORDER BY f.created_at, f.rowid`)
+}
+
+// InviteFolders lists, by invite, the live folders it gives, the oldest first.
+func (d *DB) InviteFolders(ctx context.Context) (map[string][]string, error) {
+	return d.folderLists(ctx, `SELECT i.invite_id, f.id FROM invite_folders i JOIN folders f ON f.id = i.folder_id
+		WHERE f.deleted_at IS NULL ORDER BY f.created_at, f.rowid`)
+}
+
+func (d *DB) folderLists(ctx context.Context, query string) (map[string][]string, error) {
+	rows, err := d.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string][]string{}
+	for rows.Next() {
+		var key, folder string
+		if err := rows.Scan(&key, &folder); err != nil {
+			return nil, err
+		}
+		out[key] = append(out[key], folder)
+	}
+	return out, rows.Err()
 }
 
 // DirTaken reports whether a folder, deleted or not, has a directory, ignoring case.
