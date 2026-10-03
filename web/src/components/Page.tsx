@@ -5,6 +5,9 @@ import { Brand } from './Brand';
 /** Inside the frame of the account's pages (account/Shell.tsx), which has its own header. */
 export const InShell = createContext(false);
 
+/** Something every screen shows under the header, such as the PIN pages' Send and See. */
+export const PageTop = createContext<ComponentChildren>(null);
+
 interface Props {
   name: string;
   languageSwitch?: boolean;
@@ -13,7 +16,7 @@ interface Props {
    * middle. 'split': the same card on tablets, two panes side by side on computers. 'sending':
    * a wider card on tablets, the progress beside the tiles on computers. (Also class names.)
    */
-  layout?: 'single' | 'split' | 'sending';
+  layout?: 'single' | 'split' | 'sending' | 'see';
   children: ComponentChildren;
 }
 
@@ -22,6 +25,7 @@ interface Props {
  * the content's wrappers take no room there; styles.css lays them out on bigger screens.
  */
 export function Page({ name, languageSwitch, layout = 'single', children }: Props) {
+  const top = useContext(PageTop);
   if (useContext(InShell)) {
     return (
       <div class={`screen in-shell ${layout}`}>
@@ -32,6 +36,7 @@ export function Page({ name, languageSwitch, layout = 'single', children }: Prop
   return (
     <main class={`screen ${layout}`}>
       <Brand name={name} languageSwitch={languageSwitch} />
+      {top && <div class="ptop">{top}</div>}
       <div class="body">{children}</div>
     </main>
   );

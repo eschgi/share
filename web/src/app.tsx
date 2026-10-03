@@ -1,7 +1,9 @@
+import type { ComponentType } from 'preact';
 import { useEffect, useMemo, useReducer, useRef, useState } from 'preact/hooks';
 import { ApiError, endSession, getInfo, getSession, unlock, type Info } from './api';
 import { DropZone } from './components/DropZone';
-import { Page } from './components/Page';
+import { Icon } from './components/Icon';
+import { Page, PageTop } from './components/Page';
 import { useLeaveWarning } from './device';
 import { formatPercent } from './format';
 import { I18nContext, isLang, languages, makeI18n, pickLanguage, storeLanguage, storedLanguage, type Lang } from './i18n';
@@ -32,6 +34,18 @@ function problemOf(e: unknown): PinProblem {
   return { kind: 'network' };
 }
 
+type SeeModule = { See: ComponentType<{ name: string; onEnded: () => void }> };
+let seeLoading: Promise<SeeModule> | null = null;
+
+/** A guest's look into a PIN's folder comes in a chunk of its own, loaded once it is wanted. */
+function loadSee(): Promise<SeeModule> {
+  seeLoading ??= import('./guest/See').catch((e: unknown) => {
+    seeLoading = null;
+    throw e;
+  });
+  return seeLoading;
+}
+
 export function App() {
   const [info, setInfo] = useState<Info | null>(null);
   const [state, dispatch] = useReducer(reduce, initialState);
@@ -43,6 +57,10 @@ export function App() {
   const [, setTick] = useState(0);
   const redraw = () => setTick((n) => n + 1);
   const uploader = useRef<Uploader | null>(null);
+  /** A PIN that shows its folder: sending, or looking into the folder. */
+  const [tab, setTab] = useState<'send' | 'see'>('send');
+  const [See, setSee] = useState<SeeModule['See'] | null>(null);
+  const [seeFailed, setSeeFailed] = useState(false);
 
   useEffect(() => {
     document.documentElement.lang = lang;
@@ -201,8 +219,53 @@ export function App() {
       break;
   }
 
+  // A PIN that shows its folder gets Send and See, once it works.
+  const shows = state.session?.kind === 'pin' && state.session.shows_folder && state.screen !== 'pin' && state.screen !== 'boot';
+  const seeing = shows && tab === 'see';
+  useEffect(() => {
+    if (!seeing || See) return;
+    setSeeFailed(false);
+    loadSee().then(
+      (m) => setSee(() => m.See),
+      () => setSeeFailed(true),
+    );
+  }, [seeing]);
+  if (seeing && dropTo) {
+    // Files dropped while looking go out, on the Send tab.
+    const send = dropTo;
+    dropTo = (files) => {
+      setTab('send');
+      send(files);
+    };
+  }
+  const tabs = shows && (
+    <div class="seg" role="tablist">
+      {(['send', 'see'] as const).map((k) => (
+        <button key={k} type="button" role="tab" aria-selected={tab === k} class={tab === k ? 'on' : ''} onClick={() => setTab(k)}>
+          <Icon name={k === 'send' ? 'upload' : 'images'} />
+          {i18n.t(k === 'send' ? 'ready.tabSend' : 'ready.tabSee')}
+        </button>
+      ))}
+    </div>
+  );
+
   let screen;
-  switch (state.screen) {
+  switch (seeing ? 'see' : state.screen) {
+    case 'see':
+      screen = See ? (
+        <See
+          name={name}
+          onEnded={() => {
+            setTab('send');
+            dispatch({ type: 'sessionEnded', lost: false });
+          }}
+        />
+      ) : (
+        <Page name={name} languageSwitch>
+          <p class="lead">{i18n.t(seeFailed ? 'pin.network' : 'common.loading')}</p>
+        </Page>
+      );
+      break;
     case 'boot':
       screen = (
         <Page name={name}>
@@ -277,7 +340,7 @@ export function App() {
   }
   return (
     <I18nContext.Provider value={i18n}>
-      {screen}
+      <PageTop.Provider value={tabs || null}>{screen}</PageTop.Provider>
       <DropZone onFiles={dropTo} label={dropLabel} />
     </I18nContext.Provider>
   );

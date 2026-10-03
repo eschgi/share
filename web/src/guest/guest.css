@@ -1,0 +1,31 @@
+/* A guest's look into a folder (screen 46): the PIN pages' frame, with the library's days and
+   tiles inside, in a wider card on bigger screens. */
+.gtitle {
+  margin-top: 22px;
+}
+.lead.gmeta {
+  margin: 6px 0 0;
+}
+.gfiles {
+  margin: 4px -10px 14px;
+}
+.gfiles .selm {
+  display: none !important;
+}
+.btn.gall {
+  margin-top: 6px;
+}
+@media (min-width: 640px) and (min-height: 540px) {
+  .see .body {
+    max-width: 1100px;
+    margin: 12px auto auto;
+  }
+  .gfiles {
+    margin: 4px 0 14px;
+  }
+  .btn.gall {
+    align-self: flex-start;
+    width: auto;
+    padding: 0 26px;
+  }
+}

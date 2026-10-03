@@ -51,6 +51,8 @@
   "ready.private": "Gli altri con questo PIN non vedono quello che invii.",
   "ready.seen": "Tutti quelli con questo PIN vedono quello che invii.",
   "ready.into": "Nella cartella “{folder}”",
+  "ready.tabSend": "Invia",
+  "ready.tabSee": "Guarda",
   "when.today": "oggi alle {time}",
   "when.tomorrow": "domani alle {time}",
   "when.date": "{date} alle {time}",

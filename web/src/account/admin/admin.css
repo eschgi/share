@@ -113,44 +113,8 @@
 }
 
 /* Inviting (screen 32): member or admin, then the code and the link. */
-.seg {
-  display: flex;
-  flex: none;
-  padding: 4px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--s1);
-}
 .modal-panel .seg {
   background: var(--s2);
-}
-.seg > button {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  height: 44px;
-  border: 0;
-  border-radius: 11px;
-  background: none;
-  color: var(--text-2);
-  font-size: 15.5px;
-  font-weight: 500;
-}
-.seg > button.on {
-  background: var(--accent-soft);
-  color: var(--accent-text);
-  font-weight: 600;
-}
-.seg .ic {
-  width: 18px;
-  height: 18px;
-  stroke-width: 2.6;
-}
-.seg > button:focus-visible {
-  outline: 2px solid var(--accent-text);
-  outline-offset: -2px;
 }
 .qrrow {
   display: flex;

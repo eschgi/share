@@ -51,6 +51,8 @@
   "ready.private": "Others with this PIN can't see what you send.",
   "ready.seen": "Everyone with this PIN sees what you send.",
   "ready.into": "Into the folder “{folder}”",
+  "ready.tabSend": "Send",
+  "ready.tabSee": "See",
   "when.today": "today, {time}",
   "when.tomorrow": "tomorrow, {time}",
   "when.date": "{date}, {time}",
