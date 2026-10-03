@@ -21,12 +21,30 @@ export function Link({ href, onClick, ...rest }: JSX.HTMLAttributes<HTMLAnchorEl
   );
 }
 
-export function Avatar({ id, name, size, pending }: { id: string; name: string; size?: 'sm' | 'lg'; pending?: boolean }) {
+export function Avatar({ id, name, size, pending }: { id: string; name: string; size?: 'xs' | 'sm' | 'lg'; pending?: boolean }) {
   return (
     <span class={`av ${size ?? ''} ${pending ? 'pend' : avatarClass(id)}`} aria-hidden="true">
       {initial(name)}
     </span>
   );
+}
+
+/** A few people side by side, overlapping, and how many more there are. */
+export function AvatarStack({ people, max = 4 }: { people: { id: string; name: string; pending?: boolean }[]; max?: number }) {
+  const more = people.length - max;
+  return (
+    <span class="avs" aria-hidden="true">
+      {people.slice(0, more > 0 ? max - 1 : max).map((p) => (
+        <Avatar key={p.id} id={p.id} name={p.name} size="xs" pending={p.pending} />
+      ))}
+      {more > 0 && <span class="av xs more">+{more + 1}</span>}
+    </span>
+  );
+}
+
+/** An on/off switch, for a row that is the button; locked shows it can't change. */
+export function Switch({ on, locked }: { on: boolean; locked?: boolean }) {
+  return <span class={`sw${on ? ' on' : ''}${locked ? ' lock' : ''}`} aria-hidden="true" />;
 }
 
 export function RoleBadge({ role, crown }: { role: Role; crown?: boolean }) {

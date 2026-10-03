@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { FolderInfo } from '../src/api';
-import { allTotals, dropTarget, hasChoices, sendTarget, validShown } from '../src/account/folders/folders';
+import type { FolderInfo, OpenInvite, People, Person } from '../src/api';
+import { allTotals, dropTarget, hasChoices, sendTarget, validShown, whoSees } from '../src/account/folders/folders';
 import { uploadMeta } from '../src/uploader';
 
 function folder(id: string, files = 1, bytes = 100): FolderInfo {
@@ -52,5 +52,25 @@ describe('sending into folders', () => {
     expect(uploadMeta(undefined, undefined)).toEqual({});
     expect(uploadMeta(7, 'wedding')).toEqual({ shareKey: '7', folder: 'wedding' });
     expect(uploadMeta(undefined, 'family')).toEqual({ folder: 'family' });
+  });
+});
+
+describe('who sees a folder', () => {
+  it('is the admins, the members given it, and open invites for new people', () => {
+    const person = (id: string, role: 'admin' | 'member', folders: string[]) =>
+      ({ id, name: id, role, username: null, has_password: false, me: false, created_at: '', last_seen_at: null, phones: [], folders }) as Person;
+    const invite = (id: string, role: 'admin' | 'member', folders: string[], user_id: string | null = null) =>
+      ({ id, name: id, role, user_id, created_at: '', expires_at: '', folders }) as OpenInvite;
+    const people: People = {
+      users: [person('stefan', 'admin', ['family', 'taxes']), person('maria', 'member', ['family', 'wedding']), person('peter', 'member', ['family'])],
+      invites: [invite('rosa', 'member', ['wedding']), invite('marco', 'admin', []), invite('phone', 'member', ['wedding'], 'peter')],
+    };
+    expect(whoSees(people, 'wedding').map((s) => [s.id, s.pending])).toEqual([
+      ['stefan', false],
+      ['maria', false],
+      ['rosa', true],
+      ['marco', true],
+    ]);
+    expect(whoSees(people, 'taxes').map((s) => s.id)).toEqual(['stefan', 'marco']);
   });
 });

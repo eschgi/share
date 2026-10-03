@@ -285,6 +285,19 @@ export interface FolderInfo {
 /** The folders this person sees, the oldest first. */
 export const getFolders = () => request<{ folders: FolderInfo[] }>('GET', '/api/folders');
 
+/** Admins: a new folder, which only admins see until people are given it. */
+export const createFolder = (name: string) => request<FolderInfo>('POST', '/api/folders', { name });
+/** Admins: renames a folder, and its directory on the server's drive. */
+export const renameFolder = (id: string, name: string) => request<FolderInfo>('PATCH', `/api/folders/${encodeURIComponent(id)}`, { name });
+/** Admins: deletes a folder; its files go to Recently deleted, and its PINs stop. */
+export const deleteFolder = (id: string) => request<{ changed: number }>('DELETE', `/api/folders/${encodeURIComponent(id)}`);
+/** Admins: gives someone a folder, or takes it away. */
+export const setFolderPerson = (folder: string, user: string, sees: boolean) =>
+  request<void>(sees ? 'PUT' : 'DELETE', `/api/folders/${encodeURIComponent(folder)}/people/${encodeURIComponent(user)}`);
+/** Admins: lets an open invite for a new member give a folder, or not. */
+export const setFolderInvite = (folder: string, invite: string, gets: boolean) =>
+  request<void>(gets ? 'PUT' : 'DELETE', `/api/folders/${encodeURIComponent(folder)}/invites/${encodeURIComponent(invite)}`);
+
 /** Several files as one ZIP: the archive's name, its exact size, and each file's path in it. */
 export interface ZipDownload {
   id: string;
@@ -350,7 +363,8 @@ export interface PinInfo {
 
 export const getPins = () => request<{ pins: PinInfo[] }>('GET', '/api/pins');
 export const suggestPin = () => request<{ code: string }>('GET', '/api/pins/suggest');
-export const createPin = (kind: PinInfo['kind'], code: string) => request<PinInfo>('POST', '/api/pins', { kind, code });
+export const createPin = (kind: PinInfo['kind'], code: string, folder: string, shows_folder = false) =>
+  request<PinInfo>('POST', '/api/pins', { kind, code, folder, shows_folder });
 export const newPinCode = (id: string) => request<PinInfo>('POST', `/api/pins/${encodeURIComponent(id)}/new-code`, {});
 export const endPin = (id: string) => request<void>('POST', `/api/pins/${encodeURIComponent(id)}/end`, {});
 

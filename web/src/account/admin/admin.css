@@ -446,8 +446,9 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     max-width: 860px;
   }
-  /* Beside the list, a page has no way back of its own. */
-  .dset .phead > .ib {
+  /* Beside the list, a page has no way back of its own; a folder's page goes back to the
+     folders. */
+  .dset .phead > .ib:not(.keep) {
     display: none;
   }
 }

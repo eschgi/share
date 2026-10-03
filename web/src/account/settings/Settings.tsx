@@ -10,20 +10,21 @@ import { dropShared } from '../../incoming';
 import { useRoute } from '../../router';
 import { storedTheme, type ThemeChoice } from '../../theme';
 import { got, useAdminData, type AdminData } from '../admin/data';
+import { FolderNameDialog, FolderPage, FoldersList } from '../admin/Folders';
 import { InviteDialog, PeopleGroup } from '../admin/People';
 import { NewPinDialog, PinsList } from '../admin/Pins';
 import { SelectAllTrash, TrashList, useTrash } from '../admin/Trash';
 import { Avatar, Link, RoleBadge, Row } from '../components/Bits';
 import { Confirm } from '../components/Modal';
 import { useAccount } from '../context';
-import { forgetFolders } from '../folders/store';
+import { forgetFolders, useFolders } from '../folders/store';
 import { clearMarks } from '../save/marks';
 import { Shell, TitleBar } from '../Shell';
 import { AboutDialog, DevicesDialog, LanguageDialog, PasswordDialog, ThemeDialog, themeSummary } from './dialogs';
 import { hasProblem, warningKey } from './storage';
 
 /** The admin's pages besides the list: on a computer beside it, elsewhere pages of their own. */
-type Page = 'pins' | 'people' | 'trash';
+type Page = 'pins' | 'folders' | 'people' | 'trash';
 
 const twoPanes = '(min-width: 1024px) and (min-height: 540px)';
 
@@ -39,8 +40,8 @@ export function Settings() {
   const admin = me.user.role === 'admin';
   const wide = useMedia(twoPanes);
   const data = useAdminData(admin);
-  const sub = route.path.split('/')[2];
-  const page: Page | null = admin && (sub === 'pins' || sub === 'people' || sub === 'trash') ? sub : null;
+  const [, , sub, folderId] = route.path.split('/');
+  const page: Page | null = admin && (sub === 'pins' || sub === 'folders' || sub === 'people' || sub === 'trash') ? sub : null;
 
   if (admin && wide) {
     const right = page ?? 'people';
@@ -51,16 +52,16 @@ export function Settings() {
             <SettingsList data={data} current={right} />
           </div>
           <div class="pane pane2">
-            <AdminPage page={right} data={data} />
+            <AdminPage page={right} data={data} folderId={folderId} />
           </div>
         </div>
       </Shell>
     );
   }
-  if (page === 'pins' || page === 'trash') {
+  if (page === 'pins' || page === 'trash' || page === 'folders') {
     return (
       <Shell tab="settings">
-        <AdminPage page={page} data={data} back />
+        <AdminPage page={page} data={data} folderId={folderId} back />
       </Shell>
     );
   }
@@ -75,12 +76,16 @@ export function Settings() {
 }
 
 /** One of the admin's pages, with its title and what it offers at the top. On its own page it
- * has the title bar's arrow back on a phone, and a link back on a tablet. */
-function AdminPage({ page, data, back }: { page: Page; data: AdminData; back?: boolean }) {
+ * has the title bar's arrow back on a phone, and a link back on a tablet; a folder's page also
+ * beside the list, back to the folders. */
+function AdminPage({ page, data, folderId, back }: { page: Page; data: AdminData; folderId?: string; back?: boolean }) {
   const { t } = useI18n();
   const [making, setMaking] = useState(false);
   const [inviting, setInviting] = useState(false);
+  const [naming, setNaming] = useState(false);
   const trash = useTrash(() => void data.reload());
+  const folders = useFolders();
+  const backTo = page === 'folders' && folderId ? '/settings/folders' : '/settings';
 
   let title: string;
   let action = null;
@@ -102,6 +107,30 @@ function AdminPage({ page, data, back }: { page: Page; data: AdminData; back?: b
     );
     const pins = data.pins;
     body = pins === 'failed' ? <p class="help">{t('common.offline')}</p> : pins ? <PinsList pins={pins} onChanged={data.reload} /> : <Spinner />;
+  } else if (page === 'folders' && folderId) {
+    const folder = folders.list?.find((f) => f.id === folderId);
+    title = folder?.name ?? t('folders.title');
+    body = folder ? (
+      <FolderPage folder={folder} list={folders.list!} people={got(data.people)} pins={got(data.pins)} onChanged={data.reload} />
+    ) : folders.list ? (
+      <p class="help">{t('folders.gone')}</p>
+    ) : (
+      <Spinner />
+    );
+  } else if (page === 'folders') {
+    title = t('folders.title');
+    action = (
+      <button type="button" class="btn primary xs" onClick={() => setNaming(true)}>
+        <Icon name="plus" />
+        {t('folders.new')}
+      </button>
+    );
+    barAction = (
+      <button type="button" class="ib tonal" aria-label={t('folders.new')} title={t('folders.new')} onClick={() => setNaming(true)}>
+        <Icon name="plus" />
+      </button>
+    );
+    body = folders.list ? <FoldersList list={folders.list} people={got(data.people)} pins={got(data.pins)} /> : <Spinner />;
   } else if (page === 'trash') {
     title = t('trash.title');
     action = <SelectAllTrash state={trash} />;
@@ -121,14 +150,14 @@ function AdminPage({ page, data, back }: { page: Page; data: AdminData; back?: b
   return (
     <>
       {back && (
-        <TitleBar title={title} back="/settings">
+        <TitleBar title={title} back={backTo}>
           {barAction ?? action}
         </TitleBar>
       )}
       <div class={back ? 'settings' : 'adminpage'}>
         <div class="phead">
-          {back && (
-            <Link href="/settings" class="ib" aria-label={t('common.back')}>
+          {(back || backTo !== '/settings') && (
+            <Link href={backTo} class={`ib${backTo !== '/settings' ? ' keep' : ''}`} aria-label={t('common.back')}>
               <Icon name="back" />
             </Link>
           )}
@@ -154,6 +183,7 @@ function AdminPage({ page, data, back }: { page: Page; data: AdminData; back?: b
           }}
         />
       )}
+      {naming && <FolderNameDialog onClose={() => setNaming(false)} />}
     </>
   );
 }
@@ -226,6 +256,16 @@ function SettingsList({ data, current }: { data: AdminData; current?: Page }) {
     />
   );
   const pinsRow = <Row icon="key" tone="accent" title={t('pins.title')} sub={pinsLine} href="/settings/pins" current={current === 'pins'} />;
+  const folderList = useFolders().list;
+  const foldersRow = (
+    <Row
+      icon="folder"
+      title={t('folders.title')}
+      sub={folderList ? tn('folders.countFolders', folderList.length) : ''}
+      href="/settings/folders"
+      current={current === 'folders'}
+    />
+  );
 
   return (
     <>
@@ -243,6 +283,7 @@ function SettingsList({ data, current }: { data: AdminData; current?: Page }) {
         <>
           <div class="group">
             {pinsRow}
+            {foldersRow}
             <Row icon="users" title={t('people.title')} sub={peopleLine} href="/settings/people" current={current === 'people'} />
             <Row icon="trash" title={t('trash.title')} sub={trashLine} href="/settings/trash" current={current === 'trash'} />
             {storage && (
@@ -268,6 +309,7 @@ function SettingsList({ data, current }: { data: AdminData; current?: Page }) {
         <>
           <div class="group">
             {pinsRow}
+            {foldersRow}
             {languageRow}
             {themeRow}
           </div>

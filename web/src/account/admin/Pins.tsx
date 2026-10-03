@@ -8,6 +8,7 @@ import { useI18n, type Lang } from '../../i18n';
 import { cleanPinInput, pinLength } from '../../pin';
 import { Confirm, Modal } from '../components/Modal';
 import { useAccount } from '../context';
+import { useFolders } from '../folders/store';
 import { copyText, sharesLinks, shareText } from './share';
 
 /** "12 Sep", "12. Sept.", "12 set": when a permanent PIN was made, the day first as in the app. */
@@ -29,8 +30,9 @@ export function CodeBoxes({ code }: { code: string }) {
 
 type Asking = { kind: 'newCode' | 'end'; pin: PinInfo } | null;
 
-/** Screens 18 and 33: the PINs that work now, permanent ones first; and a new one (34). */
-export function PinsList({ pins, onChanged }: { pins: PinInfo[]; onChanged: () => Promise<void> }) {
+/** Screens 18 and 33: the PINs that work now, permanent ones first; and a new one (34). bare:
+ * only the cards, on a folder's page. */
+export function PinsList({ pins, onChanged, bare }: { pins: PinInfo[]; onChanged: () => Promise<void>; bare?: boolean }) {
   const { t } = useI18n();
   const { toast } = useAccount();
   const [qr, setQr] = useState<PinInfo | null>(null);
@@ -61,10 +63,12 @@ export function PinsList({ pins, onChanged }: { pins: PinInfo[]; onChanged: () =
   const card = (p: PinInfo) => <PinCard key={p.id} pin={p} shares={shares} onHandOn={() => void handOn(p)} onQr={() => setQr(p)} onAsk={(kind) => setAsking({ kind, pin: p })} />;
   return (
     <>
-      <p class="lead sm">
-        <Bold text={t('pins.lead')} />
-      </p>
-      {pins.length === 0 && <p class="help">{t('pins.none')}</p>}
+      {!bare && (
+        <p class="lead sm">
+          <Bold text={t('pins.lead')} />
+        </p>
+      )}
+      {!bare && pins.length === 0 && <p class="help">{t('pins.none')}</p>}
       <div class="pgrid">
         {permanent.length > 0 && (
           <div>
@@ -164,10 +168,13 @@ function PinQr({ pin, onClose }: { pin: PinInfo; onClose: () => void }) {
   );
 }
 
-/** Screen 34: how long the PIN works, and its code: made up, or typed. */
-export function NewPinDialog({ onCreated, onClose }: { onCreated: (pin: PinInfo) => void; onClose: () => void }) {
+/** Screen 34: how long the PIN works, and its code: made up, or typed. It sends into folder,
+ * or the folder sending goes into. */
+export function NewPinDialog({ folder, onCreated, onClose }: { folder?: string; onCreated: (pin: PinInfo) => void; onClose: () => void }) {
   const { t, lang } = useI18n();
   const { toast } = useAccount();
+  const folders = useFolders();
+  const into = folder ?? folders.sendTo?.id;
   const [kind, setKind] = useState<PinInfo['kind']>('day');
   const [code, setCode] = useState('');
   const [focused, setFocused] = useState(false);
@@ -187,11 +194,12 @@ export function NewPinDialog({ onCreated, onClose }: { onCreated: (pin: PinInfo)
 
   const create = async () => {
     if (code.length !== pinLength) return setProblem(t('pins.badCode'));
+    if (!into) return setProblem(t('common.offline'));
     setBusy(true);
     setProblem(null);
     let pin: PinInfo;
     try {
-      pin = await createPin(kind, code);
+      pin = await createPin(kind, code, into);
     } catch (e) {
       setBusy(false);
       if (!(e instanceof ApiError) || e.status === 0) return setProblem(t('common.offline'));

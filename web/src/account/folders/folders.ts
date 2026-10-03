@@ -1,7 +1,7 @@
 // Folders, as everyone sees them: the library shows one of them or all, sending goes into one.
 // Only with a second folder is there anything to choose, and only then do the pages talk of
 // folders. Pure decisions, kept here so the tests can check them.
-import type { FolderInfo } from '../../api';
+import type { FolderInfo, People, Role } from '../../api';
 
 /** There is a folder to choose: the person sees more than one. */
 export function hasChoices(list: readonly FolderInfo[] | null): boolean {
@@ -34,4 +34,23 @@ export function dropTarget(path: string, list: readonly FolderInfo[], shown: str
   if (path.startsWith('/library') && shown !== null) return shown;
   if (path.startsWith('/send') && sendTo !== null) return sendTo;
   return 'ask';
+}
+
+/** Someone who sees a folder: an admin, a member given it, or an open invite (pending). */
+export interface Seer {
+  id: string;
+  name: string;
+  role: Role;
+  pending: boolean;
+}
+
+/** Who sees a folder: the admins, then the members given it, then the open invites for new
+ * people that give it (an invite for a new admin gives every folder). */
+export function whoSees(people: People, folder: string): Seer[] {
+  const seer = (id: string, name: string, role: Role, pending: boolean): Seer => ({ id, name, role, pending });
+  return [
+    ...people.users.filter((u) => u.role === 'admin').map((u) => seer(u.id, u.name, u.role, false)),
+    ...people.users.filter((u) => u.role !== 'admin' && u.folders.includes(folder)).map((u) => seer(u.id, u.name, u.role, false)),
+    ...people.invites.filter((i) => i.user_id === null && (i.role === 'admin' || i.folders.includes(folder))).map((i) => seer(i.id, i.name, i.role, true)),
+  ];
 }
