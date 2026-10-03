@@ -316,8 +316,14 @@ void main() {
     expect(find.text('Admins see every folder.'), findsOneWidget);
     Checkbox boxOf(String name) => tester.widget<Checkbox>(find.descendant(of: find.widgetWithText(SettingsRow, name), matching: find.byType(Checkbox)));
     expect([for (final f in ['Family', 'Wedding Anna & Marco', 'Taxes 2026']) boxOf(f).value], [false, true, false]);
+    BusyButton show() => tester.widget<BusyButton>(find.widgetWithText(BusyButton, 'Show the QR code'));
+    await tester.tap(find.text('Wedding Anna & Marco'));
+    await tester.pump();
+    expect(show().onPressed, isNull, reason: 'a member gets at least one folder');
+    await tester.tap(find.text('Wedding Anna & Marco'));
     await tester.tap(find.text('Family'));
     await tester.pump();
+    expect(show().onPressed, isNotNull);
     await tester.tap(find.text('Show the QR code'));
     await tester.pumpAndSettle();
     final made = server.requests.lastWhere((r) => r.url.path == '/api/invites');

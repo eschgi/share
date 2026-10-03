@@ -183,7 +183,7 @@ func (s *Service) EndBrowserSession(ctx context.Context, r *http.Request) error 
 }
 
 // CreateInvite makes an invite and returns its token, which is shown once. For a new person
-// give their name, role and, for a member, the folders they get (nil: the oldest folder);
+// give their name, role and, for a member, the folders they get (possibly none, but not nil);
 // to add a phone for someone with an account, give their user id. It returns ErrFolderGone
 // if one of the folders doesn't exist or is deleted.
 func (s *Service) CreateInvite(ctx context.Context, name, role, forUserID, createdBy string, folders []string, lifetime time.Duration) (string, db.Invite, error) {
@@ -204,6 +204,9 @@ func (s *Service) CreateInvite(ctx context.Context, name, role, forUserID, creat
 			return "", in, &InputError{"role", "must be admin or member"}
 		}
 		if role == db.RoleMember {
+			if folders == nil {
+				return "", in, &InputError{"folders", "are needed for a member"}
+			}
 			var err error
 			if in.Folders, err = s.liveFolders(ctx, folders); err != nil {
 				return "", in, err
@@ -217,16 +220,8 @@ func (s *Service) CreateInvite(ctx context.Context, name, role, forUserID, creat
 	return token, in, nil
 }
 
-// liveFolders checks that every folder exists and isn't deleted; nil stands for the oldest
-// folder.
+// liveFolders checks that every folder exists and isn't deleted.
 func (s *Service) liveFolders(ctx context.Context, folderIDs []string) ([]string, error) {
-	if folderIDs == nil {
-		live, err := s.DB.LiveFolders(ctx)
-		if err != nil || len(live) == 0 {
-			return nil, err
-		}
-		return []string{live[0].ID}, nil
-	}
 	out := []string{}
 	for _, id := range folderIDs {
 		f, err := s.DB.FolderByID(ctx, id)

@@ -95,18 +95,6 @@ func folderIDs(folders []db.Folder) []string {
 	return out
 }
 
-// oldestFolder is where things go when nobody says which folder: the oldest one.
-func (a *API) oldestFolder(ctx context.Context) (db.Folder, error) {
-	live, err := a.Auth.DB.LiveFolders(ctx)
-	if err != nil {
-		return db.Folder{}, err
-	}
-	if len(live) == 0 {
-		return db.Folder{}, errors.New("there is no folder")
-	}
-	return live[0], nil
-}
-
 func (a *API) folders(w http.ResponseWriter, r *http.Request) {
 	p, folders, ok := a.viewer(w, r)
 	if !ok {

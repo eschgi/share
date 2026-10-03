@@ -375,14 +375,14 @@ func TestInvitesGiveTheirFolders(t *testing.T) {
 	}
 	wantStatus(t, "a used invite", e.do(nil, "PUT", path, admin.token, nil, nil), http.StatusNotFound, "not_found")
 
-	// None at all, the oldest when left out, and none for an admin.
+	// None at all, and none for an admin, who sees every folder; a member's invite must say.
 	for _, tc := range []struct {
 		body map[string]any
 		want int
 	}{
 		{map[string]any{"name": "Peter", "role": "member", "folders": []string{}}, 0},
-		{map[string]any{"name": "Anna", "role": "member"}, 1},
 		{map[string]any{"name": "Marco", "role": "admin", "folders": []string{wedding.ID}}, 3},
+		{map[string]any{"name": "Anna", "role": "admin"}, 3},
 	} {
 		r := invite(tc.body)
 		if got := r.json(t)["invite"].(map[string]any)["folders"].([]any); len(got) != tc.want {
@@ -391,6 +391,7 @@ func TestInvitesGiveTheirFolders(t *testing.T) {
 	}
 	wantStatus(t, "an unknown folder", invite(map[string]any{"name": "X", "role": "member", "folders": []string{ids.New()}}),
 		http.StatusNotFound, "not_found")
+	wantStatus(t, "a member's folders left out", invite(map[string]any{"name": "Y", "role": "member"}), http.StatusBadRequest, "bad_request")
 }
 
 func TestDemotedAdminKeepsSeeingEverything(t *testing.T) {
@@ -463,7 +464,6 @@ func TestSendingIntoAChosenFolder(t *testing.T) {
 	ctx := context.Background()
 	admin := e.admin()
 	maria := e.accept(e.invite(admin, "Maria", "member"), "Maria's phone")
-	family := e.firstFolder()
 	wedding, taxes, gone := e.newFolder("Wedding"), e.newFolder("Taxes 2026"), e.newFolder("Gone")
 	for _, f := range []db.Folder{wedding, gone} {
 		if err := e.app.DB.SetFolderPerson(ctx, f.ID, maria.userID, true); err != nil {
@@ -480,9 +480,7 @@ func TestSendingIntoAChosenFolder(t *testing.T) {
 	for _, folder := range []string{taxes.ID, gone.ID, ids.New()} {
 		wantStatus(t, "sending into "+folder, up.createInto(folder, "x.jpg", 1), http.StatusNotFound, "folder_gone")
 	}
-	if f := e.file(up.sendFile("IMG_2.jpg", []byte("no folder said"))); f.FolderID != family.ID {
-		t.Fatalf("without a folder it went into %q, want the oldest", f.FolderID)
-	}
+	wantStatus(t, "sending without saying the folder", up.createWith("IMG_2.jpg", 1, ""), http.StatusBadRequest, "bad_request")
 	if f := (tus{e, admin.token}).sendInto(taxes.ID, "Steuer.pdf", []byte("tax")); f.FolderID != taxes.ID {
 		t.Fatalf("the admin's file went into %q", f.FolderID)
 	}

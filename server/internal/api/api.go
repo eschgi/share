@@ -23,7 +23,7 @@ import (
 )
 
 // Version is the API version, sent in /api/info so apps can tell what the server speaks.
-const Version = 1
+const Version = 2
 
 // API holds what the handlers need.
 type API struct {

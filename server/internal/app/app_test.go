@@ -25,6 +25,7 @@ import (
 	"github.com/eschgi/share/server/internal/auth"
 	"github.com/eschgi/share/server/internal/config"
 	"github.com/eschgi/share/server/internal/db"
+	"github.com/eschgi/share/server/internal/ids"
 	"github.com/eschgi/share/server/internal/storage"
 	"github.com/eschgi/share/server/internal/upload"
 )
@@ -236,9 +237,23 @@ func (c tus) headers(extra map[string]string) map[string]string {
 	return h
 }
 
+// create starts an upload as the clients do: a signed-in phone says the folder, here the
+// oldest; a PIN sends into its own.
 func (c tus) create(name string, size int) response {
+	folder := ""
+	if strings.HasPrefix(c.token, ids.PrefixDevice) {
+		folder = c.e.firstFolder().ID
+	}
+	return c.createWith(name, size, folder)
+}
+
+// createWith starts an upload into folder; empty: without saying one.
+func (c tus) createWith(name string, size int, folder string) response {
 	meta := "filename " + base64.StdEncoding.EncodeToString([]byte(name)) +
 		",filetype " + base64.StdEncoding.EncodeToString([]byte("application/octet-stream"))
+	if folder != "" {
+		meta += ",folder " + base64.StdEncoding.EncodeToString([]byte(folder))
+	}
 	return c.e.do(nil, "POST", "/tus/", c.token, nil, c.headers(map[string]string{
 		"Upload-Length": strconv.Itoa(size), "Upload-Metadata": meta,
 	}))
@@ -568,6 +583,9 @@ func TestInfoMatchesContract(t *testing.T) {
 	}
 	got := r.json(t)
 	assertShape(t, "info", readFixture(t, "api/info.json")["response"], got)
+	if got["api_version"].(float64) != 2 {
+		t.Errorf("api_version = %v, want 2: every upload, PIN and invite names its folders", got["api_version"])
+	}
 	if got["chunk_size_bytes"].(float64) != 20<<20 {
 		t.Errorf("chunk_size_bytes = %v", got["chunk_size_bytes"])
 	}

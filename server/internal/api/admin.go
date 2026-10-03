@@ -138,7 +138,7 @@ func (a *API) suggestPin(w http.ResponseWriter, r *http.Request) {
 type createPinRequest struct {
 	Kind   string `json:"kind"`
 	Code   string `json:"code,omitempty"`   // empty: a random one
-	Folder string `json:"folder,omitempty"` // the folder it sends into; left out: the oldest one
+	Folder string `json:"folder"` // the folder it sends into
 	// ShowsFolder: guests with it also see and download what is in the folder.
 	ShowsFolder bool `json:"shows_folder,omitempty"`
 }
@@ -157,12 +157,8 @@ func (a *API) createPin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Folder == "" {
-		folder, err := a.oldestFolder(r.Context())
-		if err != nil {
-			internal(w, "create PIN", err)
-			return
-		}
-		req.Folder = folder.ID
+		httpx.WriteError(w, http.StatusBadRequest, "bad_request", "Say which folder the PIN sends into.")
+		return
 	}
 	spec := auth.PinSpec{Kind: req.Kind, Code: req.Code, FolderID: req.Folder, ShowsFolder: req.ShowsFolder}
 	pin, err := a.Auth.CreatePin(r.Context(), spec, p.UserID)
@@ -459,7 +455,7 @@ func (a *API) signOutPhone(w http.ResponseWriter, r *http.Request) {
 type newInviteRequest struct {
 	Name    string   `json:"name"`
 	Role    string   `json:"role"`
-	Folders []string `json:"folders"` // for a member; left out: the oldest folder
+	Folders []string `json:"folders"` // the folders a member gets, possibly none; needed for a member
 }
 
 // NewInvite is a fresh invite. The token and the link are shown only now; the server keeps

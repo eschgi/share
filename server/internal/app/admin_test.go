@@ -41,20 +41,23 @@ func TestAdminsManagePins(t *testing.T) {
 		t.Errorf("suggested %q", code)
 	}
 
-	created := e.postJSON(nil, "/api/pins", admin.token, map[string]string{"kind": "day", "code": "r8d-4w"}, nil)
+	first := e.firstFolder().ID
+	created := e.postJSON(nil, "/api/pins", admin.token, map[string]string{"kind": "day", "code": "r8d-4w", "folder": first}, nil)
 	wantStatus(t, "a chosen code", created, http.StatusCreated, "")
 	assertShape(t, "new PIN", readFixture(t, "api/pin_create.json")["response"], created.json(t))
 	day := created.json(t)
 	if day["code"] != "R8D4W" || day["link"] != "https://share.example.test/#R8D4W" || day["expires_at"] == nil {
 		t.Errorf("new PIN: %v", day)
 	}
-	wantStatus(t, "the same code again", e.postJSON(nil, "/api/pins", admin.token, map[string]string{"kind": "permanent", "code": "R8D4W"}, nil),
+	wantStatus(t, "the same code again", e.postJSON(nil, "/api/pins", admin.token, map[string]string{"kind": "permanent", "code": "R8D4W", "folder": first}, nil),
 		http.StatusConflict, "pin_taken")
-	wantStatus(t, "not a PIN", e.postJSON(nil, "/api/pins", admin.token, map[string]string{"kind": "day", "code": "abc"}, nil),
+	wantStatus(t, "not a PIN", e.postJSON(nil, "/api/pins", admin.token, map[string]string{"kind": "day", "code": "abc", "folder": first}, nil),
 		http.StatusBadRequest, "pin_format")
-	wantStatus(t, "an unknown kind", e.postJSON(nil, "/api/pins", admin.token, map[string]string{"kind": "week"}, nil),
+	wantStatus(t, "an unknown kind", e.postJSON(nil, "/api/pins", admin.token, map[string]string{"kind": "week", "folder": first}, nil),
 		http.StatusBadRequest, "bad_request")
-	perm := e.postJSON(nil, "/api/pins", admin.token, map[string]string{"kind": "permanent"}, nil).json(t)
+	wantStatus(t, "a PIN that doesn't say its folder", e.postJSON(nil, "/api/pins", admin.token, map[string]string{"kind": "day"}, nil),
+		http.StatusBadRequest, "bad_request")
+	perm := e.postJSON(nil, "/api/pins", admin.token, map[string]string{"kind": "permanent", "folder": first}, nil).json(t)
 
 	// Two phones send with the 24-hour PIN.
 	for range 2 {
@@ -92,14 +95,17 @@ func TestAdminsManagePeople(t *testing.T) {
 	e := newEnv(t)
 	admin := e.admin()
 
-	created := e.postJSON(nil, "/api/invites", admin.token, map[string]string{"name": "Oma Rosa", "role": "member"}, nil)
+	first := []string{e.firstFolder().ID}
+	created := e.postJSON(nil, "/api/invites", admin.token, map[string]any{"name": "Oma Rosa", "role": "member", "folders": first}, nil)
 	wantStatus(t, "invite", created, http.StatusCreated, "")
 	assertShape(t, "invite", readFixture(t, "api/invite_create.json")["response"], created.json(t))
 	inv := created.json(t)
 	if !strings.HasPrefix(inv["link"].(string), "https://share.example.test/join#shi_") || !strings.HasSuffix(inv["link"].(string), inv["token"].(string)) {
 		t.Errorf("link %v", inv["link"])
 	}
-	wantStatus(t, "an invite without a name", e.postJSON(nil, "/api/invites", admin.token, map[string]string{"name": " ", "role": "member"}, nil),
+	wantStatus(t, "an invite without a name", e.postJSON(nil, "/api/invites", admin.token, map[string]any{"name": " ", "role": "member", "folders": first}, nil),
+		http.StatusBadRequest, "bad_request")
+	wantStatus(t, "a member's invite that doesn't say the folders", e.postJSON(nil, "/api/invites", admin.token, map[string]string{"name": "Anna", "role": "member"}, nil),
 		http.StatusBadRequest, "bad_request")
 
 	maria := e.accept(e.invite(admin, "Maria", "member"), "Pixel 8")

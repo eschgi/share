@@ -153,7 +153,13 @@ class _InvitePersonScreenState extends State<InvitePersonScreen> {
             padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
             child: invite == null
                 ? (person == null
-                    ? BusyButton(label: t.inviteShowCode, icon: AppIcons.qrCode, busy: _busy, onPressed: _who.isEmpty ? null : _create)
+                    ? BusyButton(
+                        label: t.inviteShowCode,
+                        icon: AppIcons.qrCode,
+                        busy: _busy,
+                        // A member gets at least one folder, so there is something to see.
+                        onPressed: _who.isEmpty || (_role == Role.member && given.isEmpty) ? null : _create,
+                      )
                     : const SizedBox())
                 : Column(mainAxisSize: MainAxisSize.min, children: [
                     OutlinedButton.icon(

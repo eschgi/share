@@ -333,14 +333,17 @@ class _NewPinSheetState extends State<NewPinSheet> {
   Future<void> _create() async {
     final t = AppLocalizations.of(context);
     if (_code.text.length != 5) return setState(() => _error = t.pinBadCode);
+    final services = Services.read(context);
+    // A PIN sends into a folder: without the folders known, there is none to give it.
+    final folder = _folder ?? services.folders.sendTo?.id;
+    if (folder == null) return setState(() => _error = t.commonOffline);
     setState(() {
       _busy = true;
       _error = null;
     });
     final navigator = Navigator.of(context);
     try {
-      final services = Services.read(context);
-      final pin = await services.admin.createPin(_kind, code: _code.text, folder: _folder ?? services.folders.sendTo?.id, showsFolder: _shows);
+      final pin = await services.admin.createPin(_kind, code: _code.text, folder: folder, showsFolder: _shows);
       navigator.pop(pin);
     } on ApiException catch (e) {
       setState(() => _error = switch (e.code) { 'pin_taken' => t.pinTaken, 'pin_format' => t.pinBadCode, 'folder_gone' => t.folderGone, _ => t.commonFailed });

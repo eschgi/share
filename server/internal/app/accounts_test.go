@@ -51,10 +51,14 @@ func (e *env) admin() signedIn {
 	return e.accept(token, "Stefan's phone")
 }
 
-// invite makes an invite as p.
+// invite makes an invite as p; a member gets the oldest folder.
 func (e *env) invite(p signedIn, name, role string) string {
 	e.t.Helper()
-	token, _, err := e.app.Auth.CreateInvite(context.Background(), name, role, "", p.userID, nil, auth.InviteLifetime)
+	var folders []string
+	if role == db.RoleMember {
+		folders = []string{e.firstFolder().ID}
+	}
+	token, _, err := e.app.Auth.CreateInvite(context.Background(), name, role, "", p.userID, folders, auth.InviteLifetime)
 	if err != nil {
 		e.t.Fatal(err)
 	}

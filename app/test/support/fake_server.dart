@@ -150,6 +150,7 @@ class FakeServer {
         'GET /api/pins/suggest': (_) => json({'code': 'R8D4W'}),
         'POST /api/pins': (req) {
           final b = _body(req);
+          if (b['folder'] == null) return _error(400, 'bad_request'); // as the server: every PIN says its folder
           final code = (b['code'] as String? ?? 'Z${_made}XYZ').toUpperCase();
           if (usedCodes.contains(code)) return _error(409, 'pin_taken');
           usedCodes.add(code);
@@ -185,6 +186,7 @@ class FakeServer {
         'GET /api/users': (_) => json(people),
         'POST /api/invites': (req) {
           final b = _body(req);
+          if (b['role'] == 'member' && b['folders'] == null) return _error(400, 'bad_request'); // a member's invite says the folders
           return _newInvite(b['name'] as String, b['role'] as String, null, folders: (b['folders'] as List?)?.cast<String>() ?? const []);
         },
         'POST /api/files/delete': (req) {

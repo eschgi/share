@@ -21,5 +21,5 @@
     "folder": "w3dding5x2k7mbqz4bwdbyj6qs",
     "shows_folder": true
   },
-  "notes": "kind is permanent or day (24 hours). code is optional: without it the server picks one. Typed codes are cleaned up like at unlock (spaces, dashes, small letters). folder is the folder it sends into. With shows_folder, guests with the PIN also see and download what is in the folder (but delete nothing); it is false unless given. Errors: pin_format (400), pin_taken (409): codes are never used twice; not_found (404) for no such folder."
+  "notes": "kind is permanent or day (24 hours). code is optional: without it the server picks one. Typed codes are cleaned up like at unlock (spaces, dashes, small letters). folder is the folder it sends into, and must be given (400 bad_request without). With shows_folder, guests with the PIN also see and download what is in the folder (but delete nothing); it is false unless given. Errors: pin_format (400), pin_taken (409): codes are never used twice; not_found (404) for no such folder."
 }

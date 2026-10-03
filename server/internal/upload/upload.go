@@ -320,6 +320,9 @@ func (h *Handler) preCreate(hook handler.HookEvent) (handler.HTTPResponse, handl
 	if errors.Is(err, errFolderGone) {
 		return handler.HTTPResponse{}, handler.FileInfoChanges{}, tusError(http.StatusNotFound, "folder_gone", "That folder is gone, or you don't see it any more.")
 	}
+	if errors.Is(err, errFolderUnsaid) {
+		return handler.HTTPResponse{}, handler.FileInfoChanges{}, tusError(http.StatusBadRequest, "bad_request", "Say which folder the file goes into (Upload-Metadata folder).")
+	}
 	if err != nil {
 		return handler.HTTPResponse{}, handler.FileInfoChanges{}, err
 	}
@@ -342,18 +345,22 @@ func (h *Handler) preCreate(hook handler.HookEvent) (handler.HTTPResponse, handl
 }
 
 var (
-	errNoFolder   = errors.New("no folder to send into")
-	errFolderGone = errors.New("that folder is gone, or not the sender's")
+	errNoFolder     = errors.New("no folder to send into")
+	errFolderGone   = errors.New("that folder is gone, or not the sender's")
+	errFolderUnsaid = errors.New("no folder said")
 )
 
 // folderFor is the folder an upload goes into: a PIN's into the PIN's folder, someone signed
-// in into the one they chose, among those they see; without a choice, the oldest.
+// in into the one they chose, among those they see.
 func (h *Handler) folderFor(ctx context.Context, p *auth.Principal, chosen string) (string, error) {
 	if p.Kind == auth.KindPin {
 		if p.PinFolderID == "" {
 			return "", errNoFolder
 		}
 		return p.PinFolderID, nil
+	}
+	if chosen == "" {
+		return "", errFolderUnsaid
 	}
 	var folders []db.Folder
 	var err error
@@ -367,9 +374,6 @@ func (h *Handler) folderFor(ctx context.Context, p *auth.Principal, chosen strin
 	}
 	if len(folders) == 0 {
 		return "", errNoFolder
-	}
-	if chosen == "" {
-		return folders[0].ID, nil
 	}
 	for _, f := range folders {
 		if f.ID == chosen {

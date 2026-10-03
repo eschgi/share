@@ -43,11 +43,12 @@ func withPage(h map[string]string) map[string]string {
 	return h
 }
 
-// tusCreate starts an upload from a browser.
+// tusCreate starts an upload from a browser that is signed in, into the oldest folder.
 func (e *env) tusCreate(browser *http.Client, name string, size int) string {
 	e.t.Helper()
 	meta := "filename " + base64.StdEncoding.EncodeToString([]byte(name)) +
-		",filetype " + base64.StdEncoding.EncodeToString([]byte("application/octet-stream"))
+		",filetype " + base64.StdEncoding.EncodeToString([]byte("application/octet-stream")) +
+		",folder " + base64.StdEncoding.EncodeToString([]byte(e.firstFolder().ID))
 	r := e.do(browser, "POST", "/tus/", "", nil, withPage(tus{}.headers(map[string]string{
 		"Upload-Length": strconv.Itoa(size), "Upload-Metadata": meta,
 	})))
