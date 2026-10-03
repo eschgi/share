@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FolderInfo, OpenInvite, People, Person } from '../src/api';
-import { allTotals, dropTarget, hasChoices, sendTarget, validShown, whoSees } from '../src/account/folders/folders';
+import { allTotals, dropTarget, hasChoices, inviteDefault, sendTarget, validShown, whoSees } from '../src/account/folders/folders';
 import { uploadMeta } from '../src/uploader';
 
 function folder(id: string, files = 1, bytes = 100): FolderInfo {
@@ -72,5 +72,15 @@ describe('who sees a folder', () => {
       ['marco', true],
     ]);
     expect(whoSees(people, 'taxes').map((s) => s.id)).toEqual(['stefan', 'marco']);
+  });
+});
+
+describe('an invite for a new member', () => {
+  it('gives the folder the library shows, else the oldest', () => {
+    const list = [folder('family'), folder('wedding')];
+    expect(inviteDefault(list, 'wedding')).toEqual(['wedding']);
+    expect(inviteDefault(list, null)).toEqual(['family']);
+    expect(inviteDefault(list, 'gone')).toEqual(['family']);
+    expect(inviteDefault([], null)).toEqual([]);
   });
 });

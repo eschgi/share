@@ -52,7 +52,7 @@ export function FoldersList({ list, people, pins }: { list: FolderInfo[]; people
       <div class="group">
         {list.map((f) => {
           const sending = pins?.filter((p) => p.folder === f.id).length ?? 0;
-          const line = [lines.count(f.files), sending > 0 ? tn('folders.pins', sending) : '', f.admins_only ? t('folders.onlyAdmins').toLowerCase() : '']
+          const line = [lines.count(f.files), sending > 0 ? tn('folders.pins', sending) : '', f.admins_only ? t('folders.onlyAdminsLine') : '']
             .filter(Boolean)
             .join(' · ');
           return (

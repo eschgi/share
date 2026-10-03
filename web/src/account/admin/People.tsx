@@ -4,6 +4,7 @@ import {
   createInvite,
   inviteDevice,
   removePerson,
+  setFolderPerson,
   setRole,
   signOutDevice,
   withdrawInvite,
@@ -18,9 +19,12 @@ import { Icon } from '../../components/Icon';
 import { QrCode } from '../../components/QrCode';
 import { formatTime, formatWhen, daysAgo } from '../../format';
 import { useI18n, type Lang } from '../../i18n';
-import { Avatar, RoleBadge } from '../components/Bits';
+import { Avatar, RoleBadge, Switch } from '../components/Bits';
 import { Confirm, Modal } from '../components/Modal';
 import { useAccount } from '../context';
+import { inviteDefault } from '../folders/folders';
+import { FolderCover, useFolderLines } from '../folders/Folders';
+import { refreshFolders, useFolders } from '../folders/store';
 import { lastUsed } from '../settings/dialogs';
 import { personLine } from './format';
 import { NewPasswordDialog } from './NewPassword';
@@ -128,6 +132,17 @@ function PersonDialog({ person, onClose }: { person: Person; onClose: () => void
     }
   };
 
+  const folders = useFolders().list ?? [];
+  const lines = useFolderLines();
+  // With one folder there is nothing to choose, unless the person doesn't see it.
+  const showFolders = folders.length > 1 || (p.role !== 'admin' && folders.some((f) => !p.folders.includes(f.id)));
+  const turnFolder = async (folder: string, sees: boolean) => {
+    if (await run(() => setFolderPerson(folder, p.id, sees))) {
+      setP({ ...p, folders: sees ? [...p.folders, folder] : p.folders.filter((f) => f !== folder) });
+      void refreshFolders();
+    }
+  };
+
   const signOut = async (d: ListedDevice) => {
     if (await run(() => signOutDevice(d.id))) setP({ ...p, phones: p.phones.filter((x) => x.id !== d.id) });
     setAsking(null);
@@ -155,6 +170,36 @@ function PersonDialog({ person, onClose }: { person: Person; onClose: () => void
         </div>
       }
     >
+      {showFolders && (
+        <>
+          <p class="glabel">{t('folders.title')}</p>
+          <div class="group">
+            {folders.map((f) => {
+              const admin = p.role === 'admin';
+              const sees = admin || p.folders.includes(f.id);
+              return (
+                <button
+                  key={f.id}
+                  type="button"
+                  class="row"
+                  role="switch"
+                  aria-checked={sees}
+                  aria-disabled={admin || busy}
+                  onClick={admin || busy ? undefined : () => void turnFolder(f.id, !sees)}
+                >
+                  <FolderCover folder={f} />
+                  <span class="rt">
+                    <b>{f.name}</b>
+                    <span>{f.admins_only ? `${lines.count(f.files)} · ${t('folders.onlyAdminsLine')}` : lines.holds(f.files, f.bytes)}</span>
+                  </span>
+                  <Switch on={sees} locked={admin} />
+                </button>
+              );
+            })}
+          </div>
+          <p class="help sm">{p.role === 'admin' ? t('folders.adminsSeeAll') : t('folders.personSees', { name: p.name })}</p>
+        </>
+      )}
       <p class="glabel">{t('people.devices')}</p>
       <div class="group">
         {p.phones.map((d) => (
@@ -301,8 +346,15 @@ function InviteInfo({ invite, people, onClose }: { invite: OpenInvite; people: P
 export function InviteDialog({ forPerson, onClose }: { forPerson?: Person; onClose: () => void }) {
   const { t } = useI18n();
   const { toast } = useAccount();
+  const folders = useFolders();
+  const list = folders.list ?? [];
+  const lines = useFolderLines();
   const [name, setName] = useState('');
   const [role, setRoleChoice] = useState<Role>('member');
+  /** The folders a new member gets; until changed, the one the library shows. */
+  const [picked, setPicked] = useState<string[] | null>(null);
+  const given = picked ?? inviteDefault(list, folders.shown?.id ?? null);
+  const pick = (id: string) => setPicked(given.includes(id) ? given.filter((f) => f !== id) : [...given, id]);
   const [invite, setInvite] = useState<NewInvite | null>(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -314,7 +366,7 @@ export function InviteDialog({ forPerson, onClose }: { forPerson?: Person; onClo
     setBusy(true);
     setProblem(null);
     try {
-      setInvite(forPerson ? await inviteDevice(forPerson.id) : await createInvite(who, role));
+      setInvite(forPerson ? await inviteDevice(forPerson.id) : await createInvite(who, role, given));
     } catch (e) {
       setProblem(t(e instanceof ApiError && e.status > 0 ? 'common.failed' : 'common.offline'));
     } finally {
@@ -333,6 +385,7 @@ export function InviteDialog({ forPerson, onClose }: { forPerson?: Person; onClo
     setInvite(null);
     setName('');
     setRoleChoice('member');
+    setPicked(null);
   };
 
   return (
@@ -370,6 +423,29 @@ export function InviteDialog({ forPerson, onClose }: { forPerson?: Person; onClo
             ))}
           </div>
           <p class="help">{t('invite.roleHelp')}</p>
+          {list.length > 1 && role === 'member' && (
+            <>
+              <p class="label">{t('folders.title')}</p>
+              <div class="group">
+                {list.map((f) => {
+                  const on = given.includes(f.id);
+                  return (
+                    <button key={f.id} type="button" class="row" role="checkbox" aria-checked={on} disabled={!!invite} onClick={() => pick(f.id)}>
+                      <FolderCover folder={f} />
+                      <span class="rt">
+                        <b>{f.name}</b>
+                        <span>{lines.about(f)}</span>
+                      </span>
+                      <span class={`cbx${on ? ' on' : ''}`} aria-hidden="true">
+                        {on && <Icon name="check" />}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+          {list.length > 1 && <p class="help sm">{t('folders.adminsSeeAll')}</p>}
         </>
       )}
       {invite && (
@@ -409,7 +485,12 @@ export function InviteDialog({ forPerson, onClose }: { forPerson?: Person; onClo
           </>
         ) : (
           !forPerson && (
-            <button type="button" class="btn sm primary" disabled={busy || !who} onClick={() => void create()}>
+            <button
+              type="button"
+              class="btn sm primary"
+              disabled={busy || !who || (role === 'member' && given.length === 0)}
+              onClick={() => void create()}
+            >
               <Icon name="qr" />
               {t('invite.showCode')}
             </button>

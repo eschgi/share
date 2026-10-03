@@ -409,7 +409,9 @@ export const removePerson = (id: string) => request<void>('DELETE', `/api/users/
 /** Makes up a new password for someone else, shown once; username is needed if they have none. */
 export const newPassword = (id: string, username?: string) =>
   request<{ username: string; password: string }>('POST', `/api/users/${encodeURIComponent(id)}/password`, { username });
-export const createInvite = (name: string, role: Role) => request<NewInvite>('POST', '/api/invites', { name, role });
+/** An invite for someone new; a member sees folders, an admin every folder. */
+export const createInvite = (name: string, role: Role, folders: string[]) =>
+  request<NewInvite>('POST', '/api/invites', role === 'member' ? { name, role, folders } : { name, role });
 export const inviteDevice = (userId: string) => request<NewInvite>('POST', `/api/users/${encodeURIComponent(userId)}/invites`, {});
 export const withdrawInvite = (id: string) => request<void>('DELETE', `/api/invites/${encodeURIComponent(id)}`);
 

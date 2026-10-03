@@ -54,3 +54,10 @@ export function whoSees(people: People, folder: string): Seer[] {
     ...people.invites.filter((i) => i.user_id === null && (i.role === 'admin' || i.folders.includes(folder))).map((i) => seer(i.id, i.name, i.role, true)),
   ];
 }
+
+/** The folders an invite for a new member gives at first: the one the library shows, else the
+ * oldest. */
+export function inviteDefault(list: readonly FolderInfo[], shown: string | null): string[] {
+  const first = (shown !== null && list.some((f) => f.id === shown) ? shown : list[0]?.id) ?? null;
+  return first === null ? [] : [first];
+}

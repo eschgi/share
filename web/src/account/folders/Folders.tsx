@@ -53,8 +53,8 @@ export function useFolderLines() {
     holds: (files: number, bytes: number) => tn('folders.holds', files, { n: formatCount(files, lang), size: formatBytes(bytes, lang) }),
     count,
     seen,
-    /** What a folder holds and who sees it: "2,340 files · 4 people". */
-    about: (f: FolderInfo) => `${count(f.files)} · ${seen(f)}`,
+    /** What a folder holds and who sees it: "2,340 files · 4 people", "37 files · only admins". */
+    about: (f: FolderInfo) => `${count(f.files)} · ${f.admins_only ? t('folders.onlyAdminsLine') : seen(f)}`,
   };
 }
 
