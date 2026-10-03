@@ -3,6 +3,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"io"
 	"log"
@@ -117,6 +118,23 @@ type Session struct {
 	Kind      string     `json:"kind"`               // "pin"
 	PinKind   string     `json:"pin_kind,omitempty"` // "permanent" or "day"
 	ExpiresAt *time.Time `json:"expires_at"`         // when a 24-hour PIN ends; null otherwise
+	// FolderName is the folder the PIN sends into; null while the server has only one, where
+	// nothing tells of folders.
+	FolderName *string `json:"folder_name"`
+}
+
+// folderName is the name of a PIN's folder for its session, nil on a server with one folder.
+func (a *API) folderName(ctx context.Context, folderID string) (*string, error) {
+	live, err := a.Auth.DB.LiveFolders(ctx)
+	if err != nil || len(live) < 2 {
+		return nil, err
+	}
+	for _, f := range live {
+		if f.ID == folderID {
+			return &f.Name, nil
+		}
+	}
+	return nil, nil
 }
 
 type unlockRequest struct {
@@ -175,8 +193,13 @@ func (a *API) unlock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	folder, err := a.folderName(r.Context(), res.Session.Pin.FolderID)
+	if err != nil {
+		internal(w, "unlock", err)
+		return
+	}
 	resp := UnlockResponse{
-		Session:      Session{Kind: auth.KindPin, PinKind: res.Session.Pin.Kind, ExpiresAt: res.ExpiresAt},
+		Session:      Session{Kind: auth.KindPin, PinKind: res.Session.Pin.Kind, ExpiresAt: res.ExpiresAt, FolderName: folder},
 		MovedUploads: res.Moved,
 	}
 	if req.Client == "app" {
@@ -194,7 +217,12 @@ func (a *API) session(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteAuthError(w, r, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, Session{Kind: p.Kind, PinKind: p.PinKind, ExpiresAt: p.PinExpiresAt})
+	folder, err := a.folderName(r.Context(), p.PinFolderID)
+	if err != nil {
+		internal(w, "session", err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, Session{Kind: p.Kind, PinKind: p.PinKind, ExpiresAt: p.PinExpiresAt, FolderName: folder})
 }
 
 func (a *API) endSession(w http.ResponseWriter, r *http.Request) {

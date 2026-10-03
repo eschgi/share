@@ -4,10 +4,12 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -434,4 +436,119 @@ func TestAdminsMoveFiles(t *testing.T) {
 		http.StatusNotFound, "not_found")
 	wantStatus(t, "no ids", e.sendJSON("POST", "/api/files/move", admin.token, map[string]any{"ids": []string{}, "folder": taxes.ID}),
 		http.StatusBadRequest, "bad_request")
+}
+
+// createInto starts an upload into a folder, as the website and the app do.
+func (c tus) createInto(folder, name string, size int) response {
+	meta := "filename " + base64.StdEncoding.EncodeToString([]byte(name)) + ",folder " + base64.StdEncoding.EncodeToString([]byte(folder))
+	return c.e.do(nil, "POST", "/tus/", c.token, nil, c.headers(map[string]string{
+		"Upload-Length": strconv.Itoa(size), "Upload-Metadata": meta,
+	}))
+}
+
+// sendInto uploads data into a folder and returns the file.
+func (c tus) sendInto(folder, name string, data []byte) db.File {
+	c.e.t.Helper()
+	r := c.createInto(folder, name, len(data))
+	if r.status != http.StatusCreated {
+		c.e.t.Fatalf("create in %s: %d %s", folder, r.status, r.body)
+	}
+	loc := r.header.Get("Location")
+	c.send(loc, data, 0, max(len(data), 1))
+	return c.e.file(idOf(loc))
+}
+
+func TestSendingIntoAChosenFolder(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	admin := e.admin()
+	maria := e.accept(e.invite(admin, "Maria", "member"), "Maria's phone")
+	family := e.firstFolder()
+	wedding, taxes, gone := e.newFolder("Wedding"), e.newFolder("Taxes 2026"), e.newFolder("Gone")
+	for _, f := range []db.Folder{wedding, gone} {
+		if err := e.app.DB.SetFolderPerson(ctx, f.ID, maria.userID, true); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := e.app.Lib.DeleteFolder(ctx, gone.ID, admin.userID); err != nil {
+		t.Fatal(err)
+	}
+	up := tus{e, maria.token}
+	if f := up.sendInto(wedding.ID, "IMG_1.jpg", []byte("photo")); f.FolderID != wedding.ID {
+		t.Fatalf("sent into %q", f.FolderID)
+	}
+	for _, folder := range []string{taxes.ID, gone.ID, ids.New()} {
+		wantStatus(t, "sending into "+folder, up.createInto(folder, "x.jpg", 1), http.StatusNotFound, "folder_gone")
+	}
+	if f := e.file(up.sendFile("IMG_2.jpg", []byte("no folder said"))); f.FolderID != family.ID {
+		t.Fatalf("without a folder it went into %q, want the oldest", f.FolderID)
+	}
+	if f := (tus{e, admin.token}).sendInto(taxes.ID, "Steuer.pdf", []byte("tax")); f.FolderID != taxes.ID {
+		t.Fatalf("the admin's file went into %q", f.FolderID)
+	}
+}
+
+func TestPinsSendIntoTheirFolder(t *testing.T) {
+	e := newEnv(t)
+	admin := e.admin()
+	wedding, taxes := e.newFolder("Wedding"), e.newFolder("Taxes 2026")
+	r := e.sendJSON("POST", "/api/pins", admin.token, map[string]string{"kind": "day", "folder": wedding.ID})
+	wantStatus(t, "a PIN into Wedding", r, http.StatusCreated, "")
+	assertShape(t, "pin", readFixture(t, "api/pin_create.json")["response"], r.json(t))
+	pin := r.json(t)
+	if pin["folder"] != wedding.ID {
+		t.Fatalf("the PIN: %v", pin)
+	}
+	wantStatus(t, "a PIN into no folder", e.sendJSON("POST", "/api/pins", admin.token, map[string]string{"kind": "day", "folder": ids.New()}),
+		http.StatusNotFound, "not_found")
+
+	// What guests send goes into the PIN's folder, whatever they say.
+	guest, unlocked := e.unlockApp(pin["code"].(string), "")
+	if s := unlocked["session"].(map[string]any); s["folder_name"] != "Wedding" {
+		t.Fatalf("the session: %v", s)
+	}
+	if f := (tus{e, guest}).sendInto(taxes.ID, "IMG_1.jpg", []byte("photo")); f.FolderID != wedding.ID {
+		t.Fatalf("the guest's file went into %q", f.FolderID)
+	}
+	list := e.get("/api/pins", admin.token).json(t)["pins"].([]any)
+	if len(list) != 1 || list[0].(map[string]any)["folder"] != wedding.ID {
+		t.Fatalf("PINs: %v", list)
+	}
+	r = e.sendJSON("POST", "/api/pins/"+pin["id"].(string)+"/new-code", admin.token, nil)
+	if fresh := r.json(t); fresh["folder"] != wedding.ID {
+		t.Fatalf("the new code: %v", fresh)
+	}
+}
+
+func TestSessionNamesTheFolderFromTheSecondOn(t *testing.T) {
+	e := newEnv(t)
+	token, unlocked := e.unlockApp(e.newPin(db.PinPermanent).Code, "")
+	if s := unlocked["session"].(map[string]any); s["folder_name"] != nil {
+		t.Fatalf("with one folder the session says %v", s)
+	}
+	e.newFolder("Wedding")
+	cases := readFixture(t, "api/session.json")["cases"].([]any)
+	r := e.get("/api/session", token)
+	assertShape(t, "session", cases[0].(map[string]any)["response"], r.json(t))
+	if name := r.json(t)["folder_name"]; name != "Share" {
+		t.Fatalf("with two folders the session names %v", name)
+	}
+}
+
+func TestUnlockAgainMovesUploadsToTheNewPinsFolder(t *testing.T) {
+	e := newEnv(t)
+	first := e.newPin(db.PinDay)
+	old, _ := e.unlockApp(first.Code, "")
+	loc := (tus{e, old}).mustCreate("video.mp4", 10)
+	e.clock.Add(25 * time.Hour) // the first PIN ended mid-upload
+	wedding := e.newFolder("Wedding")
+	second, err := e.app.Auth.CreatePin(context.Background(), auth.PinSpec{Kind: db.PinDay, FolderID: wedding.ID}, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, _ := e.unlockApp(second.Code, old)
+	(tus{e, token}).send(loc, randomBytes(t, 10), 0, 10)
+	if f := e.file(idOf(loc)); f.FolderID != wedding.ID || f.State != db.StateReady {
+		t.Fatalf("the upload went into %q (%s)", f.FolderID, f.State)
+	}
 }

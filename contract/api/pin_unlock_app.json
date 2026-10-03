@@ -12,7 +12,8 @@
     "session": {
       "kind": "pin",
       "pin_kind": "day",
-      "expires_at": "2026-09-28T10:00:00Z"
+      "expires_at": "2026-09-28T10:00:00Z",
+      "folder_name": "Wedding Anna & Marco"
     },
     "moved_uploads": 0,
     "server": {
@@ -23,5 +24,5 @@
       ]
     }
   },
-  "notes": "Send the old token as Authorization: Bearer when unlocking again after session_ended; its unfinished uploads move to the new session and moved_uploads counts them. expires_at is null for a permanent PIN. server says where the app can send: always the public address, and the local one (with the certificate fingerprints to pin) when there is one."
+  "notes": "Send the old token as Authorization: Bearer when unlocking again after session_ended; its unfinished uploads move to the new session and moved_uploads counts them. expires_at is null for a permanent PIN. folder_name is the folder the PIN sends into, null while the server has only one folder. server says where the app can send: always the public address, and the local one (with the certificate fingerprints to pin) when there is one."
 }

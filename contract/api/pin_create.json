@@ -4,7 +4,8 @@
   "auth": "admin",
   "request": {
     "kind": "day",
-    "code": "R8D4W"
+    "code": "R8D4W",
+    "folder": "w3dding5x2k7mbqz4bwdbyj6qs"
   },
   "status": 201,
   "response": {
@@ -15,7 +16,8 @@
     "expires_at": "2026-10-01T08:04:00Z",
     "link": "https://share.example.com/#R8D4W",
     "files": 0,
-    "phones": 0
+    "phones": 0,
+    "folder": "w3dding5x2k7mbqz4bwdbyj6qs"
   },
-  "notes": "kind is permanent or day (24 hours). code is optional: without it the server picks one. Typed codes are cleaned up like at unlock (spaces, dashes, small letters). Errors: pin_format (400), pin_taken (409): codes are never used twice."
+  "notes": "kind is permanent or day (24 hours). code is optional: without it the server picks one. Typed codes are cleaned up like at unlock (spaces, dashes, small letters). folder is the folder it sends into. Errors: pin_format (400), pin_taken (409): codes are never used twice; not_found (404) for no such folder."
 }

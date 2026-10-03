@@ -13,7 +13,8 @@
         "expires_at": null,
         "link": "https://share.example.com/#K7M2Q",
         "files": 128,
-        "phones": 6
+        "phones": 6,
+        "folder": "f4mily5x2k7mbqz4bwdbyj6qsq"
       },
       {
         "id": "p4ld5x2k7mbqz4bwdbyj6qsqxa",
@@ -23,9 +24,10 @@
         "expires_at": "2026-09-30T16:30:00Z",
         "link": "https://share.example.com/#4HX9T",
         "files": 45,
-        "phones": 7
+        "phones": 7,
+        "folder": "f4mily5x2k7mbqz4bwdbyj6qsq"
       }
     ]
   },
-  "notes": "The PINs that still work: permanent ones first, then the newest. files counts what was sent with a PIN and is still in the library; phones counts the browsers and phones that unlocked it in the last 30 days. link is the website with the PIN filled in, for sharing."
+  "notes": "The PINs that still work: permanent ones first, then the newest. files counts what was sent with a PIN and is still in the library; phones counts the browsers and phones that unlocked it in the last 30 days. link is the website with the PIN filled in, for sharing. folder is the id of the folder it sends into."
 }

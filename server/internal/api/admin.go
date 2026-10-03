@@ -74,12 +74,13 @@ type PinInfo struct {
 	Link      string     `json:"link"`       // the website with the PIN filled in
 	Files     int        `json:"files"`      // sent with it and still in the library
 	Phones    int        `json:"phones"`     // browsers and phones that unlocked it
+	Folder    string     `json:"folder"`     // the id of the folder it sends into
 }
 
 func (a *API) pinInfo(p db.Pin, s db.PinStat) PinInfo {
 	return PinInfo{
 		ID: p.ID, Code: p.Code, Kind: p.Kind, CreatedAt: p.CreatedAt, ExpiresAt: p.ExpiresAt,
-		Link: a.Cfg.PublicURL + "/#" + p.Code, Files: s.Files, Phones: s.Phones,
+		Link: a.Cfg.PublicURL + "/#" + p.Code, Files: s.Files, Phones: s.Phones, Folder: p.FolderID,
 	}
 }
 
@@ -133,8 +134,9 @@ func (a *API) suggestPin(w http.ResponseWriter, r *http.Request) {
 }
 
 type createPinRequest struct {
-	Kind string `json:"kind"`
-	Code string `json:"code,omitempty"` // empty: a random one
+	Kind   string `json:"kind"`
+	Code   string `json:"code,omitempty"`   // empty: a random one
+	Folder string `json:"folder,omitempty"` // the folder it sends into; left out: the oldest one
 }
 
 func (a *API) createPin(w http.ResponseWriter, r *http.Request) {
@@ -150,12 +152,15 @@ func (a *API) createPin(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "bad_request", "kind must be permanent or day.")
 		return
 	}
-	folder, err := a.oldestFolder(r.Context())
-	if err != nil {
-		internal(w, "create PIN", err)
-		return
+	if req.Folder == "" {
+		folder, err := a.oldestFolder(r.Context())
+		if err != nil {
+			internal(w, "create PIN", err)
+			return
+		}
+		req.Folder = folder.ID
 	}
-	pin, err := a.Auth.CreatePin(r.Context(), auth.PinSpec{Kind: req.Kind, Code: req.Code, FolderID: folder.ID}, p.UserID)
+	pin, err := a.Auth.CreatePin(r.Context(), auth.PinSpec{Kind: req.Kind, Code: req.Code, FolderID: req.Folder}, p.UserID)
 	switch {
 	case err == nil:
 		httpx.WriteJSON(w, http.StatusCreated, a.pinInfo(pin, db.PinStat{}))
@@ -163,6 +168,8 @@ func (a *API) createPin(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "pin_format", "A PIN has 5 letters or numbers.")
 	case errors.Is(err, auth.ErrPinTaken):
 		httpx.WriteError(w, http.StatusConflict, "pin_taken", "That PIN was used before. Pick another one.")
+	case errors.Is(err, auth.ErrFolderGone):
+		httpx.WriteError(w, http.StatusNotFound, "not_found", "No such folder.")
 	default:
 		internal(w, "create PIN", err)
 	}

@@ -313,9 +313,12 @@ func (h *Handler) preCreate(hook handler.HookEvent) (handler.HTTPResponse, handl
 		return handler.HTTPResponse{}, handler.FileInfoChanges{}, tusError(http.StatusForbidden, "too_many_uploads", "Too many unfinished uploads; let some finish first.")
 	}
 
-	folderID, err := h.folderFor(ctx, p)
+	folderID, err := h.folderFor(ctx, p, info.MetaData["folder"])
 	if errors.Is(err, errNoFolder) {
 		return handler.HTTPResponse{}, handler.FileInfoChanges{}, tusError(http.StatusForbidden, "no_folder", "There is no folder you could send into.")
+	}
+	if errors.Is(err, errFolderGone) {
+		return handler.HTTPResponse{}, handler.FileInfoChanges{}, tusError(http.StatusNotFound, "folder_gone", "That folder is gone, or you don't see it any more.")
 	}
 	if err != nil {
 		return handler.HTTPResponse{}, handler.FileInfoChanges{}, err
@@ -338,11 +341,14 @@ func (h *Handler) preCreate(hook handler.HookEvent) (handler.HTTPResponse, handl
 	}, nil
 }
 
-var errNoFolder = errors.New("no folder to send into")
+var (
+	errNoFolder   = errors.New("no folder to send into")
+	errFolderGone = errors.New("that folder is gone, or not the sender's")
+)
 
 // folderFor is the folder an upload goes into: a PIN's into the PIN's folder, someone signed
-// in into the oldest folder they see.
-func (h *Handler) folderFor(ctx context.Context, p *auth.Principal) (string, error) {
+// in into the one they chose, among those they see; without a choice, the oldest.
+func (h *Handler) folderFor(ctx context.Context, p *auth.Principal, chosen string) (string, error) {
 	if p.Kind == auth.KindPin {
 		if p.PinFolderID == "" {
 			return "", errNoFolder
@@ -362,7 +368,15 @@ func (h *Handler) folderFor(ctx context.Context, p *auth.Principal) (string, err
 	if len(folders) == 0 {
 		return "", errNoFolder
 	}
-	return folders[0].ID, nil
+	if chosen == "" {
+		return folders[0].ID, nil
+	}
+	for _, f := range folders {
+		if f.ID == chosen {
+			return f.ID, nil
+		}
+	}
+	return "", errFolderGone
 }
 
 func (h *Handler) preFinish(hook handler.HookEvent) (handler.HTTPResponse, error) {

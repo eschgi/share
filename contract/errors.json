@@ -17,6 +17,7 @@
     "no_folder":              {"status": 403, "meaning": "tus: someone signed in who sees no folder can't send; an admin gives them folders."},
     "password_wrong":         {"status": 403, "meaning": "The current password is wrong. attempts_left says how many tries remain before a pause."},
     "too_many_uploads":       {"status": 403, "meaning": "tus: too many unfinished uploads for this session; let some finish."},
+    "folder_gone":            {"status": 404, "meaning": "tus: the folder chosen to send into was deleted, or the sender doesn't see it any more; choose another."},
     "invite_unknown":         {"status": 404, "meaning": "No such invite; the link is wrong or incomplete."},
     "not_found":              {"status": 404, "meaning": "No such thing, or it belongs to someone else."},
     "method_not_allowed":     {"status": 405, "meaning": "Wrong HTTP method."},
