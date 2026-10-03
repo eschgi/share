@@ -21,6 +21,9 @@ import { useOverlay } from '../../router';
 import { Avatar, Link } from '../components/Bits';
 import { Confirm } from '../components/Modal';
 import { useAccount } from '../context';
+import { hasChoices } from '../folders/folders';
+import { FolderColumn, FolderSheet, FolderTitle } from '../folders/Folders';
+import { folderGone, refreshFolders, useFolders } from '../folders/store';
 import { canSaveToFolder } from '../save/folder';
 import { useSavedMarks } from '../save/marks';
 import { SaveChoice } from '../save/SaveChoice';
@@ -39,7 +42,7 @@ import {
   startDownload,
   zipLimit,
 } from './actions';
-import { LibraryModel } from './model';
+import { LibraryModel, sameFilter } from './model';
 import {
   dayCount,
   dayState,
@@ -74,8 +77,22 @@ export function Library() {
   const { t, tn, lang } = useI18n();
   const { info, me, toast } = useAccount();
   const admin = me.user.role === 'admin';
-  const model = useMemo(() => new LibraryModel({ overview: getLibrary, page: getFiles }), []);
+  const folders = useFolders();
+  const choices = hasChoices(folders.list);
+  const shownId = folders.shown?.id ?? null;
+  const model = useMemo(() => {
+    // A folder the person doesn't see any more answers 404: then all folders.
+    const gone = (f: LibraryFilter) => (e: unknown) => {
+      if (f.folder && e instanceof ApiError && e.status === 404) folderGone(f.folder);
+      throw e;
+    };
+    return new LibraryModel({
+      overview: (f) => getLibrary(f).catch(gone(f)),
+      page: (f, cursor, limit) => getFiles(f, cursor, limit).catch(gone(f)),
+    });
+  }, []);
   const [, redraw] = useState(0);
+  const [picking, setPicking] = useState(false);
   const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
   const [viewing, setViewing] = useState<string | null>(null);
@@ -87,6 +104,8 @@ export function Library() {
   const [choosing, setChoosing] = useState(false);
   const saved = useSavedMarks();
   const touch = useMedia('(pointer: coarse)');
+  const wide = useMedia('(min-width: 1024px) and (min-height: 540px)');
+  const column = choices && wide;
   const shareable = useMemo(canShareFiles, []);
   const lib = useRef<HTMLDivElement>(null);
   const end = useRef<HTMLDivElement>(null);
@@ -106,17 +125,28 @@ export function Library() {
   // A selection takes a step in the history, so Back ends it, as on a phone.
   useOverlay(selecting, clear);
 
+  useEffect(() => model.subscribe(() => redraw((n) => n + 1)), []);
+  // The first page waits for the folders, to show the folder that was chosen last time.
+  const ready = folders.list !== null || folders.failed;
   useEffect(() => {
-    const stop = model.subscribe(() => redraw((n) => n + 1));
-    void model.reload();
-    return stop;
-  }, []);
+    if (!ready) return;
+    if (!model.overview && !model.loading) {
+      model.filter = { ...model.filter, folder: shownId };
+      void model.reload();
+    } else {
+      changeFilter({ ...model.filter, folder: shownId });
+    }
+  }, [ready, shownId]);
 
   // New files show up by themselves: every 30 seconds, and when the tab comes back; not while
   // selecting, so what is selected stays as it is.
   useEffect(() => {
     const check = () => {
-      if (document.visibilityState === 'visible' && !live.current.selecting) void model.refreshIfChanged();
+      if (document.visibilityState === 'visible' && !live.current.selecting) {
+        void model.refreshIfChanged().then((changed) => {
+          if (changed) void refreshFolders();
+        });
+      }
     };
     const id = setInterval(check, 30_000);
     document.addEventListener('visibilitychange', check);
@@ -127,13 +157,13 @@ export function Library() {
   }, []);
 
   const changeFilter = (f: LibraryFilter) => {
-    if (f.kind === model.filter.kind && f.q.trim() === model.filter.q.trim()) return;
+    if (sameFilter(f, model.filter)) return;
     clear();
     void model.setFilter(f);
   };
   // Typing searches after a short pause.
   useEffect(() => {
-    const id = setTimeout(() => changeFilter({ kind: model.filter.kind, q: query }), 350);
+    const id = setTimeout(() => changeFilter({ ...model.filter, q: query }), 350);
     return () => clearTimeout(id);
   }, [query]);
 
@@ -336,7 +366,7 @@ export function Library() {
     const today = new Date();
     const day =
       days.length === 1 ? days[0] : `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    return `${info?.name ?? 'Share'} ${day}.zip`;
+    return `${(choices && folders.shown?.name) || info?.name || 'Share'} ${day}.zip`;
   };
 
   async function shareSelected() {
@@ -462,7 +492,10 @@ export function Library() {
           </button>
         </header>
       ) : (
-        <TitleBar title={t('nav.library')} field={searching ? searchField(true) : undefined}>
+        <TitleBar
+          title={t('nav.library')}
+          field={searching ? searchField(true) : choices ? <FolderTitle shown={folders.shown} onOpen={() => setPicking(true)} /> : undefined}
+        >
           <button
             type="button"
             class="ib"
@@ -476,95 +509,103 @@ export function Library() {
           </Link>
         </TitleBar>
       )}
-      <div ref={lib} class={`lib${selecting ? ' selecting' : ''}`}>
-        <div class="chips">
-          {kinds.map((k) => (
-            <button
-              key={k.label}
-              type="button"
-              class={`chip${model.filter.kind === k.kind ? ' on' : ''}`}
-              aria-pressed={model.filter.kind === k.kind}
-              onClick={() => changeFilter({ kind: k.kind, q: query })}
-            >
-              {t(k.label)}
-            </button>
-          ))}
-        </div>
-        {selecting && (
-          <p class="tipbar">
-            <Icon name="info" />
-            {t(touch ? 'select.tipTouch' : 'select.tipMouse')}
-          </p>
-        )}
-        {sections.map((s) => {
-          const day: LibraryDay = { day: s.day, count: s.count, bytes: s.bytes };
-          const state = dayState(sel, day);
-          const first = offset;
-          offset += s.files.length;
-          return (
-            <section class="lday" key={s.day}>
-              <header class="dayh">
-                <div>
-                  <h2>{formatDay(s.day, now, lang, t('day.today'), t('day.yesterday'))}</h2>
-                  <p>
-                    {state === 'some'
-                      ? t('day.selected', { selected: dayCount(sel, day), count: s.count })
-                      : tn('library.dayMeta', s.count, { size: formatBytes(s.bytes, lang) })}
-                  </p>
+      <div ref={lib} class={`lib${selecting ? ' selecting' : ''}${column ? ' withf' : ''}`}>
+        {column && <FolderColumn list={folders.list!} shown={folders.shown} />}
+        <div class="fmain">
+          {choices && !wide && (
+            <div class="lhead">
+              <FolderTitle shown={folders.shown} onOpen={() => setPicking(true)} />
+            </div>
+          )}
+          <div class="chips">
+            {kinds.map((k) => (
+              <button
+                key={k.label}
+                type="button"
+                class={`chip${model.filter.kind === k.kind ? ' on' : ''}`}
+                aria-pressed={model.filter.kind === k.kind}
+                onClick={() => changeFilter({ ...model.filter, kind: k.kind, q: query })}
+              >
+                {t(k.label)}
+              </button>
+            ))}
+          </div>
+          {selecting && (
+            <p class="tipbar">
+              <Icon name="info" />
+              {t(touch ? 'select.tipTouch' : 'select.tipMouse')}
+            </p>
+          )}
+          {sections.map((s) => {
+            const day: LibraryDay = { day: s.day, count: s.count, bytes: s.bytes };
+            const state = dayState(sel, day);
+            const first = offset;
+            offset += s.files.length;
+            return (
+              <section class="lday" key={s.day}>
+                <header class="dayh">
+                  <div>
+                    <h2>{formatDay(s.day, now, lang, t('day.today'), t('day.yesterday'))}</h2>
+                    <p>
+                      {state === 'some'
+                        ? t('day.selected', { selected: dayCount(sel, day), count: s.count })
+                        : tn('library.dayMeta', s.count, { size: formatBytes(s.bytes, lang) })}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    class={`dsel ${state}`}
+                    aria-label={t('select.day')}
+                    aria-pressed={state === 'all' ? 'true' : state === 'some' ? 'mixed' : 'false'}
+                    onClick={() => setSel(setDay(sel, s.day, state !== 'all'))}
+                  >
+                    {state === 'all' && <Icon name="check" />}
+                    {state === 'some' && <Icon name="minus" />}
+                  </button>
+                </header>
+                <div class="lgrid">
+                  {s.files.map((f, j) => (
+                    <Tile
+                      key={f.id}
+                      file={f}
+                      index={first + j}
+                      selected={selecting && isSelected(sel, f)}
+                      selecting={selecting}
+                      onClick={(e) => onTileClick(first + j, e)}
+                      onCircle={() => toggle(first + j)}
+                      savedInto={saved.has(f.id) ? saved.folder : undefined}
+                    />
+                  ))}
                 </div>
-                <button
-                  type="button"
-                  class={`dsel ${state}`}
-                  aria-label={t('select.day')}
-                  aria-pressed={state === 'all' ? 'true' : state === 'some' ? 'mixed' : 'false'}
-                  onClick={() => setSel(setDay(sel, s.day, state !== 'all'))}
-                >
-                  {state === 'all' && <Icon name="check" />}
-                  {state === 'some' && <Icon name="minus" />}
-                </button>
-              </header>
-              <div class="lgrid">
-                {s.files.map((f, j) => (
-                  <Tile
-                    key={f.id}
-                    file={f}
-                    index={first + j}
-                    selected={selecting && isSelected(sel, f)}
-                    selecting={selecting}
-                    onClick={(e) => onTileClick(first + j, e)}
-                    onCircle={() => toggle(first + j)}
-                    savedInto={saved.has(f.id) ? saved.folder : undefined}
-                  />
-                ))}
-              </div>
-            </section>
-          );
-        })}
-        {empty && model.failed && (
-          <div class="lempty">
-            <Icon name="wifi" />
-            <p>{t('common.offline')}</p>
-            <button type="button" class="tbtn" onClick={() => void model.reload()}>
-              {t('common.retry')}
-            </button>
-          </div>
-        )}
-        {empty && !model.failed && (
-          <div class="lempty">
-            <Icon name={filtered ? 'search' : 'images'} />
-            <p>{t(filtered ? 'library.nothingFound' : 'library.empty')}</p>
-          </div>
-        )}
-        {!empty && model.failed && (
-          <p class="lmore">
-            {t('common.offline')}{' '}
-            <button type="button" class="tbtn" onClick={() => void model.more()}>
-              {t('common.retry')}
-            </button>
-          </p>
-        )}
-        {model.loading && <span class="spinner" role="status" aria-label={t('common.loading')} />}
-        <div ref={end} />
+              </section>
+            );
+          })}
+          {empty && model.failed && (
+            <div class="lempty">
+              <Icon name="wifi" />
+              <p>{t('common.offline')}</p>
+              <button type="button" class="tbtn" onClick={() => void model.reload()}>
+                {t('common.retry')}
+              </button>
+            </div>
+          )}
+          {empty && !model.failed && (
+            <div class="lempty">
+              <Icon name={filtered ? 'search' : 'images'} />
+              <p>{t(filtered ? 'library.nothingFound' : 'library.empty')}</p>
+            </div>
+          )}
+          {!empty && model.failed && (
+            <p class="lmore">
+              {t('common.offline')}{' '}
+              <button type="button" class="tbtn" onClick={() => void model.more()}>
+                {t('common.retry')}
+              </button>
+            </p>
+          )}
+          {model.loading && <span class="spinner" role="status" aria-label={t('common.loading')} />}
+          <div ref={end} />
+        </div>
       </div>
       {selecting && (
         <div class="selbar" role="toolbar" aria-label={tn('select.count', picked.count)}>
@@ -603,6 +644,7 @@ export function Library() {
           more={model.complete ? undefined : () => void model.more()}
           onMove={setViewing}
           onClose={() => setViewing(null)}
+          folderOf={choices ? (f: FileInfo) => folders.byId(f.folder)?.name : undefined}
           onDelete={
             admin
               ? (file) => {
@@ -614,6 +656,7 @@ export function Library() {
           }
         />
       )}
+      {picking && folders.list && <FolderSheet list={folders.list} shown={folders.shown} onClose={() => setPicking(false)} />}
       {choosing && (
         <SaveChoice
           count={picked.count}

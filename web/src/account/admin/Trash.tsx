@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'preact/hooks';
-import { getTrash, purgeFiles, restoreFiles, type TrashedFile } from '../../api';
+import { getTrash, purgeFiles, restoreFiles, type TrashedFile, type TrashedFolder } from '../../api';
 import { Icon } from '../../components/Icon';
 import { formatBytes } from '../../format';
 import { useI18n } from '../../i18n';
 import { Confirm } from '../components/Modal';
 import { useAccount } from '../context';
+import { hasChoices } from '../folders/folders';
+import { refreshFolders, useFolders } from '../folders/store';
 import { inParts } from '../library/actions';
 import { Thumb } from '../library/Tile';
 import { daysLeft } from './format';
@@ -14,13 +16,13 @@ import { daysLeft } from './format';
  * on click, as in the app. The page's title and Select all come from where it is shown.
  */
 export function useTrash(onChanged: () => void) {
-  const [trash, setTrash] = useState<{ files: TrashedFile[]; days: number } | null>(null);
+  const [trash, setTrash] = useState<{ files: TrashedFile[]; folders: TrashedFolder[]; days: number } | null>(null);
   const [failed, setFailed] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const load = async () => {
     try {
       const t = await getTrash();
-      setTrash({ files: t.files, days: t.trash_days });
+      setTrash({ files: t.files, folders: t.folders, days: t.trash_days });
       setFailed(false);
       setSelected((s) => new Set([...s].filter((id) => t.files.some((f) => f.id === id))));
     } catch {
@@ -51,7 +53,14 @@ export function TrashList({ state }: { state: TrashState }) {
   const { trash, failed, selected, setSelected, load, onChanged } = state;
   const [busy, setBusy] = useState(false);
   const [asking, setAsking] = useState(false);
+  const choices = hasChoices(useFolders().list);
   const now = new Date();
+  /** The file's folder, where there are several, or where it went with its file. */
+  const folderOf = (f: TrashedFile) => {
+    const folder = trash?.folders.find((x) => x.id === f.folder);
+    if (!folder || !(choices || folder.deleted)) return '';
+    return t(folder.deleted ? 'trash.inDeletedFolder' : 'trash.inFolder', { folder: folder.name });
+  };
 
   const toggle = (id: string) => {
     const next = new Set(selected);
@@ -65,6 +74,7 @@ export function TrashList({ state }: { state: TrashState }) {
       const n = await inParts([...selected], restoreFiles);
       toast({ text: tn('trash.restored', n) });
       setSelected(new Set());
+      void refreshFolders(); // a deleted folder comes back with its files
     } catch {
       toast({ text: t('common.failed') });
     }
@@ -110,6 +120,7 @@ export function TrashList({ state }: { state: TrashState }) {
                   <b>{f.name}</b>
                   <span>
                     {[
+                      folderOf(f),
                       formatBytes(f.size, lang),
                       tn('trash.daysLeft', daysLeft(new Date(f.purge_at), now)),
                       f.deleted_by ? t('trash.deletedBy', { name: f.deleted_by }) : '',

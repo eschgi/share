@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Session } from '../src/api';
 import { initialState, reduce, type Action, type State } from '../src/state';
 
-const session: Session = { kind: 'pin', pin_kind: 'permanent', expires_at: null };
+const session: Session = { kind: 'pin', pin_kind: 'permanent', expires_at: null, folder_name: null, shows_folder: false };
 const run = (...actions: Action[]): State => actions.reduce(reduce, initialState);
 
 describe('screen flow', () => {

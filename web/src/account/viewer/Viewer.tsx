@@ -24,6 +24,8 @@ interface Props {
   onClose: () => void;
   /** Admins: asks to delete the file shown. */
   onDelete?: (file: FileInfo) => void;
+  /** The name of a file's folder, for the details; left out where there is only one folder. */
+  folderOf?: (file: FileInfo) => string | undefined;
 }
 
 /** Whether the details are open: beside the picture on computers, where there's room, at first. */
@@ -36,7 +38,7 @@ const wideQuery = '(min-width: 1024px) and (min-height: 540px)';
  * the original is there, videos and sound play right here. Arrows, swipes and the film strip
  * go to the others; Back and Escape close it.
  */
-export function Viewer({ files, id, more, onMove, onClose, onDelete }: Props) {
+export function Viewer({ files, id, more, onMove, onClose, onDelete, folderOf }: Props) {
   const { t, lang } = useI18n();
   const ref = useRef<HTMLDialogElement>(null);
   const wide = useMedia(wideQuery);
@@ -96,6 +98,7 @@ export function Viewer({ files, id, more, onMove, onClose, onDelete }: Props) {
       {t('viewer.details')}
     </button>
   );
+  const folder = folderOf?.(file);
   const facts = (
     <>
       <div class="vrow">
@@ -108,6 +111,12 @@ export function Viewer({ files, id, more, onMove, onClose, onDelete }: Props) {
         <Icon name="user" />
         <b>{file.from === null ? t('viewer.fromPin') : t('viewer.from', { name: file.from })}</b>
       </div>
+      {folder && (
+        <div class="vrow">
+          <Icon name="folder" />
+          <b>{t('viewer.inFolder', { folder })}</b>
+        </div>
+      )}
       <div class="vrow">
         <Icon name="file" />
         <div>

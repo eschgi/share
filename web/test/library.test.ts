@@ -5,6 +5,7 @@ import { LibraryModel } from '../src/account/library/model';
 function file(id: string, day: string, size = 100): FileInfo {
   return {
     id,
+    folder: 'family',
     name: `${id}.jpg`,
     size,
     mime: 'image/jpeg',
@@ -81,7 +82,7 @@ describe('LibraryModel', () => {
     void m.reload();
     await server.answer(overview(1, [['2026-10-02', 1, 100]]));
     // Photos are chosen while the first page is still on its way.
-    void m.setFilter({ kind: 'photo', q: '' });
+    void m.setFilter({ folder: null, kind: 'photo', q: '' });
     await server.answer({ files: [file('old', '2026-10-02')], next_cursor: null });
     expect(m.files).toEqual([]);
     expect(m.loading).toBe(true);
@@ -94,10 +95,38 @@ describe('LibraryModel', () => {
   it('keeps a search that only differs in spaces', async () => {
     const server = new FakeServer();
     const m = new LibraryModel(server.requests);
-    void m.setFilter({ kind: null, q: 'img' });
+    void m.setFilter({ folder: null, kind: null, q: 'img' });
     expect(server.calls).toHaveLength(1);
-    void m.setFilter({ kind: null, q: ' img ' });
+    void m.setFilter({ folder: null, kind: null, q: ' img ' });
     expect(server.calls).toHaveLength(1);
+  });
+
+  it('shows one folder, or all of them', async () => {
+    const server = new FakeServer();
+    const m = new LibraryModel(server.requests, { folder: 'wedding', kind: null, q: '' });
+    void m.reload();
+    expect(server.calls[0]).toMatchObject({ what: 'overview', filter: { folder: 'wedding' } });
+    await server.answer(overview(1, []));
+    await server.answer({ files: [], next_cursor: null });
+    void m.setFilter({ folder: 'wedding', kind: null, q: '' });
+    expect(server.calls).toEqual([]); // the same folder: nothing to load
+    void m.setFilter({ folder: null, kind: null, q: '' });
+    expect(server.calls[0]).toMatchObject({ what: 'overview', filter: { folder: null } });
+  });
+
+  it('starts over when files went away, such as to another folder', async () => {
+    const server = new FakeServer();
+    const m = new LibraryModel(server.requests);
+    void m.reload();
+    await server.answer(overview(1, [['2026-10-01', 2, 200]]));
+    await server.answer({ files: [file('a', '2026-10-01'), file('b', '2026-10-01')], next_cursor: null });
+    const changed = m.refreshIfChanged();
+    await server.answer(overview(2, [['2026-10-01', 1, 100]]));
+    expect(await changed).toBe(true);
+    expect(server.calls[0]).toMatchObject({ what: 'overview' }); // the list starts over
+    await server.answer(overview(2, [['2026-10-01', 1, 100]]));
+    await server.answer({ files: [file('a', '2026-10-01')], next_cursor: null });
+    expect(m.files.map((f) => f.id)).toEqual(['a']);
   });
 
   it('puts new files on top when the version grows, and keeps the rest', async () => {
@@ -107,16 +136,18 @@ describe('LibraryModel', () => {
     await server.answer(overview(1, [['2026-10-01', 2, 200]]));
     await server.answer({ files: [file('a', '2026-10-01'), file('b', '2026-10-01')], next_cursor: 'c1' });
 
-    void m.refreshIfChanged();
+    const same = m.refreshIfChanged();
     await server.answer(overview(1, [['2026-10-01', 2, 200]]));
     expect(server.calls).toEqual([]); // the same version: nothing to load
+    expect(await same).toBe(false);
 
-    void m.refreshIfChanged();
+    const grown = m.refreshIfChanged();
     await server.answer(overview(2, [['2026-10-02', 1, 50], ['2026-10-01', 2, 200]]));
     expect(server.calls[0]).toMatchObject({ what: 'page', cursor: null, limit: 100 });
     await server.answer({ files: [file('n', '2026-10-02', 50), file('a', '2026-10-01')], next_cursor: 'x' });
     expect(m.files.map((f) => f.id)).toEqual(['n', 'a', 'b']);
     expect(m.overview?.version).toBe(2);
+    expect(await grown).toBe(true);
     // The next page still follows the old list.
     void m.more();
     expect(server.calls[0]).toMatchObject({ cursor: 'c1' });

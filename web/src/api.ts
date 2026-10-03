@@ -15,6 +15,10 @@ export interface Session {
   kind: 'pin';
   pin_kind: 'permanent' | 'day';
   expires_at: string | null;
+  /** The folder the PIN sends into; null while the server has only one folder. */
+  folder_name: string | null;
+  /** The PIN also shows what is in its folder. */
+  shows_folder: boolean;
 }
 
 export class ApiError extends Error {
@@ -190,6 +194,8 @@ export type FileKind = 'photo' | 'video' | 'document';
 
 export interface FileInfo {
   id: string;
+  /** The id of the folder it lies in. */
+  folder: string;
   name: string;
   size: number;
   mime: string;
@@ -224,14 +230,16 @@ export interface FilePage {
   next_cursor: string | null;
 }
 
-/** What the library shows: one kind or all, and part of a file name. */
+/** What the library shows: one folder or all, one kind or all, and part of a file name. */
 export interface LibraryFilter {
+  folder: string | null;
   kind: FileKind | null;
   q: string;
 }
 
 function libraryQuery(f: LibraryFilter, extra: Record<string, string | undefined> = {}): string {
   const p = new URLSearchParams();
+  if (f.folder) p.set('folder', f.folder);
   if (f.kind) p.set('kind', f.kind);
   if (f.q.trim()) p.set('q', f.q.trim());
   for (const [k, v] of Object.entries(extra)) if (v !== undefined) p.set(k, v);
@@ -252,9 +260,30 @@ export const thumbUrl = (f: FileInfo) => `/api/files/${encodeURIComponent(f.id)}
 
 export const getFile = (id: string) => request<FileInfo>('GET', `/api/files/${encodeURIComponent(id)}`);
 
-/** Every file of a day that the filter shows, for selecting the day as a whole. */
-export const getFileIds = (f: LibraryFilter, day: string) =>
+/** Every file of a day that the filter shows, for selecting the day as a whole; without a day,
+ * of every day. */
+export const getFileIds = (f: LibraryFilter, day?: string) =>
   request<{ ids: string[]; bytes: number }>('GET', '/api/files/ids' + libraryQuery(f, { day }));
+
+/** A folder of the library: what it holds and how many see it. */
+export interface FolderInfo {
+  id: string;
+  name: string;
+  files: number;
+  bytes: number;
+  /** The people and PIN sessions that sent its files. */
+  senders: number;
+  /** Who sees it: the admins, its members and open invites. */
+  people: number;
+  /** No member sees it. */
+  admins_only: boolean;
+  /** Its newest photo or video with a thumbnail. */
+  cover: FileInfo | null;
+  created_at: string;
+}
+
+/** The folders this person sees, the oldest first. */
+export const getFolders = () => request<{ folders: FolderInfo[] }>('GET', '/api/folders');
 
 /** Several files as one ZIP: the archive's name, its exact size, and each file's path in it. */
 export interface ZipDownload {
@@ -313,6 +342,10 @@ export interface PinInfo {
   files: number;
   /** Phones and browsers that unlocked it in the last 30 days. */
   phones: number;
+  /** The id of the folder it sends into. */
+  folder: string;
+  /** Guests with it also see and download what is in the folder. */
+  shows_folder: boolean;
 }
 
 export const getPins = () => request<{ pins: PinInfo[] }>('GET', '/api/pins');
@@ -328,6 +361,8 @@ export interface Person extends User {
   created_at: string;
   last_seen_at: string | null;
   phones: ListedDevice[];
+  /** The folders they see: every folder for an admin. */
+  folders: string[];
 }
 
 /** An invite nobody has used yet; with user_id it adds a phone or browser for that person. */
@@ -338,6 +373,8 @@ export interface OpenInvite {
   user_id: string | null;
   created_at: string;
   expires_at: string;
+  /** The folders the new person will see; none for an added phone. */
+  folders: string[];
 }
 
 export interface People {
@@ -369,5 +406,12 @@ export interface TrashedFile extends FileInfo {
   purge_at: string;
 }
 
-export const getTrash = () => request<{ files: TrashedFile[]; trash_days: number }>('GET', '/api/trash');
+/** A folder that files in Recently deleted are from; deleted ones aren't in /api/folders. */
+export interface TrashedFolder {
+  id: string;
+  name: string;
+  deleted: boolean;
+}
+
+export const getTrash = () => request<{ files: TrashedFile[]; folders: TrashedFolder[]; trash_days: number }>('GET', '/api/trash');
 export const purgeFiles = (ids: string[]) => request<{ changed: number }>('POST', '/api/trash/purge', { ids });

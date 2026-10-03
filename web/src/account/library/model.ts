@@ -19,8 +19,20 @@ export interface DaySection {
 const pageSize = 200;
 const newerPageSize = 100;
 
+/** Whether two filters show the same: the same folder, kind and words. */
+export function sameFilter(a: LibraryFilter, b: LibraryFilter): boolean {
+  return a.folder === b.folder && a.kind === b.kind && a.q.trim() === b.q.trim();
+}
+
+/** Some day has fewer files than before, or none: files were moved away or hidden, which
+ * adding new files on top can't show. */
+export function shrank(before: LibraryOverview, after: LibraryOverview): boolean {
+  const now = new Map(after.days.map((d) => [d.day, d.count]));
+  return before.days.some((d) => (now.get(d.day) ?? 0) < d.count);
+}
+
 export class LibraryModel {
-  filter: LibraryFilter = { kind: null, q: '' };
+  filter: LibraryFilter;
   overview: LibraryOverview | null = null;
   files: FileInfo[] = [];
   /** Loading the overview or a page. */
@@ -36,7 +48,12 @@ export class LibraryModel {
   private generation = 0;
   private listeners = new Set<() => void>();
 
-  constructor(private readonly requests: LibraryRequests) {}
+  constructor(
+    private readonly requests: LibraryRequests,
+    filter: LibraryFilter = { folder: null, kind: null, q: '' },
+  ) {
+    this.filter = filter;
+  }
 
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
@@ -48,7 +65,7 @@ export class LibraryModel {
   }
 
   setFilter(f: LibraryFilter): Promise<void> {
-    if (f.kind === this.filter.kind && f.q.trim() === this.filter.q.trim()) return Promise.resolve();
+    if (sameFilter(f, this.filter)) return Promise.resolve();
     this.filter = f;
     return this.reload();
   }
@@ -101,21 +118,27 @@ export class LibraryModel {
   }
 
   /** Something changed on the server (the version grew): new files go on top, and the place
-   * in the list stays. Errors wait for the next check. */
-  async refreshIfChanged(): Promise<void> {
+   * in the list stays; if files went away, the list starts over. Errors wait for the next
+   * check. It reports whether the library changed. */
+  async refreshIfChanged(): Promise<boolean> {
     const current = this.overview;
-    if (!current || this.loading) return;
+    if (!current || this.loading) return false;
     const gen = this.generation;
     try {
       const o = await this.requests.overview(this.filter);
-      if (gen !== this.generation || o.version === current.version) return;
+      if (gen !== this.generation || o.version === current.version) return false;
+      if (shrank(current, o)) {
+        void this.reload();
+        return true;
+      }
       const first = await this.requests.page(this.filter, null, newerPageSize);
-      if (gen !== this.generation) return;
+      if (gen !== this.generation) return true;
       this.overview = o;
       this.add(first.files, true);
       this.changed();
+      return true;
     } catch {
-      // the next check tries again
+      return false; // the next check tries again
     }
   }
 

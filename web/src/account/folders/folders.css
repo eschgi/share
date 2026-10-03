@@ -1,0 +1,173 @@
+/* Folders (screens 38, 39 and 44): the library's title that switches folders, the choice of
+   folder, and on computers the column of folders beside the library. */
+.fcov {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  overflow: hidden;
+  border-radius: 12px;
+}
+.fcov img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.fcov .ic {
+  width: 19px;
+  height: 19px;
+  color: rgba(255, 255, 255, 0.62);
+}
+.fcov.doc {
+  border: 1px solid var(--line-soft);
+  background: var(--s2);
+}
+.fcov.doc .ic {
+  color: var(--text-2);
+}
+.modal-panel .fcov.doc {
+  background: var(--s3);
+}
+.fcov.all {
+  background: var(--accent-soft);
+}
+.fcov.all .ic {
+  color: var(--accent-text);
+}
+.fcov.lg {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+}
+.fcov.lg .ic {
+  width: 26px;
+  height: 26px;
+}
+.ic.down {
+  transform: rotate(90deg);
+}
+.row .tick {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  color: var(--accent-text);
+  stroke-width: 2.8;
+}
+
+/* The title, a button: the folder's name and an arrow down. */
+.fpick {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-family: var(--serif);
+  font-size: 27px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  text-align: left;
+}
+.fpick .t {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fpick .ic {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  color: var(--text-3);
+}
+.fpick:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+/* On a tablet, where the header has no title, it stands above the kinds. */
+.lhead {
+  display: none;
+}
+
+/* On a computer: the folders in a column beside the library. */
+.lib.withf {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: 34px;
+  align-items: start;
+}
+.fside {
+  position: sticky;
+  top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 6px;
+}
+.fside .glabel {
+  margin: 6px 10px 8px;
+}
+.frow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 14px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.frow .fcov {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+}
+.frow > span {
+  min-width: 0;
+}
+.frow b {
+  display: block;
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.frow > span > span {
+  display: block;
+  margin-top: 1px;
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+.frow.on {
+  background: var(--accent-soft);
+}
+.frow.on b {
+  color: var(--accent-text);
+}
+.frow:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: -2px;
+}
+@media (hover: hover) {
+  .frow:not(.on):hover {
+    background: var(--s1);
+  }
+}
+.fmain {
+  min-width: 0;
+}
+
+@media (min-width: 640px) and (max-width: 1023.98px) and (min-height: 540px) {
+  .lhead {
+    display: flex;
+    margin: 10px 0 8px;
+  }
+}
