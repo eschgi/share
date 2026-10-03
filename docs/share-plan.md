@@ -4,15 +4,15 @@ Status: built; what works is in the README's status. Screens: [share-mockup.html
 (numbers below refer to its screens).
 
 Share is a self-hosted place to collect files. Anyone with a PIN sends photos, videos and documents
-through a website, without an account. People with an account see and download everything in an
-Android app or on the website, and admins run it from either. Nothing is family-specific: friends
+through a website, without an account. People with an account see and download the folders they
+were given in an Android app or on the website, and admins run it from either. Nothing is family-specific: friends
 and anyone else with a PIN or an invite use the same screens. The project is open source, and the
 app will go on Google Play later.
 
 ## Parts
 
 - **Server**: one Go binary. It serves the website, the API, uploads and downloads, and keeps every
-  file in a folder set in `config.json`. It runs on the GL.iNet router for now and maybe on a Hetzner VPS
+  file in one of its folders, each a directory inside the storage folder set in `config.json`. It runs on the GL.iNet router for now and maybe on a Hetzner VPS
   later, so it must not depend on anything router-specific.
 - **Website** (PWA): for sending with a PIN (1–6), and for people with an account everything the app
   does (22–37). Uppy runs headless under our own screens: tus for uploads, Golden Retriever to survive
@@ -25,24 +25,46 @@ app will go on Google Play later.
 ## Access
 
 - **Upload PINs**: 5 letters or digits, not case-sensitive, without look-alikes such as 0/O and 1/I.
-  Either permanent or valid for 24 hours; no names, the code is the label (18, 19). A PIN only allows
-  sending. The link you share can carry the PIN (`…/#K7M2Q`). After 5 wrong tries, a device waits
+  Either permanent or valid for 24 hours; no names, the code is the label (18, 19). A PIN sends into
+  one folder (43, 45); only a PIN made to show its folder lets guests see it too (46). The link you share can carry the PIN (`…/#K7M2Q`). After 5 wrong tries, a device waits
   10 minutes.
 - **Accounts**: the roles are admin and member. People join with username and password, or with a
   one-time invite (QR code or link, valid 24 hours) that needs no password (10, 20). Each phone gets its
   own key, which an admin can revoke.
 - **Admins** delete files (kept 30 days in Recently deleted), manage PINs, and invite, remove or promote
   people, or give someone who forgot a password a new one.
-- **Signed-in users** send without a PIN (15, 29).
+- **Signed-in users** send without a PIN (15, 29), into a folder they see (48).
 - **Browsers** sign in like phones, with the password or an invite (22, 23), and keep their key in a
   cookie the page can't read. One that signs in at home, over plain http, gets a session that works
   only at home: a cookie belongs to an address, and someone else's network has the same addresses.
 - **No uploader names**: the website doesn't ask for one.
 
+## Folders
+
+- **Every file lies in exactly one folder**, a real directory on the drive:
+  `<storage>/Wedding Anna & Marco/2026-09-26/IMG_0001.jpg`. The database keeps each file's path
+  within its folder, so renaming a folder renames one directory and changes one row.
+- **Who sees what**: admins see every folder; members see the folders they were given, with a switch
+  per person (41, 42) and per invite (47). Nothing tells members about the others.
+- **The library** shows one folder or all of them, and the choice stays on the phone or in the
+  browser (38, 39, 44). Sending goes into the folder open in the library, or another one (48); files
+  shared from other apps wait for the choice when there is one.
+- **Admins** create, rename and delete folders (40, 41) and move files between them (49). A deleted
+  folder's files go to Recently deleted, its PINs end, and restoring one of its files brings it back.
+  The last folder can't be deleted.
+- **PINs** send into one folder (43, 45). "Guests also see this folder" (43) lets everyone with the
+  PIN see and download what is in it, without names and without deleting anything (46).
+- **One folder looks like none**: the folder's name, the choices and the folder column appear only
+  with the second folder.
+- **Upgrading** puts everything that was there into a first folder named after the server, and
+  moves the day folders into its directory; the moves resume after an interruption. The clients name
+  the folders of every upload, PIN and invite, and the server refuses those that don't (API
+  version 2).
+
 ## Library
 
 - Uploads go straight into the library, without a review step.
-- Grouped by upload day, newest first (11).
+- Grouped by upload day, newest first (11), in one folder or all of them.
 - Downloads: photos and videos go into a "Share" album in the gallery, documents into Downloads; files
   already on the phone are skipped (13).
 - In a browser (24–28): one file downloads as it is; several as one ZIP, stored without compression

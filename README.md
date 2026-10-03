@@ -5,11 +5,14 @@ A self-hosted place where family and friends drop photos, videos and documents.
 - **Sending** works in any browser with a 5-character PIN: no app, no account. Uploads go in
   pieces and continue after a dropped connection, so videos of several gigabytes get through,
   also behind Cloudflare's 100 MB request limit.
-- **Seeing and downloading** everything is for people with an account, in the Android app or in
-  any browser, on iPhones and computers too. They join with an invite, without a password, and
-  send from there as well, without a PIN. At home the app uses the server's local address and skips
-  the internet. Admins manage PINs and people in either, and deleted files wait 30 days in Recently
+- **Seeing and downloading** is for people with an account, in the Android app or in any browser,
+  on iPhones and computers too. They join with an invite, without a password, and send from there
+  as well, without a PIN. At home the app uses the server's local address and skips the internet.
+  Admins manage PINs, people and folders in either, and deleted files wait 30 days in Recently
   deleted.
+- **Folders, each with its own people.** Admins see every folder; everyone else sees the folders
+  they were given. A PIN sends into one folder, and one made to show it lets guests see and download
+  it too, as at a wedding. With one folder, the library and sending look as they always did.
 - Files are stored unchanged, in a directory per folder with one folder per upload day inside:
   `<storage_dir>/Family/2026-09-30/IMG_0001.jpg`.
 
@@ -68,6 +71,23 @@ small Linux machine with a USB drive, or on a VPS. The website is embedded in it
   </tr>
 </table>
 
+**Folders**, each with its own people:
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/web-computer-folders.png" width="380" alt="The library on a computer, with the folders in a column beside it: all folders, Family, Wedding Anna & Marco, Kindergarten and Taxes 2026"><br><sub>The library and its folders, on a computer</sub></td>
+    <td align="center"><img src="docs/screenshots/app-choose-folder.png" width="180" alt="Choosing a folder in the app: all folders or one of them, each with how many files it holds"><br><sub>Choosing a folder in the app</sub></td>
+  </tr>
+</table>
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/app-folders.png" width="180" alt="An admin's folders, each with its files, its PINs and who sees it"><br><sub>Folders, for an admin</sub></td>
+    <td align="center"><img src="docs/screenshots/app-folder.png" width="180" alt="A folder: who sees it, with a switch for each person, and the PINs that send into it"><br><sub>Who sees a folder</sub></td>
+    <td align="center"><img src="docs/screenshots/app-pin-sees.png" width="180" alt="A PIN that shows its folder: Send and See, the folder's files by day, and Download all"><br><sub>A PIN that shows its folder</sub></td>
+  </tr>
+</table>
+
 **The Android app**, for people with an account:
 
 <table>
@@ -105,11 +125,13 @@ Both speak English, German and Italian.
 | Server: the version for people with an account, new passwords from admins, the drive's warnings | works |
 | Website: zooming into photos, marks for files saved into a folder, notifications when a transfer ends | works |
 | Website: Use another PIN, About, new passwords and the drive's warnings for admins | works |
+| Server and website: folders with their own people, PINs into a folder and PINs that show it, moving files | works |
 | Website: Share into Share, installed on Android | built and tested in Chrome, not yet tried on a phone |
 | Android app: see and download | built and tested, not yet tried on a phone |
 | Android app: send, manage PINs and people, Recently deleted | built and tested, not yet tried on a phone |
 | Android app: videos and sound in the viewer, deleting there, one's own phones and browsers | built and tested, not yet tried on a phone |
 | Android app: Share into Share, new passwords, the drive's warnings, About | built and tested, not yet tried on a phone |
+| Android app: folders, sending into one, a PIN's folder to see, moving files | built and tested, not yet tried on a phone |
 | Self-updating app, Google Play, a VPS setup | planned |
 
 The plan and the screens are in [`docs/`](docs/).
@@ -136,6 +158,16 @@ The plan and the screens are in [`docs/`](docs/).
   PIN, and an admin's settings. One file downloads as it is; several as one ZIP, whose exact size is
   known at once and which the browser's download list resumes. Chrome and Edge on a computer can
   also save them straight into a folder, a folder per day, skipping files already there.
+- **Folders.** Every file lies in one folder, a directory on the drive. Admins see every folder, make,
+  rename and delete them, switch who sees each one, per person or per invite, and move files between
+  them; someone who loses a folder stops seeing its files. Members see the folders they were given.
+  The library shows one folder or all of them, and sending goes into the folder open in the library
+  unless another one is chosen. Deleting a folder sends its files to Recently deleted, and restoring
+  one brings the folder back. Until there is a second folder, the library and sending look as
+  before.
+- **A PIN sends into one folder.** Made with "Guests also see this folder", everyone with it also
+  sees and downloads what is in that folder, but deletes nothing and sees nobody's name: for a
+  wedding, everyone's photos for everyone.
 - Deleted files stay in Recently deleted for 30 days (`trash_days`), and admins can bring them back.
 - **Share into Share.** In another app's share sheet, "Send with Share" sends what was picked there:
   in the app, and on Android also in the website installed as an app. Signed in, it goes at once;
