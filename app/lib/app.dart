@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'data/admin.dart';
 import 'data/api.dart';
+import 'data/folders.dart';
 import 'data/library.dart';
 import 'data/pin.dart';
 import 'data/platform.dart';
@@ -26,6 +27,7 @@ class AppServices {
         player = player ?? videoPlayer {
     session = SessionRepository(api: this.api, platform: platform);
     library = LibraryRepository(api: this.api, platform: platform);
+    folders = FolderStore(library: library, platform: platform);
     admin = AdminRepository(api: this.api);
     pin = PinRepository(api: this.api, platform: platform);
   }
@@ -37,6 +39,7 @@ class AppServices {
   final MediaPlayerFactory player;
   late final SessionRepository session;
   late final LibraryRepository library;
+  late final FolderStore folders;
   late final AdminRepository admin;
   late final PinRepository pin;
 
@@ -54,6 +57,7 @@ class AppServices {
     shared.value = await platform.sharedCount();
     theme.value = await platform.readSecret('theme');
     language.value = await platform.readSecret('language');
+    await folders.start();
     await session.restore();
     await pin.restore();
   }

@@ -126,6 +126,41 @@
   "pasteInvite": "Paste invite link",
   "pasteInviteHint": "https://share.example.com/join#…",
   "libraryTitle": "Library",
+  "foldersTitle": "Folders",
+  "foldersAll": "All folders",
+  "foldersSwitch": "Show another folder",
+  "folderHolds": "{count, plural, =0{Empty} =1{1 file · {size}} other{{count} files · {size}}}",
+  "@folderHolds": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "folderFiles": "{count, plural, =0{Empty} =1{1 file} other{{count} files}}",
+  "@folderFiles": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "folderPeople": "{count, plural, =1{1 person} other{{count} people}}",
+  "@folderPeople": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "folderOnlyAdmins": "Only admins",
+  "folderOnlyAdminsLine": "only admins",
   "filterAll": "All",
   "filterPhotos": "Photos",
   "filterVideos": "Videos",
@@ -266,6 +301,14 @@
   "@viewerFrom": {
     "placeholders": {
       "name": {
+        "type": "String"
+      }
+    }
+  },
+  "viewerInFolder": "In “{folder}”",
+  "@viewerInFolder": {
+    "placeholders": {
+      "folder": {
         "type": "String"
       }
     }
@@ -786,6 +829,22 @@
   "@trashDeletedBy": {
     "placeholders": {
       "name": {
+        "type": "String"
+      }
+    }
+  },
+  "trashInFolder": "From “{folder}”",
+  "@trashInFolder": {
+    "placeholders": {
+      "folder": {
+        "type": "String"
+      }
+    }
+  },
+  "trashInDeletedFolder": "From the deleted folder “{folder}”",
+  "@trashInDeletedFolder": {
+    "placeholders": {
+      "folder": {
         "type": "String"
       }
     }

@@ -52,6 +52,25 @@ void main() {
     }));
   }
 
+  // Maria's three folders, as in the mockups, with the library showing Family.
+  FakeServer folders() {
+    final server = library();
+    Map<String, dynamic> cover(int i) => {...server.files[i], 'has_thumb': true};
+    return server
+      ..folders = [
+        FakeServer.folder('f4mily5x2k7mbqz4bwdbyj6qsq', 'Family', files: 2340, bytes: 41000000000, cover: cover(0)),
+        FakeServer.folder('w3dd1ng5x2k7mbqz4bwdbyj6qs', 'Wedding Anna & Marco', files: 412, bytes: 9800000000, cover: cover(7)),
+        FakeServer.folder('k1nd3rg4rt3nmbqz4bwdbyj6qs', 'Kindergarten', files: 86, bytes: 340000000),
+      ];
+  }
+
+  testWidgets('a folder', (tester) => atTen(() async {
+    await startApp(tester, signedInPhone()..secrets['folder'] = 'f4mily5x2k7mbqz4bwdbyj6qsq', folders());
+    await shot(tester, 'en/38-library-folder');
+    await tester.tap(find.text('Family'));
+    await shot(tester, 'en/39-choose-folder');
+  }));
+
   testWidgets('sign in', (tester) => atTen(() async {
     await startApp(tester, FakePlatform(), FakeServer());
     await tester.tap(find.text('See & download'));

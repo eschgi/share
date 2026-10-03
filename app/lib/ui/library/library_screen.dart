@@ -6,12 +6,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter/rendering.dart';
 
 import '../../app.dart';
-import '../../data/library.dart';
+import '../../data/api.dart';
+import '../../data/folders.dart';
 import '../../data/models.dart';
 import '../../l10n/app_localizations.dart';
 import '../admin/delete.dart';
 import '../download_sheet.dart';
 import '../fetch.dart';
+import '../folders.dart';
 import '../format.dart';
 import '../icons.dart';
 import '../theme.dart';
@@ -39,6 +41,8 @@ class _TileRef {
 
 class _LibraryScreenState extends State<LibraryScreen> with WidgetsBindingObserver {
   late final LibraryController _c;
+  late final FolderStore _folders = Services.read(context).folders;
+  bool _started = false;
   final _scroll = ScrollController();
   final _scrollBox = GlobalKey();
   Timer? _poll;
@@ -56,19 +60,47 @@ class _LibraryScreenState extends State<LibraryScreen> with WidgetsBindingObserv
   void initState() {
     super.initState();
     final s = Services.read(context);
-    _c = LibraryController(repo: s.library, platform: s.platform)..addListener(() => setState(() {}));
-    _c.reload();
+    _c = LibraryController(repo: s.library, platform: s.platform)..addListener(_changed);
+    _folders.addListener(_foldersChanged);
+    unawaited(_first());
     _scroll.addListener(() {
       if (_scroll.position.extentAfter < 1200) _c.more();
     });
-    _poll = Timer.periodic(const Duration(seconds: 30), (_) => _c.refreshIfChanged());
+    _poll = Timer.periodic(const Duration(seconds: 30), (_) => _refresh());
     WidgetsBinding.instance.addObserver(this);
+  }
+
+  /// The first page waits for the folders, to show the folder chosen last time.
+  Future<void> _first() async {
+    if (_folders.list == null && !_folders.failed) await _folders.load();
+    if (!mounted) return;
+    _started = true;
+    final f = _c.filter.withFolder(_folders.shown?.id);
+    await (f == _c.filter ? _c.reload() : _c.setFilter(f));
+  }
+
+  void _changed() {
+    // A folder the person doesn't see any more answers 404: then all folders.
+    final e = _c.error;
+    final folder = _c.filter.folder;
+    if (e is ApiException && e.status == 404 && folder != null) unawaited(_folders.gone(folder));
+    setState(() {});
+  }
+
+  void _foldersChanged() {
+    if (_started && _folders.shown?.id != _c.filter.folder) _c.setFilter(_c.filter.withFolder(_folders.shown?.id));
+    setState(() {});
+  }
+
+  /// New files, and with them the folders' counts.
+  Future<void> _refresh() async {
+    if (await _c.refreshIfChanged()) unawaited(_folders.load());
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _c.refreshIfChanged();
+      _refresh();
       _c.refreshSaved();
     }
   }
@@ -76,6 +108,7 @@ class _LibraryScreenState extends State<LibraryScreen> with WidgetsBindingObserv
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _folders.removeListener(_foldersChanged);
     _poll?.cancel();
     _searchDelay?.cancel();
     _autoScroll?.cancel();
@@ -84,11 +117,11 @@ class _LibraryScreenState extends State<LibraryScreen> with WidgetsBindingObserv
     super.dispose();
   }
 
-  void _setKind(FileKind? kind) => _c.setFilter(LibraryFilter(kind: kind, query: _c.filter.query));
+  void _setKind(FileKind? kind) => _c.setFilter(_c.filter.withKind(kind));
 
   void _search(String q) {
     _searchDelay?.cancel();
-    _searchDelay = Timer(const Duration(milliseconds: 350), () => _c.setFilter(LibraryFilter(kind: _c.filter.kind, query: q)));
+    _searchDelay = Timer(const Duration(milliseconds: 350), () => _c.setFilter(_c.filter.withQuery(q)));
   }
 
   // Drag selection.
@@ -203,6 +236,7 @@ class _LibraryScreenState extends State<LibraryScreen> with WidgetsBindingObserv
           initial: index,
           onDeleted: widget.user.isAdmin ? (id) => _c.remove([id]) : null,
           onRestored: _c.reload,
+          folderOf: _folders.choices ? (f) => _folders.byId(f.folder)?.name : null,
         ),
       ),
     );
@@ -327,7 +361,9 @@ class _LibraryScreenState extends State<LibraryScreen> with WidgetsBindingObserv
                   focusedBorder: InputBorder.none,
                 ),
               )
-            : Text(t.libraryTitle),
+            : _folders.choices
+                ? FolderTitle(shown: _folders.shown, onTap: () => showFolderSheet(context))
+                : Text(t.libraryTitle),
         actions: [
           IconButton(
             tooltip: t.librarySearch,

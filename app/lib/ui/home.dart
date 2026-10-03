@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../app.dart';
+import '../data/folders.dart';
 import '../data/models.dart';
 import '../l10n/app_localizations.dart';
 import 'icons.dart';
@@ -20,6 +24,19 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _tab = 0;
+  late final FolderStore _folders = Services.read(context).folders;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_folders.load());
+  }
+
+  @override
+  void dispose() {
+    unawaited(_folders.clear()); // signed out: the next person starts with all folders
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

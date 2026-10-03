@@ -19,11 +19,12 @@ class FakeServer {
       'GET /api/server': (_) => json(contractResponse('api/server.json')),
       'GET /api/about': (_) => json(contractResponse('api/about.json')),
       'GET /api/me/devices': (_) => json({'devices': myDevices}),
-      'GET /api/library': (req) => json(_library(req.url.queryParameters)),
-      'GET /api/files': (req) => json(_files(req.url.queryParameters)),
+      'GET /api/folders': (_) => json({'folders': [for (final f in folders) _withCounts(f)]}),
+      'GET /api/library': (req) => _seen(req) ?? json(_library(req.url.queryParameters)),
+      'GET /api/files': (req) => _seen(req) ?? json(_files(req.url.queryParameters)),
       'GET /api/files/ids': (req) {
         final list = _filtered(req.url.queryParameters);
-        return json({'ids': [for (final f in list) f['id']], 'bytes': list.fold<int>(0, (s, f) => s + (f['size'] as int))});
+        return _seen(req) ?? json({'ids': [for (final f in list) f['id']], 'bytes': list.fold<int>(0, (s, f) => s + (f['size'] as int))});
       },
       ..._adminRoutes(),
       'POST /api/pin/unlock': (req) {
@@ -42,6 +43,42 @@ class FakeServer {
   /// The PIN that unlocks, and whether the stored session's PIN has ended.
   String pinCode = 'K7M2Q';
   bool pinEnded = false;
+
+  /// The folders the person sees: one, as on most servers, unless a test adds more.
+  List<Map<String, dynamic>> folders = [folder('f4mily5x2k7mbqz4bwdbyj6qsq', 'Family')];
+  String get firstFolder => folders.first['id'] as String;
+
+  /// A folder like the contract's; what it holds is counted from [files] unless [files] and
+  /// [bytes] say.
+  static Map<String, dynamic> folder(String id, String name, {int? files, int? bytes, int people = 4, Map<String, dynamic>? cover}) {
+    final example = ((contractResponse('api/folders.json')['folders'] as List).first as Map).cast<String, dynamic>()
+      ..remove('files')
+      ..remove('bytes');
+    return {
+      ...example,
+      'id': id,
+      'name': name,
+      'files': ?files,
+      'bytes': ?bytes,
+      'people': people,
+      'cover': cover,
+    };
+  }
+
+  /// A folder as the server lists it.
+  Map<String, dynamic> _withCounts(Map<String, dynamic> f) {
+    final mine = files.where((x) => x['folder'] == f['id']);
+    return {'files': mine.length, 'bytes': mine.fold<int>(0, (s, x) => s + (x['size'] as int)), ...f};
+  }
+
+  /// A folder the person doesn't see answers 404, as if it didn't exist.
+  http.Response? _seen(http.Request req) {
+    final folder = req.url.queryParameters['folder'];
+    return folder == null || folders.any((f) => f['id'] == folder) ? null : _error(404, 'not_found');
+  }
+
+  /// Grows with every change to the library, as the server's.
+  int version = 1;
 
   /// A signed-in admin, for the admin screens.
   static Map<String, dynamic> get adminMe => {
@@ -234,7 +271,8 @@ class FakeServer {
 
   List<Map<String, dynamic>> _filtered(Map<String, String> q) => [
         for (final f in files)
-          if ((q['kind'] == null || f['kind'] == q['kind']) &&
+          if ((q['folder'] == null || f['folder'] == q['folder']) &&
+              (q['kind'] == null || f['kind'] == q['kind']) &&
               (q['day'] == null || f['day'] == q['day']) &&
               (q['q'] == null || (f['name'] as String).toLowerCase().contains(q['q']!.toLowerCase())))
             f,
@@ -247,7 +285,7 @@ class FakeServer {
       d['count'] = (d['count'] as int) + 1;
       d['bytes'] = (d['bytes'] as int) + (f['size'] as int);
     }
-    return {'version': 1, 'days': days.values.toList()};
+    return {'version': version, 'days': days.values.toList()};
   }
 
   Map<String, dynamic> _files(Map<String, String> q) {
@@ -259,13 +297,15 @@ class FakeServer {
     return {'files': page, 'next_cursor': next};
   }
 
-  /// Adds [count] files on [day]: photos, a video now and then, and a document.
-  void addDay(String day, int count, {int startId = 0}) {
+  /// Adds [count] files on [day]: photos, a video now and then, and a document; into [folder],
+  /// the first folder unless said.
+  void addDay(String day, int count, {int startId = 0, String? folder}) {
     for (var i = 0; i < count; i++) {
       final n = startId + i;
       final kind = i == 2 ? 'video' : (i == 3 ? 'document' : 'photo');
       files.add({
         'id': _id(n),
+        'folder': folder ?? firstFolder,
         'name': kind == 'document' ? 'Car_insurance.pdf' : (kind == 'video' ? 'VID_$n.mp4' : 'IMG_$n.jpg'),
         'size': 3000000 + n * 1000,
         'mime': kind == 'document' ? 'application/pdf' : (kind == 'video' ? 'video/mp4' : 'image/jpeg'),

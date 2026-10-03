@@ -91,6 +91,15 @@ class _TrashScreenState extends State<TrashScreen> {
     await _load();
   }
 
+  /// The folder a file came from, where there are several, or where it went with its file.
+  String? _folderOf(TrashedFile f, Trash trash) {
+    final t = AppLocalizations.of(context);
+    final folder = trash.folders.where((x) => x.id == f.file.folder).firstOrNull;
+    if (folder == null) return null;
+    if (folder.deleted) return t.trashInDeletedFolder(folder.name);
+    return Services.of(context).folders.choices ? t.trashInFolder(folder.name) : null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
@@ -162,6 +171,7 @@ class _TrashScreenState extends State<TrashScreen> {
               for (final f in files)
                 _TrashRow(
                   item: f,
+                  folder: _folderOf(f, trash!),
                   selected: _selected.contains(f.file.id),
                   onTap: () => setState(() => _selected.contains(f.file.id) ? _selected.remove(f.file.id) : _selected.add(f.file.id)),
                 ),
@@ -173,8 +183,11 @@ class _TrashScreenState extends State<TrashScreen> {
 }
 
 class _TrashRow extends StatelessWidget {
-  const _TrashRow({required this.item, required this.selected, required this.onTap});
+  const _TrashRow({required this.item, this.folder, required this.selected, required this.onTap});
   final TrashedFile item;
+
+  /// Which folder it came from, where there are several or that folder went with it.
+  final String? folder;
   final bool selected;
   final VoidCallback onTap;
 
@@ -197,7 +210,12 @@ class _TrashRow extends StatelessWidget {
               Text(f.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w500)),
               const SizedBox(height: 2),
               Text(
-                [formatBytes(f.size, locale), t.trashDaysLeft(left), if (item.deletedBy != null) t.trashDeletedBy(item.deletedBy!)].join(' · '),
+                [
+                  ?folder,
+                  formatBytes(f.size, locale),
+                  t.trashDaysLeft(left),
+                  if (item.deletedBy != null) t.trashDeletedBy(item.deletedBy!),
+                ].join(' · '),
                 maxLines: 2,
                 style: TextStyle(fontSize: 13, color: c.text3),
               ),

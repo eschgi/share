@@ -20,9 +20,12 @@ import 'widgets.dart';
 /// Screen 14: one file at a time, at original size; swipe to the next. Admins can delete the file
 /// shown.
 class ViewerScreen extends StatefulWidget {
-  const ViewerScreen({super.key, required this.files, required this.initial, this.onDeleted, this.onRestored});
+  const ViewerScreen({super.key, required this.files, required this.initial, this.onDeleted, this.onRestored, this.folderOf});
   final List<FileInfo> files;
   final int initial;
+
+  /// The name of a file's folder, for the details; left out where there is only one folder.
+  final String? Function(FileInfo file)? folderOf;
 
   /// Admins: a file was deleted here, the library drops it. Without it, there is no Delete.
   final void Function(String id)? onDeleted;
@@ -108,6 +111,7 @@ class _ViewerScreenState extends State<ViewerScreen> {
     final locale = Localizations.localeOf(context).languageCode;
     final f = _file;
     final c = context.colors;
+    final folder = widget.folderOf?.call(f);
     showModalBottomSheet<void>(
       context: context,
       builder: (context) => SafeArea(
@@ -119,6 +123,7 @@ class _ViewerScreenState extends State<ViewerScreen> {
             for (final line in [
               '${formatDay(f.day, clock.now(), locale, today: t.dayToday, yesterday: t.dayYesterday)}, ${formatTime(f.uploadedAt, locale)}',
               f.from == null ? t.viewerFromPin : t.viewerFrom(f.from!),
+              if (folder != null) t.viewerInFolder(folder),
               [
                 formatBytes(f.size, locale),
                 if (f.width != null && f.height != null) '${f.width} × ${f.height}',

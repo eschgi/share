@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../data/api.dart';
 import '../../data/library.dart';
 import '../../data/models.dart';
 import '../../data/platform.dart';
@@ -16,6 +17,13 @@ class DaySection {
 }
 
 enum DaySelection { none, some, all }
+
+/// Some day has fewer files than before, or none: files were moved away or hidden, which adding
+/// new files on top can't show.
+bool shrank(LibraryOverview before, LibraryOverview after) {
+  final now = {for (final d in after.days) d.day: d.count};
+  return before.days.any((d) => (now[d.day] ?? 0) < d.count);
+}
 
 /// The library screen's state: files loaded page by page, newest first, and the selection.
 class LibraryController extends ChangeNotifier {
@@ -103,16 +111,21 @@ class LibraryController extends ChangeNotifier {
   }
 
   /// Something changed on the server (the version grew): puts new files on top without
-  /// losing the place in the list.
-  Future<void> refreshIfChanged() async {
+  /// losing the place in the list; if files went away, such as into another folder, the list
+  /// starts over. Says whether the library changed.
+  Future<bool> refreshIfChanged() async {
     final current = overview;
-    if (current == null || loading) return;
+    if (current == null || loading) return false;
     final gen = _generation;
     try {
       final o = await repo.overview(_filter);
-      if (gen != _generation || o.version == current.version) return;
+      if (gen != _generation || o.version == current.version) return false;
+      if (shrank(current, o)) {
+        unawaited(reload());
+        return true;
+      }
       final first = await repo.page(_filter, limit: 100);
-      if (gen != _generation) return;
+      if (gen != _generation) return true;
       final newer = first.files.where((f) => !_shown.contains(f.id)).toList();
       overview = o;
       files.insertAll(0, newer);
@@ -121,8 +134,13 @@ class LibraryController extends ChangeNotifier {
         _known[f.id] = f;
       }
       notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      if (e.status != 404 || gen != _generation) return false;
+      unawaited(reload()); // the folder shown is gone, or no longer the person's: say so
+      return true;
     } catch (_) {
-      // Try again at the next check.
+      return false; // try again at the next check
     }
   }
 

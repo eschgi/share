@@ -118,6 +118,7 @@ enum FileKind {
 class FileInfo {
   const FileInfo({
     required this.id,
+    this.folder = '',
     required this.name,
     required this.size,
     required this.mime,
@@ -134,6 +135,7 @@ class FileInfo {
 
   factory FileInfo.fromJson(Json j) => FileInfo(
         id: _str(j['id']),
+        folder: _str(j['folder']),
         name: _str(j['name']),
         size: _int(j['size']),
         mime: _str(j['mime'], 'application/octet-stream'),
@@ -149,6 +151,7 @@ class FileInfo {
       );
 
   final String id;
+  final String folder; // the id of the folder it lies in
   final String name;
   final int size;
   final String mime;
@@ -171,6 +174,45 @@ class FileInfo {
   static const _audioExt = {'MP3', 'M4A', 'AAC', 'WAV', 'OGG', 'OGA', 'OPUS', 'FLAC'};
 
   Json toJson() => {'id': id, 'name': name, 'size': size, 'mime': mime, 'kind': kind.name, 'day': day};
+}
+
+/// A folder of the library: what it holds and how many see it.
+class FolderInfo {
+  const FolderInfo({
+    required this.id,
+    required this.name,
+    this.files = 0,
+    this.bytes = 0,
+    this.senders = 0,
+    this.people = 0,
+    this.adminsOnly = false,
+    this.cover,
+    required this.createdAt,
+  });
+
+  factory FolderInfo.fromJson(Json j) => FolderInfo(
+        id: _str(j['id']),
+        name: _str(j['name']),
+        files: _int(j['files']),
+        bytes: _int(j['bytes']),
+        senders: _int(j['senders']),
+        people: _int(j['people']),
+        adminsOnly: _bool(j['admins_only']),
+        cover: j['cover'] is Map ? FileInfo.fromJson(_obj(j['cover'])) : null,
+        createdAt: _time(j['created_at']) ?? DateTime.fromMillisecondsSinceEpoch(0),
+      );
+
+  /// GET /api/folders: the folders the person sees, the oldest first.
+  static List<FolderInfo> listFromJson(Json j) => [for (final f in _list(j['folders'])) FolderInfo.fromJson(_obj(f))];
+
+  final String id;
+  final String name;
+  final int files, bytes;
+  final int senders; // the people and PIN sessions that sent its files
+  final int people; // who sees it: the admins, its members and open invites
+  final bool adminsOnly; // no member sees it
+  final FileInfo? cover; // its newest photo or video with a thumbnail
+  final DateTime createdAt;
 }
 
 class DaySummary {
@@ -237,6 +279,8 @@ class PinInfo {
     required this.link,
     this.files = 0,
     this.phones = 0,
+    this.folder = '',
+    this.showsFolder = false,
   });
 
   factory PinInfo.fromJson(Json j) => PinInfo(
@@ -248,6 +292,8 @@ class PinInfo {
         link: _str(j['link']),
         files: _int(j['files']),
         phones: _int(j['phones']),
+        folder: _str(j['folder']),
+        showsFolder: _bool(j['shows_folder']),
       );
 
   final String id;
@@ -258,6 +304,8 @@ class PinInfo {
   final String link; // the website with the PIN filled in
   final int files; // sent with it, still in the library
   final int phones; // browsers and phones that unlocked it
+  final String folder; // the id of the folder it sends into
+  final bool showsFolder; // guests with it also see and download the folder
 }
 
 /// A signed-in phone of someone.
@@ -303,6 +351,7 @@ class Person {
     this.isMe = false,
     this.lastSeenAt,
     this.phones = const [],
+    this.folders = const [],
   });
 
   factory Person.fromJson(Json j) => Person(
@@ -314,6 +363,7 @@ class Person {
         isMe: _bool(j['me']),
         lastSeenAt: _time(j['last_seen_at']),
         phones: [for (final p in _list(j['phones'])) Phone.fromJson(_obj(p))],
+        folders: [for (final f in _list(j['folders'])) if (f is String) f],
       );
 
   final String id;
@@ -324,10 +374,11 @@ class Person {
   final bool isMe;
   final DateTime? lastSeenAt;
   final List<Phone> phones;
+  final List<String> folders; // the folders they see: every folder for an admin
 
   bool get isAdmin => role == Role.admin;
 
-  Person copyWith({Role? role, List<Phone>? phones}) => Person(
+  Person copyWith({Role? role, List<Phone>? phones, List<String>? folders}) => Person(
         id: id,
         name: name,
         role: role ?? this.role,
@@ -336,12 +387,13 @@ class Person {
         isMe: isMe,
         lastSeenAt: lastSeenAt,
         phones: phones ?? this.phones,
+        folders: folders ?? this.folders,
       );
 }
 
 /// An invite nobody has used yet.
 class OpenInvite {
-  const OpenInvite({required this.id, required this.name, required this.role, this.userId, required this.expiresAt});
+  const OpenInvite({required this.id, required this.name, required this.role, this.userId, required this.expiresAt, this.folders = const []});
 
   factory OpenInvite.fromJson(Json j) => OpenInvite(
         id: _str(j['id']),
@@ -349,6 +401,7 @@ class OpenInvite {
         role: Role.parse(j['role']),
         userId: j['user_id'] is String ? j['user_id'] as String : null,
         expiresAt: _time(j['expires_at']) ?? DateTime.fromMillisecondsSinceEpoch(0),
+        folders: [for (final f in _list(j['folders'])) if (f is String) f],
       );
 
   final String id;
@@ -356,6 +409,7 @@ class OpenInvite {
   final Role role;
   final String? userId; // set: it adds a phone for this person
   final DateTime expiresAt;
+  final List<String> folders; // the folders the new person will see
 }
 
 class People {
@@ -397,13 +451,29 @@ class TrashedFile {
 }
 
 class Trash {
-  const Trash({required this.files, required this.days});
+  const Trash({required this.files, required this.days, this.folders = const []});
 
-  factory Trash.fromJson(Json j) =>
-      Trash(files: [for (final f in _list(j['files'])) TrashedFile.fromJson(_obj(f))], days: _int(j['trash_days'], 30));
+  factory Trash.fromJson(Json j) => Trash(
+        files: [for (final f in _list(j['files'])) TrashedFile.fromJson(_obj(f))],
+        days: _int(j['trash_days'], 30),
+        folders: [for (final f in _list(j['folders'])) TrashedFolder.fromJson(_obj(f))],
+      );
 
   final List<TrashedFile> files;
   final int days;
+
+  /// The folders the files are from; deleted ones aren't in GET /api/folders any more.
+  final List<TrashedFolder> folders;
+}
+
+class TrashedFolder {
+  const TrashedFolder({required this.id, required this.name, this.deleted = false});
+
+  factory TrashedFolder.fromJson(Json j) => TrashedFolder(id: _str(j['id']), name: _str(j['name']), deleted: _bool(j['deleted']));
+
+  final String id;
+  final String name;
+  final bool deleted; // the folder went too; restoring a file brings it back
 }
 
 class StorageInfo {

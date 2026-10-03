@@ -11,22 +11,28 @@ import 'models.dart';
 import 'platform.dart';
 
 class LibraryFilter {
-  const LibraryFilter({this.kind, this.query = ''});
+  const LibraryFilter({this.folder, this.kind, this.query = ''});
 
+  final String? folder; // null: every folder the person sees
   final FileKind? kind;
   final String query;
 
+  LibraryFilter withFolder(String? folder) => LibraryFilter(folder: folder, kind: kind, query: query);
+  LibraryFilter withKind(FileKind? kind) => LibraryFilter(folder: folder, kind: kind, query: query);
+  LibraryFilter withQuery(String query) => LibraryFilter(folder: folder, kind: kind, query: query);
+
   Map<String, String> toQuery({String? day}) => {
+        'folder': ?folder,
         'kind': ?kind?.name,
         if (query.trim().isNotEmpty) 'q': query.trim(),
         'day': ?day,
       };
 
   @override
-  bool operator ==(Object other) => other is LibraryFilter && other.kind == kind && other.query == query;
+  bool operator ==(Object other) => other is LibraryFilter && other.folder == folder && other.kind == kind && other.query == query;
 
   @override
-  int get hashCode => Object.hash(kind, query);
+  int get hashCode => Object.hash(folder, kind, query);
 }
 
 class LibraryRepository {
@@ -34,6 +40,9 @@ class LibraryRepository {
 
   final Api api;
   final Platform platform;
+
+  /// The folders the person sees, the oldest first.
+  Future<List<FolderInfo>> folders() async => FolderInfo.listFromJson(await api.get('/api/folders'));
 
   Future<LibraryOverview> overview(LibraryFilter filter) async =>
       LibraryOverview.fromJson(await api.get('/api/library', query: filter.toQuery()));
