@@ -33,12 +33,13 @@ func (d *DB) PinSessionByToken(ctx context.Context, tokenHash []byte) (PinSessio
 	var created, seen int64
 	var revoked sql.NullInt64
 	row := d.QueryRowContext(ctx, `SELECT s.id, s.pin_id, s.client, s.created_at, s.last_seen_at, s.revoked_at,
-			p.id, p.code, p.kind, p.created_by, p.created_at, p.expires_at, p.ended_at
+			p.id, p.code, p.kind, p.created_by, p.created_at, p.expires_at, p.ended_at, p.folder_id, p.shows_folder
 		FROM pin_sessions s JOIN pins p ON p.id = s.pin_id WHERE s.token_hash = ?`, tokenHash)
 	var pCreated int64
 	var pExpires, pEnded sql.NullInt64
+	var pFolder sql.NullString
 	err := row.Scan(&s.ID, &s.PinID, &s.Client, &created, &seen, &revoked,
-		&s.Pin.ID, &s.Pin.Code, &s.Pin.Kind, &s.Pin.CreatedBy, &pCreated, &pExpires, &pEnded)
+		&s.Pin.ID, &s.Pin.Code, &s.Pin.Kind, &s.Pin.CreatedBy, &pCreated, &pExpires, &pEnded, &pFolder, &s.Pin.ShowsFolder)
 	if errors.Is(err, sql.ErrNoRows) {
 		return s, ErrNotFound
 	}
@@ -47,6 +48,7 @@ func (d *DB) PinSessionByToken(ctx context.Context, tokenHash []byte) (PinSessio
 	}
 	s.CreatedAt, s.LastSeenAt, s.RevokedAt = fromMS(created), fromMS(seen), optTime(revoked)
 	s.Pin.CreatedAt, s.Pin.ExpiresAt, s.Pin.EndedAt = fromMS(pCreated), optTime(pExpires), optTime(pEnded)
+	s.Pin.FolderID = pFolder.String
 	return s, nil
 }
 
@@ -64,11 +66,11 @@ func (d *DB) RevokePinSession(ctx context.Context, id string, at time.Time) erro
 
 // MoveReceivingUploads hands the unfinished uploads of an old session to a new one. That
 // happens when a PIN ended mid-upload and the person unlocked again with a new PIN: the
-// uploads continue instead of starting over.
-func (d *DB) MoveReceivingUploads(ctx context.Context, fromSession, toSession, toPin string, at time.Time) (int64, error) {
-	res, err := d.ExecContext(ctx,
-		"UPDATE files SET pin_session_id = ?, pin_id = ?, updated_at = ? WHERE pin_session_id = ? AND state = 'receiving'",
-		toSession, toPin, ms(at), fromSession)
+// uploads continue instead of starting over, into the new PIN's folder.
+func (d *DB) MoveReceivingUploads(ctx context.Context, fromSession, toSession, toPin, toFolder string, at time.Time) (int64, error) {
+	res, err := d.ExecContext(ctx, `UPDATE files SET pin_session_id = ?, pin_id = ?, folder_id = ?, updated_at = ?
+		WHERE pin_session_id = ? AND state = 'receiving'`,
+		toSession, toPin, toFolder, ms(at), fromSession)
 	if err != nil {
 		return 0, err
 	}

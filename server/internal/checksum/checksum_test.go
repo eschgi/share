@@ -15,10 +15,11 @@ import (
 )
 
 type fixture struct {
-	t     *testing.T
-	store *Store
-	dir   string
-	at    time.Time
+	t      *testing.T
+	store  *Store
+	dir    string
+	at     time.Time
+	folder string
 }
 
 func newFixture(t *testing.T, pace int64) *fixture {
@@ -32,6 +33,10 @@ func newFixture(t *testing.T, pace int64) *fixture {
 	if err := d.Migrate(context.Background(), filepath.Join(dir, "backups")); err != nil {
 		t.Fatal(err)
 	}
+	folder, _, err := d.EnsureFirstFolder(context.Background(), db.Folder{ID: ids.New(), Name: "Share", CreatedBy: "first-start"}, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
 	files := filepath.Join(dir, "files")
 	os.MkdirAll(filepath.Join(files, "2026-09-27"), 0o755)
 	root, err := os.OpenRoot(files)
@@ -39,7 +44,7 @@ func newFixture(t *testing.T, pace int64) *fixture {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { root.Close() })
-	return &fixture{t: t, dir: files, at: time.Date(2026, 9, 27, 10, 0, 0, 0, time.UTC),
+	return &fixture{t: t, dir: files, at: time.Date(2026, 9, 27, 10, 0, 0, 0, time.UTC), folder: folder.ID,
 		store: &Store{DB: d, Root: root, Pace: pace, Logf: t.Logf}}
 }
 
@@ -51,7 +56,7 @@ func (f *fixture) add(name string, size, body int) (db.File, []byte) {
 	data := make([]byte, size)
 	rand.Read(data)
 	f.at = f.at.Add(time.Minute)
-	file := db.File{ID: ids.New(), Name: name, Size: int64(size), CreatedAt: f.at, UpdatedAt: f.at}
+	file := db.File{ID: ids.New(), Name: name, Size: int64(size), CreatedAt: f.at, UpdatedAt: f.at, FolderID: f.folder}
 	rel := "2026-09-27/" + name
 	if err := f.store.DB.InsertReceiving(ctx, file); err != nil {
 		f.t.Fatal(err)

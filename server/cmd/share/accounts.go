@@ -18,6 +18,7 @@ import (
 )
 
 // openDB opens and migrates the database of cfg, for the commands that work on it directly.
+// Like the server, it makes the first folder if there is none yet.
 func openDB(ctx context.Context, cfg *config.Config) (*db.DB, *auth.Service, error) {
 	layout := storage.Layout{StorageDir: cfg.StorageDir, DataDir: cfg.DataDir}
 	d, err := db.Open(layout.DBPath())
@@ -28,7 +29,23 @@ func openDB(ctx context.Context, cfg *config.Config) (*db.DB, *auth.Service, err
 		d.Close()
 		return nil, nil, err
 	}
+	if _, err := storage.EnsureFirstFolder(ctx, d, cfg.Name, time.Now()); err != nil {
+		d.Close()
+		return nil, nil, err
+	}
 	return d, auth.NewService(d, time.Now, cfg.Proxies, cfg.ClientIPHeader()), nil
+}
+
+// oldestFolder is where things go when the command doesn't say: the oldest folder.
+func oldestFolder(ctx context.Context, d *db.DB) (db.Folder, error) {
+	live, err := d.LiveFolders(ctx)
+	if err != nil {
+		return db.Folder{}, err
+	}
+	if len(live) == 0 {
+		return db.Folder{}, errors.New("there is no folder")
+	}
+	return live[0], nil
 }
 
 func invite(args []string) error {
@@ -64,7 +81,7 @@ func invite(args []string) error {
 		}
 		userID = u.ID
 	}
-	token, in, err := svc.CreateInvite(ctx, *name, role, userID, "cli", auth.InviteLifetime)
+	token, in, err := svc.CreateInvite(ctx, *name, role, userID, "cli", nil, auth.InviteLifetime)
 	if err != nil {
 		return err
 	}
@@ -178,6 +195,15 @@ func password(args []string) error {
 		u = db.User{ID: ids.New(), Name: display, Role: role, CreatedAt: time.Now(), CreatedBy: "cli"}
 		if err := d.InsertUser(ctx, u); err != nil {
 			return err
+		}
+		if role == db.RoleMember {
+			folder, err := oldestFolder(ctx, d)
+			if err != nil {
+				return err
+			}
+			if err := d.SetFolderPerson(ctx, folder.ID, u.ID, true); err != nil {
+				return err
+			}
 		}
 		fmt.Printf("New account %s (%s)\n", u.Name, u.Role)
 	case err != nil:

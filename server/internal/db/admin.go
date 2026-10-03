@@ -8,7 +8,8 @@ import (
 )
 
 // SetRole makes a person an admin or a member. It returns ErrLastAdmin when that would leave
-// no admin.
+// no admin. An admin who becomes a member keeps seeing every folder, until someone switches
+// some off.
 func (d *DB) SetRole(ctx context.Context, id, role string) error {
 	if role != RoleAdmin && role != RoleMember {
 		return errors.New("db: unknown role " + role)
@@ -31,7 +32,14 @@ func (d *DB) SetRole(ctx context.Context, id, role string) error {
 				return ErrLastAdmin
 			}
 		}
-		_, err = tx.ExecContext(ctx, "UPDATE users SET role = ? WHERE id = ?", role, id)
+		if _, err := tx.ExecContext(ctx, "UPDATE users SET role = ? WHERE id = ?", role, id); err != nil {
+			return err
+		}
+		if role != RoleMember {
+			return nil
+		}
+		_, err = tx.ExecContext(ctx, `INSERT OR IGNORE INTO folder_people (folder_id, user_id)
+			SELECT id, ? FROM folders WHERE deleted_at IS NULL`, id)
 		return err
 	})
 }

@@ -140,13 +140,12 @@ func (a *API) createPin(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "bad_request", "kind must be permanent or day.")
 		return
 	}
-	var pin db.Pin
-	var err error
-	if req.Code == "" {
-		pin, err = a.Auth.CreatePin(r.Context(), req.Kind, p.UserID)
-	} else {
-		pin, err = a.Auth.CreatePinCode(r.Context(), req.Kind, req.Code, p.UserID)
+	folder, err := a.oldestFolder(r.Context())
+	if err != nil {
+		internal(w, "create PIN", err)
+		return
 	}
+	pin, err := a.Auth.CreatePin(r.Context(), auth.PinSpec{Kind: req.Kind, Code: req.Code, FolderID: folder.ID}, p.UserID)
 	switch {
 	case err == nil:
 		httpx.WriteJSON(w, http.StatusCreated, a.pinInfo(pin, db.PinStat{}))
@@ -441,7 +440,7 @@ func (a *API) invitePhone(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) newInvite(w http.ResponseWriter, r *http.Request, p *auth.Principal, name, role, forUser string) {
-	token, in, err := a.Auth.CreateInvite(r.Context(), name, role, forUser, p.UserID, auth.InviteLifetime)
+	token, in, err := a.Auth.CreateInvite(r.Context(), name, role, forUser, p.UserID, nil, auth.InviteLifetime)
 	var input *auth.InputError
 	switch {
 	case err == nil:

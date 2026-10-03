@@ -15,13 +15,15 @@ const (
 
 // Pin is an upload PIN.
 type Pin struct {
-	ID        string
-	Code      string
-	Kind      string
-	CreatedBy string
-	CreatedAt time.Time
-	ExpiresAt *time.Time
-	EndedAt   *time.Time
+	ID          string
+	Code        string
+	Kind        string
+	CreatedBy   string
+	CreatedAt   time.Time
+	ExpiresAt   *time.Time
+	EndedAt     *time.Time
+	FolderID    string // the folder it sends into; "" once that folder is gone for good
+	ShowsFolder bool   // guests with it also see and download what is in the folder
 }
 
 // LiveAt reports whether the PIN still lets people send at time now.
@@ -29,13 +31,14 @@ func (p Pin) LiveAt(now time.Time) bool {
 	return p.EndedAt == nil && (p.ExpiresAt == nil || now.Before(*p.ExpiresAt))
 }
 
-const pinColumns = "id, code, kind, created_by, created_at, expires_at, ended_at"
+const pinColumns = "id, code, kind, created_by, created_at, expires_at, ended_at, folder_id, shows_folder"
 
 func scanPin(row interface{ Scan(...any) error }) (Pin, error) {
 	var p Pin
 	var created int64
 	var expires, ended sql.NullInt64
-	err := row.Scan(&p.ID, &p.Code, &p.Kind, &p.CreatedBy, &created, &expires, &ended)
+	var folderID sql.NullString
+	err := row.Scan(&p.ID, &p.Code, &p.Kind, &p.CreatedBy, &created, &expires, &ended, &folderID, &p.ShowsFolder)
 	if errors.Is(err, sql.ErrNoRows) {
 		return p, ErrNotFound
 	}
@@ -45,13 +48,17 @@ func scanPin(row interface{ Scan(...any) error }) (Pin, error) {
 	p.CreatedAt = fromMS(created)
 	p.ExpiresAt = optTime(expires)
 	p.EndedAt = optTime(ended)
+	p.FolderID = folderID.String
 	return p, nil
 }
 
 // InsertPin stores a new PIN. It returns ErrConflict if the code was ever used before.
 func (d *DB) InsertPin(ctx context.Context, p Pin) error {
-	_, err := d.ExecContext(ctx, "INSERT INTO pins ("+pinColumns+") VALUES (?, ?, ?, ?, ?, ?, ?)",
-		p.ID, p.Code, p.Kind, p.CreatedBy, ms(p.CreatedAt), nullMS(p.ExpiresAt), nullMS(p.EndedAt))
+	if p.FolderID == "" {
+		return errors.New("db: a PIN needs a folder")
+	}
+	_, err := d.ExecContext(ctx, "INSERT INTO pins ("+pinColumns+") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		p.ID, p.Code, p.Kind, p.CreatedBy, ms(p.CreatedAt), nullMS(p.ExpiresAt), nullMS(p.EndedAt), p.FolderID, p.ShowsFolder)
 	if isUniqueViolation(err) {
 		return ErrConflict
 	}

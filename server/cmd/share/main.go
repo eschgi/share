@@ -211,15 +211,11 @@ func pin(args []string) error {
 		return err
 	}
 	ctx := context.Background()
-	d, err := db.Open(storage.Layout{StorageDir: cfg.StorageDir, DataDir: cfg.DataDir}.DBPath())
+	d, svc, err := openDB(ctx, cfg)
 	if err != nil {
 		return err
 	}
 	defer d.Close()
-	if err := d.Migrate(ctx, storage.Layout{DataDir: cfg.DataDir}.BackupDir()); err != nil {
-		return err
-	}
-	svc := auth.NewService(d, time.Now, cfg.Proxies, cfg.ClientIPHeader())
 
 	switch sub {
 	case "create":
@@ -230,7 +226,11 @@ func pin(args []string) error {
 		if *day {
 			kind = db.PinDay
 		}
-		p, err := svc.CreatePin(ctx, kind, "cli")
+		folder, err := oldestFolder(ctx, d)
+		if err != nil {
+			return err
+		}
+		p, err := svc.CreatePin(ctx, auth.PinSpec{Kind: kind, FolderID: folder.ID}, "cli")
 		if err != nil {
 			return err
 		}

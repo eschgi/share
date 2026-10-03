@@ -23,7 +23,9 @@ const Pace = 16 << 20
 type Store struct {
 	DB   *db.DB
 	Root *os.Root // the storage folder
-	Pace int64    // bytes per second for the worker; 0 reads at full speed
+	// Open opens a library file; without it the file is read at its path in Root.
+	Open func(context.Context, db.File) (*os.File, error)
+	Pace int64 // bytes per second for the worker; 0 reads at full speed
 	Logf func(format string, args ...any)
 
 	mu      sync.Mutex
@@ -178,7 +180,13 @@ func (s *Store) compute(ctx context.Context, f db.File, c *call) (uint32, error)
 	if crc, ok, err := s.DB.FileCRC32(ctx, f.ID); err != nil || ok {
 		return crc, err
 	}
-	file, err := s.Root.Open(f.RelPath)
+	var file *os.File
+	var err error
+	if s.Open != nil {
+		file, err = s.Open(ctx, f)
+	} else {
+		file, err = s.Root.Open(f.RelPath)
+	}
 	if err != nil {
 		return 0, err
 	}

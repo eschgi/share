@@ -28,27 +28,32 @@ func (lib *Library) Trash(ctx context.Context, fileIDs []string, by string) ([]d
 		return nil, err
 	}
 	for _, f := range files {
-		if err := lib.moveToTrash(f); err != nil {
+		if err := lib.moveToTrash(ctx, f); err != nil {
 			lib.Logf("storage: trashing %s: %v", f.ID, err) // the reconciler tries again
 		}
 	}
 	return files, nil
 }
 
-func (lib *Library) moveToTrash(f db.File) error {
+func (lib *Library) moveToTrash(ctx context.Context, f db.File) error {
 	if _, err := lib.root.Lstat(trashPath(f.ID)); err == nil {
 		return nil // moved before a crash
 	}
-	if err := lib.root.Rename(f.RelPath, trashPath(f.ID)); err != nil {
+	src, err := lib.locate(ctx, f)
+	if err != nil {
 		return err
 	}
-	for _, dir := range []string{".trash", f.UploadDay} {
+	if err := lib.root.Rename(src, trashPath(f.ID)); err != nil {
+		return err
+	}
+	dayDir := path.Dir(src)
+	for _, dir := range []string{".trash", dayDir} {
 		if err := syncFile(lib.root, dir); err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return err
 		}
 	}
 	// A day's folder goes with its last file; with files left, removing it just fails.
-	lib.root.Remove(path.Dir(f.RelPath))
+	lib.root.Remove(dayDir)
 	return nil
 }
 
@@ -71,7 +76,7 @@ func (lib *Library) Restore(ctx context.Context, fileIDs []string) ([]db.File, e
 			continue // restored meanwhile
 		}
 		f.State, f.RelPath, f.DeletedAt, f.DeletedBy = db.StateReady, rel, nil, ""
-		if err := lib.moveFromTrash(f); err != nil {
+		if err := lib.moveFromTrash(ctx, f); err != nil {
 			lib.Logf("storage: restoring %s: %v", f.ID, err) // the reconciler tries again
 		}
 		out = append(out, f)
@@ -79,17 +84,21 @@ func (lib *Library) Restore(ctx context.Context, fileIDs []string) ([]db.File, e
 	return out, nil
 }
 
-// restorePath claims a library path for a trashed file and records it; "" if the file isn't
-// in the trash any more.
+// restorePath claims a path in its folder for a trashed file and records it; "" if the file
+// isn't in the trash any more.
 func (lib *Library) restorePath(ctx context.Context, f db.File) (string, error) {
+	folder, err := lib.folderOf(ctx, f)
+	if err != nil {
+		return "", err
+	}
 	for try := range 5 {
 		rel := f.RelPath
-		taken, err := lib.DB.RelPathTaken(ctx, rel)
+		taken, err := lib.DB.RelPathTaken(ctx, folder.ID, rel)
 		if err != nil {
 			return "", err
 		}
-		if _, statErr := lib.root.Lstat(rel); taken || statErr == nil || try > 0 {
-			if rel, err = lib.freePath(ctx, f.UploadDay, f.Name); err != nil {
+		if _, statErr := lib.root.Lstat(inFolder(folder, rel)); taken || statErr == nil || try > 0 {
+			if rel, err = lib.freePath(ctx, folder, f.UploadDay, f.Name); err != nil {
 				return "", err
 			}
 		}
@@ -105,20 +114,25 @@ func (lib *Library) restorePath(ctx context.Context, f db.File) (string, error) 
 	return "", fmt.Errorf("restore %s: no free name for %q", f.ID, f.Name)
 }
 
-func (lib *Library) moveFromTrash(f db.File) error {
+func (lib *Library) moveFromTrash(ctx context.Context, f db.File) error {
+	dst, err := lib.locate(ctx, f)
+	if err != nil {
+		return err
+	}
 	if _, err := lib.root.Lstat(trashPath(f.ID)); errors.Is(err, fs.ErrNotExist) {
-		if _, err := lib.root.Lstat(f.RelPath); err == nil {
+		if _, err := lib.root.Lstat(dst); err == nil {
 			return nil // moved before a crash
 		}
 		return fmt.Errorf("restore %s: the file is gone from the trash", f.ID)
 	}
-	if err := lib.root.MkdirAll(f.UploadDay, 0o755); err != nil {
+	dayDir := path.Dir(dst)
+	if err := lib.root.MkdirAll(dayDir, 0o755); err != nil {
 		return err
 	}
-	if err := lib.root.Rename(trashPath(f.ID), f.RelPath); err != nil {
+	if err := lib.root.Rename(trashPath(f.ID), dst); err != nil {
 		return err
 	}
-	for _, dir := range []string{f.UploadDay, ".trash"} {
+	for _, dir := range []string{dayDir, ".trash"} {
 		if err := syncFile(lib.root, dir); err != nil {
 			return err
 		}
@@ -189,8 +203,12 @@ func (lib *Library) reconcileTrash(ctx context.Context) error {
 		if _, err := lib.root.Lstat(trashPath(f.ID)); err == nil {
 			continue
 		}
-		if _, err := lib.root.Lstat(f.RelPath); err == nil {
-			if err := lib.moveToTrash(f); err != nil {
+		src, err := lib.locate(ctx, f)
+		if err != nil {
+			return err
+		}
+		if _, err := lib.root.Lstat(src); err == nil {
+			if err := lib.moveToTrash(ctx, f); err != nil {
 				lib.Logf("storage: trashing %s: %v", f.ID, err)
 			}
 			continue
@@ -223,7 +241,7 @@ func (lib *Library) reconcileTrash(ctx context.Context) error {
 		case err != nil:
 			return err
 		case f.State == db.StateReady:
-			if err := lib.moveFromTrash(f); err != nil {
+			if err := lib.moveFromTrash(ctx, f); err != nil {
 				lib.Logf("storage: restoring %s: %v", f.ID, err)
 			}
 		}

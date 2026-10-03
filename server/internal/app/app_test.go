@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/eschgi/share/server/internal/auth"
 	"github.com/eschgi/share/server/internal/config"
 	"github.com/eschgi/share/server/internal/db"
 	"github.com/eschgi/share/server/internal/storage"
@@ -92,11 +93,21 @@ func newEnvWith(t *testing.T, settings string) *env {
 // newPin makes a PIN of the given kind through the auth service, like `share pin create`.
 func (e *env) newPin(kind string) db.Pin {
 	e.t.Helper()
-	p, err := e.app.Auth.CreatePin(context.Background(), kind, "test")
+	p, err := e.app.Auth.CreatePin(context.Background(), auth.PinSpec{Kind: kind, FolderID: e.firstFolder().ID}, "test")
 	if err != nil {
 		e.t.Fatal(err)
 	}
 	return p
+}
+
+// firstFolder is the oldest folder, which every server has.
+func (e *env) firstFolder() db.Folder {
+	e.t.Helper()
+	live, err := e.app.DB.LiveFolders(context.Background())
+	if err != nil || len(live) == 0 {
+		e.t.Fatalf("LiveFolders = %v, %v", live, err)
+	}
+	return live[0]
 }
 
 type response struct {

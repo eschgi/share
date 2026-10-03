@@ -270,7 +270,7 @@ func (a *API) content(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	file, err := a.Lib.Root().Open(f.RelPath)
+	file, err := a.Lib.Open(r.Context(), f)
 	if errors.Is(err, os.ErrNotExist) {
 		httpx.WriteError(w, http.StatusNotFound, "not_found", "The file is missing on the server's drive.")
 		return

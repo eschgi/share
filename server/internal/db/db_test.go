@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"os"
 	"path/filepath"
@@ -25,6 +26,16 @@ func openTest(t *testing.T) *DB {
 		t.Fatal(err)
 	}
 	return d
+}
+
+// testFolder makes a folder and returns its id.
+func testFolder(t *testing.T, d *DB, name string) string {
+	t.Helper()
+	f := Folder{ID: ids.New(), Name: name, Dir: name, CreatedBy: "cli", CreatedAt: t0}
+	if err := d.Tx(context.Background(), func(tx *sql.Tx) error { return insertFolder(context.Background(), tx, f) }); err != nil {
+		t.Fatal(err)
+	}
+	return f.ID
 }
 
 func TestMigrateIsIdempotentAndRefusesNewerDatabases(t *testing.T) {
@@ -69,14 +80,15 @@ func TestServerIDIsStable(t *testing.T) {
 func TestPinCodesAreNeverReused(t *testing.T) {
 	d := openTest(t)
 	ctx := context.Background()
-	p := Pin{ID: ids.New(), Code: "K7M2Q", Kind: PinPermanent, CreatedBy: "cli", CreatedAt: t0}
+	folder := testFolder(t, d, "Family")
+	p := Pin{ID: ids.New(), Code: "K7M2Q", Kind: PinPermanent, CreatedBy: "cli", CreatedAt: t0, FolderID: folder}
 	if err := d.InsertPin(ctx, p); err != nil {
 		t.Fatal(err)
 	}
 	if err := d.EndPin(ctx, p.ID, t0.Add(time.Hour)); err != nil {
 		t.Fatal(err)
 	}
-	again := Pin{ID: ids.New(), Code: "K7M2Q", Kind: PinDay, CreatedBy: "cli", CreatedAt: t0}
+	again := Pin{ID: ids.New(), Code: "K7M2Q", Kind: PinDay, CreatedBy: "cli", CreatedAt: t0, FolderID: folder}
 	if err := d.InsertPin(ctx, again); !errors.Is(err, ErrConflict) {
 		t.Fatalf("reusing an ended code: err = %v, want ErrConflict", err)
 	}
@@ -90,7 +102,7 @@ func TestEndExpiredPins(t *testing.T) {
 	d := openTest(t)
 	ctx := context.Background()
 	exp := t0.Add(24 * time.Hour)
-	p := Pin{ID: ids.New(), Code: "4HX9T", Kind: PinDay, CreatedBy: "cli", CreatedAt: t0, ExpiresAt: &exp}
+	p := Pin{ID: ids.New(), Code: "4HX9T", Kind: PinDay, CreatedBy: "cli", CreatedAt: t0, ExpiresAt: &exp, FolderID: testFolder(t, d, "Family")}
 	if err := d.InsertPin(ctx, p); err != nil {
 		t.Fatal(err)
 	}
@@ -109,8 +121,9 @@ func TestEndExpiredPins(t *testing.T) {
 func TestSessionsAndMovingUploads(t *testing.T) {
 	d := openTest(t)
 	ctx := context.Background()
-	oldPin := Pin{ID: ids.New(), Code: "AAAAA", Kind: PinPermanent, CreatedBy: "cli", CreatedAt: t0}
-	newPin := Pin{ID: ids.New(), Code: "BBBBB", Kind: PinPermanent, CreatedBy: "cli", CreatedAt: t0}
+	family, wedding := testFolder(t, d, "Family"), testFolder(t, d, "Wedding")
+	oldPin := Pin{ID: ids.New(), Code: "AAAAA", Kind: PinPermanent, CreatedBy: "cli", CreatedAt: t0, FolderID: family}
+	newPin := Pin{ID: ids.New(), Code: "BBBBB", Kind: PinPermanent, CreatedBy: "cli", CreatedAt: t0, FolderID: wedding}
 	for _, p := range []Pin{oldPin, newPin} {
 		if err := d.InsertPin(ctx, p); err != nil {
 			t.Fatal(err)
@@ -125,26 +138,26 @@ func TestSessionsAndMovingUploads(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, err := d.PinSessionByToken(ctx, []byte("old-hash"))
-	if err != nil || got.ID != oldS.ID || got.Pin.Code != "AAAAA" {
+	if err != nil || got.ID != oldS.ID || got.Pin.Code != "AAAAA" || got.Pin.FolderID != family {
 		t.Fatalf("PinSessionByToken = %+v, %v", got, err)
 	}
 	if _, err := d.PinSessionByToken(ctx, []byte("nope")); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("unknown token: err = %v", err)
 	}
 
-	f := File{ID: ids.New(), Name: "a.jpg", Size: 10, CreatedAt: t0, UpdatedAt: t0, PinID: oldPin.ID, PinSessionID: oldS.ID}
+	f := File{ID: ids.New(), Name: "a.jpg", Size: 10, CreatedAt: t0, UpdatedAt: t0, PinID: oldPin.ID, PinSessionID: oldS.ID, FolderID: family}
 	if err := d.InsertReceiving(ctx, f); err != nil {
 		t.Fatal(err)
 	}
 	if n, _ := d.UnfinishedCount(ctx, oldS.ID, ""); n != 1 {
 		t.Fatalf("UnfinishedCount = %d", n)
 	}
-	moved, err := d.MoveReceivingUploads(ctx, oldS.ID, newS.ID, newPin.ID, t0)
+	moved, err := d.MoveReceivingUploads(ctx, oldS.ID, newS.ID, newPin.ID, wedding, t0)
 	if err != nil || moved != 1 {
 		t.Fatalf("MoveReceivingUploads = %d, %v", moved, err)
 	}
 	after, _ := d.FileByID(ctx, f.ID)
-	if after.PinSessionID != newS.ID || after.PinID != newPin.ID {
+	if after.PinSessionID != newS.ID || after.PinID != newPin.ID || after.FolderID != wedding {
 		t.Fatalf("file after move: %+v", after)
 	}
 
@@ -160,25 +173,36 @@ func TestSessionsAndMovingUploads(t *testing.T) {
 func TestFinalizeStatesAndCaseInsensitivePaths(t *testing.T) {
 	d := openTest(t)
 	ctx := context.Background()
-	a := File{ID: ids.New(), Name: "IMG.jpg", Size: 10, CreatedAt: t0, UpdatedAt: t0}
-	b := File{ID: ids.New(), Name: "img.JPG", Size: 5, CreatedAt: t0, UpdatedAt: t0}
-	for _, f := range []File{a, b} {
+	family, wedding := testFolder(t, d, "Family"), testFolder(t, d, "Wedding")
+	a := File{ID: ids.New(), Name: "IMG.jpg", Size: 10, CreatedAt: t0, UpdatedAt: t0, FolderID: family}
+	b := File{ID: ids.New(), Name: "img.JPG", Size: 5, CreatedAt: t0, UpdatedAt: t0, FolderID: family}
+	c := File{ID: ids.New(), Name: "IMG.jpg", Size: 7, CreatedAt: t0, UpdatedAt: t0, FolderID: wedding}
+	for _, f := range []File{a, b, c} {
 		if err := d.InsertReceiving(ctx, f); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if n, _ := d.OutstandingBytes(ctx); n != 15 {
-		t.Fatalf("OutstandingBytes = %d, want 15", n)
+	if err := d.InsertReceiving(ctx, File{ID: ids.New(), Name: "x.jpg", Size: 1, CreatedAt: t0, UpdatedAt: t0}); err == nil {
+		t.Fatal("InsertReceiving took a file without a folder")
+	}
+	if n, _ := d.OutstandingBytes(ctx); n != 22 {
+		t.Fatalf("OutstandingBytes = %d, want 22", n)
 	}
 	ok, err := d.MarkFinalizing(ctx, a.ID, "2026-09-27/IMG.jpg", "2026-09-27", t0)
 	if err != nil || !ok {
 		t.Fatalf("MarkFinalizing(a) = %v, %v", ok, err)
 	}
-	if taken, _ := d.RelPathTaken(ctx, "2026-09-27/img.jpg"); !taken {
+	if taken, _ := d.RelPathTaken(ctx, family, "2026-09-27/img.jpg"); !taken {
 		t.Fatal("RelPathTaken ignores case differences")
+	}
+	if taken, _ := d.RelPathTaken(ctx, wedding, "2026-09-27/IMG.jpg"); taken {
+		t.Fatal("a path in one folder is taken in another")
 	}
 	if _, err := d.MarkFinalizing(ctx, b.ID, "2026-09-27/img.JPG", "2026-09-27", t0); !errors.Is(err, ErrConflict) {
 		t.Fatalf("MarkFinalizing(b) with a case-only difference: err = %v, want ErrConflict", err)
+	}
+	if ok, err := d.MarkFinalizing(ctx, c.ID, "2026-09-27/IMG.jpg", "2026-09-27", t0); err != nil || !ok {
+		t.Fatalf("MarkFinalizing(c), the same path in another folder: %v, %v", ok, err)
 	}
 	if again, _ := d.MarkFinalizing(ctx, a.ID, "2026-09-27/other.jpg", "2026-09-27", t0); again {
 		t.Fatal("MarkFinalizing claimed a second path for the same upload")
@@ -199,7 +223,7 @@ func TestFinalizeStatesAndCaseInsensitivePaths(t *testing.T) {
 		t.Fatalf("ready file: %+v", got)
 	}
 	unfinished, _ := d.FilesInStates(ctx, StateReceiving, StateFinalizing)
-	if len(unfinished) != 1 || unfinished[0].ID != b.ID {
+	if len(unfinished) != 2 {
 		t.Fatalf("FilesInStates = %+v", unfinished)
 	}
 }

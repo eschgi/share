@@ -84,6 +84,7 @@ type fixture struct {
 	layout Layout
 	now    time.Time
 	logs   []string
+	folder db.Folder // the first folder, which every library has
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -101,7 +102,11 @@ func newFixture(t *testing.T) *fixture {
 	if err := d.Migrate(context.Background(), l.BackupDir()); err != nil {
 		t.Fatal(err)
 	}
-	fx := &fixture{db: d, layout: l, now: t0}
+	folder, err := EnsureFirstFolder(context.Background(), d, "Share", t0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fx := &fixture{db: d, layout: l, now: t0, folder: folder}
 	rome, _ := time.LoadLocation("Europe/Rome")
 	lib, err := OpenLibrary(d, l, rome, func() time.Time { return fx.now }, func(f string, a ...any) {
 		fx.logs = append(fx.logs, f)
@@ -118,7 +123,7 @@ func newFixture(t *testing.T) *fixture {
 func (fx *fixture) receiving(t *testing.T, name, content string, written int) string {
 	t.Helper()
 	id := ids.New()
-	f := db.File{ID: id, Name: name, Size: int64(len(content)), CreatedAt: fx.now, UpdatedAt: fx.now}
+	f := db.File{ID: id, Name: name, Size: int64(len(content)), CreatedAt: fx.now, UpdatedAt: fx.now, FolderID: fx.folder.ID}
 	if err := fx.db.InsertReceiving(context.Background(), f); err != nil {
 		t.Fatal(err)
 	}

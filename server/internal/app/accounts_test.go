@@ -54,7 +54,7 @@ func (e *env) admin() signedIn {
 // invite makes an invite as p.
 func (e *env) invite(p signedIn, name, role string) string {
 	e.t.Helper()
-	token, _, err := e.app.Auth.CreateInvite(context.Background(), name, role, "", p.userID, auth.InviteLifetime)
+	token, _, err := e.app.Auth.CreateInvite(context.Background(), name, role, "", p.userID, nil, auth.InviteLifetime)
 	if err != nil {
 		e.t.Fatal(err)
 	}

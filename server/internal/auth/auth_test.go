@@ -161,7 +161,20 @@ func newTestService(t *testing.T) (*Service, *fakeClock) {
 		t.Fatal(err)
 	}
 	clock := &fakeClock{time.Date(2026, 9, 27, 10, 0, 0, 0, time.UTC)}
+	if _, _, err := d.EnsureFirstFolder(context.Background(), db.Folder{ID: ids.New(), Name: "Share", CreatedBy: "first-start"}, clock.t); err != nil {
+		t.Fatal(err)
+	}
 	return NewService(d, clock.Now, []netip.Prefix{netip.MustParsePrefix("127.0.0.1/32")}, "CF-Connecting-IP"), clock
+}
+
+// spec is a PIN of the given kind into the first folder.
+func spec(t *testing.T, s *Service, kind string) PinSpec {
+	t.Helper()
+	live, err := s.DB.LiveFolders(context.Background())
+	if err != nil || len(live) == 0 {
+		t.Fatalf("LiveFolders = %v, %v", live, err)
+	}
+	return PinSpec{Kind: kind, FolderID: live[0].ID}
 }
 
 // unlockReq is a request from one browser (client id) at one address.
@@ -178,7 +191,7 @@ func unlockReq(client, ip string) *http.Request {
 func TestUnlockAndAuthenticate(t *testing.T) {
 	s, clock := newTestService(t)
 	ctx := context.Background()
-	pin, err := s.CreatePin(ctx, db.PinDay, "cli")
+	pin, err := s.CreatePin(ctx, spec(t, s, db.PinDay), "cli")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,7 +224,7 @@ func TestUnlockAndAuthenticate(t *testing.T) {
 func TestEndingAPinEndsItsSessions(t *testing.T) {
 	s, _ := newTestService(t)
 	ctx := context.Background()
-	pin, _ := s.CreatePin(ctx, db.PinPermanent, "cli")
+	pin, _ := s.CreatePin(ctx, spec(t, s, db.PinPermanent), "cli")
 	res, err := s.Unlock(ctx, unlockReq("", "203.0.113.1"), pin.Code, "app")
 	if err != nil {
 		t.Fatal(err)
@@ -235,7 +248,7 @@ func TestEndingAPinEndsItsSessions(t *testing.T) {
 func TestWrongPinLimits(t *testing.T) {
 	s, clock := newTestService(t)
 	ctx := context.Background()
-	if _, err := s.CreatePin(ctx, db.PinPermanent, "cli"); err != nil {
+	if _, err := s.CreatePin(ctx, spec(t, s, db.PinPermanent), "cli"); err != nil {
 		t.Fatal(err)
 	}
 	phone := "phone-aaaaaaaaaaaaaaaa"
@@ -268,18 +281,18 @@ func TestWrongPinLimits(t *testing.T) {
 func TestUnlockTakesOverUploadsOfAnEndedSession(t *testing.T) {
 	s, clock := newTestService(t)
 	ctx := context.Background()
-	first, _ := s.CreatePin(ctx, db.PinDay, "cli")
+	first, _ := s.CreatePin(ctx, spec(t, s, db.PinDay), "cli")
 	res, err := s.Unlock(ctx, unlockReq("", "203.0.113.1"), first.Code, "web")
 	if err != nil {
 		t.Fatal(err)
 	}
 	f := db.File{ID: ids.New(), Name: "video.mp4", Size: 100, CreatedAt: clock.Now(), UpdatedAt: clock.Now(),
-		PinID: first.ID, PinSessionID: res.Session.ID}
+		PinID: first.ID, PinSessionID: res.Session.ID, FolderID: first.FolderID}
 	if err := s.DB.InsertReceiving(ctx, f); err != nil {
 		t.Fatal(err)
 	}
 	clock.Add(25 * time.Hour) // the first PIN has ended mid-upload
-	second, _ := s.CreatePin(ctx, db.PinDay, "cli")
+	second, _ := s.CreatePin(ctx, spec(t, s, db.PinDay), "cli")
 	r := unlockReq("", "203.0.113.1")
 	r.AddCookie(&http.Cookie{Name: CookiePin, Value: res.Token})
 	res2, err := s.Unlock(ctx, r, second.Code, "web")
@@ -298,7 +311,7 @@ func TestUnlockTakesOverUploadsOfAnEndedSession(t *testing.T) {
 func TestNewCodeEndsTheOldPin(t *testing.T) {
 	s, _ := newTestService(t)
 	ctx := context.Background()
-	old, _ := s.CreatePin(ctx, db.PinPermanent, "cli")
+	old, _ := s.CreatePin(ctx, spec(t, s, db.PinPermanent), "cli")
 	fresh, err := s.NewCode(ctx, old.ID, "cli")
 	if err != nil {
 		t.Fatal(err)

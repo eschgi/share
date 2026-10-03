@@ -279,6 +279,7 @@ type Invite struct {
 	UsedAt    *time.Time
 	DeviceID  string
 	RevokedAt *time.Time
+	Folders   []string // the folders a new member gets; only InsertInvite reads it
 }
 
 const inviteColumns = "id, name, role, user_id, created_by, created_at, expires_at, used_at, device_id, revoked_at"
@@ -300,12 +301,22 @@ func scanInvite(row interface{ Scan(...any) error }) (Invite, error) {
 	return in, nil
 }
 
-// InsertInvite stores a new invite; only the token's hash is kept.
+// InsertInvite stores a new invite with the folders it gives; only the token's hash is kept.
 func (d *DB) InsertInvite(ctx context.Context, in Invite, tokenHash []byte) error {
-	_, err := d.ExecContext(ctx, `INSERT INTO invites (id, token_hash, name, role, user_id, created_by, created_at, expires_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		in.ID, tokenHash, in.Name, in.Role, nullString(in.UserID), in.CreatedBy, ms(in.CreatedAt), ms(in.ExpiresAt))
-	return err
+	return d.Tx(ctx, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, `INSERT INTO invites (id, token_hash, name, role, user_id, created_by, created_at, expires_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			in.ID, tokenHash, in.Name, in.Role, nullString(in.UserID), in.CreatedBy, ms(in.CreatedAt), ms(in.ExpiresAt))
+		if err != nil {
+			return err
+		}
+		for _, f := range in.Folders {
+			if _, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO invite_folders (invite_id, folder_id) VALUES (?, ?)", in.ID, f); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // InviteByToken finds an invite by token hash, whatever its state.
@@ -340,8 +351,9 @@ func (d *DB) RevokeInvitesBy(ctx context.Context, createdBy string, at time.Time
 }
 
 // UseInvite accepts an invite in one transaction: it creates the person (unless the invite
-// adds a phone for someone), signs the phone in and marks the invite used. It returns
-// ErrConflict if the invite was used, revoked or expired in the meantime.
+// adds a phone for someone) with the invite's folders, signs the phone in and marks the
+// invite used. It returns ErrConflict if the invite was used, revoked or expired in the
+// meantime.
 func (d *DB) UseInvite(ctx context.Context, inviteID string, u User, dv Device, tokenHash []byte, now time.Time) error {
 	return d.Tx(ctx, func(tx *sql.Tx) error {
 		res, err := tx.ExecContext(ctx, `UPDATE invites SET used_at = ?, device_id = ?
@@ -361,6 +373,11 @@ func (d *DB) UseInvite(ctx context.Context, inviteID string, u User, dv Device, 
 		}
 		if exists == 0 { // a new person
 			if err := insertUser(ctx, tx, u); err != nil {
+				return err
+			}
+			if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO folder_people (folder_id, user_id)
+				SELECT i.folder_id, ? FROM invite_folders i JOIN folders f ON f.id = i.folder_id
+				WHERE i.invite_id = ? AND f.deleted_at IS NULL`, u.ID, inviteID); err != nil {
 				return err
 			}
 		}

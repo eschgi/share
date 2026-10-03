@@ -313,11 +313,19 @@ func (h *Handler) preCreate(hook handler.HookEvent) (handler.HTTPResponse, handl
 		return handler.HTTPResponse{}, handler.FileInfoChanges{}, tusError(http.StatusForbidden, "too_many_uploads", "Too many unfinished uploads; let some finish first.")
 	}
 
+	folderID, err := h.folderFor(ctx, p)
+	if errors.Is(err, errNoFolder) {
+		return handler.HTTPResponse{}, handler.FileInfoChanges{}, tusError(http.StatusForbidden, "no_folder", "There is no folder you could send into.")
+	}
+	if err != nil {
+		return handler.HTTPResponse{}, handler.FileInfoChanges{}, err
+	}
+
 	name := storage.SanitizeName(firstNonEmpty(info.MetaData["filename"], info.MetaData["name"]))
 	fileType := firstNonEmpty(info.MetaData["filetype"], info.MetaData["type"])
 	now := h.now()
 	f := db.File{
-		ID: ids.New(), Name: name, Size: info.Size, Kind: storage.GuessKind(name),
+		ID: ids.New(), Name: name, Size: info.Size, Kind: storage.GuessKind(name), FolderID: folderID,
 		CreatedAt: now, UpdatedAt: now, ClientModifiedAt: parseMillis(info.MetaData["lastModified"]),
 		PinID: p.PinID, PinSessionID: p.PinSessionID, UserID: p.UserID, DeviceID: p.DeviceID,
 	}
@@ -328,6 +336,33 @@ func (h *Handler) preCreate(hook handler.HookEvent) (handler.HTTPResponse, handl
 		ID:       f.ID,
 		MetaData: handler.MetaData{"filename": name, "filetype": fileType},
 	}, nil
+}
+
+var errNoFolder = errors.New("no folder to send into")
+
+// folderFor is the folder an upload goes into: a PIN's into the PIN's folder, someone signed
+// in into the oldest folder they see.
+func (h *Handler) folderFor(ctx context.Context, p *auth.Principal) (string, error) {
+	if p.Kind == auth.KindPin {
+		if p.PinFolderID == "" {
+			return "", errNoFolder
+		}
+		return p.PinFolderID, nil
+	}
+	var folders []db.Folder
+	var err error
+	if p.Role == db.RoleAdmin {
+		folders, err = h.db.LiveFolders(ctx)
+	} else {
+		folders, err = h.db.FoldersOf(ctx, p.UserID)
+	}
+	if err != nil {
+		return "", err
+	}
+	if len(folders) == 0 {
+		return "", errNoFolder
+	}
+	return folders[0].ID, nil
 }
 
 func (h *Handler) preFinish(hook handler.HookEvent) (handler.HTTPResponse, error) {

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"path"
 	"sort"
 	"strings"
@@ -135,7 +134,7 @@ func (a *API) download(w http.ResponseWriter, r *http.Request) {
 		}
 		defer release()
 	}
-	src := &zipSource{ctx: r.Context(), files: files, crcs: a.Checksums, root: a.Lib.Root()}
+	src := &zipSource{ctx: r.Context(), files: files, crcs: a.Checksums, lib: a.Lib}
 	reader := z.archive.Reader(r.Context(), src)
 	defer reader.Close()
 	http.ServeContent(newDeadlineWriter(w), r, "", time.Time{}, reader)
@@ -229,7 +228,7 @@ type zipSource struct {
 	ctx   context.Context
 	files []db.File
 	crcs  *checksum.Store
-	root  *os.Root
+	lib   *storage.Library
 	ahead sync.Once
 }
 
@@ -251,5 +250,5 @@ func (z *zipSource) readAhead(from int) {
 }
 
 func (z *zipSource) Open(i int) (zipstream.File, error) {
-	return z.root.Open(z.files[i].RelPath)
+	return z.lib.Open(z.ctx, z.files[i])
 }

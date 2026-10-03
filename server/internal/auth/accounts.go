@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -182,8 +183,10 @@ func (s *Service) EndBrowserSession(ctx context.Context, r *http.Request) error 
 }
 
 // CreateInvite makes an invite and returns its token, which is shown once. For a new person
-// give their name and role; to add a phone for someone with an account, give their user id.
-func (s *Service) CreateInvite(ctx context.Context, name, role, forUserID, createdBy string, lifetime time.Duration) (string, db.Invite, error) {
+// give their name, role and, for a member, the folders they get (nil: the oldest folder);
+// to add a phone for someone with an account, give their user id. It returns ErrFolderGone
+// if one of the folders doesn't exist or is deleted.
+func (s *Service) CreateInvite(ctx context.Context, name, role, forUserID, createdBy string, folders []string, lifetime time.Duration) (string, db.Invite, error) {
 	now := s.Now()
 	in := db.Invite{ID: ids.New(), UserID: forUserID, CreatedBy: createdBy, CreatedAt: now, ExpiresAt: now.Add(lifetime)}
 	if forUserID != "" {
@@ -200,12 +203,44 @@ func (s *Service) CreateInvite(ctx context.Context, name, role, forUserID, creat
 		if role != db.RoleAdmin && role != db.RoleMember {
 			return "", in, &InputError{"role", "must be admin or member"}
 		}
+		if role == db.RoleMember {
+			var err error
+			if in.Folders, err = s.liveFolders(ctx, folders); err != nil {
+				return "", in, err
+			}
+		}
 	}
 	token, hash := ids.NewToken(ids.PrefixInvite)
 	if err := s.DB.InsertInvite(ctx, in, hash); err != nil {
 		return "", in, err
 	}
 	return token, in, nil
+}
+
+// liveFolders checks that every folder exists and isn't deleted; nil stands for the oldest
+// folder.
+func (s *Service) liveFolders(ctx context.Context, folderIDs []string) ([]string, error) {
+	if folderIDs == nil {
+		live, err := s.DB.LiveFolders(ctx)
+		if err != nil || len(live) == 0 {
+			return nil, err
+		}
+		return []string{live[0].ID}, nil
+	}
+	out := []string{}
+	for _, id := range folderIDs {
+		f, err := s.DB.FolderByID(ctx, id)
+		if errors.Is(err, db.ErrNotFound) || (err == nil && f.DeletedAt != nil) {
+			return nil, ErrFolderGone
+		}
+		if err != nil {
+			return nil, err
+		}
+		if !slices.Contains(out, f.ID) {
+			out = append(out, f.ID)
+		}
+	}
+	return out, nil
 }
 
 // InviteInfo is what someone sees before accepting an invite.
@@ -307,7 +342,7 @@ func (s *Service) FirstStartInvite(ctx context.Context) (string, error) {
 	if err := s.DB.RevokeInvitesBy(ctx, FirstStart, s.Now()); err != nil {
 		return "", err
 	}
-	token, _, err := s.CreateInvite(ctx, "Admin", db.RoleAdmin, "", FirstStart, firstStartLifetime)
+	token, _, err := s.CreateInvite(ctx, "Admin", db.RoleAdmin, "", FirstStart, nil, firstStartLifetime)
 	return token, err
 }
 

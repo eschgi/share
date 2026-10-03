@@ -81,6 +81,27 @@ func splitExt(name string) (stem, ext string) {
 	return strings.TrimSuffix(name, ext), ext
 }
 
+// maxFolderName is how long a folder's name may be, in characters.
+const maxFolderName = 60
+
+// FolderName cleans a folder's name as typed: no control characters, spaces trimmed, at most
+// 60 characters. It returns "" if nothing is left.
+func FolderName(name string) string {
+	var b strings.Builder
+	n := 0
+	for _, r := range strings.TrimSpace(name) {
+		if r == utf8.RuneError || r < 0x20 || r == 0x7f {
+			continue
+		}
+		if n == maxFolderName {
+			break
+		}
+		b.WriteRune(r)
+		n++
+	}
+	return strings.TrimSpace(b.String())
+}
+
 // Numbered gives the n-th alternative for a taken name: "IMG_1 (2).jpg", still at most
 // maxNameBytes long.
 func Numbered(name string, n int) string { return numbered(name, n) }

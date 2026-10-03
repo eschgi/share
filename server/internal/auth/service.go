@@ -213,7 +213,7 @@ func (s *Service) Unlock(ctx context.Context, r *http.Request, input, client str
 
 	if old := pinToken(r); old != "" {
 		if prev, err := s.DB.PinSessionByToken(ctx, ids.HashToken(old)); err == nil && prev.ID != sess.ID {
-			if res.Moved, err = s.DB.MoveReceivingUploads(ctx, prev.ID, sess.ID, pin.ID, now); err != nil {
+			if res.Moved, err = s.DB.MoveReceivingUploads(ctx, prev.ID, sess.ID, pin.ID, pin.FolderID, now); err != nil {
 				return nil, err
 			}
 			if err := s.DB.RevokePinSession(ctx, prev.ID, now); err != nil {
@@ -355,6 +355,7 @@ func (s *Service) authenticatePin(ctx context.Context, token string) (*Principal
 		PinID:        sess.PinID,
 		PinKind:      sess.Pin.Kind,
 		PinExpiresAt: sess.Pin.ExpiresAt,
+		PinFolderID:  sess.Pin.FolderID,
 	}, nil
 }
 

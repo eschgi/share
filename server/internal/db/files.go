@@ -32,7 +32,8 @@ type File struct {
 	Received         int64
 	Mime             string
 	Kind             string
-	RelPath          string // path inside storage_dir, e.g. 2026-09-27/IMG_1.jpg
+	FolderID         string // the folder it lies in
+	RelPath          string // path inside its folder's directory, e.g. 2026-09-27/IMG_1.jpg
 	UploadDay        string // YYYY-MM-DD in the configured time zone
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
@@ -48,27 +49,28 @@ type File struct {
 	DeletedAt        *time.Time
 	DeletedBy        string
 	CRC32            *uint32 // known once the checksum worker or a download worked it out
+	MovedFrom        string  // a move to another folder in progress: "<folder id>/<rel_path>" of the bytes
 }
 
 const fileColumns = `id, state, name, size, received, mime, kind, rel_path, upload_day, created_at, updated_at,
 	uploaded_at, client_modified_at, width, height, duration_ms, thumb, pin_id, pin_session_id, user_id,
-	device_id, deleted_at, deleted_by, crc32`
+	device_id, deleted_at, deleted_by, crc32, folder_id, moved_from`
 
 func scanFile(row interface{ Scan(...any) error }) (File, error) {
 	var f File
-	var relPath, day, pinID, sessionID, userID, deviceID, deletedBy sql.NullString
+	var relPath, day, pinID, sessionID, userID, deviceID, deletedBy, folderID, movedFrom sql.NullString
 	var created, updated int64
 	var uploaded, clientModified, deleted, width, height, duration, crc sql.NullInt64
 	err := row.Scan(&f.ID, &f.State, &f.Name, &f.Size, &f.Received, &f.Mime, &f.Kind, &relPath, &day,
 		&created, &updated, &uploaded, &clientModified, &width, &height, &duration, &f.Thumb,
-		&pinID, &sessionID, &userID, &deviceID, &deleted, &deletedBy, &crc)
+		&pinID, &sessionID, &userID, &deviceID, &deleted, &deletedBy, &crc, &folderID, &movedFrom)
 	if errors.Is(err, sql.ErrNoRows) {
 		return f, ErrNotFound
 	}
 	if err != nil {
 		return f, err
 	}
-	f.RelPath, f.UploadDay = relPath.String, day.String
+	f.FolderID, f.RelPath, f.UploadDay, f.MovedFrom = folderID.String, relPath.String, day.String, movedFrom.String
 	f.CreatedAt, f.UpdatedAt = fromMS(created), fromMS(updated)
 	f.UploadedAt, f.ClientModifiedAt, f.DeletedAt = optTime(uploaded), optTime(clientModified), optTime(deleted)
 	f.Width, f.Height, f.DurationMS = optInt(width), optInt(height), optInt(duration)
@@ -108,16 +110,19 @@ func queryFiles(ctx context.Context, q interface {
 }
 
 // InsertReceiving records a new upload before tus creates its files. The kind is only a
-// guess from the name until finalize looks at the content.
+// guess from the name until finalize looks at the content. Every file needs its folder.
 func (d *DB) InsertReceiving(ctx context.Context, f File) error {
+	if f.FolderID == "" {
+		return errors.New("db: a file needs a folder")
+	}
 	if f.Kind == "" {
 		f.Kind = KindDocument
 	}
 	_, err := d.ExecContext(ctx, `INSERT INTO files (id, state, name, size, received, mime, kind, created_at, updated_at,
-			client_modified_at, pin_id, pin_session_id, user_id, device_id)
-		VALUES (?, 'receiving', ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			client_modified_at, pin_id, pin_session_id, user_id, device_id, folder_id)
+		VALUES (?, 'receiving', ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		f.ID, f.Name, f.Size, f.Mime, f.Kind, ms(f.CreatedAt), ms(f.UpdatedAt), nullMS(f.ClientModifiedAt),
-		nullString(f.PinID), nullString(f.PinSessionID), nullString(f.UserID), nullString(f.DeviceID))
+		nullString(f.PinID), nullString(f.PinSessionID), nullString(f.UserID), nullString(f.DeviceID), f.FolderID)
 	return err
 }
 
@@ -148,17 +153,17 @@ func (d *DB) OutstandingBytes(ctx context.Context) (int64, error) {
 	return n.Int64, err
 }
 
-// RelPathTaken reports whether a library path is in use, ignoring case, because exFAT and
-// NTFS drives treat IMG.jpg and img.jpg as the same file.
-func (d *DB) RelPathTaken(ctx context.Context, relPath string) (bool, error) {
+// RelPathTaken reports whether a path in a folder is in use, ignoring case, because exFAT
+// and NTFS drives treat IMG.jpg and img.jpg as the same file.
+func (d *DB) RelPathTaken(ctx context.Context, folderID, relPath string) (bool, error) {
 	var n int
 	err := d.QueryRowContext(ctx, `SELECT COUNT(*) FROM files
-		WHERE rel_path = ? COLLATE NOCASE AND state IN ('finalizing', 'ready')`, relPath).Scan(&n)
+		WHERE folder_id = ? AND rel_path = ? COLLATE NOCASE AND state IN ('finalizing', 'ready')`, folderID, relPath).Scan(&n)
 	return n > 0, err
 }
 
-// MarkFinalizing claims a library path for a complete upload. It returns false if the row
-// isn't receiving any more, and ErrConflict if the path was just taken by another upload.
+// MarkFinalizing claims a path in its folder for a complete upload. It returns false if the
+// row isn't receiving any more, and ErrConflict if the path was just taken by another upload.
 func (d *DB) MarkFinalizing(ctx context.Context, id, relPath, day string, at time.Time) (bool, error) {
 	res, err := d.ExecContext(ctx, `UPDATE files SET state = 'finalizing', rel_path = ?, upload_day = ?, updated_at = ?
 		WHERE id = ? AND state = 'receiving'`, relPath, day, ms(at), id)

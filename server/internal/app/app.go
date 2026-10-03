@@ -90,6 +90,10 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 		d.Close()
 		return nil, err
 	}
+	if _, err := storage.EnsureFirstFolder(ctx, d, cfg.Name, now()); err != nil {
+		d.Close()
+		return nil, err
+	}
 	serverID, err := d.ServerID(ctx)
 	if err != nil {
 		d.Close()
@@ -117,9 +121,9 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 		d.Close()
 		return nil, err
 	}
-	th := &thumbs.Store{DB: d, Dir: layout.ThumbsDir(), Root: lib.Root(), Now: now, Logf: log.Printf}
+	th := &thumbs.Store{DB: d, Dir: layout.ThumbsDir(), Root: lib.Root(), Open: lib.Open, Now: now, Logf: log.Printf}
 	lib.OnPurged = th.Remove
-	crcs := &checksum.Store{DB: d, Root: lib.Root(), Pace: checksum.Pace, Logf: log.Printf}
+	crcs := &checksum.Store{DB: d, Root: lib.Root(), Open: lib.Open, Pace: checksum.Pace, Logf: log.Printf}
 	lib.OnReady = crcs.Wake
 	dl := &downloads.Store{Now: now}
 	ui := webui.New(cfg)

@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"strings"
 	"sync"
 	"time"
@@ -18,7 +19,8 @@ import (
 // ErrIncomplete means an upload hasn't received all its bytes yet.
 var ErrIncomplete = errors.New("upload is not complete yet")
 
-// Library moves finished uploads into the day folders.
+// Library moves finished uploads into the day folders of their folder, and keeps track of
+// where each file's bytes are.
 type Library struct {
 	DB     *db.DB
 	Layout Layout
@@ -52,6 +54,44 @@ func (lib *Library) Root() *os.Root { return lib.root }
 func uploadPath(id string) string { return ".uploads/" + id }
 func infoPath(id string) string   { return ".uploads/" + id + ".info" }
 
+// inFolder is a path in a folder's directory.
+func inFolder(folder db.Folder, rel string) string { return path.Join(folder.Dir, rel) }
+
+// folderOf returns the folder a file lies in.
+func (lib *Library) folderOf(ctx context.Context, f db.File) (db.Folder, error) {
+	if f.FolderID == "" {
+		return db.Folder{}, fmt.Errorf("file %s has no folder", f.ID)
+	}
+	return lib.DB.FolderByID(ctx, f.FolderID)
+}
+
+// locate finds a file's bytes on the drive: the path in its folder's directory.
+func (lib *Library) locate(ctx context.Context, f db.File) (string, error) {
+	folder, err := lib.folderOf(ctx, f)
+	if err != nil {
+		return "", err
+	}
+	return inFolder(folder, f.RelPath), nil
+}
+
+// Open opens a file of the library for reading. A row read before a rename or a move may
+// point to an old place; then the file is looked up again.
+func (lib *Library) Open(ctx context.Context, f db.File) (*os.File, error) {
+	for try := 0; ; try++ {
+		p, err := lib.locate(ctx, f)
+		if err != nil {
+			return nil, err
+		}
+		file, err := lib.root.Open(p)
+		if err == nil || !errors.Is(err, fs.ErrNotExist) || try == 2 {
+			return file, err
+		}
+		if f, err = lib.DB.FileByID(ctx, f.ID); err != nil {
+			return nil, fs.ErrNotExist
+		}
+	}
+}
+
 // Finalize moves a complete upload into the library. It is idempotent: the tus hook, a tus
 // HEAD after a lost response and the reconciler may all call it, in any state, and a crash
 // at any step is picked up again by the next call.
@@ -80,10 +120,14 @@ func (lib *Library) Finalize(ctx context.Context, id string) error {
 	}
 
 	// State is finalizing: the path is chosen, the bytes may or may not be there yet.
-	if err := lib.moveIntoLibrary(f); err != nil {
+	dst, err := lib.locate(ctx, f)
+	if err != nil {
 		return err
 	}
-	mime, kind := lib.classify(f)
+	if err := lib.moveIntoLibrary(f, dst); err != nil {
+		return err
+	}
+	mime, kind := lib.classify(f, dst)
 	if err := lib.DB.MarkReady(ctx, id, mime, kind, lib.Now()); err != nil {
 		return err
 	}
@@ -96,12 +140,16 @@ func (lib *Library) Finalize(ctx context.Context, id string) error {
 	return nil
 }
 
-// claimPath picks the library path for f and records it, retrying if a name is taken.
+// claimPath picks the path in its folder for f and records it, retrying if a name is taken.
 func (lib *Library) claimPath(ctx context.Context, f db.File) (db.File, error) {
+	folder, err := lib.folderOf(ctx, f)
+	if err != nil {
+		return f, err
+	}
 	now := lib.Now()
 	day := Day(now, lib.Loc)
 	for range 5 {
-		rel, err := lib.freePath(ctx, day, f.Name)
+		rel, err := lib.freePath(ctx, folder, day, f.Name)
 		if err != nil {
 			return f, err
 		}
@@ -121,23 +169,24 @@ func (lib *Library) claimPath(ctx context.Context, f db.File) (db.File, error) {
 	return f, fmt.Errorf("finalize %s: no free name for %q", f.ID, f.Name)
 }
 
-// freePath returns day/name, or day/name (2) and so on if taken. Names are compared without
-// case, both in the database and on disk, because exFAT and NTFS drives ignore case.
-func (lib *Library) freePath(ctx context.Context, day, name string) (string, error) {
+// freePath returns day/name in a folder, or day/name (2) and so on if taken. Names are
+// compared without case, both in the database and on disk, because exFAT and NTFS drives
+// ignore case.
+func (lib *Library) freePath(ctx context.Context, folder db.Folder, day, name string) (string, error) {
 	for n := 1; n <= 10000; n++ {
 		candidate := name
 		if n > 1 {
 			candidate = numbered(name, n)
 		}
 		rel := day + "/" + candidate
-		taken, err := lib.DB.RelPathTaken(ctx, rel)
+		taken, err := lib.DB.RelPathTaken(ctx, folder.ID, rel)
 		if err != nil {
 			return "", err
 		}
 		if taken {
 			continue
 		}
-		if _, err := lib.root.Lstat(rel); err == nil {
+		if _, err := lib.root.Lstat(inFolder(folder, rel)); err == nil {
 			continue // a file someone put there by hand
 		}
 		return rel, nil
@@ -145,12 +194,12 @@ func (lib *Library) freePath(ctx context.Context, day, name string) (string, err
 	return "", fmt.Errorf("no free name for %q", name)
 }
 
-// moveIntoLibrary renames the upload's bytes to their library path, with fsyncs so a power cut
-// can't leave a file that looks complete but isn't.
-func (lib *Library) moveIntoLibrary(f db.File) error {
+// moveIntoLibrary renames the upload's bytes to dst, their place in the library, with fsyncs
+// so a power cut can't leave a file that looks complete but isn't.
+func (lib *Library) moveIntoLibrary(f db.File, dst string) error {
 	src := uploadPath(f.ID)
 	if _, err := lib.root.Lstat(src); errors.Is(err, fs.ErrNotExist) {
-		if _, err := lib.root.Lstat(f.RelPath); err == nil {
+		if _, err := lib.root.Lstat(dst); err == nil {
 			return nil // moved before a crash
 		}
 		return fmt.Errorf("finalize %s: the uploaded data is gone", f.ID)
@@ -158,13 +207,14 @@ func (lib *Library) moveIntoLibrary(f db.File) error {
 	if err := syncFile(lib.root, src); err != nil {
 		return err
 	}
-	if err := lib.root.MkdirAll(f.UploadDay, 0o755); err != nil {
+	dayDir := path.Dir(dst)
+	if err := lib.root.MkdirAll(dayDir, 0o755); err != nil {
 		return err
 	}
-	if err := lib.root.Rename(src, f.RelPath); err != nil {
+	if err := lib.root.Rename(src, dst); err != nil {
 		return fmt.Errorf("finalize %s: %w", f.ID, err)
 	}
-	for _, dir := range []string{f.UploadDay, ".uploads"} {
+	for _, dir := range []string{dayDir, ".uploads"} {
 		if err := syncFile(lib.root, dir); err != nil {
 			return err
 		}
@@ -172,9 +222,9 @@ func (lib *Library) moveIntoLibrary(f db.File) error {
 	return nil
 }
 
-func (lib *Library) classify(f db.File) (mime, kind string) {
+func (lib *Library) classify(f db.File, at string) (mime, kind string) {
 	head := make([]byte, 512)
-	fh, err := lib.root.Open(f.RelPath)
+	fh, err := lib.root.Open(at)
 	if err == nil {
 		n, _ := io.ReadFull(fh, head)
 		head = head[:n]

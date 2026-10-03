@@ -22,6 +22,7 @@ type Principal struct {
 	PinID        string
 	PinKind      string
 	PinExpiresAt *time.Time
+	PinFolderID  string // the folder the PIN sends into
 
 	// Signed-in phones and browsers.
 	UserID   string

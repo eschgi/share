@@ -12,25 +12,49 @@ import (
 // ErrPinTaken means a PIN had that code already; codes are never used twice.
 var ErrPinTaken = errors.New("that PIN code is taken")
 
-func (s *Service) newPin(kind, createdBy string) (db.Pin, error) {
-	if kind != db.PinPermanent && kind != db.PinDay {
-		return db.Pin{}, fmt.Errorf("unknown PIN kind %q", kind)
+// ErrFolderGone means the folder a PIN or a file should go into doesn't exist (any more).
+var ErrFolderGone = errors.New("that folder doesn't exist any more")
+
+// PinSpec says what PIN to make.
+type PinSpec struct {
+	Kind     string // db.PinPermanent or db.PinDay
+	Code     string // as typed (spaces, dashes and small letters are fine); "" for a random one
+	FolderID string // the folder it sends into
+}
+
+// CreatePin makes a PIN that sends into a folder, with the code asked for or a fresh random
+// one. A 24-hour PIN stops working a day after it was made. It returns ErrPINFormat for a
+// code that can't be a PIN, ErrPinTaken for one that was used before, and ErrFolderGone for a
+// folder that doesn't exist or is deleted.
+func (s *Service) CreatePin(ctx context.Context, spec PinSpec, createdBy string) (db.Pin, error) {
+	if spec.Kind != db.PinPermanent && spec.Kind != db.PinDay {
+		return db.Pin{}, fmt.Errorf("unknown PIN kind %q", spec.Kind)
+	}
+	folder, err := s.DB.FolderByID(ctx, spec.FolderID)
+	if errors.Is(err, db.ErrNotFound) || (err == nil && folder.DeletedAt != nil) {
+		return db.Pin{}, ErrFolderGone
+	}
+	if err != nil {
+		return db.Pin{}, err
 	}
 	now := s.Now()
-	p := db.Pin{ID: ids.New(), Kind: kind, CreatedBy: createdBy, CreatedAt: now}
-	if kind == db.PinDay {
+	p := db.Pin{ID: ids.New(), Kind: spec.Kind, CreatedBy: createdBy, CreatedAt: now, FolderID: folder.ID}
+	if spec.Kind == db.PinDay {
 		exp := now.Add(DayPinLifetime)
 		p.ExpiresAt = &exp
 	}
-	return p, nil
-}
-
-// CreatePin makes a PIN with a fresh random code. A 24-hour PIN stops working a day after it
-// was made.
-func (s *Service) CreatePin(ctx context.Context, kind, createdBy string) (db.Pin, error) {
-	p, err := s.newPin(kind, createdBy)
-	if err != nil {
-		return p, err
+	if spec.Code != "" {
+		code, ok := NormalizeCode(spec.Code)
+		if !ok {
+			return db.Pin{}, ErrPINFormat
+		}
+		p.Code = code
+		if err := s.DB.InsertPin(ctx, p); errors.Is(err, db.ErrConflict) {
+			return db.Pin{}, ErrPinTaken
+		} else if err != nil {
+			return db.Pin{}, err
+		}
+		return p, nil
 	}
 	// 2^25 codes: collisions with earlier codes are rare, but they are never reused.
 	for range 50 {
@@ -42,27 +66,6 @@ func (s *Service) CreatePin(ctx context.Context, kind, createdBy string) (db.Pin
 		return p, err
 	}
 	return db.Pin{}, errors.New("could not find an unused PIN code")
-}
-
-// CreatePinCode makes a PIN with a code the person chose (typed as they like: spaces,
-// dashes and small letters are fine). It returns ErrPINFormat for something that can't be a
-// PIN and ErrPinTaken for a code that was used before.
-func (s *Service) CreatePinCode(ctx context.Context, kind, input, createdBy string) (db.Pin, error) {
-	code, ok := NormalizeCode(input)
-	if !ok {
-		return db.Pin{}, ErrPINFormat
-	}
-	p, err := s.newPin(kind, createdBy)
-	if err != nil {
-		return p, err
-	}
-	p.Code = code
-	if err := s.DB.InsertPin(ctx, p); errors.Is(err, db.ErrConflict) {
-		return db.Pin{}, ErrPinTaken
-	} else if err != nil {
-		return db.Pin{}, err
-	}
-	return p, nil
 }
 
 // SuggestCode returns a random code no PIN has had yet, for the new-PIN screen to show.
@@ -81,7 +84,8 @@ func (s *Service) SuggestCode(ctx context.Context) (string, error) {
 }
 
 // NewCode replaces a PIN's code. The old PIN ends (so its sessions and links stop working)
-// and a new PIN of the same kind takes its place; codes are never reused.
+// and a new PIN of the same kind, into the same folder, takes its place; codes are never
+// reused.
 func (s *Service) NewCode(ctx context.Context, id, createdBy string) (db.Pin, error) {
 	old, err := s.DB.PinByID(ctx, id)
 	if err != nil {
@@ -90,7 +94,7 @@ func (s *Service) NewCode(ctx context.Context, id, createdBy string) (db.Pin, er
 	if !old.LiveAt(s.Now()) {
 		return db.Pin{}, errors.New("that PIN has already ended")
 	}
-	p, err := s.CreatePin(ctx, old.Kind, createdBy)
+	p, err := s.CreatePin(ctx, PinSpec{Kind: old.Kind, FolderID: old.FolderID}, createdBy)
 	if err != nil {
 		return db.Pin{}, err
 	}
