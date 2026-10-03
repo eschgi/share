@@ -47,6 +47,7 @@ import {
 } from './actions';
 import { LibraryModel, sameFilter } from './model';
 import {
+  commonFolder,
   dayCount,
   dayState,
   isEmpty,
@@ -450,11 +451,15 @@ export function Library() {
     });
   }
 
-  /** Screen 49: the selected files go into another folder; out of the one shown, with Undo. */
+  /** Where the selected files all are, if the page can tell: the folder shown, or theirs. */
+  const movingFrom = moving ? (shownId ?? commonFolder(sel, model.files, days)) : null;
+
+  /** Screen 49: the selected files go into another folder, and out of the one shown. Files that
+   * were all in one folder can go back there. */
   async function move(to: FolderInfo) {
     setBusy(true);
     setMoveProblem(null);
-    const from = shownId;
+    const from = movingFrom;
     let ids: string[];
     let n: number;
     try {
@@ -467,7 +472,7 @@ export function Library() {
     setBusy(false);
     setMoving(false);
     clear();
-    if (from) model.remove(ids);
+    if (shownId) model.remove(ids);
     else void model.reload();
     void refreshFolders();
     toast({
@@ -718,7 +723,7 @@ export function Library() {
         <MoveDialog
           count={picked.count}
           list={folders.list}
-          here={shownId}
+          here={movingFrom}
           busy={busy}
           problem={moveProblem}
           onMove={(to) => void move(to)}

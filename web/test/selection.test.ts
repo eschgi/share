@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { FileInfo, LibraryDay } from '../src/api';
 import {
+  commonFolder,
   dayCount,
   dayState,
   isEmpty,
@@ -90,5 +91,15 @@ describe('selection', () => {
     setDay(s, 'yesterday', true);
     expect(totals(s, days)).toEqual({ count: 1, bytes: 100 });
     expect(isEmpty(noSelection)).toBe(true);
+  });
+
+  it('knows the folder the selected files are all in, once they are all loaded', () => {
+    const inFolder = (x: FileInfo, folder: string) => ({ ...x, folder }) as FileInfo;
+    const loaded = [inFolder(a, 'fam'), inFolder(b, 'fam'), inFolder(y1, 'fam'), inFolder(y2, 'tax')];
+    expect(commonFolder(setFiles(noSelection, [a, b, y1], true, days), loaded, days)).toBe('fam');
+    expect(commonFolder(setFiles(noSelection, [a, y2], true, days), loaded, days)).toBeNull();
+    // Today's third file isn't loaded: where it is, the page can't tell.
+    expect(commonFolder(setDay(noSelection, 'today', true), loaded, days)).toBeNull();
+    expect(commonFolder(noSelection, loaded, days)).toBeNull();
   });
 });

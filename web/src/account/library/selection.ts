@@ -101,6 +101,15 @@ export function loadedSelected(s: Selection, files: readonly FileInfo[]): FileIn
   return files.filter((f) => isSelected(s, f));
 }
 
+/** The folder the selected files are all in; null when they are in several, or when some aren't
+ * loaded (a day picked as a whole), so the page can't tell. */
+export function commonFolder(s: Selection, files: readonly FileInfo[], days: readonly LibraryDay[]): string | null {
+  const known = loadedSelected(s, files);
+  if (known.length === 0 || known.length < totals(s, days).count) return null;
+  const first = known[0].folder;
+  return known.every((f) => f.folder === first) ? first : null;
+}
+
 /** Every selected id, asking for the ids of the days picked as a whole (the list's filter). */
 export async function selectedIds(s: Selection, idsOfDay: (day: string) => Promise<string[]>): Promise<string[]> {
   const out: string[] = [];

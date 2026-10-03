@@ -6,8 +6,8 @@ import { Modal } from '../components/Modal';
 import { moveDefault } from './folders';
 import { FolderChoices } from './Folders';
 
-/** Screen 49: the folder selected files go into. here is the folder the library shows, where
- * they are already. */
+/** Screen 49: the folder selected files go into. here is the folder they are all in already,
+ * where the page can tell. */
 export function MoveDialog({
   count,
   list,
