@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"slices"
 	"sort"
 	"time"
 
@@ -33,6 +34,10 @@ func (a *API) registerAdmin(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/invites", a.invite)
 	mux.HandleFunc("POST /api/users/{id}/invites", a.invitePhone)
 	mux.HandleFunc("DELETE /api/invites/{id}", a.withdrawInvite)
+
+	mux.HandleFunc("POST /api/folders", a.createFolder)
+	mux.HandleFunc("PATCH /api/folders/{id}", a.renameFolder)
+	mux.HandleFunc("DELETE /api/folders/{id}", a.deleteFolder)
 
 	mux.HandleFunc("POST /api/files/delete", a.deleteFiles)
 	mux.HandleFunc("GET /api/trash", a.trash)
@@ -524,10 +529,19 @@ type TrashedFile struct {
 	PurgeAt   time.Time `json:"purge_at"`   // when it goes for good
 }
 
-// Trash is everything in Recently deleted, the most recently deleted first.
+// Trash is everything in Recently deleted, the most recently deleted first, with the folders
+// its files are from: deleted folders aren't in /api/folders any more.
 type Trash struct {
-	Files     []TrashedFile `json:"files"`
-	TrashDays int           `json:"trash_days"`
+	Files     []TrashedFile   `json:"files"`
+	Folders   []TrashedFolder `json:"folders"`
+	TrashDays int             `json:"trash_days"`
+}
+
+// TrashedFolder is a folder that files in Recently deleted are from.
+type TrashedFolder struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Deleted bool   `json:"deleted"` // the folder went too; restoring a file brings it back
 }
 
 func (a *API) trash(w http.ResponseWriter, r *http.Request) {
@@ -544,7 +558,21 @@ func (a *API) trash(w http.ResponseWriter, r *http.Request) {
 		internal(w, "trash", err)
 		return
 	}
-	out := Trash{Files: []TrashedFile{}, TrashDays: a.Cfg.TrashDays}
+	out := Trash{Files: []TrashedFile{}, Folders: []TrashedFolder{}, TrashDays: a.Cfg.TrashDays}
+	var folderIDs []string
+	for _, f := range files {
+		if !slices.Contains(folderIDs, f.FolderID) {
+			folderIDs = append(folderIDs, f.FolderID)
+		}
+	}
+	folders, err := a.Auth.DB.FoldersByID(r.Context(), folderIDs)
+	if err != nil {
+		internal(w, "trash", err)
+		return
+	}
+	for _, f := range folders {
+		out.Folders = append(out.Folders, TrashedFolder{ID: f.ID, Name: f.Name, Deleted: f.DeletedAt != nil})
+	}
 	for _, f := range files {
 		t := TrashedFile{FileInfo: fileInfo(f, names)}
 		if f.DeletedAt != nil {

@@ -85,11 +85,17 @@ func (lib *Library) Restore(ctx context.Context, fileIDs []string) ([]db.File, e
 }
 
 // restorePath claims a path in its folder for a trashed file and records it; "" if the file
-// isn't in the trash any more.
+// isn't in the trash any more. A deleted folder comes back with its file.
 func (lib *Library) restorePath(ctx context.Context, f db.File) (string, error) {
 	folder, err := lib.folderOf(ctx, f)
 	if err != nil {
 		return "", err
+	}
+	if folder.DeletedAt != nil {
+		if folder, err = lib.DB.ReviveFolder(ctx, folder.ID); err != nil {
+			return "", err
+		}
+		lib.Logf("storage: the folder %q is back, with a file restored from the trash", folder.Name)
 	}
 	for try := range 5 {
 		rel := f.RelPath
@@ -161,7 +167,7 @@ func (lib *Library) Purge(ctx context.Context, fileIDs []string) ([]db.File, err
 		lib.removePurged(f.ID)
 		out = append(out, f)
 	}
-	return out, nil
+	return out, lib.dropEmptyFolders(ctx)
 }
 
 // PurgeOld removes what has been in the trash for longer than days.

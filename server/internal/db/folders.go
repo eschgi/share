@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 )
 
@@ -266,4 +268,166 @@ func (d *DB) CountFolderPeople(ctx context.Context, now time.Time) (FolderPeople
 		(SELECT COUNT(*) FROM invites WHERE user_id IS NULL AND role = 'admin' AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ?)`,
 		ms(now)).Scan(&out.Admins)
 	return out, err
+}
+
+// ErrLastFolder means the change would leave no folder to send into.
+var ErrLastFolder = errors.New("the last folder can't go")
+
+// ErrBusy means the folder's files are still being moved from an earlier rename.
+var ErrBusy = errors.New("the folder's files are still being moved")
+
+// RenameFolder gives a live folder a new name and, if dir differs from its directory, a new
+// directory; the old one is noted until the files are moved over (FinishRelocation). It
+// returns ErrNotFound for no such live folder, ErrConflict if a live folder has the name or
+// any folder the directory, and ErrBusy while an earlier move isn't finished.
+func (d *DB) RenameFolder(ctx context.Context, id, name, dir string) (Folder, error) {
+	var out Folder
+	err := d.Tx(ctx, func(tx *sql.Tx) error {
+		f, err := scanFolder(tx.QueryRowContext(ctx, "SELECT "+folderColumns+" FROM folders WHERE id = ? AND deleted_at IS NULL", id))
+		if err != nil {
+			return err
+		}
+		if dir != f.Dir {
+			if f.RenamingFrom != nil {
+				return ErrBusy
+			}
+			old := f.Dir
+			f.RenamingFrom = &old
+		}
+		f.Name, f.Dir = name, dir
+		if _, err := tx.ExecContext(ctx, "UPDATE folders SET name = ?, dir = ?, renaming_from = ? WHERE id = ?",
+			f.Name, f.Dir, f.RenamingFrom, f.ID); err != nil {
+			if isUniqueViolation(err) {
+				return ErrConflict
+			}
+			return err
+		}
+		out = f
+		return bumpLibraryVersion(ctx, tx)
+	})
+	return out, err
+}
+
+// DeleteFolder deletes a folder in one transaction: its files in the library go to the trash,
+// its PINs end, and only Recently deleted still shows it. The files' bytes are moved to the
+// trash afterwards (storage.Library.DeleteFolder). It returns the files it trashed;
+// ErrLastFolder for the last live folder, ErrNotFound for no such live folder.
+func (d *DB) DeleteFolder(ctx context.Context, id, by string, at time.Time) ([]File, error) {
+	var out []File
+	err := d.Tx(ctx, func(tx *sql.Tx) error {
+		var live int
+		if err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM folders WHERE deleted_at IS NULL").Scan(&live); err != nil {
+			return err
+		}
+		res, err := tx.ExecContext(ctx, "UPDATE folders SET deleted_at = ?, deleted_by = ? WHERE id = ? AND deleted_at IS NULL",
+			ms(at), nullString(by), id)
+		if err != nil {
+			return err
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			return ErrNotFound
+		}
+		if live <= 1 {
+			return ErrLastFolder
+		}
+		files, err := queryFiles(ctx, tx, "SELECT "+fileColumns+" FROM files WHERE folder_id = ? AND state = 'ready'", id)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE files SET state = 'trashed', deleted_at = ?, deleted_by = ?, updated_at = ?
+			WHERE folder_id = ? AND state = 'ready'`, ms(at), nullString(by), ms(at), id); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, "UPDATE pins SET ended_at = ? WHERE folder_id = ? AND ended_at IS NULL", ms(at), id); err != nil {
+			return err
+		}
+		for i := range files {
+			files[i].State, files[i].DeletedAt, files[i].DeletedBy, files[i].UpdatedAt = StateTrashed, &at, by, at
+		}
+		out = files
+		return bumpLibraryVersion(ctx, tx)
+	})
+	return out, err
+}
+
+// ReviveFolder brings a deleted folder back, with its people, when one of its files is
+// restored. If a live folder has its name now, it gets a number: "Wedding (2)".
+func (d *DB) ReviveFolder(ctx context.Context, id string) (Folder, error) {
+	var out Folder
+	err := d.Tx(ctx, func(tx *sql.Tx) error {
+		f, err := scanFolder(tx.QueryRowContext(ctx, "SELECT "+folderColumns+" FROM folders WHERE id = ?", id))
+		if err != nil || f.DeletedAt == nil {
+			out = f
+			return err
+		}
+		for n := 1; n <= 1000; n++ {
+			name := f.Name
+			if n > 1 {
+				name = numberedName(f.Name, n)
+			}
+			_, err := tx.ExecContext(ctx, "UPDATE folders SET name = ?, deleted_at = NULL, deleted_by = NULL WHERE id = ?", name, id)
+			if isUniqueViolation(err) {
+				continue
+			}
+			if err != nil {
+				return err
+			}
+			f.Name, f.DeletedAt, f.DeletedBy = name, nil, ""
+			out = f
+			return bumpLibraryVersion(ctx, tx)
+		}
+		return fmt.Errorf("no free name for the folder %q", f.Name)
+	})
+	return out, err
+}
+
+// numberedName is the n-th choice for a taken folder name, still at most 60 characters.
+func numberedName(name string, n int) string {
+	suffix := fmt.Sprintf(" (%d)", n)
+	r := []rune(name)
+	if max := 60 - len([]rune(suffix)); len(r) > max {
+		r = r[:max]
+	}
+	return strings.TrimSpace(string(r)) + suffix
+}
+
+// ReadyInDeletedFolders lists files in the library whose folder is deleted: uploads that
+// finished after their folder went.
+func (d *DB) ReadyInDeletedFolders(ctx context.Context) ([]File, error) {
+	return queryFiles(ctx, d, "SELECT "+fileColumns+` FROM files
+		WHERE state = 'ready' AND folder_id IN (SELECT id FROM folders WHERE deleted_at IS NOT NULL)`)
+}
+
+// DropEmptyDeletedFolders forgets the deleted folders that have no file left, not even in the
+// trash, and returns them.
+func (d *DB) DropEmptyDeletedFolders(ctx context.Context) ([]Folder, error) {
+	var out []Folder
+	err := d.Tx(ctx, func(tx *sql.Tx) error {
+		var err error
+		out, err = queryFolders(ctx, tx, "SELECT "+folderColumns+` FROM folders f WHERE deleted_at IS NOT NULL
+			AND NOT EXISTS (SELECT 1 FROM files WHERE folder_id = f.id)
+			AND NOT EXISTS (SELECT 1 FROM files WHERE moved_from LIKE f.id || '/%')`)
+		if err != nil {
+			return err
+		}
+		for _, f := range out {
+			if _, err := tx.ExecContext(ctx, "DELETE FROM folders WHERE id = ?", f.ID); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return out, err
+}
+
+// FoldersByID returns the folders among ids, deleted or not.
+func (d *DB) FoldersByID(ctx context.Context, ids []string) ([]Folder, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	args := make([]any, len(ids))
+	for i, id := range ids {
+		args[i] = id
+	}
+	return queryFolders(ctx, d, "SELECT "+folderColumns+" FROM folders WHERE id IN (?"+strings.Repeat(", ?", len(ids)-1)+") ORDER BY created_at, rowid", args...)
 }

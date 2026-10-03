@@ -270,7 +270,9 @@ func (lib *Library) Terminate(ctx context.Context, id string) error {
 //   - receiving uploads whose bytes are all there are finalized (the response was lost);
 //   - receiving uploads idle for longer than ttl are dropped;
 //   - files in .uploads without a row, and rows without files, are removed after an hour;
-//   - a trash, restore or purge that was cut short is finished.
+//   - files that reached a deleted folder go to the trash;
+//   - a trash, restore or purge that was cut short is finished;
+//   - deleted folders without files are forgotten.
 func (lib *Library) Reconcile(ctx context.Context, ttl time.Duration) error {
 	if err := lib.relocate(ctx); err != nil {
 		return err
@@ -307,7 +309,13 @@ func (lib *Library) Reconcile(ctx context.Context, ttl time.Duration) error {
 	if err := lib.removeOrphans(ctx, now); err != nil {
 		return err
 	}
-	return lib.reconcileTrash(ctx)
+	if err := lib.sweepDeletedFolders(ctx); err != nil {
+		return err
+	}
+	if err := lib.reconcileTrash(ctx); err != nil {
+		return err
+	}
+	return lib.dropEmptyFolders(ctx)
 }
 
 func (lib *Library) removeOrphans(ctx context.Context, now time.Time) error {

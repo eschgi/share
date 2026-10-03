@@ -9,6 +9,7 @@ import (
 	"path"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/eschgi/share/server/internal/db"
@@ -176,4 +177,178 @@ func (lib *Library) syncDirs(dirs ...string) error {
 		}
 	}
 	return nil
+}
+
+// ErrBadFolderName means a folder's name is empty, or looks like a day: 2026-09-27.
+var ErrBadFolderName = errors.New("a folder needs a name that isn't a date")
+
+// cleanFolderName checks a folder's name as typed and returns it cleaned.
+func cleanFolderName(name string) (string, error) {
+	name = FolderName(name)
+	if name == "" || dayName.MatchString(name) {
+		return "", ErrBadFolderName
+	}
+	return name, nil
+}
+
+// CreateFolder makes a new folder and its directory. Nobody but the admins sees it until
+// they are given it. It returns ErrBadFolderName, or db.ErrConflict if a folder has the name.
+func (lib *Library) CreateFolder(ctx context.Context, name, by string) (db.Folder, error) {
+	name, err := cleanFolderName(name)
+	if err != nil {
+		return db.Folder{}, err
+	}
+	lib.mu.Lock()
+	defer lib.mu.Unlock()
+	dir, err := freeDir(ctx, lib.DB, name, lib.exists)
+	if err != nil {
+		return db.Folder{}, err
+	}
+	f := db.Folder{ID: ids.New(), Name: name, Dir: dir, CreatedBy: by, CreatedAt: lib.Now()}
+	if err := lib.DB.InsertFolder(ctx, f); err != nil {
+		return db.Folder{}, err
+	}
+	if err := lib.root.MkdirAll(dir, 0o755); err != nil {
+		lib.Logf("storage: making the directory %q: %v", dir, err) // the first file makes it too
+	}
+	return f, nil
+}
+
+// RenameFolder gives a folder a new name, and its directory the same. The files move with
+// the directory in one rename; where that fails (on Windows, while a file in it is open),
+// Reconcile finishes it later, and files are read from wherever they are meanwhile. It
+// returns ErrBadFolderName, db.ErrNotFound, db.ErrConflict for a name that is taken, and
+// db.ErrBusy while the files of an earlier rename are still being moved.
+func (lib *Library) RenameFolder(ctx context.Context, id, name string) (db.Folder, error) {
+	name, err := cleanFolderName(name)
+	if err != nil {
+		return db.Folder{}, err
+	}
+	lib.mu.Lock()
+	defer lib.mu.Unlock()
+	f, err := lib.DB.FolderByID(ctx, id)
+	if err == nil && f.DeletedAt != nil {
+		err = db.ErrNotFound
+	}
+	if err != nil {
+		return db.Folder{}, err
+	}
+	dir := f.Dir
+	// Only a new name gets a new directory: a change of case keeps it, since drives that ignore
+	// case can't tell the two apart.
+	if !strings.EqualFold(FolderDir(name, 1), f.Dir) {
+		if dir, err = freeDir(ctx, lib.DB, name, lib.exists); err != nil {
+			return db.Folder{}, err
+		}
+	}
+	renamed, err := lib.DB.RenameFolder(ctx, id, name, dir)
+	if err != nil || renamed.RenamingFrom == nil {
+		return renamed, err
+	}
+	from := *renamed.RenamingFrom
+	done, err := lib.relocateFolder(dir, from)
+	switch {
+	case err != nil:
+		lib.Logf("storage: moving %q to %q: %v; trying again later", from, dir, err)
+	case done:
+		if err := lib.DB.FinishRelocation(ctx, id, from); err != nil {
+			return renamed, err
+		}
+		renamed.RenamingFrom = nil
+	}
+	return renamed, nil
+}
+
+// DeleteFolder deletes a folder: its files go to the trash, where they wait like any deleted
+// file, its PINs end and its unfinished uploads are dropped. Restoring one of its files
+// brings it back. It returns the files it trashed; db.ErrLastFolder for the last folder.
+func (lib *Library) DeleteFolder(ctx context.Context, id, by string) ([]db.File, error) {
+	lib.mu.Lock()
+	files, err := lib.DB.DeleteFolder(ctx, id, by, lib.Now())
+	lib.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+	receiving, err := lib.DB.FilesInStates(ctx, db.StateReceiving)
+	if err != nil {
+		return files, err
+	}
+	for _, f := range receiving {
+		if f.FolderID == id {
+			if err := lib.Terminate(ctx, f.ID); err != nil {
+				lib.Logf("storage: dropping %s: %v", f.ID, err)
+			}
+		}
+	}
+	// The bytes go a few hundred at a time, so uploads can finish in between.
+	for start := 0; start < len(files); start += 200 {
+		lib.mu.Lock()
+		for _, f := range files[start:min(start+200, len(files))] {
+			if err := lib.moveToTrash(ctx, f); err != nil {
+				lib.Logf("storage: trashing %s: %v", f.ID, err) // the reconciler tries again
+			}
+		}
+		lib.mu.Unlock()
+	}
+	if folder, err := lib.DB.FolderByID(ctx, id); err == nil && folder.Dir != "" {
+		lib.removeEmptyDirs(folder.Dir) // restoring a file makes it again
+	}
+	return files, nil
+}
+
+// sweepDeletedFolders trashes what reached a folder after it was deleted (an upload that was
+// finishing), and removes the directories of deleted folders that have nothing left.
+func (lib *Library) sweepDeletedFolders(ctx context.Context) error {
+	late, err := lib.DB.ReadyInDeletedFolders(ctx)
+	if err != nil {
+		return err
+	}
+	for _, f := range late {
+		folder, err := lib.DB.FolderByID(ctx, f.FolderID)
+		if err != nil {
+			return err
+		}
+		if _, err := lib.Trash(ctx, []string{f.ID}, folder.DeletedBy); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// dropEmptyFolders forgets deleted folders whose last file was purged, and removes their
+// directories if nothing else is in them.
+func (lib *Library) dropEmptyFolders(ctx context.Context) error {
+	dropped, err := lib.DB.DropEmptyDeletedFolders(ctx)
+	if err != nil {
+		return err
+	}
+	for _, f := range dropped {
+		for _, dir := range []string{f.Dir, ptrOr(f.RenamingFrom, f.Dir)} {
+			if dir != "" {
+				lib.removeEmptyDirs(dir)
+			}
+		}
+	}
+	return nil
+}
+
+// removeEmptyDirs removes a folder's directory if only empty day folders are left in it.
+func (lib *Library) removeEmptyDirs(dir string) {
+	entries, err := fs.ReadDir(lib.root.FS(), dir)
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			lib.root.Remove(path.Join(dir, e.Name())) // fails while it holds something
+		}
+	}
+	lib.root.Remove(dir)
+}
+
+func ptrOr(p *string, or string) string {
+	if p == nil {
+		return or
+	}
+	return *p
 }

@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -244,6 +245,157 @@ func TestFolderDirs(t *testing.T) {
 		got, err := freeDir(ctx, fx.db, name, fx.exists)
 		if err != nil || got != want {
 			t.Errorf("freeDir(%q) = %q, %v; want %q", name, got, err, want)
+		}
+	}
+}
+
+// readyIn puts a finished file into folder.
+func (fx *fixture) readyIn(t *testing.T, folder db.Folder, name, content string) db.File {
+	t.Helper()
+	id := newID()
+	f := db.File{ID: id, Name: name, Size: int64(len(content)), CreatedAt: fx.now, UpdatedAt: fx.now, FolderID: folder.ID}
+	if err := fx.db.InsertReceiving(context.Background(), f); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(fx.layout.UploadsDir(), id), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := fx.lib.Finalize(context.Background(), id); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := fx.db.FileByID(context.Background(), id)
+	return got
+}
+
+func TestRenameMovesTheDirectory(t *testing.T) {
+	fx := newFixture(t)
+	ctx := context.Background()
+	wedding, err := fx.lib.CreateFolder(ctx, "Wedding", "admin")
+	if err != nil || !fx.exists("Wedding") {
+		t.Fatalf("CreateFolder = %+v, %v", wedding, err)
+	}
+	f := fx.readyIn(t, wedding, "IMG_1.jpg", "one")
+
+	renamed, err := fx.lib.RenameFolder(ctx, wedding.ID, "Hochzeit")
+	if err != nil || renamed.Dir != "Hochzeit" || renamed.RenamingFrom != nil {
+		t.Fatalf("RenameFolder = %+v, %v", renamed, err)
+	}
+	if fx.exists("Wedding") || !fx.exists("Hochzeit/2026-09-27/IMG_1.jpg") {
+		t.Fatal("the directory didn't move")
+	}
+	if got := fx.read(t, f.ID); got != "one" { // a row read before the rename
+		t.Fatalf("after the rename: %q", got)
+	}
+	// Only a change of case keeps the directory.
+	if again, err := fx.lib.RenameFolder(ctx, wedding.ID, "HOCHZEIT"); err != nil || again.Dir != "Hochzeit" || again.Name != "HOCHZEIT" {
+		t.Fatalf("a change of case: %+v, %v", again, err)
+	}
+	for _, bad := range []string{"", "  ", "2026-09-27"} {
+		if _, err := fx.lib.RenameFolder(ctx, wedding.ID, bad); !errors.Is(err, ErrBadFolderName) {
+			t.Errorf("RenameFolder(%q): %v", bad, err)
+		}
+	}
+	if _, err := fx.lib.RenameFolder(ctx, wedding.ID, "share"); !errors.Is(err, db.ErrConflict) {
+		t.Errorf("a name another folder has: %v", err)
+	}
+}
+
+func TestRenameResumesAfterACrash(t *testing.T) {
+	fx := newFixture(t)
+	ctx := context.Background()
+	wedding, _ := fx.lib.CreateFolder(ctx, "Wedding", "admin")
+	f := fx.readyIn(t, wedding, "IMG_1.jpg", "one")
+	// The rename reached the database, but the server stopped before the directory moved.
+	if _, err := fx.db.RenameFolder(ctx, wedding.ID, "Hochzeit", "Hochzeit"); err != nil {
+		t.Fatal(err)
+	}
+	if got := fx.read(t, f.ID); got != "one" {
+		t.Fatalf("before the move: %q", got)
+	}
+	if _, err := fx.lib.RenameFolder(ctx, wedding.ID, "Matrimonio"); !errors.Is(err, db.ErrBusy) {
+		t.Fatalf("a second rename while the first is moving: %v", err)
+	}
+	if err := fx.lib.Reconcile(ctx, time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	if fx.exists("Wedding") || !fx.exists("Hochzeit/2026-09-27/IMG_1.jpg") {
+		t.Fatal("Reconcile didn't finish the rename")
+	}
+	if got, _ := fx.db.FolderByID(ctx, wedding.ID); got.RenamingFrom != nil {
+		t.Fatal("the rename is still noted as moving")
+	}
+}
+
+func TestDeletingAFolderTrashesItsFiles(t *testing.T) {
+	fx := newFixture(t)
+	ctx := context.Background()
+	wedding, _ := fx.lib.CreateFolder(ctx, "Wedding", "admin")
+	a := fx.readyIn(t, wedding, "IMG_1.jpg", "one")
+	arriving := fx.receiving(t, "IMG_2.jpg", "two", 1)
+	if _, err := fx.db.Exec("UPDATE files SET folder_id = ? WHERE id = ?", wedding.ID, arriving); err != nil {
+		t.Fatal(err)
+	}
+
+	trashed, err := fx.lib.DeleteFolder(ctx, wedding.ID, "admin")
+	if err != nil || len(trashed) != 1 {
+		t.Fatalf("DeleteFolder = %d files, %v", len(trashed), err)
+	}
+	if !fx.exists(".trash/"+a.ID) || fx.exists("Wedding") {
+		t.Fatal("the files didn't go to the trash, or the empty directory stayed")
+	}
+	if _, err := fx.db.FileByID(ctx, arriving); !errors.Is(err, db.ErrNotFound) {
+		t.Fatalf("the upload into the deleted folder is still there: %v", err)
+	}
+	if _, err := fx.lib.DeleteFolder(ctx, fx.folder.ID, "admin"); !errors.Is(err, db.ErrLastFolder) {
+		t.Fatalf("deleting the last folder: %v", err)
+	}
+
+	// Restoring a file brings the folder back, with a number if its name is taken now.
+	again, _ := fx.lib.CreateFolder(ctx, "wedding", "admin")
+	if again.Dir != "wedding (2)" {
+		t.Fatalf("the new folder's directory: %q; the deleted folder keeps its own", again.Dir)
+	}
+	if _, err := fx.lib.Restore(ctx, []string{a.ID}); err != nil {
+		t.Fatal(err)
+	}
+	back, _ := fx.db.FolderByID(ctx, wedding.ID)
+	if back.DeletedAt != nil || back.Name != "Wedding (2)" || !fx.exists("Wedding/2026-09-27/IMG_1.jpg") {
+		t.Fatalf("the folder after the restore: %+v", back)
+	}
+
+	// Once its last file is purged, a deleted folder is gone.
+	if _, err := fx.lib.DeleteFolder(ctx, wedding.ID, "admin"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fx.lib.Purge(ctx, []string{a.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fx.db.FolderByID(ctx, wedding.ID); !errors.Is(err, db.ErrNotFound) {
+		t.Fatalf("the emptied folder is still there: %v", err)
+	}
+}
+
+func TestReconcileFinishesADeletedFolder(t *testing.T) {
+	fx := newFixture(t)
+	ctx := context.Background()
+	wedding, _ := fx.lib.CreateFolder(ctx, "Wedding", "admin")
+	a := fx.readyIn(t, wedding, "IMG_1.jpg", "one")
+	// An upload that was finishing while the folder went.
+	late := fx.receiving(t, "IMG_2.jpg", "two", 3)
+	if _, err := fx.db.Exec("UPDATE files SET folder_id = ? WHERE id = ?", wedding.ID, late); err != nil {
+		t.Fatal(err)
+	}
+	// The server stopped right after the folder was deleted in the database.
+	if _, err := fx.db.DeleteFolder(ctx, wedding.ID, "admin", t0); err != nil {
+		t.Fatal(err)
+	}
+	if err := fx.lib.Reconcile(ctx, time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{a.ID, late} {
+		f, _ := fx.db.FileByID(ctx, id)
+		if f.State != db.StateTrashed || !fx.exists(".trash/"+id) {
+			t.Errorf("%s after Reconcile: %s", f.Name, f.State)
 		}
 	}
 }

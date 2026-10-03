@@ -10,6 +10,7 @@ import (
 	"github.com/eschgi/share/server/internal/auth"
 	"github.com/eschgi/share/server/internal/db"
 	"github.com/eschgi/share/server/internal/httpx"
+	"github.com/eschgi/share/server/internal/storage"
 )
 
 // FolderInfo is a folder of the library: what it holds and how many see it.
@@ -157,4 +158,90 @@ func (a *API) folderContents(ctx context.Context, folders []db.Folder) (map[stri
 		}
 	}
 	return c.stats, c.covers, nil
+}
+
+type folderRequest struct {
+	Name string `json:"name"`
+}
+
+// folderInfo describes one folder, as GET /api/folders would.
+func (a *API) folderInfo(r *http.Request, f db.Folder) (FolderInfo, error) {
+	list, err := a.folderInfos(r, []db.Folder{f})
+	if err != nil {
+		return FolderInfo{}, err
+	}
+	return list[0], nil
+}
+
+func (a *API) createFolder(w http.ResponseWriter, r *http.Request) {
+	p, ok := a.admin(w, r)
+	if !ok {
+		return
+	}
+	var req folderRequest
+	if !httpx.DecodeJSON(w, r, &req) {
+		return
+	}
+	f, err := a.Lib.CreateFolder(r.Context(), req.Name, p.UserID)
+	if !a.folderError(w, "create folder", err) {
+		return
+	}
+	a.writeFolder(w, r, http.StatusCreated, f)
+}
+
+func (a *API) renameFolder(w http.ResponseWriter, r *http.Request) {
+	if _, ok := a.admin(w, r); !ok {
+		return
+	}
+	var req folderRequest
+	if !httpx.DecodeJSON(w, r, &req) {
+		return
+	}
+	f, err := a.Lib.RenameFolder(r.Context(), r.PathValue("id"), req.Name)
+	if !a.folderError(w, "rename folder", err) {
+		return
+	}
+	a.writeFolder(w, r, http.StatusOK, f)
+}
+
+func (a *API) deleteFolder(w http.ResponseWriter, r *http.Request) {
+	p, ok := a.admin(w, r)
+	if !ok {
+		return
+	}
+	files, err := a.Lib.DeleteFolder(r.Context(), r.PathValue("id"), p.UserID)
+	if !a.folderError(w, "delete folder", err) {
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, Changed{Changed: len(files)})
+}
+
+func (a *API) writeFolder(w http.ResponseWriter, r *http.Request, status int, f db.Folder) {
+	info, err := a.folderInfo(r, f)
+	if err != nil {
+		internal(w, "folder", err)
+		return
+	}
+	httpx.WriteJSON(w, status, info)
+}
+
+// folderError answers a failed change of a folder; it reports whether there was no error.
+func (a *API) folderError(w http.ResponseWriter, what string, err error) bool {
+	switch {
+	case err == nil:
+		return true
+	case errors.Is(err, storage.ErrBadFolderName):
+		httpx.WriteError(w, http.StatusBadRequest, "bad_request", "A folder needs a name, and it can't be a date like 2026-09-27.")
+	case errors.Is(err, db.ErrNotFound):
+		httpx.WriteError(w, http.StatusNotFound, "not_found", "No such folder.")
+	case errors.Is(err, db.ErrConflict):
+		httpx.WriteError(w, http.StatusConflict, "folder_name_taken", "Another folder has that name.")
+	case errors.Is(err, db.ErrBusy):
+		httpx.WriteError(w, http.StatusConflict, "folder_busy", "The folder's files are still moving after its last rename. Try again in a few minutes.")
+	case errors.Is(err, db.ErrLastFolder):
+		httpx.WriteError(w, http.StatusConflict, "last_folder", "The last folder can't go: everything is sent into a folder.")
+	default:
+		internal(w, what, err)
+	}
+	return false
 }

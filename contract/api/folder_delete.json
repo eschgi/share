@@ -1,0 +1,10 @@
+{
+  "method": "DELETE",
+  "path": "/api/folders/w3dding5x2k7mbqz4bwdbyj6qs",
+  "auth": "admin",
+  "status": 200,
+  "response": {
+    "changed": 412
+  },
+  "notes": "Deletes a folder: changed of its files go to Recently deleted, where they wait like any deleted file, its PINs end and unfinished uploads into it are dropped. Restoring one of its files brings the folder back, with its people; once its last file is purged, it is gone for good. 409 last_folder for the last folder; 404 not_found for no such folder."
+}

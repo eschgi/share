@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/eschgi/share/server/internal/auth"
 	"github.com/eschgi/share/server/internal/db"
 	"github.com/eschgi/share/server/internal/ids"
 )
@@ -221,4 +222,76 @@ func TestDownloadsLeaveOutWhatIsNoLongerVisible(t *testing.T) {
 	}
 	wantStatus(t, "the ZIP after Maria lost the folder", e.get("/api/downloads/"+z["id"].(string), maria.token), http.StatusNotFound, "not_found")
 	wantStatus(t, "an admin fetching Maria's ZIP", e.get("/api/downloads/"+z["id"].(string), admin.token), http.StatusNotFound, "not_found")
+}
+
+func TestAdminsCreateRenameAndDeleteFolders(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	admin := e.admin()
+	maria := e.accept(e.invite(admin, "Maria", "member"), "Maria's phone")
+
+	r := e.sendJSON("POST", "/api/folders", admin.token, map[string]string{"name": "  Wedding Anna & Marco "})
+	wantStatus(t, "create", r, http.StatusCreated, "")
+	assertShape(t, "create", readFixture(t, "api/folder_create.json")["response"], r.json(t))
+	created := r.json(t)
+	if created["name"] != "Wedding Anna & Marco" || created["admins_only"] != true {
+		t.Fatalf("created: %v", created)
+	}
+	id := created["id"].(string)
+	if _, err := os.Stat(filepath.Join(e.cfg.StorageDir, "Wedding Anna & Marco")); err != nil {
+		t.Fatalf("no directory for the folder: %v", err)
+	}
+	wantStatus(t, "the same name", e.sendJSON("POST", "/api/folders", admin.token, map[string]string{"name": "wedding anna & marco"}),
+		http.StatusConflict, "folder_name_taken")
+	wantStatus(t, "a date", e.sendJSON("POST", "/api/folders", admin.token, map[string]string{"name": "2026-09-26"}), http.StatusBadRequest, "bad_request")
+	wantStatus(t, "a member", e.sendJSON("POST", "/api/folders", maria.token, map[string]string{"name": "Mine"}), http.StatusForbidden, "forbidden")
+
+	wedding, _ := e.app.DB.FolderByID(ctx, id)
+	f := e.put(wedding, "IMG_1.jpg", []byte("photo"))
+	pin, err := e.app.Auth.CreatePin(ctx, auth.PinSpec{Kind: db.PinPermanent, FolderID: id}, admin.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	guest, _ := e.unlockApp(pin.Code, "")
+	arriving := (tus{e, guest}).mustCreate("IMG_2.jpg", 100)
+
+	r = e.sendJSON("PATCH", "/api/folders/"+id, admin.token, map[string]string{"name": "Hochzeit Anna & Marco"})
+	wantStatus(t, "rename", r, http.StatusOK, "")
+	assertShape(t, "rename", readFixture(t, "api/folder_rename.json")["response"], r.json(t))
+	if _, err := os.Stat(filepath.Join(e.cfg.StorageDir, "Hochzeit Anna & Marco", "2026-09-27", "IMG_1.jpg")); err != nil {
+		t.Fatalf("the directory didn't move: %v", err)
+	}
+	if r := e.get("/api/files/"+f.ID+"/content", admin.token); string(r.body) != "photo" {
+		t.Fatalf("download after the rename: %d %s", r.status, r.body)
+	}
+	wantStatus(t, "rename someone else's", e.sendJSON("PATCH", "/api/folders/"+id, maria.token, map[string]string{"name": "X"}), http.StatusForbidden, "forbidden")
+
+	r = e.do(nil, "DELETE", "/api/folders/"+id, admin.token, nil, nil)
+	wantStatus(t, "delete", r, http.StatusOK, "")
+	assertShape(t, "delete", readFixture(t, "api/folder_delete.json")["response"], r.json(t))
+	if r.json(t)["changed"] != 1.0 {
+		t.Fatalf("delete: %s", r.body)
+	}
+	if list := e.get("/api/folders", admin.token).json(t)["folders"].([]any); len(list) != 1 {
+		t.Fatalf("folders after the delete: %v", list)
+	}
+	trash := e.get("/api/trash", admin.token)
+	assertShape(t, "trash", readFixture(t, "api/trash.json")["response"], trash.json(t))
+	folders := trash.json(t)["folders"].([]any)
+	if len(folders) != 1 || folders[0].(map[string]any)["deleted"] != true || folders[0].(map[string]any)["name"] != "Hochzeit Anna & Marco" {
+		t.Fatalf("the trash's folders: %v", folders)
+	}
+	if _, r := (tus{e, guest}).head(arriving); r.status == http.StatusOK {
+		t.Error("the upload into the deleted folder goes on")
+	}
+	r = e.postJSON(nil, "/api/pin/unlock", "", map[string]string{"code": pin.Code, "client": "app"}, nil)
+	wantStatus(t, "the deleted folder's PIN", r, http.StatusUnauthorized, "pin_ended")
+	wantStatus(t, "delete the last folder", e.do(nil, "DELETE", "/api/folders/"+e.firstFolder().ID, admin.token, nil, nil),
+		http.StatusConflict, "last_folder")
+
+	// Restoring its file brings the folder back.
+	wantStatus(t, "restore", e.sendJSON("POST", "/api/trash/restore", admin.token, map[string][]string{"ids": {f.ID}}), http.StatusOK, "")
+	if list := e.get("/api/folders", admin.token).json(t)["folders"].([]any); len(list) != 2 {
+		t.Fatalf("folders after the restore: %v", list)
+	}
 }

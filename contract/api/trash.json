@@ -25,7 +25,14 @@
         "purge_at": "2026-10-30T08:10:00Z"
       }
     ],
+    "folders": [
+      {
+        "id": "f4mily5x2k7mbqz4bwdbyj6qsq",
+        "name": "Family",
+        "deleted": false
+      }
+    ],
     "trash_days": 30
   },
-  "notes": "Recently deleted, the most recently deleted first: the file as in /api/files, plus when and by whom it was deleted (null if that admin is gone) and when it goes for good. Admins can still fetch the thumbnails of deleted files."
+  "notes": "Recently deleted, the most recently deleted first: the file as in /api/files, plus when and by whom it was deleted (null if that admin is gone) and when it goes for good. Admins can still fetch the thumbnails of deleted files. folders are the folders the files are from, by the files' folder: a deleted folder (deleted true) isn't in /api/folders any more, and restoring one of its files brings it back, with a number added to its name if another folder has it now."
 }
