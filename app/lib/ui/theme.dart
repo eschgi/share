@@ -395,5 +395,12 @@ ThemeData shareTheme([ShareColors? colors]) {
       }),
       trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
     ),
+    // The folders an invite gives (screen 47).
+    checkboxTheme: CheckboxThemeData(
+      fillColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? c.accent : Colors.transparent),
+      checkColor: const WidgetStatePropertyAll(Colors.white),
+      side: WidgetStateBorderSide.resolveWith((s) => BorderSide(color: s.contains(WidgetState.selected) ? c.accent : c.text3, width: 2)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
+    ),
   );
 }

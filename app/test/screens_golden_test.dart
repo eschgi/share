@@ -177,6 +177,25 @@ void main() {
     await shot(tester, 'en/41-folder');
   }));
 
+  testWidgets("a person's folders", (tester) => atTen(() async {
+    await startApp(tester, signedInPhone(), adminFolders());
+    await tester.tap(find.text('Settings').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Maria'));
+    await shot(tester, 'en/42-person-folders');
+  }));
+
+  testWidgets('invite someone, with folders', (tester) => atTen(() async {
+    await startApp(tester, signedInPhone(), adminFolders());
+    await tester.tap(find.text('Settings').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Invite'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Oma Rosa');
+    FocusManager.instance.primaryFocus?.unfocus();
+    await shot(tester, 'en/47-invite-folders');
+  }));
+
   testWidgets('settings', (tester) => atTen(() async {
     await startApp(tester, signedInPhone()..current = const RouteStatus(ServerRoute.local, millis: 12), admin());
     await tester.tap(find.text('Settings').last);

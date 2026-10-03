@@ -75,6 +75,8 @@
   "folderSince": "Dal {date}",
   "folderWhoSees": "Chi la vede",
   "folderAdminSeesAll": "Admin · vede tutte le cartelle",
+  "folderAdminsSeeAll": "Gli admin vedono tutte le cartelle.",
+  "folderPersonSees": "{name} vede solo le cartelle attivate. Gli admin vedono tutte le cartelle.",
   "folderPinsInto": "PIN che inviano qui",
   "folderNewPin": "Nuovo PIN per questa cartella",
   "folderPinEnds": "scade {when}",

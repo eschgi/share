@@ -192,6 +192,15 @@
   },
   "folderWhoSees": "Who sees it",
   "folderAdminSeesAll": "Admin · sees all folders",
+  "folderAdminsSeeAll": "Admins see every folder.",
+  "folderPersonSees": "{name} sees only the folders switched on. Admins see every folder.",
+  "@folderPersonSees": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "folderPinsInto": "PINs that send into it",
   "folderNewPin": "New PIN for this folder",
   "folderPinEnds": "ends {when}",

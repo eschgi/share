@@ -6,6 +6,7 @@ import '../../data/api.dart';
 import '../../data/models.dart';
 import '../../l10n/app_localizations.dart';
 import '../devices.dart';
+import '../folders.dart';
 import '../format.dart';
 import '../icons.dart';
 import '../theme.dart';
@@ -73,7 +74,7 @@ class PeopleGroup extends StatelessWidget {
   }
 }
 
-/// One person: their phones, their role, and removing them.
+/// One person: their folders (screen 42), their phones, their role, and removing them.
 class PersonSheet extends StatefulWidget {
   const PersonSheet({super.key, required this.person});
   final Person person;
@@ -124,6 +125,15 @@ class _PersonSheetState extends State<PersonSheet> {
         false;
   }
 
+  /// Gives the person a folder, or takes it away.
+  Future<void> _folder(String folder, bool sees) async {
+    final services = Services.read(context);
+    if (await _do(() => services.admin.setFolderPerson(folder, _person.id, sees: sees)) && mounted) {
+      setState(() => _person = _person.copyWith(folders: [for (final f in _person.folders) if (f != folder) f, if (sees) folder]));
+      await services.folders.load();
+    }
+  }
+
   Future<void> _role(Role role) async {
     final admin = Services.read(context).admin;
     if (await _do(() => admin.setRole(_person.id, role)) && mounted) {
@@ -164,6 +174,10 @@ class _PersonSheetState extends State<PersonSheet> {
     final t = AppLocalizations.of(context);
     final c = context.colors;
     final p = _person;
+    final folders = Services.of(context).folders.list ?? const <FolderInfo>[];
+    final lines = FolderLines(context);
+    // With one folder there is nothing to switch, unless a member lacks it.
+    final showFolders = folders.length > 1 || (!p.isAdmin && folders.any((f) => !p.folders.contains(f.id)));
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
@@ -179,6 +193,25 @@ class _PersonSheetState extends State<PersonSheet> {
             ),
             RoleBadge(label: p.isAdmin ? t.roleAdmin : t.roleMember, admin: p.isAdmin),
           ]),
+          if (showFolders) ...[
+            SectionLabel(t.foldersTitle),
+            SettingsGroup(children: [
+              for (final f in folders)
+                SettingsRow(
+                  leading: FolderCover(folder: f),
+                  title: f.name,
+                  subtitle: f.adminsOnly ? '${lines.count(f.files)} · ${t.folderOnlyAdminsLine}' : lines.holds(f.files, f.bytes),
+                  trailing: Switch(
+                    value: p.isAdmin || p.folders.contains(f.id),
+                    onChanged: p.isAdmin || _busy ? null : (on) => _folder(f.id, on),
+                  ),
+                ),
+            ]),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(6, 8, 6, 0),
+              child: Text(p.isAdmin ? t.folderAdminsSeeAll : t.folderPersonSees(p.name), style: TextStyle(fontSize: 13.5, height: 1.45, color: c.text3)),
+            ),
+          ],
           SectionLabel(t.personPhones),
           SettingsGroup(children: [
             for (final phone in p.phones) PhoneRow(phone: phone, onSignOut: _busy ? null : () => _signOut(phone)),

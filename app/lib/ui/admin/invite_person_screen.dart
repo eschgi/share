@@ -2,14 +2,16 @@ import 'package:flutter/material.dart';
 
 import '../../app.dart';
 import '../../data/api.dart';
+import '../../data/folders.dart';
 import '../../data/models.dart';
 import '../../l10n/app_localizations.dart';
+import '../folders.dart';
 import '../icons.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
-/// Screen 20: an invite as a QR code, or as a link. With [forPerson] it adds a phone for
-/// someone who has an account.
+/// Screen 20: an invite as a QR code, or as a link, with the folders a new member gets (47).
+/// With [forPerson] it adds a phone for someone who has an account.
 class InvitePersonScreen extends StatefulWidget {
   const InvitePersonScreen({super.key, this.forPerson});
   final Person? forPerson;
@@ -21,6 +23,7 @@ class InvitePersonScreen extends StatefulWidget {
 class _InvitePersonScreenState extends State<InvitePersonScreen> {
   final _name = TextEditingController();
   Role _role = Role.member;
+  List<String>? _picked; // the folders a new member gets, once changed
   NewInvite? _invite;
   String? _error;
   bool _busy = false;
@@ -40,6 +43,17 @@ class _InvitePersonScreenState extends State<InvitePersonScreen> {
 
   String get _who => widget.forPerson?.name ?? _name.text.trim();
 
+  /// The folders a new member gets; until changed, the one the library shows.
+  List<String> get _given {
+    final folders = Services.read(context).folders;
+    return _picked ?? inviteDefault(folders.list ?? const [], folders.shown?.id);
+  }
+
+  void _pick(String id) {
+    final given = _given;
+    setState(() => _picked = given.contains(id) ? [for (final f in given) if (f != id) f] : [...given, id]);
+  }
+
   Future<void> _create() async {
     final t = AppLocalizations.of(context);
     setState(() {
@@ -48,7 +62,7 @@ class _InvitePersonScreenState extends State<InvitePersonScreen> {
     });
     try {
       final admin = Services.read(context).admin;
-      final invite = widget.forPerson == null ? await admin.invite(_who, _role) : await admin.invitePhone(widget.forPerson!.id);
+      final invite = widget.forPerson == null ? await admin.invite(_who, _role, folders: _given) : await admin.invitePhone(widget.forPerson!.id);
       if (mounted) setState(() => _invite = invite);
     } on ApiException {
       setState(() => _error = t.commonFailed);
@@ -63,6 +77,7 @@ class _InvitePersonScreenState extends State<InvitePersonScreen> {
         _invite = null;
         _name.clear();
         _role = Role.member;
+        _picked = null;
       });
 
   @override
@@ -71,6 +86,9 @@ class _InvitePersonScreenState extends State<InvitePersonScreen> {
     final c = context.colors;
     final invite = _invite;
     final person = widget.forPerson;
+    final folders = Services.of(context).folders.list ?? const <FolderInfo>[];
+    final given = _given;
+    final lines = FolderLines(context);
     return Scaffold(
       appBar: AppBar(
         leading: const ShareBackButton(),
@@ -92,6 +110,21 @@ class _InvitePersonScreenState extends State<InvitePersonScreen> {
                 FieldLabel(t.joinRole),
                 _RoleToggle(role: _role, enabled: invite == null, onChanged: (r) => setState(() => _role = r)),
                 Help(t.inviteRoleHelp),
+                // With one folder there is nothing to choose: a new member gets it.
+                if (folders.length > 1 && _role == Role.member) ...[
+                  FieldLabel(t.foldersTitle),
+                  SettingsGroup(children: [
+                    for (final f in folders)
+                      SettingsRow(
+                        leading: FolderCover(folder: f),
+                        title: f.name,
+                        subtitle: lines.about(f),
+                        trailing: Checkbox(value: given.contains(f.id), onChanged: invite == null ? (_) => _pick(f.id) : null),
+                        onTap: invite == null ? () => _pick(f.id) : null,
+                      ),
+                  ]),
+                ],
+                if (folders.length > 1) Help(t.folderAdminsSeeAll),
                 const SizedBox(height: 22),
               ],
               if (invite != null)

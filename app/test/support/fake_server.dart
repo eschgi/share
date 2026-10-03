@@ -161,7 +161,7 @@ class FakeServer {
         'GET /api/users': (_) => json(people),
         'POST /api/invites': (req) {
           final b = _body(req);
-          return _newInvite(b['name'] as String, b['role'] as String, null);
+          return _newInvite(b['name'] as String, b['role'] as String, null, folders: (b['folders'] as List?)?.cast<String>() ?? const []);
         },
         'POST /api/files/delete': (req) {
           final ids = (_body(req)['ids'] as List).cast<String>().toSet();
@@ -190,7 +190,7 @@ class FakeServer {
         'GET /api/admin/storage': (_) => json(storage),
       };
 
-  http.Response _newInvite(String name, String role, String? userId) {
+  http.Response _newInvite(String name, String role, String? userId, {List<String> folders = const []}) {
     _made++;
     final token = 'shi_${'x' * 40}$_made';
     final invite = {
@@ -198,6 +198,7 @@ class FakeServer {
       'name': name,
       'role': role,
       'user_id': userId,
+      'folders': role == 'admin' ? [for (final f in this.folders) f['id']] : folders,
       'created_at': clock.now().toUtc().toIso8601String(),
       'expires_at': clock.now().toUtc().add(const Duration(days: 1)).toIso8601String(),
     };

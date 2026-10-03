@@ -264,4 +264,89 @@ void main() {
     expect(find.textContaining('Empty · '), findsNothing, reason: 'the header says how much it holds');
     expect(server.folders.map((f) => f['name']), ['Family', 'Kindergarten']);
   });
+
+  testWidgets("a person's folders, switched from the person", (tester) async {
+    final server = adminFolders();
+    await startApp(tester, signedInPhone(), server);
+    await openSettings(tester);
+    await tester.tap(find.text('Maria'));
+    await tester.pumpAndSettle();
+    expect(find.text('Maria sees only the folders switched on. Admins see every folder.'), findsOneWidget);
+    expect(find.text('Empty · only admins'), findsOneWidget);
+    Switch switchOf(String name) => tester.widget<Switch>(find.descendant(of: find.widgetWithText(SettingsRow, name), matching: find.byType(Switch)));
+    expect([for (final f in ['Family', 'Wedding Anna & Marco', 'Taxes 2026']) switchOf(f).value], [true, true, false]);
+
+    await tester.tap(find.descendant(of: find.widgetWithText(SettingsRow, 'Taxes 2026'), matching: find.byType(Switch)));
+    await tester.pumpAndSettle();
+    expect(server.requests.any((r) => r.method == 'PUT' && r.url.path == '/api/folders/$taxes/people/$maria'), isTrue);
+    expect(switchOf('Taxes 2026').value, isTrue);
+    await tester.tap(find.descendant(of: find.widgetWithText(SettingsRow, 'Family'), matching: find.byType(Switch)));
+    await tester.pumpAndSettle();
+    expect(server.requests.any((r) => r.method == 'DELETE' && r.url.path == '/api/folders/$family/people/$maria'), isTrue);
+    expect(switchOf('Family').value, isFalse);
+    await tester.binding.handlePopRoute(); // the phone's back
+    await tester.pumpAndSettle();
+
+    // An admin sees every folder, whatever the switches said.
+    await tester.tap(find.text('Stefan').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Admins see every folder.'), findsOneWidget);
+    expect(switchOf('Taxes 2026').value, isTrue);
+    expect(switchOf('Taxes 2026').onChanged, isNull);
+  });
+
+  testWidgets('with one folder a member has, there is nothing to switch', (tester) async {
+    await startApp(tester, signedInPhone(), adminServer());
+    await openSettings(tester);
+    await tester.tap(find.text('Maria'));
+    await tester.pumpAndSettle();
+    expect(find.text('Folders'.toUpperCase()), findsNothing);
+    expect(find.byType(Switch), findsNothing);
+  });
+
+  testWidgets('an invite gives the folders ticked; the one the library shows to begin with', (tester) async {
+    final server = adminFolders();
+    await startApp(tester, signedInPhone()..secrets['folder'] = wedding, server);
+    await openSettings(tester);
+    await tester.tap(find.text('Invite'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Oma Rosa');
+    await tester.pump();
+    expect(find.text('Admins see every folder.'), findsOneWidget);
+    Checkbox boxOf(String name) => tester.widget<Checkbox>(find.descendant(of: find.widgetWithText(SettingsRow, name), matching: find.byType(Checkbox)));
+    expect([for (final f in ['Family', 'Wedding Anna & Marco', 'Taxes 2026']) boxOf(f).value], [false, true, false]);
+    await tester.tap(find.text('Family'));
+    await tester.pump();
+    await tester.tap(find.text('Show the QR code'));
+    await tester.pumpAndSettle();
+    final made = server.requests.lastWhere((r) => r.url.path == '/api/invites');
+    expect(jsonDecode(made.body), {'name': 'Oma Rosa', 'role': 'member', 'folders': [wedding, family]});
+    expect(boxOf('Family').onChanged, isNull, reason: 'made already');
+
+    // An admin sees every folder: nothing to tick.
+    await tester.tap(find.text('Invite someone else'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Anna');
+    await tester.tap(find.text('Admin'));
+    await tester.pump();
+    expect(find.byType(Checkbox), findsNothing);
+    await tester.tap(find.text('Show the QR code'));
+    await tester.pumpAndSettle();
+    expect(jsonDecode(server.requests.lastWhere((r) => r.url.path == '/api/invites').body), {'name': 'Anna', 'role': 'admin'});
+  });
+
+  testWidgets('with one folder an invite gives it without asking', (tester) async {
+    final server = adminServer();
+    await startApp(tester, signedInPhone(), server);
+    await openSettings(tester);
+    await tester.tap(find.text('Invite'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Oma Rosa');
+    await tester.pump();
+    expect(find.byType(Checkbox), findsNothing);
+    expect(find.text('Admins see every folder.'), findsNothing);
+    await tester.tap(find.text('Show the QR code'));
+    await tester.pumpAndSettle();
+    expect(jsonDecode(server.requests.lastWhere((r) => r.url.path == '/api/invites').body)['folders'], [family]);
+  });
 }

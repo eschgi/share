@@ -46,8 +46,9 @@ class AdminRepository {
     return (username: r['username'] as String? ?? '', password: r['password'] as String? ?? '');
   }
 
-  Future<NewInvite> invite(String name, Role role) async =>
-      NewInvite.fromJson(await api.post('/api/invites', {'name': name.trim(), 'role': role.name}));
+  /// An invite for someone new; a member gets [folders], an admin sees every folder.
+  Future<NewInvite> invite(String name, Role role, {List<String> folders = const []}) async => NewInvite.fromJson(
+      await api.post('/api/invites', {'name': name.trim(), 'role': role.name, if (role == Role.member) 'folders': folders}));
 
   /// An invite that adds a phone for someone who has an account.
   Future<NewInvite> invitePhone(String userId) async => NewInvite.fromJson(await api.post('/api/users/$userId/invites'));

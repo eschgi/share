@@ -40,6 +40,10 @@ List<Seer> whoSees(People people, String folder) => [
         if (i.userId == null && (i.role == Role.admin || i.folders.contains(folder))) (id: i.id, name: i.name, pending: true),
     ];
 
+/// The folders an invite for a new member gives at first: the one the library shows, else the
+/// oldest.
+List<String> inviteDefault(List<FolderInfo> list, String? shown) => [?(validShown(list, shown) ?? list.firstOrNull?.id)];
+
 /// What all the folders hold together.
 ({int files, int bytes}) allTotals(List<FolderInfo> list) =>
     (files: list.fold(0, (s, f) => s + f.files), bytes: list.fold(0, (s, f) => s + f.bytes));

@@ -75,6 +75,8 @@
   "folderSince": "Seit {date}",
   "folderWhoSees": "Wer ihn sieht",
   "folderAdminSeesAll": "Admin · sieht alle Ordner",
+  "folderAdminsSeeAll": "Admins sehen alle Ordner.",
+  "folderPersonSees": "{name} sieht nur die eingeschalteten Ordner. Admins sehen alle Ordner.",
   "folderPinsInto": "PINs, die hinein senden",
   "folderNewPin": "Neue PIN für diesen Ordner",
   "folderPinEnds": "endet {when}",
