@@ -128,8 +128,8 @@ class UploaderTest {
 
     @Test
     fun anUploadTheServerForgotStartsOverInItsFolder() {
-        assertEquals(Uploader.Outcome.Done("u0"), upload(uploadId = "gone", folder = "w3dd1ng5x2k7mbqz4bwdbyj6qs"))
-        assertEquals("w3dd1ng5x2k7mbqz4bwdbyj6qs", uploads.getValue("u0").folder)
+        assertEquals(Uploader.Outcome.Done("u0"), upload(uploadId = "gone", folder = "w3dding5x2k7mbqz4bwdbyj6qs"))
+        assertEquals("w3dding5x2k7mbqz4bwdbyj6qs", uploads.getValue("u0").folder)
     }
 
     @Test

@@ -383,5 +383,17 @@ ThemeData shareTheme([ShareColors? colors]) {
       extendedTextStyle: const TextStyle(fontFamily: 'Roboto', fontSize: 17, fontWeight: FontWeight.w600),
     ),
     progressIndicatorTheme: ProgressIndicatorThemeData(color: c.accent, linearTrackColor: c.s3),
+    // Who sees a folder (screen 41): on in the accent, off quietly; an admin's stays on, faded.
+    switchTheme: SwitchThemeData(
+      thumbColor: WidgetStateProperty.resolveWith((s) {
+        final color = s.contains(WidgetState.selected) ? Colors.white : c.text3;
+        return s.contains(WidgetState.disabled) ? color.withValues(alpha: 0.7) : color;
+      }),
+      trackColor: WidgetStateProperty.resolveWith((s) {
+        final color = s.contains(WidgetState.selected) ? c.accent : c.s3;
+        return s.contains(WidgetState.disabled) ? color.withValues(alpha: 0.45) : color;
+      }),
+      trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
+    ),
   );
 }

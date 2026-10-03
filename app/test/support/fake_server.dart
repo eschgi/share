@@ -103,7 +103,7 @@ class FakeServer {
 
   http.Response get _noContent => http.Response('', 204);
 
-  Map<String, dynamic> _pin(String kind, String code) {
+  Map<String, dynamic> _pin(String kind, String code, {String? folder, bool showsFolder = false}) {
     _made++;
     final now = clock.now().toUtc();
     return {
@@ -115,7 +115,25 @@ class FakeServer {
       'link': 'https://share.example.com/#$code',
       'files': 0,
       'phones': 0,
+      'folder': folder ?? firstFolder,
+      'shows_folder': showsFolder,
     };
+  }
+
+  /// What's wrong with a folder name, as the server says it; null if nothing.
+  http.Response? _folderName(String name, {String? except}) {
+    if (name.isEmpty || name.length > 60 || RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(name)) return _error(400, 'bad_request');
+    final taken = folders.any((f) => f['id'] != except && (f['name'] as String).toLowerCase() == name.toLowerCase());
+    return taken ? _error(409, 'folder_name_taken') : null;
+  }
+
+  /// Files gone to Recently deleted, as an admin deleted them.
+  void _toTrash(Iterable<Map<String, dynamic>> gone) {
+    final now = clock.now().toUtc();
+    trash.insertAll(0, [
+      for (final f in gone)
+        {...f, 'deleted_at': now.toIso8601String(), 'deleted_by': 'Stefan', 'purge_at': now.add(const Duration(days: 30)).toIso8601String()},
+    ]);
   }
 
   Map<String, http.Response Function(http.Request)> _adminRoutes() => {
@@ -126,9 +144,19 @@ class FakeServer {
           final code = (b['code'] as String? ?? 'Z${_made}XYZ').toUpperCase();
           if (usedCodes.contains(code)) return _error(409, 'pin_taken');
           usedCodes.add(code);
-          final pin = _pin(b['kind'] as String, code);
+          final pin = _pin(b['kind'] as String, code, folder: b['folder'] as String?, showsFolder: b['shows_folder'] == true);
           pins.add(pin);
           return json(pin, 201);
+        },
+        'POST /api/folders': (req) {
+          final name = (_body(req)['name'] as String? ?? '').trim();
+          final problem = _folderName(name);
+          if (problem != null) return problem;
+          _made++;
+          final f = {...folder('f${_made}new${'a' * 20}', name, people: 1), 'admins_only': true, 'created_at': clock.now().toUtc().toIso8601String()};
+          folders.add(f);
+          version++;
+          return json(_withCounts(f), 201);
         },
         'GET /api/users': (_) => json(people),
         'POST /api/invites': (req) {
@@ -139,11 +167,7 @@ class FakeServer {
           final ids = (_body(req)['ids'] as List).cast<String>().toSet();
           final gone = files.where((f) => ids.contains(f['id'])).toList();
           files.removeWhere((f) => ids.contains(f['id']));
-          final now = clock.now().toUtc();
-          trash.insertAll(0, [
-            for (final f in gone)
-              {...f, 'deleted_at': now.toIso8601String(), 'deleted_by': 'Stefan', 'purge_at': now.add(const Duration(days: 30)).toIso8601String()},
-          ]);
+          _toTrash(gone);
           return json({'changed': gone.length});
         },
         'GET /api/trash': (_) => json({'files': trash, 'trash_days': 30}),
@@ -231,6 +255,40 @@ class FakeServer {
         for (final u in _users) {...u, 'phones': [for (final p in u['phones'] as List) if ((p as Map)['id'] != device.group(1)) p]},
       ];
       return _noContent;
+    }
+    final folder = RegExp(r'^/api/folders/([^/]+)(?:/(people|invites)/([^/]+))?$').firstMatch(path);
+    if (folder != null) {
+      final id = folder.group(1)!;
+      final f = folders.where((f) => f['id'] == id).firstOrNull;
+      if (f == null) return _error(404, 'not_found');
+      final who = folder.group(3);
+      if (who != null && (req.method == 'PUT' || req.method == 'DELETE')) {
+        final key = folder.group(2) == 'people' ? 'users' : 'invites';
+        final list = [for (final x in people[key] as List) (x as Map).cast<String, dynamic>()];
+        if (!list.any((x) => x['id'] == who)) return _error(404, 'not_found');
+        List<Object?> given(Map<String, dynamic> x) => [for (final g in x['folders'] as List? ?? const []) if (g != id) g];
+        people[key] = [for (final x in list) x['id'] != who ? x : {...x, 'folders': [...given(x), if (req.method == 'PUT') id]}];
+        version++;
+        return _noContent;
+      }
+      if (req.method == 'PATCH') {
+        final name = (_body(req)['name'] as String? ?? '').trim();
+        final problem = _folderName(name, except: id);
+        if (problem != null) return problem;
+        f['name'] = name;
+        version++;
+        return json(_withCounts(f));
+      }
+      if (req.method == 'DELETE') {
+        if (folders.length <= 1) return _error(409, 'last_folder');
+        folders.remove(f);
+        final gone = files.where((x) => x['folder'] == id).toList();
+        files.removeWhere((x) => x['folder'] == id);
+        _toTrash(gone);
+        pins.removeWhere((p) => p['folder'] == id);
+        version++;
+        return json({'changed': gone.length});
+      }
     }
     final invite = RegExp(r'^/api/invites/([^/]+)$').firstMatch(path);
     if (req.method == 'DELETE' && invite != null) {

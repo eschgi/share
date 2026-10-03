@@ -231,6 +231,37 @@ class Avatar extends StatelessWidget {
   }
 }
 
+/// A few people's initials, overlapping, such as who sees a folder (screen 40).
+class AvatarStack extends StatelessWidget {
+  const AvatarStack({super.key, required this.people, this.size = 26, this.max = 4});
+  final List<({String id, String name, bool pending})> people;
+  final double size;
+  final int max; // more aren't drawn
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final shown = people.take(max).toList();
+    final ring = size + 4; // a ring of the card's colour sets them apart
+    final step = ring - 9;
+    return SizedBox(
+      width: shown.isEmpty ? 0 : ring + (shown.length - 1) * step,
+      height: ring,
+      child: Stack(children: [
+        for (final (i, p) in shown.indexed)
+          Positioned(
+            left: i * step,
+            child: Container(
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(color: c.s1, shape: BoxShape.circle),
+              child: Avatar(name: p.name, id: p.id, size: size, pending: p.pending),
+            ),
+          ),
+      ]),
+    );
+  }
+}
+
 /// Settings rows, grouped on a card.
 class SettingsGroup extends StatelessWidget {
   const SettingsGroup({super.key, required this.children});
@@ -261,6 +292,7 @@ class SettingsRow extends StatelessWidget {
     this.trailing,
     this.onTap,
     this.danger = false,
+    this.accent = false,
     this.monoTitle = false,
   });
   final Widget leading;
@@ -269,6 +301,7 @@ class SettingsRow extends StatelessWidget {
   final Widget? trailing;
   final VoidCallback? onTap;
   final bool danger;
+  final bool accent; // makes something new, such as a PIN
   final bool monoTitle; // a path, like the storage folder
 
   /// The square icon of a row, accent-coloured for the most used ones.
@@ -299,7 +332,7 @@ class SettingsRow extends StatelessWidget {
                     fontFamily: monoTitle ? mono : null,
                     fontSize: monoTitle ? 15 : 15.5,
                     fontWeight: FontWeight.w600,
-                    color: danger ? c.danger : c.text,
+                    color: danger ? c.danger : (accent ? c.accentText : c.text),
                   )),
               if (subtitle != null) ...[
                 const SizedBox(height: 2),

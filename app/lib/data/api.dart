@@ -89,9 +89,9 @@ class Api {
 
   Future<void> put(String path, Object body) => _send('PUT', path, body: body);
 
-  Future<void> patch(String path, Object body) => _send('PATCH', path, body: body);
+  Future<Json> patch(String path, Object body) async => _json(await _send('PATCH', path, body: body));
 
-  Future<void> delete(String path) => _send('DELETE', path);
+  Future<Json> delete(String path) async => _json(await _send('DELETE', path));
 
   Future<Uint8List> bytes(String path) async => (await _send('GET', path, raw: true)).bodyBytes;
 

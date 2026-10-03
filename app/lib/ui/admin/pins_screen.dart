@@ -43,57 +43,8 @@ class _PinsScreenState extends State<PinsScreen> {
     }
   }
 
-  void _say(String text) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
-
-  Future<void> _share(PinInfo p) => Services.read(context).platform.shareText(AppLocalizations.of(context).pinShareText(p.link));
-
   Future<void> _new() async {
-    final created = await showModalBottomSheet<PinInfo>(context: context, isScrollControlled: true, builder: (_) => const NewPinSheet());
-    if (created == null || !mounted) return;
-    await _load();
-    await _share(created);
-  }
-
-  Future<bool> _confirm(String title, String body, String action) async {
-    final t = AppLocalizations.of(context);
-    return await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text(title),
-            content: Text(body, style: TextStyle(color: context.colors.text2, height: 1.5)),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(context, false), child: Text(t.commonCancel)),
-              TextButton(
-                style: TextButton.styleFrom(foregroundColor: context.colors.danger),
-                onPressed: () => Navigator.pop(context, true),
-                child: Text(action),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-  }
-
-  Future<void> _newCode(PinInfo p) async {
-    final t = AppLocalizations.of(context);
-    if (!await _confirm(t.pinNewCodeTitle(p.code), t.pinNewCodeBody, t.pinNewCode) || !mounted) return;
-    try {
-      await Services.read(context).admin.newCode(p.id);
-    } on Exception {
-      _say(t.commonFailed);
-    }
-    await _load();
-  }
-
-  Future<void> _end(PinInfo p) async {
-    final t = AppLocalizations.of(context);
-    if (!await _confirm(t.pinEndTitle(p.code), t.pinEndBody, t.pinEndNow) || !mounted) return;
-    try {
-      await Services.read(context).admin.endPin(p.id);
-    } on Exception {
-      _say(t.commonFailed);
-    }
-    await _load();
+    if (await makePin(context) != null) await _load();
   }
 
   @override
@@ -124,24 +75,82 @@ class _PinsScreenState extends State<PinsScreen> {
           if (_failed) Padding(padding: const EdgeInsets.only(top: 24), child: Help(t.commonOffline)),
           if (pins != null && pins.isEmpty) Padding(padding: const EdgeInsets.only(top: 24), child: Help(t.pinsNone)),
           if (permanent.isNotEmpty) SectionLabel(t.pinsPermanent),
-          for (final p in permanent)
-            _PinCard(pin: p, onShare: () => _share(p), onNewCode: () => _newCode(p), onQr: () => showPinQr(context, p), onEnd: () => _end(p)),
+          for (final p in permanent) PinCard(pin: p, onChanged: _load),
           if (day.isNotEmpty) SectionLabel(t.pinsDay),
-          for (final p in day)
-            _PinCard(pin: p, onShare: () => _share(p), onNewCode: () => _newCode(p), onQr: () => showPinQr(context, p), onEnd: () => _end(p)),
+          for (final p in day) PinCard(pin: p, onChanged: _load),
         ]),
       ),
     );
   }
 }
 
-class _PinCard extends StatelessWidget {
-  const _PinCard({required this.pin, required this.onShare, required this.onNewCode, required this.onQr, required this.onEnd});
+/// Screen 19, then sharing the new PIN; the PIN, or null. [folder] is where it sends into.
+Future<PinInfo?> makePin(BuildContext context, {String? folder}) async {
+  final created = await showModalBottomSheet<PinInfo>(context: context, isScrollControlled: true, builder: (_) => NewPinSheet(folder: folder));
+  if (created != null && context.mounted) await sharePin(context, created);
+  return created;
+}
+
+Future<void> sharePin(BuildContext context, PinInfo p) => Services.read(context).platform.shareText(AppLocalizations.of(context).pinShareText(p.link));
+
+Future<bool> _confirm(BuildContext context, String title, String body, String action) async {
+  final t = AppLocalizations.of(context);
+  return await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(title),
+          content: Text(body, style: TextStyle(color: context.colors.text2, height: 1.5)),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: Text(t.commonCancel)),
+            TextButton(
+              style: TextButton.styleFrom(foregroundColor: context.colors.danger),
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(action),
+            ),
+          ],
+        ),
+      ) ??
+      false;
+}
+
+/// Asks, then does [change] to a PIN; false if the person didn't want to.
+Future<bool> _changePin(BuildContext context, String title, String body, String action, Future<void> Function() change) async {
+  final t = AppLocalizations.of(context);
+  final messenger = ScaffoldMessenger.of(context);
+  if (!await _confirm(context, title, body, action)) return false;
+  try {
+    await change();
+  } on Exception {
+    messenger.showSnackBar(SnackBar(content: Text(t.commonFailed)));
+  }
+  return true;
+}
+
+/// A PIN with what can be done with it: share it, a new code or its QR code, end it.
+/// [onChanged] hears of a new code or the end.
+class PinCard extends StatelessWidget {
+  const PinCard({super.key, required this.pin, required this.onChanged});
   final PinInfo pin;
-  final VoidCallback onShare, onNewCode, onQr, onEnd;
+  final VoidCallback onChanged;
+
+  Future<void> _newCode(BuildContext context) async {
+    final t = AppLocalizations.of(context);
+    final admin = Services.read(context).admin;
+    if (await _changePin(context, t.pinNewCodeTitle(pin.code), t.pinNewCodeBody, t.pinNewCode, () => admin.newCode(pin.id))) onChanged();
+  }
+
+  Future<void> _end(BuildContext context) async {
+    final t = AppLocalizations.of(context);
+    final admin = Services.read(context).admin;
+    if (await _changePin(context, t.pinEndTitle(pin.code), t.pinEndBody, t.pinEndNow, () => admin.endPin(pin.id))) onChanged();
+  }
 
   @override
   Widget build(BuildContext context) {
+    void onShare() => sharePin(context, pin);
+    void onNewCode() => _newCode(context);
+    void onQr() => showPinQr(context, pin);
+    void onEnd() => _end(context);
     final t = AppLocalizations.of(context);
     final c = context.colors;
     final locale = Localizations.localeOf(context).languageCode;
@@ -247,7 +256,10 @@ Future<void> showPinQr(BuildContext context, PinInfo pin) {
 
 /// Screen 19: how long the PIN works, and its code (made up, or typed).
 class NewPinSheet extends StatefulWidget {
-  const NewPinSheet({super.key});
+  const NewPinSheet({super.key, this.folder});
+
+  /// The folder it sends into.
+  final String? folder;
 
   @override
   State<NewPinSheet> createState() => _NewPinSheetState();
@@ -294,7 +306,7 @@ class _NewPinSheetState extends State<NewPinSheet> {
     });
     final navigator = Navigator.of(context);
     try {
-      final pin = await Services.read(context).admin.createPin(_kind, code: _code.text);
+      final pin = await Services.read(context).admin.createPin(_kind, code: _code.text, folder: widget.folder);
       navigator.pop(pin);
     } on ApiException catch (e) {
       setState(() => _error = switch (e.code) { 'pin_taken' => t.pinTaken, 'pin_format' => t.pinBadCode, _ => t.commonFailed });

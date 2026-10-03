@@ -26,6 +26,20 @@ String? sendTarget(List<FolderInfo> list, String? shown, String? chosen) {
   return list.firstOrNull?.id;
 }
 
+/// Someone who sees a folder; [pending] for an invite nobody used yet.
+typedef Seer = ({String id, String name, bool pending});
+
+/// Who sees a folder: the admins, the members given it, and open invites for new people that
+/// give it (an admin's invite sees every folder).
+List<Seer> whoSees(People people, String folder) => [
+      for (final u in people.users)
+        if (u.isAdmin) (id: u.id, name: u.name, pending: false),
+      for (final u in people.users)
+        if (!u.isAdmin && u.folders.contains(folder)) (id: u.id, name: u.name, pending: false),
+      for (final i in people.invites)
+        if (i.userId == null && (i.role == Role.admin || i.folders.contains(folder))) (id: i.id, name: i.name, pending: true),
+    ];
+
 /// What all the folders hold together.
 ({int files, int bytes}) allTotals(List<FolderInfo> list) =>
     (files: list.fold(0, (s, f) => s + f.files), bytes: list.fold(0, (s, f) => s + f.bytes));

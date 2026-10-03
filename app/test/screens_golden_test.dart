@@ -9,6 +9,7 @@ import 'package:share_app/data/platform.dart';
 import 'package:share_app/ui/settings_screen.dart';
 
 import 'app_test.dart' show daysAgo, inviteToken, signedInPhone, startApp, today;
+import 'folders_test.dart' show family, kindergarten, taxes, wedding;
 import 'support/contract.dart';
 import 'support/fake_platform.dart';
 import 'support/fake_server.dart';
@@ -52,20 +53,25 @@ void main() {
     }));
   }
 
-  // Maria's three folders, as in the mockups, with the library showing Family.
+  // The mockups' folders: Maria's three (38, 39, 48), and the taxes only admins see (40, 41).
+  List<Map<String, dynamic>> mockupFolders(FakeServer server, {bool admin = false}) {
+    Map<String, dynamic> cover(int i) => {...server.files[i], 'has_thumb': true};
+    return [
+      FakeServer.folder(family, 'Family', files: 2340, bytes: 41000000000, cover: cover(0)),
+      {...FakeServer.folder(wedding, 'Wedding Anna & Marco', files: 412, bytes: 9800000000, people: 2, cover: cover(7)), 'created_at': '2026-09-26T08:00:00Z'},
+      FakeServer.folder(kindergarten, 'Kindergarten', files: 86, bytes: 340000000, people: 2),
+      if (admin) {...FakeServer.folder(taxes, 'Taxes 2026', files: 37, bytes: 120000000, people: 1), 'admins_only': true},
+    ];
+  }
+
+  // As Maria, with the library showing Family.
   FakeServer folders() {
     final server = library();
-    Map<String, dynamic> cover(int i) => {...server.files[i], 'has_thumb': true};
-    return server
-      ..folders = [
-        FakeServer.folder('f4mily5x2k7mbqz4bwdbyj6qsq', 'Family', files: 2340, bytes: 41000000000, cover: cover(0)),
-        FakeServer.folder('w3dd1ng5x2k7mbqz4bwdbyj6qs', 'Wedding Anna & Marco', files: 412, bytes: 9800000000, cover: cover(7)),
-        FakeServer.folder('k1nd3rg4rt3nmbqz4bwdbyj6qs', 'Kindergarten', files: 86, bytes: 340000000),
-      ];
+    return server..folders = mockupFolders(server);
   }
 
   testWidgets('a folder', (tester) => atTen(() async {
-    await startApp(tester, signedInPhone()..secrets['folder'] = 'f4mily5x2k7mbqz4bwdbyj6qsq', folders());
+    await startApp(tester, signedInPhone()..secrets['folder'] = family, folders());
     await shot(tester, 'en/38-library-folder');
     await tester.tap(find.text('Family'));
     await shot(tester, 'en/39-choose-folder');
@@ -143,6 +149,33 @@ void main() {
     server.pins[1]['expires_at'] = at(today.add(const Duration(hours: 23, minutes: 30)));
     return server;
   }
+
+  // As Stefan: Maria was given Kindergarten too and Peter Family; the 24-hour PIN sends into
+  // the wedding's folder.
+  FakeServer adminFolders() {
+    final server = admin()..addDay(today(), 6)..addDay(daysAgo(1), 11, startId: 100);
+    server.folders = mockupFolders(server, admin: true);
+    server.people['users'] = [
+      for (final u in server.people['users'] as List)
+        switch ((u as Map)['name']) {
+          'Maria' => {...u, 'folders': [family, wedding, kindergarten]},
+          'Peter' => {...u, 'folders': [family]},
+          _ => u,
+        },
+    ];
+    server.pins[1]['folder'] = wedding;
+    return server;
+  }
+
+  testWidgets('folders', (tester) => atTen(() async {
+    await startApp(tester, signedInPhone(), adminFolders());
+    await tester.tap(find.text('Settings').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Folders'));
+    await shot(tester, 'en/40-folders');
+    await tester.tap(find.text('Wedding Anna & Marco'));
+    await shot(tester, 'en/41-folder');
+  }));
 
   testWidgets('settings', (tester) => atTen(() async {
     await startApp(tester, signedInPhone()..current = const RouteStatus(ServerRoute.local, millis: 12), admin());
@@ -235,7 +268,7 @@ void main() {
   }));
 
   testWidgets('sending into a folder', (tester) => atTen(() async {
-    await startApp(tester, signedInPhone()..secrets['folder'] = 'f4mily5x2k7mbqz4bwdbyj6qsq', folders());
+    await startApp(tester, signedInPhone()..secrets['folder'] = family, folders());
     await tester.tap(find.text('Send').last);
     await shot(tester, 'en/48-send-folder');
   }));

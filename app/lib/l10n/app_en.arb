@@ -161,6 +161,81 @@
   },
   "folderOnlyAdmins": "Only admins",
   "folderOnlyAdminsLine": "only admins",
+  "foldersLead": "Everyone sees only the folders they were given; admins see all of them.",
+  "foldersCount": "{count, plural, =1{1 folder} other{{count} folders}}",
+  "@foldersCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "foldersPins": "{count, plural, =1{1 PIN} other{{count} PINs}}",
+  "@foldersPins": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "foldersNew": "New folder",
+  "folderName": "Name",
+  "folderNewHelp": "Only admins see it until you give it to people.",
+  "folderCreate": "Create",
+  "folderSince": "Since {date}",
+  "@folderSince": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "folderWhoSees": "Who sees it",
+  "folderAdminSeesAll": "Admin · sees all folders",
+  "folderPinsInto": "PINs that send into it",
+  "folderNewPin": "New PIN for this folder",
+  "folderPinEnds": "ends {when}",
+  "@folderPinEnds": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "folderPinSince": "since {date}",
+  "@folderPinSince": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "folderRename": "Rename",
+  "folderRenameTitle": "Rename the folder",
+  "folderRenameHelp": "Its folder on the server's drive gets the new name too.",
+  "folderDelete": "Delete the folder",
+  "folderDeleteTitle": "Delete “{folder}”?",
+  "@folderDeleteTitle": {
+    "placeholders": {
+      "folder": {
+        "type": "String"
+      }
+    }
+  },
+  "folderDeleteBody": "Its files go to Recently deleted, and restoring one brings the folder back. PINs that send into it stop working.",
+  "folderDeleted": "“{folder}” is deleted.",
+  "@folderDeleted": {
+    "placeholders": {
+      "folder": {
+        "type": "String"
+      }
+    }
+  },
+  "folderGone": "This folder doesn't exist any more.",
+  "folderNameTaken": "Another folder has that name.",
+  "folderNameBad": "A folder needs a name, and it can't be a date like 2026-09-27.",
+  "folderBusy": "The folder's files are still moving after its last rename. Try again in a few minutes.",
+  "folderLastFolder": "The last folder can't be deleted: everything is sent into a folder.",
   "filterAll": "All",
   "filterPhotos": "Photos",
   "filterVideos": "Videos",

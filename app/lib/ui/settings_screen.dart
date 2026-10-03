@@ -8,6 +8,7 @@ import '../data/models.dart';
 import '../data/platform.dart';
 import '../data/username.dart';
 import '../l10n/app_localizations.dart';
+import 'admin/folders_screen.dart';
 import 'admin/invite_person_screen.dart';
 import 'admin/people.dart';
 import 'admin/pins_screen.dart';
@@ -40,7 +41,7 @@ String storageWarningText(AppLocalizations t, String code) => switch (code) {
     };
 
 /// Screen 17: profile, language, server, password, signing out and deleting the account;
-/// admins also get the upload PINs, the people and the storage.
+/// admins also get the upload PINs, the folders, the people and the storage.
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key, required this.user, required this.navigation});
   final User user;
@@ -282,6 +283,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: t.settingsPins,
               subtitle: _pinsSummary(t),
               onTap: () => _open(const PinsScreen()),
+            ),
+          if (u.isAdmin)
+            ListenableBuilder(
+              listenable: Services.of(context).folders,
+              builder: (context, _) => SettingsRow(
+                leading: SettingsRow.icon(context, AppIcons.folder),
+                title: t.foldersTitle,
+                subtitle: switch (Services.of(context).folders.list) { final list? => t.foldersCount(list.length), null => null },
+                onTap: () => _open(const FoldersScreen()),
+              ),
             ),
           SettingsRow(
             leading: SettingsRow.icon(context, AppIcons.globe),

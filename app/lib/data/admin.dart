@@ -1,4 +1,5 @@
-/// What admins do (screens 17–21): PINs, people and invites, deleting files and the trash.
+/// What admins do (screens 17–21, 40–41): PINs, people and invites, folders, deleting files and
+/// the trash.
 library;
 
 import 'api.dart';
@@ -20,9 +21,10 @@ class AdminRepository {
 
   Future<String> suggestPin() async => (await api.get('/api/pins/suggest'))['code'] as String? ?? '';
 
-  /// Throws ApiException pin_taken or pin_format for a [code] that can't be had.
-  Future<PinInfo> createPin(PinKind kind, {String? code}) async =>
-      PinInfo.fromJson(await api.post('/api/pins', {'kind': kind.wire, if (code != null && code.isNotEmpty) 'code': code}));
+  /// A PIN that sends into [folder]. Throws ApiException pin_taken or pin_format for a [code]
+  /// that can't be had, folder_gone for a folder that is no more.
+  Future<PinInfo> createPin(PinKind kind, {String? code, String? folder}) async =>
+      PinInfo.fromJson(await api.post('/api/pins', {'kind': kind.wire, if (code != null && code.isNotEmpty) 'code': code, 'folder': ?folder}));
 
   Future<PinInfo> newCode(String id) async => PinInfo.fromJson(await api.post('/api/pins/$id/new-code'));
 
@@ -51,6 +53,25 @@ class AdminRepository {
   Future<NewInvite> invitePhone(String userId) async => NewInvite.fromJson(await api.post('/api/users/$userId/invites'));
 
   Future<void> withdrawInvite(String id) => api.delete('/api/invites/$id');
+
+  /// A new folder, which only admins see at first. Throws ApiException folder_name_taken, or
+  /// bad_request for a name that won't do.
+  Future<FolderInfo> createFolder(String name) async => FolderInfo.fromJson(await api.post('/api/folders', {'name': name.trim()}));
+
+  /// Also throws ApiException folder_busy while the files of the last rename are still moving.
+  Future<FolderInfo> renameFolder(String id, String name) async => FolderInfo.fromJson(await api.patch('/api/folders/$id', {'name': name.trim()}));
+
+  /// Its files go to Recently deleted and its PINs end; returns how many files went. Throws
+  /// ApiException last_folder for the last one.
+  Future<int> deleteFolder(String id) async => ((await api.delete('/api/folders/$id'))['changed'] as num?)?.toInt() ?? 0;
+
+  /// Gives someone a folder, or takes it away; admins see every folder anyway.
+  Future<void> setFolderPerson(String folder, String userId, {required bool sees}) =>
+      sees ? api.put('/api/folders/$folder/people/$userId', const {}) : api.delete('/api/folders/$folder/people/$userId');
+
+  /// The same for an open invite for a new member.
+  Future<void> setFolderInvite(String folder, String inviteId, {required bool gets}) =>
+      gets ? api.put('/api/folders/$folder/invites/$inviteId', const {}) : api.delete('/api/folders/$folder/invites/$inviteId');
 
   /// Moves files to Recently deleted; returns how many were in the library.
   Future<int> deleteFiles(List<String> ids) => _inParts('/api/files/delete', ids);
