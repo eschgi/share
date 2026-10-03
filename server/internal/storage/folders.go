@@ -352,3 +352,109 @@ func ptrOr(p *string, or string) string {
 	}
 	return *p
 }
+
+// MoveFiles moves files of the library to another folder: on the drive, into the same day's
+// folder in the other folder's directory, with a number added where a name is taken. Who sees
+// them changes with the folder. The database changes first and the bytes follow; Reconcile
+// finishes what a crash cut short. It returns the files it moved; db.ErrNotFound for no such
+// folder.
+func (lib *Library) MoveFiles(ctx context.Context, fileIDs []string, folderID string) ([]db.File, error) {
+	lib.mu.Lock()
+	defer lib.mu.Unlock()
+	to, err := lib.DB.FolderByID(ctx, folderID)
+	if err == nil && to.DeletedAt != nil {
+		err = db.ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	files, err := lib.DB.ReadyFiles(ctx, fileIDs)
+	if err != nil {
+		return nil, err
+	}
+	var moves []db.Move
+	var moved []db.File
+	var from []string
+	claimed := map[string]bool{}
+	for _, f := range files {
+		if f.FolderID == to.ID {
+			continue
+		}
+		src, err := lib.locate(ctx, f)
+		if err != nil {
+			return nil, err
+		}
+		rel, err := lib.freePath(ctx, to, f.UploadDay, f.Name, claimed)
+		if err != nil {
+			return nil, err
+		}
+		claimed[strings.ToLower(rel)] = true
+		moves = append(moves, db.Move{ID: f.ID, FolderID: to.ID, RelPath: rel, From: f.FolderID + "/" + f.RelPath})
+		from = append(from, src)
+		f.FolderID, f.RelPath, f.MovedFrom = to.ID, rel, f.FolderID+"/"+f.RelPath
+		moved = append(moved, f)
+	}
+	if len(moves) == 0 {
+		return nil, nil
+	}
+	if err := lib.DB.MoveFiles(ctx, moves); err != nil {
+		return nil, err
+	}
+	var done []string
+	dirs := map[string]bool{}
+	for i, f := range moved {
+		dst := inFolder(to, f.RelPath)
+		if err := lib.root.MkdirAll(path.Dir(dst), 0o755); err != nil {
+			lib.Logf("storage: moving %s: %v", f.ID, err) // the reconciler tries again
+			continue
+		}
+		if err := lib.root.Rename(from[i], dst); err != nil {
+			lib.Logf("storage: moving %s: %v", f.ID, err)
+			continue
+		}
+		dirs[path.Dir(dst)], dirs[path.Dir(from[i])] = true, true
+		done = append(done, f.ID)
+	}
+	for dir := range dirs {
+		if err := syncFile(lib.root, dir); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			lib.Logf("storage: syncing %s: %v", dir, err)
+		}
+		lib.root.Remove(dir) // a day's folder goes with its last file
+	}
+	if err := lib.DB.FinishMoves(ctx, done); err != nil {
+		return moved, err
+	}
+	return moved, nil
+}
+
+// finishMoves moves the bytes of files whose move to another folder was cut short.
+func (lib *Library) finishMoves(ctx context.Context) error {
+	lib.mu.Lock()
+	defer lib.mu.Unlock()
+	files, err := lib.DB.Moving(ctx)
+	if err != nil {
+		return err
+	}
+	var done []string
+	for _, f := range files {
+		folder, err := lib.folderOf(ctx, f)
+		if err != nil {
+			return err
+		}
+		dst, src := inFolder(folder, f.RelPath), lib.movedFrom(ctx, f)
+		if !lib.exists(dst) && src != "" && lib.exists(src) {
+			if err := lib.root.MkdirAll(path.Dir(dst), 0o755); err != nil {
+				return err
+			}
+			if err := lib.root.Rename(src, dst); err != nil {
+				lib.Logf("storage: moving %s: %v", f.ID, err)
+				continue
+			}
+			lib.syncDirs(path.Dir(dst), path.Dir(src))
+			lib.root.Remove(path.Dir(src))
+		}
+		// Moved now, or before a crash; or its bytes are in the trash already.
+		done = append(done, f.ID)
+	}
+	return lib.DB.FinishMoves(ctx, done)
+}

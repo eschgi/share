@@ -1,0 +1,17 @@
+{
+  "method": "POST",
+  "path": "/api/files/move",
+  "auth": "admin",
+  "request": {
+    "ids": [
+      "q3ld5x2k7mbqz4bwdbyj6qsqxa",
+      "q4ld5x2k7mbqz4bwdbyj6qsqxa"
+    ],
+    "folder": "t4xes5x2k7mbqz4bwdbyj6qsqx"
+  },
+  "status": 200,
+  "response": {
+    "changed": 2
+  },
+  "notes": "Moves files of the library to another folder: who sees them changes with the folder. On the drive they go into the same day's folder in the other folder's directory, with a number added where a name is taken there (IMG_0001 (2).jpg). changed counts the files that moved; files already in that folder or not in the library are left alone. The files keep their id and updated_at, so thumbnails stay cached. At most 1000 ids per request (bad_request); send more in parts. 404 not_found for no such folder."
+}

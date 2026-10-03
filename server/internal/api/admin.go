@@ -44,6 +44,7 @@ func (a *API) registerAdmin(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/folders/{id}/invites/{invite}", a.folderInvite(false))
 
 	mux.HandleFunc("POST /api/files/delete", a.deleteFiles)
+	mux.HandleFunc("POST /api/files/move", a.moveFiles)
 	mux.HandleFunc("GET /api/trash", a.trash)
 	mux.HandleFunc("POST /api/trash/restore", a.restore)
 	mux.HandleFunc("POST /api/trash/purge", a.purge)
@@ -527,17 +528,22 @@ func fileIDsIn(w http.ResponseWriter, r *http.Request) ([]string, bool) {
 	if !httpx.DecodeJSON(w, r, &req) {
 		return nil, false
 	}
-	if len(req.IDs) == 0 || len(req.IDs) > maxIDs {
+	return checkFileIDs(w, req.IDs)
+}
+
+// checkFileIDs checks the ids of a request that changes files.
+func checkFileIDs(w http.ResponseWriter, fileIDs []string) ([]string, bool) {
+	if len(fileIDs) == 0 || len(fileIDs) > maxIDs {
 		httpx.WriteError(w, http.StatusBadRequest, "bad_request", "Send between 1 and 1000 ids.")
 		return nil, false
 	}
-	for _, id := range req.IDs {
+	for _, id := range fileIDs {
 		if !ids.Valid(id) {
 			httpx.WriteError(w, http.StatusBadRequest, "bad_request", "That isn't a file id: "+id)
 			return nil, false
 		}
 	}
-	return req.IDs, true
+	return fileIDs, true
 }
 
 // Changed says how many of the files a request changed; the others were already so.

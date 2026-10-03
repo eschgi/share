@@ -66,22 +66,44 @@ func (lib *Library) folderOf(ctx context.Context, f db.File) (db.Folder, error) 
 	return lib.DB.FolderByID(ctx, f.FolderID)
 }
 
-// locate finds a file's bytes on the drive: the path in its folder's directory, or the one
-// under the folder's older directory while its files are being moved there.
+// locate finds a file's bytes on the drive: the path in its folder's directory, or, while
+// they are being moved there, the one under the folder's older directory or in the folder
+// the file came from.
 func (lib *Library) locate(ctx context.Context, f db.File) (string, error) {
 	folder, err := lib.folderOf(ctx, f)
 	if err != nil {
 		return "", err
 	}
 	p := inFolder(folder, f.RelPath)
+	if (folder.RenamingFrom == nil && f.MovedFrom == "") || lib.exists(p) {
+		return p, nil
+	}
 	if folder.RenamingFrom != nil {
-		if _, err := lib.root.Lstat(p); errors.Is(err, fs.ErrNotExist) {
-			if old := path.Join(*folder.RenamingFrom, f.RelPath); lib.exists(old) {
-				return old, nil
-			}
+		if old := path.Join(*folder.RenamingFrom, f.RelPath); lib.exists(old) {
+			return old, nil
 		}
 	}
+	if old := lib.movedFrom(ctx, f); old != "" && lib.exists(old) {
+		return old, nil
+	}
 	return p, nil
+}
+
+// movedFrom is where a file's bytes were before its move to another folder, "" if it isn't
+// moving.
+func (lib *Library) movedFrom(ctx context.Context, f db.File) string {
+	id, rel, ok := strings.Cut(f.MovedFrom, "/")
+	if !ok {
+		return ""
+	}
+	from, err := lib.DB.FolderByID(ctx, id)
+	if err != nil {
+		return ""
+	}
+	if p := inFolder(from, rel); lib.exists(p) || from.RenamingFrom == nil {
+		return p
+	}
+	return path.Join(*from.RenamingFrom, rel)
 }
 
 func (lib *Library) exists(p string) bool {
@@ -164,7 +186,7 @@ func (lib *Library) claimPath(ctx context.Context, f db.File) (db.File, error) {
 	now := lib.Now()
 	day := Day(now, lib.Loc)
 	for range 5 {
-		rel, err := lib.freePath(ctx, folder, day, f.Name)
+		rel, err := lib.freePath(ctx, folder, day, f.Name, nil)
 		if err != nil {
 			return f, err
 		}
@@ -186,14 +208,17 @@ func (lib *Library) claimPath(ctx context.Context, f db.File) (db.File, error) {
 
 // freePath returns day/name in a folder, or day/name (2) and so on if taken. Names are
 // compared without case, both in the database and on disk, because exFAT and NTFS drives
-// ignore case.
-func (lib *Library) freePath(ctx context.Context, folder db.Folder, day, name string) (string, error) {
+// ignore case. claimed, if given, holds lower-case paths that count as taken too.
+func (lib *Library) freePath(ctx context.Context, folder db.Folder, day, name string, claimed map[string]bool) (string, error) {
 	for n := 1; n <= 10000; n++ {
 		candidate := name
 		if n > 1 {
 			candidate = numbered(name, n)
 		}
 		rel := day + "/" + candidate
+		if claimed[strings.ToLower(rel)] {
+			continue
+		}
 		taken, err := lib.DB.RelPathTaken(ctx, folder.ID, rel)
 		if err != nil {
 			return "", err
@@ -266,6 +291,7 @@ func (lib *Library) Terminate(ctx context.Context, id string) error {
 // Reconcile repairs what a crash or an abandoned upload leaves behind. It runs before the
 // server starts listening and then every few minutes:
 //   - files still under a folder's older directory move into the new one;
+//   - files moved to another folder whose bytes didn't follow yet move there;
 //   - uploads stuck halfway through finalizing are finished;
 //   - receiving uploads whose bytes are all there are finalized (the response was lost);
 //   - receiving uploads idle for longer than ttl are dropped;
@@ -275,6 +301,9 @@ func (lib *Library) Terminate(ctx context.Context, id string) error {
 //   - deleted folders without files are forgotten.
 func (lib *Library) Reconcile(ctx context.Context, ttl time.Duration) error {
 	if err := lib.relocate(ctx); err != nil {
+		return err
+	}
+	if err := lib.finishMoves(ctx); err != nil {
 		return err
 	}
 	now := lib.Now()

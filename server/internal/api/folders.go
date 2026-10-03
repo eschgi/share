@@ -308,3 +308,33 @@ func (a *API) liveFolder(w http.ResponseWriter, r *http.Request) (db.Folder, boo
 	}
 	return f, true
 }
+
+type moveRequest struct {
+	IDs    []string `json:"ids"`
+	Folder string   `json:"folder"`
+}
+
+// moveFiles moves files to another folder: who sees them changes with the folder.
+func (a *API) moveFiles(w http.ResponseWriter, r *http.Request) {
+	if _, ok := a.admin(w, r); !ok {
+		return
+	}
+	var req moveRequest
+	if !httpx.DecodeJSON(w, r, &req) {
+		return
+	}
+	fileIDs, ok := checkFileIDs(w, req.IDs)
+	if !ok {
+		return
+	}
+	moved, err := a.Lib.MoveFiles(r.Context(), fileIDs, req.Folder)
+	if errors.Is(err, db.ErrNotFound) {
+		httpx.WriteError(w, http.StatusNotFound, "not_found", "No such folder.")
+		return
+	}
+	if err != nil {
+		internal(w, "move", err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, Changed{Changed: len(moved)})
+}

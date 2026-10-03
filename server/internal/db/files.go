@@ -218,3 +218,58 @@ func (d *DB) IdleReceiving(ctx context.Context, before time.Time) ([]File, error
 	return queryFiles(ctx, d, "SELECT "+fileColumns+" FROM files WHERE state = 'receiving' AND updated_at < ? ORDER BY updated_at",
 		ms(before))
 }
+
+// Move is one file's move to another folder: where it goes, and where its bytes come from
+// ("<folder id>/<rel_path>").
+type Move struct {
+	ID       string
+	FolderID string
+	RelPath  string
+	From     string
+}
+
+// MoveFiles records moves to other folders in one transaction, before the bytes follow; each
+// file notes where its bytes come from until FinishMoves. Files that aren't in the library
+// any more are left alone. updated_at stays: the file and its thumbnail didn't change.
+func (d *DB) MoveFiles(ctx context.Context, moves []Move) error {
+	return d.Tx(ctx, func(tx *sql.Tx) error {
+		changed := false
+		for _, m := range moves {
+			res, err := tx.ExecContext(ctx, "UPDATE files SET folder_id = ?, rel_path = ?, moved_from = ? WHERE id = ? AND state = 'ready'",
+				m.FolderID, m.RelPath, m.From, m.ID)
+			if isUniqueViolation(err) {
+				return ErrConflict
+			}
+			if err != nil {
+				return err
+			}
+			if n, _ := res.RowsAffected(); n > 0 {
+				changed = true
+			}
+		}
+		if !changed {
+			return nil
+		}
+		return bumpLibraryVersion(ctx, tx)
+	})
+}
+
+// FinishMoves notes that the bytes of moved files are in their new place.
+func (d *DB) FinishMoves(ctx context.Context, ids []string) error {
+	for start := 0; start < len(ids); start += 500 {
+		part := ids[start:min(start+500, len(ids))]
+		args := make([]any, len(part))
+		for i, id := range part {
+			args[i] = id
+		}
+		if _, err := d.ExecContext(ctx, "UPDATE files SET moved_from = NULL WHERE id IN (?"+strings.Repeat(", ?", len(part)-1)+")", args...); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Moving lists the files whose bytes may still be at their place before a move.
+func (d *DB) Moving(ctx context.Context) ([]File, error) {
+	return queryFiles(ctx, d, "SELECT "+fileColumns+" FROM files WHERE moved_from IS NOT NULL")
+}

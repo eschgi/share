@@ -104,7 +104,7 @@ func (lib *Library) restorePath(ctx context.Context, f db.File) (string, error) 
 			return "", err
 		}
 		if _, statErr := lib.root.Lstat(inFolder(folder, rel)); taken || statErr == nil || try > 0 {
-			if rel, err = lib.freePath(ctx, folder, f.UploadDay, f.Name); err != nil {
+			if rel, err = lib.freePath(ctx, folder, f.UploadDay, f.Name, nil); err != nil {
 				return "", err
 			}
 		}

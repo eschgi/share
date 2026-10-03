@@ -399,3 +399,79 @@ func TestReconcileFinishesADeletedFolder(t *testing.T) {
 		}
 	}
 }
+
+func TestMoveFilesToAnotherFolder(t *testing.T) {
+	fx := newFixture(t)
+	ctx := context.Background()
+	family := fx.folder
+	wedding, _ := fx.lib.CreateFolder(ctx, "Wedding", "admin")
+	kindergarten, _ := fx.lib.CreateFolder(ctx, "Kindergarten", "admin")
+	a := fx.readyIn(t, family, "IMG_1.jpg", "a")
+	fx.readyIn(t, wedding, "IMG_1.jpg", "taken")
+	b := fx.readyIn(t, kindergarten, "IMG_1.jpg", "b")
+	c := fx.readyIn(t, family, "Menu.pdf", "c")
+	before, _ := fx.db.LibraryVersion(ctx)
+
+	moved, err := fx.lib.MoveFiles(ctx, []string{a.ID, b.ID, c.ID}, wedding.ID)
+	if err != nil || len(moved) != 3 {
+		t.Fatalf("MoveFiles = %d files, %v", len(moved), err)
+	}
+	want := map[string]string{a.ID: "IMG_1 (2).jpg", b.ID: "IMG_1 (3).jpg", c.ID: "Menu.pdf"}
+	for id, name := range want {
+		f, _ := fx.db.FileByID(ctx, id)
+		if f.FolderID != wedding.ID || f.RelPath != "2026-09-27/"+name || f.MovedFrom != "" || !f.UpdatedAt.Equal(a.UpdatedAt) {
+			t.Errorf("%s after the move: %+v", name, f)
+		}
+		if !fx.exists("Wedding/2026-09-27/" + name) {
+			t.Errorf("%s isn't in Wedding on the drive", name)
+		}
+	}
+	if fx.exists("Share/2026-09-27") || fx.exists("Kindergarten/2026-09-27") {
+		t.Error("an emptied day folder stayed")
+	}
+	if v, _ := fx.db.LibraryVersion(ctx); v == before {
+		t.Error("the library version didn't change")
+	}
+	if again, err := fx.lib.MoveFiles(ctx, []string{a.ID}, wedding.ID); err != nil || len(again) != 0 {
+		t.Fatalf("moving into the folder it's in: %d, %v", len(again), err)
+	}
+	if _, err := fx.lib.MoveFiles(ctx, []string{a.ID}, newID()); !errors.Is(err, db.ErrNotFound) {
+		t.Fatalf("moving into no folder: %v", err)
+	}
+}
+
+func TestMoveResumesAfterACrash(t *testing.T) {
+	fx := newFixture(t)
+	ctx := context.Background()
+	wedding, _ := fx.lib.CreateFolder(ctx, "Wedding", "admin")
+	a := fx.readyIn(t, fx.folder, "IMG_1.jpg", "one")
+	b := fx.readyIn(t, fx.folder, "IMG_2.jpg", "two")
+	// The moves reached the database, but the server stopped before the bytes followed.
+	if err := fx.db.MoveFiles(ctx, []db.Move{
+		{ID: a.ID, FolderID: wedding.ID, RelPath: a.RelPath, From: fx.folder.ID + "/" + a.RelPath},
+		{ID: b.ID, FolderID: wedding.ID, RelPath: b.RelPath, From: fx.folder.ID + "/" + b.RelPath},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if got := fx.read(t, a.ID); got != "one" {
+		t.Fatalf("before the bytes moved: %q", got)
+	}
+	// Deleting one meanwhile takes its bytes from where they are.
+	if _, err := fx.lib.Trash(ctx, []string{b.ID}, "admin"); err != nil || !fx.exists(".trash/"+b.ID) {
+		t.Fatalf("trashing during the move: %v", err)
+	}
+	if err := fx.lib.Reconcile(ctx, time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	if !fx.exists("Wedding/2026-09-27/IMG_1.jpg") || fx.exists("Share/2026-09-27/IMG_1.jpg") {
+		t.Fatal("Reconcile didn't finish the move")
+	}
+	for _, id := range []string{a.ID, b.ID} {
+		if f, _ := fx.db.FileByID(ctx, id); f.MovedFrom != "" {
+			t.Errorf("%s still notes a move", f.Name)
+		}
+	}
+	if _, err := fx.lib.Restore(ctx, []string{b.ID}); err != nil || !fx.exists("Wedding/2026-09-27/IMG_2.jpg") {
+		t.Fatalf("restoring the file deleted during the move: %v", err)
+	}
+}

@@ -401,3 +401,37 @@ func TestDemotedAdminKeepsSeeingEverything(t *testing.T) {
 		t.Fatalf("Peter, a member now, sees %v", list)
 	}
 }
+
+func TestAdminsMoveFiles(t *testing.T) {
+	e := newEnv(t)
+	admin := e.admin()
+	maria := e.accept(e.invite(admin, "Maria", "member"), "Maria's phone")
+	taxes := e.newFolder("Taxes 2026")
+	id := tus{e, maria.token}.sendFile("Steuer.png", pngBytes(t, 64, 48))
+	e.clock.Add(3 * time.Minute)
+	if _, err := e.app.Thumbs.MakePending(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	before := e.file(id)
+
+	r := e.sendJSON("POST", "/api/files/move", admin.token, map[string]any{"ids": []string{id}, "folder": taxes.ID})
+	wantStatus(t, "move", r, http.StatusOK, "")
+	assertShape(t, "move", readFixture(t, "api/files_move.json")["response"], r.json(t))
+	after := e.file(id)
+	if after.FolderID != taxes.ID || !after.UpdatedAt.Equal(before.UpdatedAt) || after.Thumb != before.Thumb {
+		t.Fatalf("after the move: %+v", after)
+	}
+	if _, err := os.Stat(e.disk(after)); err != nil {
+		t.Fatalf("not in Taxes 2026 on the drive: %v", err)
+	}
+	// Maria doesn't see Taxes 2026; the admin still downloads the file and its thumbnail.
+	wantStatus(t, "Maria after the move", e.get("/api/files/"+id, maria.token), http.StatusNotFound, "not_found")
+	wantStatus(t, "the thumbnail", e.get("/api/files/"+id+"/thumb", admin.token), http.StatusOK, "")
+
+	wantStatus(t, "a member moving", e.sendJSON("POST", "/api/files/move", maria.token, map[string]any{"ids": []string{id}, "folder": taxes.ID}),
+		http.StatusForbidden, "forbidden")
+	wantStatus(t, "no such folder", e.sendJSON("POST", "/api/files/move", admin.token, map[string]any{"ids": []string{id}, "folder": ids.New()}),
+		http.StatusNotFound, "not_found")
+	wantStatus(t, "no ids", e.sendJSON("POST", "/api/files/move", admin.token, map[string]any{"ids": []string{}, "folder": taxes.ID}),
+		http.StatusBadRequest, "bad_request")
+}
