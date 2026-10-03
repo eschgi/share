@@ -3,7 +3,7 @@
 // library changes and after an admin changes them.
 import { useEffect, useState } from 'preact/hooks';
 import { getFolders, type FolderInfo } from '../../api';
-import { validShown } from './folders';
+import { sendTarget, validShown } from './folders';
 
 const storedKey = 'share.folder';
 
@@ -11,6 +11,8 @@ let list: FolderInfo[] | null = null;
 let failed = false;
 let loading: Promise<void> | null = null;
 let stored: string | null = readStored();
+/** The folder chosen on the Send tab, for this visit. */
+let sendChoice: string | null = null;
 const listeners = new Set<() => void>();
 const changed = () => listeners.forEach((l) => l());
 
@@ -55,8 +57,21 @@ export function showFolder(id: string | null): void {
   changed();
 }
 
+/** Sending goes into this folder from now on, for this visit. */
+export function chooseSendFolder(id: string): void {
+  sendChoice = id;
+  changed();
+}
+
+/** The folders as they are now, and the folder sending goes into; for code outside the pages. */
+export function foldersNow(): { list: FolderInfo[] | null; shown: string | null; sendTo: string | null } {
+  const shown = validShown(list, stored);
+  return { list, shown, sendTo: list ? sendTarget(list, shown, sendChoice) : null };
+}
+
 /** A folder the library showed is gone, or the person doesn't see it any more: all folders. */
 export function folderGone(id: string): void {
+  if (sendChoice === id) sendChoice = null;
   if (stored === id) showFolder(null);
   void refreshFolders();
 }
@@ -73,6 +88,8 @@ export interface Folders {
   failed: boolean;
   /** The folder the library shows; null for all. */
   shown: FolderInfo | null;
+  /** The folder sending goes into: chosen on the Send tab, or the one the library shows. */
+  sendTo: FolderInfo | null;
   byId: (id: string) => FolderInfo | undefined;
 }
 
@@ -85,11 +102,12 @@ export function useFolders(): Folders {
     if (list === null) void refreshFolders();
     return () => void listeners.delete(l);
   }, []);
-  const shownId = validShown(list, stored);
+  const now = foldersNow();
   return {
     list,
     failed,
-    shown: list?.find((f) => f.id === shownId) ?? null,
+    shown: list?.find((f) => f.id === now.shown) ?? null,
+    sendTo: list?.find((f) => f.id === now.sendTo) ?? null,
     byId: (id) => list?.find((f) => f.id === id),
   };
 }

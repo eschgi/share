@@ -49,6 +49,17 @@ export interface UploaderEvents {
   onSharedGone?(key: number): void;
   /** Nothing is on its way any more, and some files didn't go. */
   onFailed?(failed: number): void;
+  /** Signed in: the folder a file was to go into is gone, or the person doesn't see it any more. */
+  onFolderGone?(): void;
+}
+
+/** What a file's upload says about it besides its name and type: the inbox key of a file
+ * shared from another app, and the folder it goes into (signed in; a PIN has its own). */
+export function uploadMeta(shareKey: number | undefined, folder: string | undefined): Meta {
+  const meta: Meta = {};
+  if (shareKey !== undefined) meta.shareKey = String(shareKey);
+  if (folder !== undefined) meta.folder = folder;
+  return meta;
 }
 
 const MiB = 1 << 20;
@@ -106,6 +117,12 @@ export class Uploader {
   private heldBack: File[] = [];
   /** Files shared from other apps, with their key in the inbox. */
   private readonly shared = new WeakMap<File, number>();
+  /** Signed in: the folder each file goes into. */
+  private readonly folders = new WeakMap<File, string>();
+  /** Files whose folder was gone when they started; trying again needs another folder. */
+  private readonly folderless = new Set<string>();
+  /** A refusal for a gone folder just came in, for the next upload-error. */
+  private folderGone = false;
   private readonly thumbs = new ThumbQueue();
 
   /** keepQueue: this tab keeps the queue across a closed page (see holdQueueLock). */
@@ -122,11 +139,15 @@ export class Uploader {
       limit: 3,
       retryDelays: [0, 1000, 3000, 5000, 10000, 20000, 30000, 60000, 60000, 60000],
       removeFingerprintOnSuccess: true,
-      allowedMetaFields: ['name', 'type', 'lastModified'],
+      allowedMetaFields: ['name', 'type', 'lastModified', 'folder'],
       onShouldRetry: (err, _attempt, _opts, next) => {
         const status = err.originalResponse?.getStatus() ?? 0;
         if (status === 401) {
           this.endSession(errorCode(err.originalResponse?.getBody()) !== 'session_ended');
+          return false;
+        }
+        if (status === 404 && errorCode(err.originalResponse?.getBody()) === 'folder_gone') {
+          this.folderGone = true;
           return false;
         }
         // Full drive, too large, too many: retrying won't help.
@@ -182,18 +203,27 @@ export class Uploader {
       this.checkDone();
       this.checkFailed();
     });
-    this.uppy.on('upload-error', () => this.checkFailed());
+    this.uppy.on('upload-error', (file) => {
+      if (this.folderGone && file) {
+        this.folderGone = false;
+        this.folderless.add(file.id);
+        events.onFolderGone?.();
+      }
+      this.checkFailed();
+    });
   }
 
   /** Queues files shared from other apps; each leaves the inbox once it is sent. */
-  addShared(files: Shared[]): void {
+  addShared(files: Shared[], folder?: string): void {
     for (const s of files) this.shared.set(s.file, s.key);
-    this.add(files.map((s) => s.file));
+    this.add(files.map((s) => s.file), folder);
   }
 
-  /** Queues files; they start right away. A file matching a ghost continues its upload. */
-  add(files: File[]): void {
+  /** Queues files, into a folder when signed in; they start right away. A file matching a
+   * ghost continues its upload. */
+  add(files: File[], folder?: string): void {
     if (files.length === 0) return;
+    if (folder !== undefined) for (const f of files) this.folders.set(f, folder);
     if (this.restoring) {
       this.pickedWhileRestoring.push(...files);
       return;
@@ -219,7 +249,7 @@ export class Uploader {
     try {
       // All at once: one by one, a dropped folder of thousands of files gets slow, as each one
       // copies the whole list. Files that are too large or already there are left out.
-      this.uppy.addFiles(rest.map((f) => ({ name: f.name, type: f.type, data: f, source: 'Local', meta: this.shareMeta(f) })));
+      this.uppy.addFiles(rest.map((f) => ({ name: f.name, type: f.type, data: f, source: 'Local', meta: this.metaOf(f) })));
     } catch {
       // Only for errors other than restrictions; then none of the files were added.
     }
@@ -272,9 +302,12 @@ export class Uploader {
     for (const id of failed) this.uppy.retryUpload(id).catch(() => {});
   }
 
-  retryFailed(): void {
+  /** Tries the failed files again; those whose folder was gone go into folder now. */
+  retryFailed(folder?: string): void {
     for (const f of this.uppy.getFiles()) {
-      if (f.error && !f.isGhost) this.uppy.retryUpload(f.id).catch(() => {});
+      if (!f.error || f.isGhost) continue;
+      if (this.folderless.delete(f.id) && folder !== undefined) this.uppy.setFileMeta(f.id, { folder });
+      this.uppy.retryUpload(f.id).catch(() => {});
     }
   }
 
@@ -320,15 +353,15 @@ export class Uploader {
     }
   }
 
-  /** A shared file keeps its inbox key in its meta, which also comes back after a closed page. */
-  private shareMeta(f: File): Meta {
-    const key = this.shared.get(f);
-    return key === undefined ? {} : { shareKey: String(key) };
+  /** A file's meta, which also comes back after a closed page: its inbox key if it was
+   * shared, and its folder. */
+  private metaOf(f: File): Meta {
+    return uploadMeta(this.shared.get(f), this.folders.get(f));
   }
 
   private markShared(id: string, f: File): void {
-    const meta = this.shareMeta(f);
-    if (meta.shareKey) this.uppy.setFileMeta(id, meta);
+    const key = this.shared.get(f);
+    if (key !== undefined) this.uppy.setFileMeta(id, { shareKey: String(key) });
   }
 
   /** Removes an unfinished upload from the server. */

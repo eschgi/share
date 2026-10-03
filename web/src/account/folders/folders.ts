@@ -17,3 +17,21 @@ export function validShown(list: readonly FolderInfo[] | null, stored: string | 
 export function allTotals(list: readonly FolderInfo[]): { files: number; bytes: number } {
   return list.reduce((t, f) => ({ files: t.files + f.files, bytes: t.bytes + f.bytes }), { files: 0, bytes: 0 });
 }
+
+/** The folder sending goes into: the one chosen for it, else the one the library shows, else
+ * the oldest. null while the person sees no folder. */
+export function sendTarget(list: readonly FolderInfo[], shown: string | null, chosen: string | null): string | null {
+  for (const id of [chosen, shown]) if (id !== null && list.some((f) => f.id === id)) return id;
+  return list[0]?.id ?? null;
+}
+
+/** Where files dropped on a page go: with one folder into it; in the library into the folder
+ * shown, on the Send tab into the folder chosen there. Elsewhere, and while the library shows
+ * all folders, the person is asked first. */
+export function dropTarget(path: string, list: readonly FolderInfo[], shown: string | null, sendTo: string | null): string | 'ask' {
+  if (list.length === 1) return list[0].id;
+  if (list.length === 0) return 'ask';
+  if (path.startsWith('/library') && shown !== null) return shown;
+  if (path.startsWith('/send') && sendTo !== null) return sendTo;
+  return 'ask';
+}

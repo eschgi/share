@@ -1,3 +1,4 @@
+import type { ComponentChildren } from 'preact';
 import { Stack } from '../components/Bits';
 import { Icon } from '../components/Icon';
 import { Page } from '../components/Page';
@@ -15,11 +16,13 @@ interface Props {
   shareFailed?: boolean;
   /** With a PIN: stops using it, to enter another one. */
   onForgetPin?: () => void;
+  /** Signed in: where the files go, under the lead. */
+  into?: ComponentChildren;
 }
 
 /** Screens 2, 3 and 29: ready to send; with a 24-hour PIN it also says until when it works, and
  * signed in, that no PIN is needed. */
-export function ReadyScreen({ name, session, onFiles, shareFailed, onForgetPin }: Props) {
+export function ReadyScreen({ name, session, onFiles, shareFailed, onForgetPin, into }: Props) {
   const { t, lang } = useI18n();
   const until = session.kind === 'pin' && session.pin_kind === 'day' && session.expires_at ? new Date(session.expires_at) : null;
   const computer = !useMedia(touchFirst);
@@ -35,6 +38,7 @@ export function ReadyScreen({ name, session, onFiles, shareFailed, onForgetPin }
             {t('ready.worksUntil', { when: formatWhen(until, new Date(), lang) })}
           </div>
         )}
+        {into}
       </div>
       <div class="grow" />
       <div class="pane">

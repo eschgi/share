@@ -1,10 +1,12 @@
-import { useEffect } from 'preact/hooks';
+import { useEffect, useRef } from 'preact/hooks';
 import { DropZone } from '../../components/DropZone';
 import { useLeaveWarning, useWakeLock } from '../../device';
 import { useI18n } from '../../i18n';
 import { navigate } from '../../router';
 import { useAccount } from '../context';
-import { sendFiles, sendMore, unfinished, useSender } from './sender';
+import { dropTarget } from '../folders/folders';
+import { foldersNow, useFolders } from '../folders/store';
+import { hold, sendFiles, sendMore, unfinished, useSender } from './sender';
 
 /**
  * Sending, on every page of the account: closing the page asks first while files are on their
@@ -13,9 +15,10 @@ import { sendFiles, sendMore, unfinished, useSender } from './sender';
  * files go out stay small.
  */
 export function SendGuard() {
-  const { t } = useI18n();
+  const { t, tn } = useI18n();
   const { toast } = useAccount();
   const sending = useSender();
+  const folders = useFolders();
   const busy = unfinished(sending);
   useLeaveWarning(busy);
   useWakeLock(busy);
@@ -27,10 +30,27 @@ export function SendGuard() {
     }
   }, [restored]);
 
+  // Files waiting for a folder, while the person is elsewhere; and a folder that went.
+  const waiting = sending.pending > 0;
+  useEffect(() => {
+    if (waiting && !location.pathname.startsWith('/send')) {
+      toast({ text: tn('send.waiting', sending.pending), action: { label: t('save.show'), run: () => navigate('/send') } });
+    }
+  }, [waiting]);
+  const gone = useRef(sending.foldersGone);
+  useEffect(() => {
+    if (sending.foldersGone === gone.current) return;
+    gone.current = sending.foldersGone;
+    toast({ text: t('send.folderGone') });
+  }, [sending.foldersGone]);
+
   const toSend = (files: File[]) => {
     if (files.length === 0) return;
     if (screen === 'done') sendMore();
-    sendFiles(files);
+    const now = foldersNow();
+    const to = dropTarget(location.pathname, folders.list ?? [], now.shown, now.sendTo);
+    if (to === 'ask') hold(files, []);
+    else sendFiles(files, to);
     if (!location.pathname.startsWith('/send')) navigate('/send');
   };
   let onFiles: ((files: File[]) => void) | null = toSend;

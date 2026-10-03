@@ -1,4 +1,7 @@
+import '../save/save.css';
 import './folders.css';
+import type { ComponentChildren } from 'preact';
+import { useState } from 'preact/hooks';
 import { thumbUrl, type FolderInfo } from '../../api';
 import { Icon } from '../../components/Icon';
 import { formatBytes, formatCount } from '../../format';
@@ -41,13 +44,95 @@ export function FolderCover({ folder, large }: { folder: FolderInfo | 'all'; lar
   );
 }
 
-/** "2,340 files · 41 GB" */
+/** "2,340 files · 41 GB", "2,340 files", "4 people" */
 export function useFolderLines() {
-  const { tn, lang } = useI18n();
+  const { t, tn, lang } = useI18n();
+  const count = (files: number) => tn('folders.count', files, { n: formatCount(files, lang) });
+  const seen = (f: FolderInfo) => (f.admins_only ? t('folders.onlyAdmins') : tn('folders.people', f.people, { n: formatCount(f.people, lang) }));
   return {
     holds: (files: number, bytes: number) => tn('folders.holds', files, { n: formatCount(files, lang), size: formatBytes(bytes, lang) }),
-    count: (files: number) => tn('folders.count', files, { n: formatCount(files, lang) }),
+    count,
+    seen,
+    /** What a folder holds and who sees it: "2,340 files · 4 people". */
+    about: (f: FolderInfo) => `${count(f.files)} · ${seen(f)}`,
   };
+}
+
+/** The folders to choose one from, as cards: each with what it holds and who sees it. note
+ * adds a word to a card, such as "Here now"; those are greyed out. */
+export function FolderChoices({
+  list,
+  value,
+  onChoose,
+  label,
+  note,
+}: {
+  list: FolderInfo[];
+  value: string | null;
+  onChoose: (id: string) => void;
+  label: string;
+  note?: (f: FolderInfo) => string | undefined;
+}) {
+  const lines = useFolderLines();
+  return (
+    <div role="radiogroup" aria-label={label} class="fchoices">
+      {list.map((f) => {
+        const extra = note?.(f);
+        return (
+          <label key={f.id} class={`dopt${value === f.id ? ' on' : ''}${extra ? ' dis' : ''}`}>
+            <input type="radio" name="folder" class="sr-only" checked={value === f.id} disabled={!!extra} onChange={() => onChoose(f.id)} />
+            <FolderCover folder={f} />
+            <span class="dt">
+              <b>{f.name}</b>
+              <span>{extra ? `${extra} · ${lines.seen(f)}` : lines.about(f)}</span>
+            </span>
+            <i class="radio" />
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
+/** A folder to send into, as a field: it opens the choice (screens 43 and 48). */
+export function FolderPicker({ list, value, onChange, title }: { list: FolderInfo[]; value: FolderInfo | null; onChange: (id: string) => void; title: string }) {
+  const lines = useFolderLines();
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" class="fsel" aria-haspopup="dialog" onClick={() => setOpen(true)}>
+        {value && <FolderCover folder={value} />}
+        <span class="rt">
+          <b>{value?.name ?? title}</b>
+          {value && <span>{lines.about(value)}</span>}
+        </span>
+        <Icon name="chev" class="down" />
+      </button>
+      {open && (
+        <Modal title={title} onClose={() => setOpen(false)}>
+          <FolderChoices
+            list={list}
+            value={value?.id ?? null}
+            label={title}
+            onChoose={(id) => {
+              onChange(id);
+              setOpen(false);
+            }}
+          />
+        </Modal>
+      )}
+    </>
+  );
+}
+
+/** A labelled part of a form, such as "Into the folder" over its picker. */
+export function FolderField({ label, children }: { label: string; children: ComponentChildren }) {
+  return (
+    <div class="ffield">
+      <p class="flabel">{label}</p>
+      {children}
+    </div>
+  );
 }
 
 /** The library's title while there is a folder to choose: the folder shown, which opens the

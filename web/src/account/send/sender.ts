@@ -3,14 +3,20 @@
 // queue that a closed page interrupted. The screens' steps are the PIN pages' (state.ts).
 import { useEffect, useState } from 'preact/hooks';
 import { getInfo } from '../../api';
-import { claimShared, sharedGone } from '../../incoming';
+import { claimShared, dropShared, sharedGone, type Shared } from '../../incoming';
 import { notify } from '../../notify';
 import { initialState, reduce, type Action, type State } from '../../state';
 import { holdQueueLock, Uploader, type Snapshot } from '../../uploader';
+import { hasChoices } from '../folders/folders';
+import { foldersNow, refreshFolders } from '../folders/store';
 
 let state: State = initialState;
 let uploader: Uploader | null = null;
 let rejected: string[] = [];
+/** Files waiting for the person to say which folder they go into. */
+let pending: { files: File[]; shared: Shared[] } | null = null;
+/** Grows each time a folder turned out to be gone, for the pages to say so. */
+let foldersGone = 0;
 let starting: Promise<void> | null = null;
 let whenSignedOut = () => {};
 const listeners = new Set<() => void>();
@@ -42,27 +48,66 @@ export function startSender(signedOut: () => void): void {
         },
         onRestored: () => dispatch({ type: 'restored' }),
         onSharedGone: sharedGone,
+        onFolderGone: () => {
+          foldersGone++;
+          void refreshFolders();
+          changed();
+        },
       },
       keepQueue,
     );
+    await refreshFolders();
     dispatch({ type: 'booted', session: { kind: 'account' }, sessionEnded: false });
-    // Files shared from other apps go out right away, from whichever page this is.
+    // Files shared from other apps go out right away, from whichever page this is; with
+    // several folders they wait on the Send tab until the person says which.
     const shared = await claimShared();
     if (shared.length > 0) {
-      uploader.addShared(shared);
-      dispatch({ type: 'filesAdded' });
+      const { list, sendTo } = foldersNow();
+      if (hasChoices(list) || sendTo === null) hold([], shared);
+      else {
+        uploader.addShared(shared, sendTo);
+        dispatch({ type: 'filesAdded' });
+      }
     }
   })().catch(() => {
     starting = null;
   });
 }
 
-/** Sends files; the screens and the drop zone offer this only once the uploader is ready. */
-export function sendFiles(files: File[]): void {
+/** Sends files into a folder, by default the one chosen for sending; the screens and the
+ * drop zone offer this only once the uploader is ready. */
+export function sendFiles(files: File[], folder = foldersNow().sendTo): void {
   if (files.length === 0 || !uploader) return; // e.g. a dropped folder with nothing but hidden files
+  if (folder === null) return hold(files, []);
   rejected = [];
-  uploader.add(files);
+  uploader.add(files, folder);
   dispatch({ type: 'filesAdded' });
+}
+
+/** Keeps files until the person says which folder they go into. */
+export function hold(files: File[], shared: Shared[]): void {
+  if (files.length === 0 && shared.length === 0) return;
+  pending = { files: [...(pending?.files ?? []), ...files], shared: [...(pending?.shared ?? []), ...shared] };
+  changed();
+}
+
+/** Sends the files that waited, into folder. */
+export function sendPending(folder: string): void {
+  if (!pending || !uploader) return;
+  const { files, shared } = pending;
+  pending = null;
+  rejected = [];
+  uploader.add(files, folder);
+  uploader.addShared(shared, folder);
+  dispatch({ type: 'filesAdded' });
+}
+
+/** Doesn't send the files that waited; shared ones leave the inbox. */
+export function dropPending(): void {
+  if (!pending) return;
+  void dropShared(pending.shared.map((s) => s.key));
+  pending = null;
+  changed();
 }
 
 export function continueRestored(): void {
@@ -81,7 +126,7 @@ export function skipGhosts(): void {
 }
 
 export function retryFailed(): void {
-  uploader?.retryFailed();
+  uploader?.retryFailed(foldersNow().sendTo ?? undefined);
 }
 
 export function sendMore(): void {
@@ -93,6 +138,10 @@ export interface Sending {
   state: State;
   snapshot: Snapshot | null;
   rejected: string[];
+  /** How many files wait for the person to say which folder they go into. */
+  pending: number;
+  /** Grows each time a folder turned out to be gone. */
+  foldersGone: number;
 }
 
 /** The sending, kept up to date: redrawn at most once a frame while files go out. */
@@ -103,7 +152,7 @@ export function useSender(): Sending {
     listeners.add(l);
     return () => void listeners.delete(l);
   }, []);
-  return { state, snapshot: uploader?.snapshot() ?? null, rejected };
+  return { state, snapshot: uploader?.snapshot() ?? null, rejected, pending: (pending?.files.length ?? 0) + (pending?.shared.length ?? 0), foldersGone };
 }
 
 /** Files are still on their way: closing the page would interrupt them. */

@@ -171,3 +171,69 @@
     margin: 10px 0 8px;
   }
 }
+
+/* A folder to send into, as a field that opens the choice (screens 43 and 48). */
+.ffield {
+  margin-top: 22px;
+}
+.flabel {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 500;
+}
+.fsel {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 14px 10px 10px;
+  border: 1.5px solid var(--line);
+  border-radius: 16px;
+  background: var(--s1);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.modal-panel .fsel {
+  background: var(--s2);
+}
+.fsel > .ic {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  color: var(--text-3);
+}
+.fsel:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
+.fchoices .dopt {
+  align-items: center;
+}
+.fchoices .dopt .fcov {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+}
+.fchoices .dopt .radio {
+  top: 50%;
+  margin-top: -10px;
+}
+.fchoices .dopt.dis {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Files waiting for the person to say which folder they go into, on the Send tab. */
+.sharedcard.pending .fsel {
+  flex: 1 0 100%;
+  margin-top: 10px;
+  background: var(--s2);
+}
+.sharedcard.pending .dbtns {
+  flex: 1 0 100%;
+  margin-top: 12px;
+}
+.sharedcard.pending .help {
+  flex: 1 0 100%;
+}
