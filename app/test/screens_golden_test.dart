@@ -177,6 +177,16 @@ void main() {
     await shot(tester, 'en/41-folder');
   }));
 
+  testWidgets('a new PIN, into a folder', (tester) => atTen(() async {
+    await startApp(tester, signedInPhone()..secrets['folder'] = wedding, adminFolders());
+    await tester.tap(find.text('Settings').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Upload PINs'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('New PIN'));
+    await shot(tester, 'en/43-new-pin-folder');
+  }));
+
   testWidgets("a person's folders", (tester) => atTen(() async {
     await startApp(tester, signedInPhone(), adminFolders());
     await tester.tap(find.text('Settings').last);
@@ -290,6 +300,18 @@ void main() {
     await startApp(tester, signedInPhone()..secrets['folder'] = family, folders());
     await tester.tap(find.text('Send').last);
     await shot(tester, 'en/48-send-folder');
+  }));
+
+  testWidgets('a PIN into a folder', (tester) => atTen(() async {
+    await startApp(tester, FakePlatform(), FakeServer()..pinFolderName = 'Wedding Anna & Marco');
+    await tester.tap(find.text('Send files'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'share.example.com');
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'K7M2Q');
+    await tester.tap(find.text('Unlock'));
+    await shot(tester, 'en/45-pin-into-folder');
   }));
 
   testWidgets('a PIN, without an account', (tester) => atTen(() async {

@@ -31,18 +31,27 @@ class FakeServer {
         final code = (_body(req)['code'] as String? ?? '').toUpperCase();
         if (code != pinCode) return json({'error': {'code': 'pin_wrong', 'message': '', 'attempts_left': 4}}, 401);
         final res = contractResponse('api/pin_unlock_app.json');
-        res['session'] = {...(res['session'] as Map).cast<String, dynamic>(), 'expires_at': clock.now().add(const Duration(hours: 20)).toUtc().toIso8601String()};
+        res['session'] = {...(res['session'] as Map).cast<String, dynamic>(), ..._pinSession};
         return json(res);
       },
-      'GET /api/session': (_) => pinEnded
-          ? json({'error': {'code': 'session_ended', 'message': ''}}, 401)
-          : json({'kind': 'pin', 'pin_kind': 'day', 'expires_at': clock.now().add(const Duration(hours: 20)).toUtc().toIso8601String()}),
+      'GET /api/session': (_) => pinEnded ? json({'error': {'code': 'session_ended', 'message': ''}}, 401) : json({'kind': 'pin', ..._pinSession}),
     };
   }
 
   /// The PIN that unlocks, and whether the stored session's PIN has ended.
   String pinCode = 'K7M2Q';
   bool pinEnded = false;
+
+  /// The PIN's folder, named only where there are several, and whether the PIN shows it.
+  String? pinFolderName;
+  bool pinShowsFolder = false;
+
+  Map<String, dynamic> get _pinSession => {
+        'pin_kind': 'day',
+        'expires_at': clock.now().add(const Duration(hours: 20)).toUtc().toIso8601String(),
+        'folder_name': pinFolderName,
+        'shows_folder': pinShowsFolder,
+      };
 
   /// The folders the person sees: one, as on most servers, unless a test adds more.
   List<Map<String, dynamic>> folders = [folder('f4mily5x2k7mbqz4bwdbyj6qsq', 'Family')];

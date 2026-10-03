@@ -9,6 +9,7 @@ import 'package:share_app/ui/widgets.dart';
 
 import 'admin_test.dart' show adminServer, openSettings, tapInList;
 import 'app_test.dart' show daysAgo, signedInPhone, startApp, today;
+import 'support/fake_platform.dart';
 import 'support/fake_server.dart';
 import 'support/fonts.dart';
 
@@ -348,5 +349,88 @@ void main() {
     await tester.tap(find.text('Show the QR code'));
     await tester.pumpAndSettle();
     expect(jsonDecode(server.requests.lastWhere((r) => r.url.path == '/api/invites').body)['folders'], [family]);
+  });
+
+  testWidgets('a new PIN sends into the folder chosen, and may show it to guests', (tester) async {
+    final server = adminFolders();
+    final platform = signedInPhone()..secrets['folder'] = wedding;
+    await startApp(tester, platform, server);
+    await openSettings(tester);
+    await tester.tap(find.text('Upload PINs'));
+    await tester.pumpAndSettle();
+    expect(find.text('Family'), findsNWidgets(2), reason: "both PINs' cards say their folder");
+    expect(find.text('Guests see the folder'), findsNothing);
+
+    await tester.tap(find.text('New PIN'));
+    await tester.pumpAndSettle();
+    expect(find.text('Sends into'), findsOneWidget);
+    expect(find.text('Wedding Anna & Marco'), findsOneWidget, reason: 'the folder the library shows');
+    await tester.tap(find.text('Wedding Anna & Marco'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Taxes 2026'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.descendant(of: find.byType(BottomSheet), matching: find.byType(Switch)));
+    await tester.pump();
+    await tester.tap(find.text('Create & share'));
+    await tester.pumpAndSettle();
+    final made = jsonDecode(server.requests.lastWhere((r) => r.method == 'POST' && r.url.path == '/api/pins').body);
+    expect(made, {'kind': 'day', 'code': 'R8D4W', 'folder': taxes, 'shows_folder': true});
+    expect(find.text('Taxes 2026'), findsOneWidget, reason: "the new PIN's card");
+    expect(find.text('Guests see the folder'), findsOneWidget);
+    expect(find.textContaining('Only PINs made to show their folder let guests see it too.'), findsOneWidget);
+  });
+
+  testWidgets('with one folder a PIN card says no folder, and a new PIN goes into it', (tester) async {
+    final server = adminServer();
+    await startApp(tester, signedInPhone(), server);
+    await openSettings(tester);
+    await tester.tap(find.text('Upload PINs'));
+    await tester.pumpAndSettle();
+    expect(find.text('Family'), findsNothing);
+    await tester.tap(find.text('New PIN'));
+    await tester.pumpAndSettle();
+    expect(find.text('Sends into'), findsNothing);
+    expect(find.text('Guests also see this folder'), findsOneWidget);
+    await tester.tap(find.text('Create & share'));
+    await tester.pumpAndSettle();
+    expect(jsonDecode(server.requests.lastWhere((r) => r.method == 'POST' && r.url.path == '/api/pins').body), {'kind': 'day', 'code': 'R8D4W', 'folder': family});
+  });
+
+  testWidgets('sending with a PIN says which folder, and whether everyone sees it', (tester) async {
+    final server = FakeServer()
+      ..pinFolderName = 'Wedding Anna & Marco'
+      ..pinShowsFolder = true;
+    final platform = FakePlatform();
+    await startApp(tester, platform, server);
+    await tester.tap(find.text('Send files'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'share.example.com');
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'K7M2Q');
+    await tester.tap(find.text('Unlock'));
+    await tester.pumpAndSettle();
+    expect(find.text('Wedding Anna & Marco'), findsOneWidget);
+    expect(find.text('Everyone with this PIN sees what you send.'), findsOneWidget);
+    expect(jsonDecode(platform.secrets['pin_session']!), containsPair('folder_name', 'Wedding Anna & Marco'));
+
+    // At the next start the server's word counts: the folder has a new name, and shows no more.
+    server
+      ..pinFolderName = 'Hochzeit'
+      ..pinShowsFolder = false;
+    await tester.pumpWidget(const SizedBox());
+    await startApp(tester, platform, server);
+    expect(find.text('Hochzeit'), findsOneWidget);
+    expect(find.text("Others with this PIN can't see what you send."), findsOneWidget);
+  });
+
+  testWidgets('a PIN of a server with one folder names no folder', (tester) async {
+    final platform = FakePlatform()
+      ..secrets['pin_token'] = 'shp_x'
+      ..secrets['pin_session'] = jsonEncode({'server': 'https://share.example.com', 'pin_kind': 'day', 'expires_at': null});
+    await startApp(tester, platform, FakeServer());
+    expect(find.text('To share.example.com'), findsOneWidget);
+    expect(find.byIcon(AppIcons.folder), findsNothing);
+    expect(find.text("Others with this PIN can't see what you send."), findsOneWidget);
   });
 }

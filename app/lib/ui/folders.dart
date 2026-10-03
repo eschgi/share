@@ -145,13 +145,15 @@ class _FolderSheet extends StatelessWidget {
   }
 }
 
-/// A folder picked for something, such as sending (screen 48): its picture, what it holds and
-/// who sees it; tapping it chooses another one.
+/// A folder picked for something, such as sending (screen 48) or a new PIN (43): its picture,
+/// what it holds and who sees it; tapping it chooses another one. On a sheet it takes the
+/// sheet's raised [color].
 class FolderField extends StatelessWidget {
-  const FolderField({super.key, required this.label, required this.value, required this.onTap});
-  final String label;
+  const FolderField({super.key, this.label, required this.value, required this.onTap, this.color});
+  final String? label;
   final FolderInfo? value;
   final VoidCallback? onTap;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
@@ -159,12 +161,13 @@ class FolderField extends StatelessWidget {
     final c = context.colors;
     final f = value;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Padding(
-        padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-        child: Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
-      ),
+      if (label != null)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+          child: Text(label!, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+        ),
       Material(
-        color: c.s1,
+        color: color ?? c.s1,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: c.line, width: 1.5)),
         clipBehavior: Clip.antiAlias,
         child: InkWell(

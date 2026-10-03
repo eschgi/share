@@ -21,10 +21,15 @@ class AdminRepository {
 
   Future<String> suggestPin() async => (await api.get('/api/pins/suggest'))['code'] as String? ?? '';
 
-  /// A PIN that sends into [folder]. Throws ApiException pin_taken or pin_format for a [code]
-  /// that can't be had, folder_gone for a folder that is no more.
-  Future<PinInfo> createPin(PinKind kind, {String? code, String? folder}) async =>
-      PinInfo.fromJson(await api.post('/api/pins', {'kind': kind.wire, if (code != null && code.isNotEmpty) 'code': code, 'folder': ?folder}));
+  /// A PIN that sends into [folder], and with [showsFolder] also shows it. Throws ApiException
+  /// pin_taken or pin_format for a [code] that can't be had, folder_gone for a folder that is no
+  /// more.
+  Future<PinInfo> createPin(PinKind kind, {String? code, String? folder, bool showsFolder = false}) async => PinInfo.fromJson(await api.post('/api/pins', {
+        'kind': kind.wire,
+        if (code != null && code.isNotEmpty) 'code': code,
+        'folder': ?folder,
+        if (showsFolder) 'shows_folder': true,
+      }));
 
   Future<PinInfo> newCode(String id) async => PinInfo.fromJson(await api.post('/api/pins/$id/new-code'));
 

@@ -6,6 +6,7 @@ import '../../app.dart';
 import '../../data/api.dart';
 import '../../data/models.dart';
 import '../../l10n/app_localizations.dart';
+import '../folders.dart';
 import '../format.dart';
 import '../icons.dart';
 import '../theme.dart';
@@ -69,7 +70,7 @@ class _PinsScreenState extends State<PinsScreen> {
         child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 110), children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Markup(t.pinsLead, style: TextStyle(fontSize: 16.5, height: 1.55, color: c.text2)),
+            child: Markup((pins ?? const []).any((p) => p.showsFolder) ? t.pinsLeadShows : t.pinsLead, style: TextStyle(fontSize: 16.5, height: 1.55, color: c.text2)),
           ),
           if (pins == null && !_failed) const Padding(padding: EdgeInsets.only(top: 80), child: Center(child: CircularProgressIndicator())),
           if (_failed) Padding(padding: const EdgeInsets.only(top: 24), child: Help(t.commonOffline)),
@@ -156,6 +157,8 @@ class PinCard extends StatelessWidget {
     final locale = Localizations.localeOf(context).languageCode;
     final now = clock.now();
     final permanent = pin.kind == PinKind.permanent;
+    final folders = Services.of(context).folders;
+    final folder = folders.choices ? folders.byId(pin.folder)?.name : null;
     final action = TextButton.styleFrom(
       foregroundColor: c.accentText,
       minimumSize: const Size(48, 44),
@@ -180,10 +183,12 @@ class PinCard extends StatelessWidget {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          child: permanent
-              ? Text('${t.pinSince(formatShortDate(pin.createdAt, now, locale))} · ${t.pinUsedOn(pin.phones)}',
-                  style: TextStyle(fontSize: 14, color: c.text3))
-              : Wrap(spacing: 10, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+          child: Wrap(spacing: 10, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+            if (folder != null) _Tag(icon: AppIcons.folder, text: folder),
+            if (pin.showsFolder) _Tag(icon: AppIcons.eye, text: t.pinShowsFolder),
+            if (permanent)
+              Text('${t.pinSince(formatShortDate(pin.createdAt, now, locale))} · ${t.pinUsedOn(pin.phones)}', style: TextStyle(fontSize: 14, color: c.text3))
+            else ...[
                   if (pin.expiresAt != null)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -197,7 +202,8 @@ class PinCard extends StatelessWidget {
                     ),
                   Text(pin.files == 0 ? t.pinFiles(0) : '${t.pinFiles(pin.files)} ${t.pinFromPhones(pin.phones)}',
                       style: TextStyle(fontSize: 14, color: c.text3)),
-                ]),
+                ],
+          ]),
         ),
         Divider(indent: 12, endIndent: 12, color: c.lineSoft),
         Padding(
@@ -221,6 +227,30 @@ class PinCard extends StatelessWidget {
             else
               TextButton(style: action.copyWith(foregroundColor: WidgetStatePropertyAll(c.danger)), onPressed: onEnd, child: Text(t.pinEndNow)),
           ]),
+        ),
+      ]),
+    );
+  }
+}
+
+/// A PIN's folder, or that it shows it, on its card.
+class _Tag extends StatelessWidget {
+  const _Tag({required this.icon, required this.text});
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Container(
+      height: 28,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(color: c.s2, borderRadius: BorderRadius.circular(14)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 14, color: c.text2),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: c.text2)),
         ),
       ]),
     );
@@ -254,7 +284,8 @@ Future<void> showPinQr(BuildContext context, PinInfo pin) {
   );
 }
 
-/// Screen 19: how long the PIN works, and its code (made up, or typed).
+/// Screen 19: how long the PIN works, and its code (made up, or typed); with a second folder,
+/// which folder it sends into (43); and whether guests also see that folder.
 class NewPinSheet extends StatefulWidget {
   const NewPinSheet({super.key, this.folder});
 
@@ -267,6 +298,8 @@ class NewPinSheet extends StatefulWidget {
 
 class _NewPinSheetState extends State<NewPinSheet> {
   PinKind _kind = PinKind.day;
+  late String? _folder = widget.folder; // chosen here
+  bool _shows = false;
   final _code = TextEditingController();
   String? _error;
   bool _busy = false;
@@ -306,10 +339,11 @@ class _NewPinSheetState extends State<NewPinSheet> {
     });
     final navigator = Navigator.of(context);
     try {
-      final pin = await Services.read(context).admin.createPin(_kind, code: _code.text, folder: widget.folder);
+      final services = Services.read(context);
+      final pin = await services.admin.createPin(_kind, code: _code.text, folder: _folder ?? services.folders.sendTo?.id, showsFolder: _shows);
       navigator.pop(pin);
     } on ApiException catch (e) {
-      setState(() => _error = switch (e.code) { 'pin_taken' => t.pinTaken, 'pin_format' => t.pinBadCode, _ => t.commonFailed });
+      setState(() => _error = switch (e.code) { 'pin_taken' => t.pinTaken, 'pin_format' => t.pinBadCode, 'folder_gone' => t.folderGone, _ => t.commonFailed });
     } on NetworkException {
       setState(() => _error = t.commonOffline);
     } finally {
@@ -323,6 +357,8 @@ class _NewPinSheetState extends State<NewPinSheet> {
     final c = context.colors;
     final locale = Localizations.localeOf(context).languageCode;
     final now = clock.now();
+    final folders = Services.of(context).folders;
+    final into = folders.byId(_folder) ?? folders.sendTo;
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: SafeArea(
@@ -330,6 +366,17 @@ class _NewPinSheetState extends State<NewPinSheet> {
           padding: const EdgeInsets.fromLTRB(22, 8, 22, 16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
             Text(t.pinNewTitle, style: Theme.of(context).textTheme.headlineMedium),
+            if (folders.choices) ...[
+              FieldLabel(t.pinSendsInto),
+              FolderField(
+                value: into,
+                color: c.s2,
+                onTap: () async {
+                  final id = await showFolderChoice(context, title: t.pinSendsInto, list: folders.list!, value: into?.id);
+                  if (id != null) setState(() => _folder = id);
+                },
+              ),
+            ],
             FieldLabel(t.pinHowLong),
             Row(children: [
               Expanded(
@@ -369,6 +416,20 @@ class _NewPinSheetState extends State<NewPinSheet> {
               ),
             ]),
             Help(_error ?? t.pinMadeUp, error: _error != null),
+            const SizedBox(height: 14),
+            MergeSemantics(
+              child: Row(children: [
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(t.pinGuestsSee, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 2),
+                    Text(t.pinGuestsSeeHelp, style: TextStyle(fontSize: 13.5, height: 1.45, color: c.text3)),
+                  ]),
+                ),
+                const SizedBox(width: 12),
+                Switch(value: _shows, onChanged: (on) => setState(() => _shows = on)),
+              ]),
+            ),
             const SizedBox(height: 22),
             BusyButton(label: t.pinCreateShare, icon: AppIcons.share, busy: _busy, onPressed: _create),
           ]),

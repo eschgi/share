@@ -175,12 +175,30 @@ class PinSendScreen extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(6, 0, 6, 18),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(t.pinSendTo(session.server.host), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              // Where the files go, where the server has several folders (screen 45).
+              if (session.folderName != null) ...[
+                const SizedBox(height: 10),
+                Container(
+                  height: 34,
+                  padding: const EdgeInsets.symmetric(horizontal: 13),
+                  decoration: BoxDecoration(color: c.accentSoft, borderRadius: BorderRadius.circular(17)),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(AppIcons.folder, size: 16, color: c.accentText),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(session.folderName!,
+                          maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: c.accentText)),
+                    ),
+                  ]),
+                ),
+                const SizedBox(height: 4),
+              ],
               if (session.kind == PinKind.day && expires != null) ...[
                 const SizedBox(height: 4),
                 Text(t.pinValidUntil(formatWhen(expires, clock.now(), locale)), style: TextStyle(fontSize: 14.5, color: c.warn)),
               ],
               const SizedBox(height: 8),
-              Text(t.pinSendLead, style: TextStyle(fontSize: 16, height: 1.5, color: c.text2)),
+              Text(session.showsFolder ? t.pinSendLeadSeen : t.pinSendLead, style: TextStyle(fontSize: 16, height: 1.5, color: c.text2)),
             ]),
           ),
           if (session.ended) ...[

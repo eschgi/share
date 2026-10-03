@@ -599,6 +599,11 @@
     }
   },
   "pinsLead": "A PIN only lets people <b>send</b>. Nobody can see or download anything with it.",
+  "pinsLeadShows": "A PIN lets people send into its folder. Only PINs made to show their folder let guests see it too.",
+  "pinSendsInto": "Sends into",
+  "pinGuestsSee": "Guests also see this folder",
+  "pinGuestsSeeHelp": "Everyone with the PIN then sees and downloads what is in it, as at a wedding.",
+  "pinShowsFolder": "Guests see the folder",
   "pinsPermanent": "Permanent",
   "pinsDay": "For 24 hours",
   "pinSince": "Since {date}",
@@ -1063,6 +1068,7 @@
   },
   "pinEndedCode": "This PIN doesn't work any more. Ask for a new one.",
   "pinSendLead": "Others with this PIN can't see what you send.",
+  "pinSendLeadSeen": "Everyone with this PIN sees what you send.",
   "pinValidUntil": "This PIN works until {when}",
   "@pinValidUntil": {
     "placeholders": {
