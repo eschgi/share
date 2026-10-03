@@ -769,8 +769,12 @@
   .ddlg .lead.sm{margin:-6px 0 6px}
   .dsplit .fsel{margin-top:2px}
   /* a guest's look into a folder, with a PIN that shows it */
-  .gtitle{margin-top:22px}
-  .lead.sm.gmeta{margin:6px 0 0}
+  .gtitle{margin:12px 0 0;font-family:var(--serif);font-size:27px;font-weight:700;letter-spacing:-.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lead.sm.gmeta{margin:4px 0 0}
+  .dlb{display:inline-flex;align-self:flex-start;align-items:center;gap:8px;height:40px;padding:0 16px;border-radius:12px;background:var(--accent-soft);
+    color:var(--accent-text);font-size:14.5px;font-weight:600;margin-top:12px;flex:none}
+  .dlb .ic{width:18px;height:18px}
+  .wb.placed{padding-bottom:0}
   .gfiles{flex:1;min-height:0;overflow:hidden;margin:2px -10px 14px}
   .gfiles .day{padding:16px 4px 9px}
 </style>
@@ -1708,8 +1712,8 @@
       </div>
       <div class="slot">
         <h3><span class="n">46</span>A PIN that also shows the folder <span class="badge proposal">proposal</span></h3>
-        <p class="cap">Only for a PIN made with the switch in 43. Guests see what everyone sent into the folder, open and download it, but delete nothing.</p>
-        <div class="phone" data-shot="46-pin-sees-folder"><div class="sb" data-time="21:20"></div><div class="wb"><div class="brand"><span data-i="images"></span><span translate="no">Share</span><span class="langpill"><span data-i="globe"></span>EN</span></div><div class="seg"><span><span data-i="upload"></span>Send</span><span class="on"><span data-i="images"></span>See</span></div><h1 class="hero sm gtitle">Wedding Anna &amp; Marco</h1><p class="lead sm gmeta">412 files from 23 people</p><div class="gfiles"><div class="day"><div><h4>Today</h4><div class="meta">38 files · 410 MB</div></div></div><div class="grid g4" data-tiles="p6 p2 v3@0:24 p9 p4 p1 p7 p10"></div><div class="day"><div><h4>Saturday, 26 Sep</h4><div class="meta">374 files · 9.4 GB</div></div></div><div class="grid g4" data-tiles="p5 p8 p3 v6@2:05 p1 p9 p2 p4 p6 p10 p7 p3"></div></div><div class="btn primary"><span data-i="download"></span>Download all <small>· 9.8 GB</small></div><p class="small">Everyone with this PIN sees these files.</p></div></div>
+        <p class="cap">Only for a PIN made with the switch in 43. Guests see what everyone sent into the folder, open and download it, but delete nothing. Send and See sit in the bar at the bottom, as in the app; on bigger screens they are tabs in the header.</p>
+        <div class="phone" data-shot="46-pin-sees-folder"><div class="sb" data-time="21:20"></div><div class="wb placed"><div class="brand"><span data-i="images"></span><span translate="no">Share</span><span class="langpill"><span data-i="globe"></span>EN</span></div><h1 class="gtitle">Wedding Anna &amp; Marco</h1><p class="lead sm gmeta">412 files from 23 people</p><div class="dlb"><span data-i="download"></span>Download all · 9.8 GB</div><div class="gfiles"><div class="day"><div><h4>Today</h4><div class="meta">38 files · 410 MB</div></div></div><div class="grid g4" data-tiles="p6 p2 v3@0:24 p9 p4 p1 p7 p10"></div><div class="day"><div><h4>Saturday, 26 Sep</h4><div class="meta">374 files · 9.4 GB</div></div></div><div class="grid g4" data-tiles="p5 p8 p3 v6@2:05 p1 p9 p2 p4 p6 p10 p7 p3"></div></div></div><div class="nav"><a><span class="pi"><span data-i="upload"></span></span>Send</a><a class="on"><span class="pi"><span data-i="images"></span></span>See</a></div><div class="gest"></div></div>
       </div>
       <div class="slot wide">
         <h3><span class="n">47</span>Invite someone, with folders <span class="badge proposal">proposal</span></h3>

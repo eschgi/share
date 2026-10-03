@@ -119,10 +119,22 @@ export function See({ name, onEnded }: { name: string; onEnded: () => void }) {
   let offset = 0;
   return (
     <Page name={name} languageSwitch layout="see">
-      <h1 class="hero gtitle">{folder?.name ?? name}</h1>
+      <h1 class="gtitle">{folder?.name ?? name}</h1>
       {folder && (
         <p class="lead gmeta">
           {tn('see.files', folder.files, { n: formatCount(folder.files, lang) })} {tn('see.from', folder.senders, { n: formatCount(folder.senders, lang) })}
+        </p>
+      )}
+      {days.length > 0 && (
+        <button type="button" class="btn tonal sm gall" disabled={busy} onClick={() => void downloadAll()}>
+          <Icon name="download" />
+          {t('see.downloadAll', { size: formatBytes(total, lang) })}
+        </button>
+      )}
+      {problem && (
+        <p class="help err" role="alert">
+          <Icon name="alert" />
+          {problem}
         </p>
       )}
       <div class="gfiles">
@@ -149,19 +161,6 @@ export function See({ name, onEnded }: { name: string; onEnded: () => void }) {
         {model.loading && <span class="spinner" role="status" aria-label={t('common.loading')} />}
         <div ref={end} />
       </div>
-      {problem && (
-        <p class="help err" role="alert">
-          <Icon name="alert" />
-          {problem}
-        </p>
-      )}
-      {days.length > 0 && (
-        <button type="button" class="btn primary gall" disabled={busy} onClick={() => void downloadAll()}>
-          <Icon name="download" />
-          {t('see.downloadAll', { size: formatBytes(total, lang) })}
-        </button>
-      )}
-      <p class="small">{t('see.note')}</p>
       {viewing && (
         <Viewer
           files={model.files}

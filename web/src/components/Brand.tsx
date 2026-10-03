@@ -1,13 +1,16 @@
+import type { ComponentChildren } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { useI18n } from '../i18n';
 import { Icon } from './Icon';
 
-/** The header: logo and name, and on the first screens the language switch. */
-export function Brand({ name, languageSwitch }: { name: string; languageSwitch?: boolean }) {
+/** The header: logo and name, what the screen adds (a PIN's Send and See on bigger screens),
+ * and on the first screens the language switch. */
+export function Brand({ name, languageSwitch, children }: { name: string; languageSwitch?: boolean; children?: ComponentChildren }) {
   return (
     <header class="brand">
       <Icon name="images" />
       <span translate={false}>{name}</span>
+      {children}
       {languageSwitch && <LanguageSwitch />}
     </header>
   );

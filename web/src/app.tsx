@@ -2,8 +2,7 @@ import type { ComponentType } from 'preact';
 import { useEffect, useMemo, useReducer, useRef, useState } from 'preact/hooks';
 import { ApiError, endSession, getInfo, getSession, unlock, type Info } from './api';
 import { DropZone } from './components/DropZone';
-import { Icon } from './components/Icon';
-import { Page, PageTop } from './components/Page';
+import { Page, PagePlaces, type Places } from './components/Page';
 import { useLeaveWarning } from './device';
 import { formatPercent } from './format';
 import { I18nContext, isLang, languages, makeI18n, pickLanguage, storeLanguage, storedLanguage, type Lang } from './i18n';
@@ -238,16 +237,17 @@ export function App() {
       send(files);
     };
   }
-  const tabs = shows && (
-    <div class="seg" role="tablist">
-      {(['send', 'see'] as const).map((k) => (
-        <button key={k} type="button" role="tab" aria-selected={tab === k} class={tab === k ? 'on' : ''} onClick={() => setTab(k)}>
-          <Icon name={k === 'send' ? 'upload' : 'images'} />
-          {i18n.t(k === 'send' ? 'ready.tabSend' : 'ready.tabSee')}
-        </button>
-      ))}
-    </div>
-  );
+  const places: Places | null = shows
+    ? {
+        label: name,
+        items: [
+          { key: 'send', icon: 'upload', label: i18n.t('ready.tabSend') },
+          { key: 'see', icon: 'images', label: i18n.t('ready.tabSee') },
+        ],
+        on: tab,
+        choose: (k) => setTab(k === 'see' ? 'see' : 'send'),
+      }
+    : null;
 
   let screen;
   switch (seeing ? 'see' : state.screen) {
@@ -340,7 +340,7 @@ export function App() {
   }
   return (
     <I18nContext.Provider value={i18n}>
-      <PageTop.Provider value={tabs || null}>{screen}</PageTop.Provider>
+      <PagePlaces.Provider value={places}>{screen}</PagePlaces.Provider>
       <DropZone onFiles={dropTo} label={dropLabel} />
     </I18nContext.Provider>
   );

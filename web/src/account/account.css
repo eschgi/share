@@ -44,49 +44,6 @@
   white-space: nowrap;
 }
 
-.nav {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 10;
-  display: flex;
-  height: calc(80px + env(safe-area-inset-bottom));
-  padding: 12px env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-  background: var(--bar);
-  border-top: 1px solid var(--line-soft);
-}
-.navtab {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  border-radius: 12px;
-  color: var(--text-3);
-  font-size: 12.5px;
-  font-weight: 500;
-  text-decoration: none;
-}
-.navtab .pi {
-  display: grid;
-  place-items: center;
-  width: 62px;
-  height: 32px;
-  border-radius: 16px;
-}
-.navtab .ic {
-  width: 22px;
-  height: 22px;
-}
-.navtab.on {
-  color: var(--text);
-}
-.navtab.on .pi {
-  background: var(--accent-soft);
-  color: var(--accent-text);
-}
-
 /* Round icon buttons, and buttons that are only words. */
 .ib {
   display: grid;
@@ -136,20 +93,13 @@
   .btn.danger:hover:not(:disabled) {
     background: color-mix(in srgb, var(--danger-strong) 88%, #fff);
   }
-  .navtab:not(.on):hover,
-  .dtab:not(.on):hover {
-    color: var(--text);
-  }
-  .dtab:not(.on):hover {
-    background: var(--s1);
-  }
   button.row:hover,
   a.row:not(.on):hover,
   .profile:hover {
     background: color-mix(in srgb, var(--s2) 60%, var(--s1));
   }
 }
-:is(.ib, .tbtn, .navtab, .dtab, .ahd .brand, .ahd-me, .profile, .choice, .tauto):focus-visible {
+:is(.ib, .tbtn, .ahd .brand, .ahd-me, .profile, .choice, .tauto):focus-visible {
   outline: 2px solid var(--accent-text);
   outline-offset: 2px;
 }
@@ -830,34 +780,6 @@
     color: inherit;
     text-decoration: none;
   }
-  .dtabs {
-    display: flex;
-    gap: 4px;
-  }
-  .dtab {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    height: 42px;
-    padding: 0 16px;
-    border-radius: 12px;
-    color: var(--text-2);
-    font-size: 15.5px;
-    font-weight: 500;
-    text-decoration: none;
-    white-space: nowrap;
-  }
-  .dtab .pi {
-    display: contents;
-  }
-  .dtab .ic {
-    width: 19px;
-    height: 19px;
-  }
-  .dtab.on {
-    background: var(--accent-soft);
-    color: var(--accent-text);
-  }
   .ahd-tools {
     flex: 1;
     display: flex;
@@ -870,7 +792,6 @@
     flex: none;
     border-radius: 50%;
   }
-  .nav,
   .ab:not(.wide) {
     display: none;
   }

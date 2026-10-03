@@ -338,6 +338,13 @@ button.small:focus-visible {
   .btn.tonal:hover:not(:disabled) {
     background: var(--accent-soft-hover);
   }
+  .navtab:not(.on):hover,
+  .dtab:not(.on):hover {
+    color: var(--text);
+  }
+  .dtab:not(.on):hover {
+    background: var(--s1);
+  }
   .btn.link:hover,
   .small.link:hover,
   .langpill:hover {
@@ -540,11 +547,64 @@ button.small:focus-visible {
   outline: 2px solid var(--accent-text);
   outline-offset: -2px;
 }
-/* The PIN pages' Send and See, under the header, for a PIN that shows its folder. */
-.ptop {
-  width: 100%;
-  max-width: 480px;
-  margin: 6px auto 0;
+/* The places a screen sits between: the account's Library, Send and Settings, or a PIN's Send
+   and See (components/Page.tsx). On a phone they are the app's bar at the bottom; bigger
+   screens show them as tabs in the header. */
+.nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  height: calc(80px + env(safe-area-inset-bottom));
+  padding: 12px env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  background: var(--bar);
+  border-top: 1px solid var(--line-soft);
+}
+.navtab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--text-3);
+  font-size: 12.5px;
+  font-weight: 500;
+  text-decoration: none;
+}
+.navtab .pi {
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 32px;
+  border-radius: 16px;
+}
+.navtab .ic {
+  width: 22px;
+  height: 22px;
+}
+.navtab.on {
+  color: var(--text);
+}
+.navtab.on .pi {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+.dtabs {
+  display: none;
+}
+:is(.navtab, .dtab):focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
+/* A PIN's pages with their places leave room for the bar at the bottom of a phone. */
+.screen.placed {
+  padding-bottom: calc(96px + env(safe-area-inset-bottom));
 }
 
 /* For screen readers only. */
@@ -1204,6 +1264,47 @@ a.small:focus-visible {
     width: 100%;
     max-width: 1200px;
     margin: 0 auto;
+  }
+  .nav {
+    display: none;
+  }
+  .dtabs {
+    display: flex;
+    gap: 4px;
+  }
+  /* In the PIN pages' header, beside the name. */
+  .brand .dtabs {
+    margin-left: 16px;
+    font-family: var(--sans);
+  }
+  .dtab {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    height: 42px;
+    padding: 0 16px;
+    border: 0;
+    border-radius: 12px;
+    background: none;
+    color: var(--text-2);
+    font-size: 15.5px;
+    font-weight: 500;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .dtab .pi {
+    display: contents;
+  }
+  .dtab .ic {
+    width: 19px;
+    height: 19px;
+  }
+  .dtab.on {
+    background: var(--accent-soft);
+    color: var(--accent-text);
+  }
+  .screen.placed {
+    padding-bottom: max(32px, env(safe-area-inset-bottom));
   }
   .body {
     display: flex;

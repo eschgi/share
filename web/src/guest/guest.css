@@ -1,10 +1,33 @@
 /* A guest's look into a folder (screen 46): the PIN pages' frame, with the library's days and
-   tiles inside, in a wider card on bigger screens. */
+   tiles inside, in a wider card on bigger screens. As in the app, the folder's name is the
+   page's title, with Download all under what it holds. */
 .gtitle {
-  margin-top: 22px;
+  margin: 12px 0 0;
+  overflow: hidden;
+  font-family: var(--serif);
+  font-size: 27px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.2px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .lead.gmeta {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
+  font-size: 15px;
+}
+.btn.gall {
+  align-self: flex-start;
+  width: auto;
+  height: 42px;
+  padding: 0 18px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.btn.gall .ic {
+  width: 19px;
+  height: 19px;
 }
 .gfiles {
   margin: 4px -10px 14px;
@@ -12,20 +35,16 @@
 .gfiles .selm {
   display: none !important;
 }
-.btn.gall {
-  margin-top: 6px;
-}
 @media (min-width: 640px) and (min-height: 540px) {
   .see .body {
     max-width: 1100px;
     margin: 12px auto auto;
   }
+  .gtitle {
+    font-size: 32px;
+    white-space: normal;
+  }
   .gfiles {
     margin: 4px 0 14px;
-  }
-  .btn.gall {
-    align-self: flex-start;
-    width: auto;
-    padding: 0 26px;
   }
 }

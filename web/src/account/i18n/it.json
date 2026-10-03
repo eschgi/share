@@ -109,7 +109,6 @@
   "see.from.other": "da {n} persone",
   "see.from.zero": "",
   "see.downloadAll": "Scarica tutto · {size}",
-  "see.note": "Tutti quelli con questo PIN vedono questi file.",
   "see.empty": "Qui non c'è ancora niente. Quello che viene inviato con questo PIN appare qui.",
   "library.dayMeta.one": "1 file · {size}",
   "library.dayMeta.other": "{n} file · {size}",
