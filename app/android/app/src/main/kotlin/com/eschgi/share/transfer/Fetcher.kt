@@ -3,8 +3,6 @@ package com.eschgi.share.transfer
 import android.content.Context
 import android.net.Uri
 import androidx.core.content.FileProvider
-import com.eschgi.share.data.SecretStore
-import com.eschgi.share.data.ServerStore
 import com.eschgi.share.net.RouteMonitor
 import com.eschgi.share.net.ServerConnection
 import java.io.File
@@ -26,14 +24,13 @@ object Fetcher {
         abort?.stop()
     }
 
-    /** Content URIs for [files], or null if cancelled. Throws if one can't be fetched. */
+    /** Content URIs for [files], fetched with [auth]'s key, or null if cancelled. Throws if one can't be fetched. */
     @Synchronized
-    fun fetch(context: Context, files: List<FileRef>): List<Uri>? {
+    fun fetch(context: Context, files: List<FileRef>, auth: String = Credentials.DEVICE): List<Uri>? {
         val app = context.applicationContext
         val dir = File(app.cacheDir, "fetch")
         trim(dir)
-        val token = SecretStore(app).read(SecretStore.DEVICE_TOKEN) ?: throw IOException("signed out")
-        val config = ServerStore(app).config() ?: throw IOException("no server")
+        val (token, config) = Credentials.of(app, auth) ?: throw IOException(if (auth == Credentials.PIN) "no PIN" else "signed out")
         val server = ServerConnection(config, token)
         val downloader = Downloader()
         val current = Abort().also { abort = it }
@@ -41,7 +38,7 @@ object Fetcher {
         val live = HashMap<String, Long>()
         val finished = HashSet<String>()
         val items = files.map { TransferItem(BATCH, it, TransferItem.QUEUED, 0, null) }
-        val local = RouteMonitor.current(app).isLocal
+        val local = Credentials.atHome(auth, RouteMonitor.current(app).isLocal)
         var reported = 0L
         fun report(running: Boolean, force: Boolean = true) {
             val now = System.nanoTime()
@@ -59,7 +56,7 @@ object Fetcher {
                 } else {
                     val target = File(File(dir, file.id), safeName(file))
                     if (!(target.exists() && target.length() == file.size)) {
-                        if (!download(app, downloader, server, file, FileSink(target), current) { live[file.id] = it; report(true, force = false) }) return null
+                        if (!download(app, downloader, server, auth, file, FileSink(target), current) { live[file.id] = it; report(true, force = false) }) return null
                     }
                     target.setLastModified(System.currentTimeMillis())
                     uris += FileProvider.getUriForFile(app, "${app.packageName}.files", target)
@@ -88,6 +85,7 @@ object Fetcher {
         app: Context,
         downloader: Downloader,
         server: ServerConnection,
+        auth: String,
         file: FileRef,
         sink: FileSink,
         abort: Abort,
@@ -95,8 +93,8 @@ object Fetcher {
     ): Boolean {
         var attempt = 0
         while (true) {
-            val route = RouteMonitor.settled(app)
-            when (val outcome = downloader.fetch(file.id, file.size, sink, open = { server.open(it, route.isLocal) }, abort = abort, onBytes = onBytes)) {
+            val home = Credentials.atHome(auth, RouteMonitor.settled(app).isLocal)
+            when (val outcome = downloader.fetch(file.id, file.size, sink, open = { server.open(it, home) }, abort = abort, onBytes = onBytes)) {
                 Downloader.Outcome.Done -> {
                     sink.commit()
                     return true
@@ -107,7 +105,7 @@ object Fetcher {
                 }
                 is Downloader.Outcome.Retry -> {
                     if (++attempt >= ATTEMPTS) throw IOException("couldn't fetch ${file.name}", outcome.cause)
-                    if (route.isLocal) RouteMonitor.check(app)
+                    if (home) RouteMonitor.check(app)
                     Thread.sleep(DownloadEngine.backoff(attempt))
                 }
                 else -> {

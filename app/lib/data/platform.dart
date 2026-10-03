@@ -88,7 +88,8 @@ class TransferState {
 
 enum PickWhat { media, documents }
 
-/// How files are sent: with the phone's key (signed in), or with a PIN.
+/// Whose key files go with: the phone's (signed in), or a PIN's. A PIN sends, and one that shows
+/// its folder also fetches, always over the public address.
 enum SendAuth { device, pin }
 
 /// One file of an upload batch.
@@ -247,8 +248,9 @@ abstract class Platform {
   /// Copies a password: Android 13 and later hide it in the clipboard's preview.
   Future<void> copySecret(String text);
 
-  /// Starts saving files to the phone and returns the batch id.
-  Future<String> download(List<FileInfo> files);
+  /// Starts saving files to the phone and returns the batch id; with [auth] pin, as the PIN
+  /// that shows their folder.
+  Future<String> download(List<FileInfo> files, {SendAuth auth = SendAuth.device});
   Future<void> cancelDownloads(String batch);
   Stream<TransferState> get transfers;
 
@@ -257,12 +259,12 @@ abstract class Platform {
 
   /// Shares files with another app, or opens one (a video in the system player), after
   /// fetching them into the cache. Both throw [OpenFailed].
-  Future<void> shareFiles(List<FileInfo> files);
-  Future<void> openFile(FileInfo file);
+  Future<void> shareFiles(List<FileInfo> files, {SendAuth auth = SendAuth.device});
+  Future<void> openFile(FileInfo file, {SendAuth auth = SendAuth.device});
 
   /// Where to play a video or sound from; null if fetching it first was cancelled. Throws
   /// [OpenFailed]. Over the https port at home it is fetched first, with the same progress.
-  Future<PlaySource?> play(FileInfo file);
+  Future<PlaySource?> play(FileInfo file, {SendAuth auth = SendAuth.device});
 
   /// Keeps the screen on while something plays.
   Future<void> keepScreenOn(bool on);
@@ -416,8 +418,8 @@ class ChannelPlatform implements Platform {
   Future<void> copySecret(String text) => _soft('clipboard.secret', {'text': text});
 
   @override
-  Future<String> download(List<FileInfo> files) async =>
-      await _invoke<String>('transfer.download', {'files': jsonEncode([for (final f in files) f.toJson()])}) ?? '';
+  Future<String> download(List<FileInfo> files, {SendAuth auth = SendAuth.device}) async =>
+      await _invoke<String>('transfer.download', {'files': jsonEncode([for (final f in files) f.toJson()]), 'auth': auth.name}) ?? '';
 
   @override
   Future<void> cancelDownloads(String batch) => _soft('transfer.cancel', {'batch': batch});
@@ -432,16 +434,17 @@ class ChannelPlatform implements Platform {
   }
 
   @override
-  Future<void> shareFiles(List<FileInfo> files) =>
-      _opening(() => _invoke('file.share', {'files': jsonEncode([for (final f in files) f.toJson()])}));
+  Future<void> shareFiles(List<FileInfo> files, {SendAuth auth = SendAuth.device}) =>
+      _opening(() => _invoke('file.share', {'files': jsonEncode([for (final f in files) f.toJson()]), 'auth': auth.name}));
 
   @override
-  Future<void> openFile(FileInfo file) => _opening(() => _invoke('file.open', {'file': jsonEncode(file.toJson())}));
+  Future<void> openFile(FileInfo file, {SendAuth auth = SendAuth.device}) =>
+      _opening(() => _invoke('file.open', {'file': jsonEncode(file.toJson()), 'auth': auth.name}));
 
   @override
-  Future<PlaySource?> play(FileInfo file) async {
+  Future<PlaySource?> play(FileInfo file, {SendAuth auth = SendAuth.device}) async {
     try {
-      final m = await _invoke<Map<Object?, Object?>>('file.play', {'file': jsonEncode(file.toJson())});
+      final m = await _invoke<Map<Object?, Object?>>('file.play', {'file': jsonEncode(file.toJson()), 'auth': auth.name});
       return m == null ? null : PlaySource.fromMap(m);
     } on PlatformException {
       throw const OpenFailed();

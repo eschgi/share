@@ -5,6 +5,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'api.dart';
+import 'library.dart';
 import 'models.dart';
 import 'platform.dart';
 import 'server.dart';
@@ -92,6 +93,19 @@ class PinRepository {
     await platform.savePinServer(config);
     _set(info);
     await platform.resumeUploads(SendAuth.pin);
+  }
+
+  /// What the PIN's folder is fetched with, while the PIN shows it (screen 46).
+  Future<PinAccess?> access() async {
+    final s = _current;
+    final token = await platform.readSecret(_tokenKey);
+    return s == null || token == null || !s.showsFolder ? null : (server: s.server, token: token);
+  }
+
+  /// The server said the PIN ended: a new one takes over what's unfinished.
+  void ended() {
+    final s = _current;
+    if (s != null && !s.ended) _set(s.copyWith(ended: true));
   }
 
   /// Stops sending with a PIN on this phone.

@@ -2,6 +2,7 @@ import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 
 import '../../app.dart';
+import '../../data/library.dart';
 import '../../data/models.dart';
 import '../../data/pin.dart';
 import '../../data/platform.dart';
@@ -14,6 +15,7 @@ import '../sign_in.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'pin_entry_screen.dart';
+import 'see_view.dart';
 import 'send_panel.dart';
 import 'shared.dart';
 
@@ -133,27 +135,62 @@ class _WaitingShared extends StatelessWidget {
 }
 
 /// Screen 15 without an account: sending with a PIN, as on the website.
-class PinSendScreen extends StatelessWidget {
+///
+/// A PIN that shows its folder also has a See tab: what everyone sent into it (screen 46).
+class PinSendScreen extends StatefulWidget {
   const PinSendScreen({super.key, required this.session});
   final PinSession session;
 
+  @override
+  State<PinSendScreen> createState() => _PinSendScreenState();
+}
+
+class _PinSendScreenState extends State<PinSendScreen> {
+  bool _seeing = false;
+  PinAccess? _access; // while the PIN shows its folder
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAccess();
+  }
+
+  @override
+  void didUpdateWidget(PinSendScreen old) {
+    super.didUpdateWidget(old);
+    if (old.session.showsFolder != widget.session.showsFolder || old.session.server != widget.session.server) _loadAccess();
+  }
+
+  Future<void> _loadAccess() async {
+    final access = await Services.read(context).pin.access();
+    if (mounted) setState(() => _access = access);
+  }
+
   void _newPin(BuildContext context) =>
-      Navigator.push(context, MaterialPageRoute<void>(builder: (_) => PinEntryScreen(server: session.server)));
+      Navigator.push(context, MaterialPageRoute<void>(builder: (_) => PinEntryScreen(server: widget.session.server)));
 
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final c = context.colors;
     final locale = Localizations.localeOf(context).languageCode;
+    final session = widget.session;
     final expires = session.expiresAt;
+    final access = session.showsFolder && !session.ended ? _access : null;
+    final seeing = _seeing && access != null;
     // Files shared from another app go out with the PIN.
     return SharedSender(
       auth: SendAuth.pin,
-      onShared: () => Navigator.of(context).popUntil((r) => r.isFirst),
+      onShared: () {
+        Navigator.of(context).popUntil((r) => r.isFirst);
+        setState(() => _seeing = false);
+      },
       child: Scaffold(
         appBar: AppBar(
-          titleSpacing: 22,
-          title: Text(t.sendTitle),
+          titleSpacing: access == null ? 22 : 16,
+          title: access == null
+              ? Text(t.sendTitle)
+              : _Tabs(seeing: seeing, onChanged: (see) => setState(() => _seeing = see)),
           actions: [
             PopupMenuButton<String>(
               icon: const Icon(AppIcons.more),
@@ -170,52 +207,97 @@ class PinSendScreen extends StatelessWidget {
             ),
           ],
         ),
-        body: ListView(padding: const EdgeInsets.fromLTRB(16, 0, 16, 24), children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(6, 0, 6, 18),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(t.pinSendTo(session.server.host), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-              // Where the files go, where the server has several folders (screen 45).
-              if (session.folderName != null) ...[
-                const SizedBox(height: 10),
-                Container(
-                  height: 34,
-                  padding: const EdgeInsets.symmetric(horizontal: 13),
-                  decoration: BoxDecoration(color: c.accentSoft, borderRadius: BorderRadius.circular(17)),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(AppIcons.folder, size: 16, color: c.accentText),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(session.folderName!,
-                          maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: c.accentText)),
-                    ),
-                  ]),
-                ),
-                const SizedBox(height: 4),
-              ],
-              if (session.kind == PinKind.day && expires != null) ...[
-                const SizedBox(height: 4),
-                Text(t.pinValidUntil(formatWhen(expires, clock.now(), locale)), style: TextStyle(fontSize: 14.5, color: c.warn)),
-              ],
-              const SizedBox(height: 8),
-              Text(session.showsFolder ? t.pinSendLeadSeen : t.pinSendLead, style: TextStyle(fontSize: 16, height: 1.5, color: c.text2)),
-            ]),
-          ),
-          if (session.ended) ...[
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: c.s1, borderRadius: BorderRadius.circular(18), border: Border.all(color: c.lineSoft)),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                Text(t.sendPinEnded, style: TextStyle(fontSize: 15.5, height: 1.5, color: c.text2)),
-                const SizedBox(height: 12),
-                FilledButton(onPressed: () => _newPin(context), child: Text(t.sendNewPin)),
+        body: IndexedStack(index: seeing ? 1 : 0, children: [
+          ListView(padding: const EdgeInsets.fromLTRB(16, 0, 16, 24), children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(6, 0, 6, 18),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(t.pinSendTo(session.server.host), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                // Where the files go, where the server has several folders (screen 45).
+                if (session.folderName != null) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    height: 34,
+                    padding: const EdgeInsets.symmetric(horizontal: 13),
+                    decoration: BoxDecoration(color: c.accentSoft, borderRadius: BorderRadius.circular(17)),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(AppIcons.folder, size: 16, color: c.accentText),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(session.folderName!,
+                            maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: c.accentText)),
+                      ),
+                    ]),
+                  ),
+                  const SizedBox(height: 4),
+                ],
+                if (session.kind == PinKind.day && expires != null) ...[
+                  const SizedBox(height: 4),
+                  Text(t.pinValidUntil(formatWhen(expires, clock.now(), locale)), style: TextStyle(fontSize: 14.5, color: c.warn)),
+                ],
+                const SizedBox(height: 8),
+                Text(session.showsFolder ? t.pinSendLeadSeen : t.pinSendLead, style: TextStyle(fontSize: 16, height: 1.5, color: c.text2)),
               ]),
             ),
-            const SizedBox(height: 16),
-          ],
-          SendPanel(auth: SendAuth.pin, onNewPin: () => _newPin(context)),
+            if (session.ended) ...[
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(color: c.s1, borderRadius: BorderRadius.circular(18), border: Border.all(color: c.lineSoft)),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  Text(t.sendPinEnded, style: TextStyle(fontSize: 15.5, height: 1.5, color: c.text2)),
+                  const SizedBox(height: 12),
+                  FilledButton(onPressed: () => _newPin(context), child: Text(t.sendNewPin)),
+                ]),
+              ),
+              const SizedBox(height: 16),
+            ],
+            SendPanel(auth: SendAuth.pin, onNewPin: () => _newPin(context)),
+          ]),
+          if (access != null) SeeView(key: ValueKey(access), access: access, folderName: session.folderName),
         ]),
       ),
+    );
+  }
+}
+
+/// Send | See, for a PIN that shows its folder.
+class _Tabs extends StatelessWidget {
+  const _Tabs({required this.seeing, required this.onChanged});
+  final bool seeing;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final c = context.colors;
+    Widget tab(bool see, String label) {
+      final on = seeing == see;
+      return Expanded(
+        child: Semantics(
+          selected: on,
+          button: true,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => onChanged(see),
+            child: Container(
+              height: 40,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: on ? c.accentSoft : null, borderRadius: BorderRadius.circular(12)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                if (on) ...[Icon(AppIcons.check, size: 18, color: c.accentText), const SizedBox(width: 6)],
+                Text(label, style: TextStyle(fontFamily: 'Roboto', fontSize: 16, fontWeight: FontWeight.w600, color: on ? c.accentText : c.text2)),
+              ]),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 320),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(color: c.s1, borderRadius: BorderRadius.circular(16), border: Border.all(color: c.line)),
+      child: Row(children: [tab(false, t.sendTitle), tab(true, t.pinTabSee)]),
     );
   }
 }

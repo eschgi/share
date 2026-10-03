@@ -33,6 +33,8 @@ data class TransferItem(
     val bytes: Long,
     /** Where it's being written: the pending MediaStore row. */
     val target: String?,
+    /** Whose key fetches it: the phone's, or a PIN's (Credentials). */
+    val auth: String = Credentials.DEVICE,
 ) {
     companion object {
         const val QUEUED = "queued"

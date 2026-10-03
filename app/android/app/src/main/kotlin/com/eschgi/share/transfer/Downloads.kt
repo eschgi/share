@@ -25,8 +25,11 @@ object Downloads {
 
     fun emit(event: Map<String, Any?>) = listeners.forEach { it(event) }
 
-    /** Queues [files] and returns the batch id. Files already on the phone are skipped. */
-    fun enqueue(context: Context, files: List<FileRef>): String {
+    /**
+     * Queues [files], fetched with [auth]'s key, and returns the batch id. Files already on the
+     * phone are skipped.
+     */
+    fun enqueue(context: Context, files: List<FileRef>, auth: String = Credentials.DEVICE): String {
         val app = context.applicationContext
         val db = TransferDb.get(app)
         val now = System.currentTimeMillis()
@@ -34,7 +37,7 @@ object Downloads {
         val id = UUID.randomUUID().toString()
         DownloadEngine.locked {
             db.deleteBatchesBefore(now - KEEP_MS)
-            db.addBatch(id, files, onPhone, now)
+            db.addBatch(id, files, onPhone, now, auth)
             db.resumePaused()
             if (!DownloadEngine.isRunning()) startHost(app)
         }

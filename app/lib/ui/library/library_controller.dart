@@ -229,13 +229,18 @@ class LibraryController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Everything the filter shows, loaded first if need be.
-  Future<void> selectAll() async {
+  /// Loads every file the filter shows, page by page.
+  Future<void> loadAll() async {
     while (!_end) {
       final before = files.length;
       await more();
       if (files.length == before && !_end) break; // an error; keep what we have
     }
+  }
+
+  /// Everything the filter shows, loaded first if need be.
+  Future<void> selectAll() async {
+    await loadAll();
     selected.addAll(files.map((f) => f.id));
     notifyListeners();
   }

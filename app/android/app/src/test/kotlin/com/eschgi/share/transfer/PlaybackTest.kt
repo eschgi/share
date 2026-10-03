@@ -44,6 +44,14 @@ class PlaybackTest {
     }
 
     @Test
+    fun aPinPlaysOverThePublicAddressEvenAtHome() {
+        // A PIN that shows its folder: its key goes only to the address it was unlocked at.
+        val home = Credentials.atHome(Credentials.PIN, routeIsLocal = true)
+        assertEquals(Playback.Way.Stream("https://share.example.com"), Playback.way(false, homeHttps, home, proved))
+        assertEquals(true, Credentials.atHome(Credentials.DEVICE, routeIsLocal = true))
+    }
+
+    @Test
     fun aServerOnlyAtHomeNeedsTheProof() {
         assertEquals(Playback.Way.Stream("http://192.168.8.1:8080"), Playback.way(false, onlyHome, local = false, proved))
         assertEquals(Playback.Way.Nowhere, Playback.way(false, onlyHome, local = false, notProved))

@@ -3,8 +3,6 @@ package com.eschgi.share.transfer
 import android.content.Context
 import android.util.Log
 import androidx.core.net.toUri
-import com.eschgi.share.data.SecretStore
-import com.eschgi.share.data.ServerStore
 import com.eschgi.share.net.RouteMonitor
 import com.eschgi.share.net.ServerConnection
 import java.io.IOException
@@ -65,8 +63,7 @@ object Uploads {
     }
 
     private fun terminate(app: Context, auth: String, uploadIds: List<String>) {
-        val token = SecretStore(app).read(if (auth == UploadBatch.PIN) SecretStore.PIN_TOKEN else SecretStore.DEVICE_TOKEN) ?: return
-        val config = (if (auth == UploadBatch.PIN) ServerStore(app).pinConfig() else ServerStore(app).config()) ?: return
+        val (token, config) = Credentials.of(app, auth) ?: return
         val server = ServerConnection(config, token)
         for (id in uploadIds) {
             try {

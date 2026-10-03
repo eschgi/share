@@ -47,12 +47,19 @@ class TransferDb private constructor(context: Context) : SQLiteOpenHelper(contex
         createUploads(db)
         createShared(db)
         version4(db)
+        version5(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         if (oldVersion < 2) createUploads(db)
         if (oldVersion < 3) createShared(db)
         if (oldVersion < 4) version4(db)
+        if (oldVersion < 5) version5(db)
+    }
+
+    /** Version 5: whose key fetches a download batch; a PIN that shows its folder downloads too. */
+    private fun version5(db: SQLiteDatabase) {
+        db.execSQL("ALTER TABLE batches ADD COLUMN auth TEXT NOT NULL DEFAULT '${Credentials.DEVICE}'")
     }
 
     /** Version 4: the folder signed-in sending goes into; null for a PIN, which sends into its own. */
@@ -103,11 +110,12 @@ class TransferDb private constructor(context: Context) : SQLiteOpenHelper(contex
         db.execSQL("CREATE INDEX uploads_queued ON uploads (state, batch)")
     }
 
-    fun addBatch(id: String, files: List<FileRef>, skipped: Set<String>, now: Long) {
+    fun addBatch(id: String, files: List<FileRef>, skipped: Set<String>, now: Long, auth: String = Credentials.DEVICE) {
         writableDatabase.transaction {
             insertOrThrow("batches", null, ContentValues().apply {
                 put("id", id)
                 put("created_at", now)
+                put("auth", auth)
             })
             for (f in files.distinctBy { it.id }) {
                 insertOrThrow("items", null, ContentValues().apply {
@@ -123,16 +131,16 @@ class TransferDb private constructor(context: Context) : SQLiteOpenHelper(contex
         }
     }
 
-    /** The next file to fetch: oldest batch first, in the order they were picked. */
+    /** The next file to fetch, with whose key: oldest batch first, in the order they were picked. */
     fun nextQueued(exclude: Set<String>): TransferItem? {
         readableDatabase.rawQuery(
-            """SELECT $ITEM_COLUMNS FROM items i JOIN batches b ON b.id = i.batch
+            """SELECT $ITEM_COLUMNS, b.auth FROM items i JOIN batches b ON b.id = i.batch
                WHERE i.state = 'queued' AND b.state = 'active'
                ORDER BY b.created_at, i.rowid""",
             null,
         ).use { c ->
             while (c.moveToNext()) {
-                val item = item(c)
+                val item = item(c).copy(auth = c.getString(9))
                 if (item.file.id !in exclude) return item
             }
         }
@@ -236,16 +244,17 @@ class TransferDb private constructor(context: Context) : SQLiteOpenHelper(contex
         writableDatabase.update("batches", ContentValues().apply { put("state", "paused") }, "state = 'active'", null)
     }
 
-    /** Stops everything queued, e.g. when the phone was signed out. */
-    fun failQueued(error: String): List<TransferItem> = writableDatabase.transaction {
-        val open = rawQuery("SELECT $ITEM_COLUMNS FROM items i WHERE i.state = 'queued'", null).use { c ->
+    /** Stops everything queued with [auth]'s key, e.g. when the phone was signed out or the PIN ended. */
+    fun failQueued(error: String, auth: String): List<TransferItem> = writableDatabase.transaction {
+        val mine = "batch IN (SELECT id FROM batches WHERE auth = ?)"
+        val open = rawQuery("SELECT $ITEM_COLUMNS FROM items i WHERE i.state = 'queued' AND i.$mine", arrayOf(auth)).use { c ->
             buildList { while (c.moveToNext()) add(item(c)) }
         }
         update("items", ContentValues().apply {
             put("state", TransferItem.FAILED)
             put("error", error)
-        }, "state = 'queued'", null)
-        update("batches", ContentValues().apply { put("state", "finished") }, "state IN ('active', 'paused')", null)
+        }, "state = 'queued' AND $mine", arrayOf(auth))
+        update("batches", ContentValues().apply { put("state", "finished") }, "state IN ('active', 'paused') AND auth = ?", arrayOf(auth))
         open
     }
 
@@ -291,7 +300,7 @@ class TransferDb private constructor(context: Context) : SQLiteOpenHelper(contex
     )
 
     companion object {
-        private const val VERSION = 4
+        private const val VERSION = 5
         private const val ITEM_COLUMNS = "i.batch, i.file_id, i.name, i.size, i.mime, i.kind, i.state, i.bytes, i.target"
 
         @Volatile private var instance: TransferDb? = null

@@ -3,17 +3,15 @@ package com.eschgi.share.transfer
 import android.content.Context
 import android.net.Uri
 import com.eschgi.share.BuildConfig
-import com.eschgi.share.data.SecretStore
 import com.eschgi.share.data.ServerConfig
-import com.eschgi.share.data.ServerStore
 import com.eschgi.share.net.RouteMonitor
 import java.io.IOException
 
 /**
  * Where the app's player (lib/ui/player.dart) plays a video or sound from: a copy on the phone
- * if there is one, else straight from the server with the phone's key. The https port at home
- * has Share's own certificate, which the player can't pin: there the file is fetched into the
- * cache first, as for opening it in another app.
+ * if there is one, else straight from the server with the phone's key, or with a PIN's over the
+ * public address. The https port at home has Share's own certificate, which the player can't
+ * pin: there the file is fetched into the cache first, as for opening it in another app.
  */
 object Playback {
     /** How to get at a file. */
@@ -51,16 +49,15 @@ object Playback {
      * What file.play answers (contract/app/platform.json play_copy and play_stream): the uri to
      * play, and the headers it needs. Null if fetching it was cancelled; throws if it can't be had.
      */
-    fun source(context: Context, file: FileRef): Map<String, Any?>? {
+    fun source(context: Context, file: FileRef, auth: String = Credentials.DEVICE): Map<String, Any?>? {
         val app = context.applicationContext
         val copy = Downloads.savedUri(app, file.id) ?: Fetcher.cached(app, file)
         if (copy != null) return copyOf(copy)
-        val token = SecretStore(app).read(SecretStore.DEVICE_TOKEN) ?: throw IOException("signed out")
-        val config = ServerStore(app).config() ?: throw IOException("no server")
-        val route = RouteMonitor.settled(app)
-        return when (val way = way(false, config, route.isLocal) { RouteMonitor.httpAllowed(config, it) }) {
+        val (token, config) = Credentials.of(app, auth) ?: throw IOException(if (auth == Credentials.PIN) "no PIN" else "signed out")
+        val home = Credentials.atHome(auth, RouteMonitor.settled(app).isLocal)
+        return when (val way = way(false, config, home) { RouteMonitor.httpAllowed(config, it) }) {
             is Way.Stream -> streamOf(way.base, file.id, token)
-            Way.Fetch -> Fetcher.fetch(app, listOf(file))?.single()?.let { copyOf(it) }
+            Way.Fetch -> Fetcher.fetch(app, listOf(file), auth)?.single()?.let { copyOf(it) }
             Way.Nowhere -> throw IOException("${config.publicUrl} hasn't shown to be this phone's server on this network")
             Way.Copy -> error("no copy")
         }

@@ -12,13 +12,15 @@ import 'download_sheet.dart';
 import 'fetch.dart';
 import 'format.dart';
 import 'icons.dart';
+import 'library/scope.dart';
 import 'library/tiles.dart';
 import 'media_page.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
 /// Screen 14: one file at a time, at original size; swipe to the next. Admins can delete the file
-/// shown.
+/// shown. Under a PIN's LibraryScope (screen 46) it fetches with the PIN, and says nothing of who
+/// sent what.
 class ViewerScreen extends StatefulWidget {
   const ViewerScreen({super.key, required this.files, required this.initial, this.onDeleted, this.onRestored, this.folderOf});
   final List<FileInfo> files;
@@ -56,7 +58,7 @@ class _ViewerScreenState extends State<ViewerScreen> {
     final platform = Services.read(context).platform;
     final String batch;
     try {
-      batch = await platform.download([_file]);
+      batch = await platform.download([_file], auth: LibraryScope.read(context).auth);
     } on PlatformException {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).commonFailed)));
       return;
@@ -112,6 +114,7 @@ class _ViewerScreenState extends State<ViewerScreen> {
     final f = _file;
     final c = context.colors;
     final folder = widget.folderOf?.call(f);
+    final senders = LibraryScope.read(context).pin == null; // a PIN's guests don't see who sent what
     showModalBottomSheet<void>(
       context: context,
       builder: (context) => SafeArea(
@@ -122,7 +125,7 @@ class _ViewerScreenState extends State<ViewerScreen> {
             const SizedBox(height: 12),
             for (final line in [
               '${formatDay(f.day, clock.now(), locale, today: t.dayToday, yesterday: t.dayYesterday)}, ${formatTime(f.uploadedAt, locale)}',
-              f.from == null ? t.viewerFromPin : t.viewerFrom(f.from!),
+              if (senders) f.from == null ? t.viewerFromPin : t.viewerFrom(f.from!),
               if (folder != null) t.viewerInFolder(folder),
               [
                 formatBytes(f.size, locale),
@@ -167,7 +170,8 @@ class _ViewerScreenState extends State<ViewerScreen> {
         actions: [
           PopupMenuButton<String>(
             icon: const Icon(AppIcons.more),
-            onSelected: (choice) => choice == 'open' ? withFetch(context, 1, () => Services.read(context).platform.openFile(f)) : _details(),
+            onSelected: (choice) =>
+                choice == 'open' ? withFetch(context, 1, () => Services.read(context).platform.openFile(f, auth: LibraryScope.read(context).auth)) : _details(),
             itemBuilder: (_) => [
               PopupMenuItem(value: 'details', child: Text(t.viewerDetails)),
               PopupMenuItem(value: 'open', child: Text(t.viewerOpenElsewhere)),
@@ -198,7 +202,11 @@ class _ViewerScreenState extends State<ViewerScreen> {
           top: false,
           child: Row(children: [
             _Action(icon: AppIcons.download, label: t.viewerDownload, onTap: _download),
-            _Action(icon: AppIcons.share, label: t.viewerShare, onTap: () => withFetch(context, 1, () => Services.read(context).platform.shareFiles([f]))),
+            _Action(
+              icon: AppIcons.share,
+              label: t.viewerShare,
+              onTap: () => withFetch(context, 1, () => Services.read(context).platform.shareFiles([f], auth: LibraryScope.read(context).auth)),
+            ),
             _Action(icon: AppIcons.info, label: t.viewerDetails, onTap: _details),
             if (widget.onDeleted != null) _Action(icon: AppIcons.trash, label: t.deleteSelected, onTap: _delete),
           ]),
@@ -226,7 +234,7 @@ class _PageState extends State<_Page> {
   void initState() {
     super.initState();
     if (widget.file.kind == FileKind.photo) {
-      Services.read(context).library.original(widget.file).then((f) {
+      LibraryScope.read(context).original(widget.file).then((f) {
         if (mounted && f != null) setState(() => _original = f);
       }, onError: (Object _) {});
     }
@@ -260,7 +268,10 @@ class _PageState extends State<_Page> {
               SizedBox(width: 160, height: 160, child: ClipRRect(borderRadius: BorderRadius.circular(14), child: ThumbImage(file: f))),
               const SizedBox(height: 20),
               Text(t.viewerNoPreview, textAlign: TextAlign.center, style: TextStyle(color: c.text2, fontSize: 15, height: 1.5)),
-              TextButton(onPressed: () => withFetch(context, 1, () => Services.read(context).platform.openFile(f)), child: Text(f.name)),
+              TextButton(
+                onPressed: () => withFetch(context, 1, () => Services.read(context).platform.openFile(f, auth: LibraryScope.read(context).auth)),
+                child: Text(f.name),
+              ),
             ]),
           ),
         );

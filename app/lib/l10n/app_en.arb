@@ -1069,6 +1069,26 @@
   "pinEndedCode": "This PIN doesn't work any more. Ask for a new one.",
   "pinSendLead": "Others with this PIN can't see what you send.",
   "pinSendLeadSeen": "Everyone with this PIN sees what you send.",
+  "pinTabSee": "See",
+  "seeFrom": "{count, plural, =1{from 1 person} other{from {count} people}}",
+  "@seeFrom": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "seeDownloadAll": "Download all · {size}",
+  "@seeDownloadAll": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "seeNote": "Everyone with this PIN sees these files.",
+  "seeEmpty": "Nothing here yet. What people send with this PIN shows up here.",
   "pinValidUntil": "This PIN works until {when}",
   "@pinValidUntil": {
     "placeholders": {

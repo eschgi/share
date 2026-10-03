@@ -7,6 +7,7 @@ import '../l10n/app_localizations.dart';
 import 'fetch.dart';
 import 'format.dart';
 import 'icons.dart';
+import 'library/scope.dart';
 import 'library/tiles.dart';
 import 'player.dart';
 import 'theme.dart';
@@ -42,7 +43,7 @@ class _MediaPageState extends State<MediaPage> {
     var failed = false;
     await withFetch(context, 1, () async {
       try {
-        source = await _services.platform.play(widget.file);
+        source = await _services.platform.play(widget.file, auth: LibraryScope.read(context).auth);
       } on OpenFailed {
         failed = true;
       }
@@ -122,7 +123,7 @@ class _MediaPageState extends State<MediaPage> {
             Wrap(alignment: WrapAlignment.center, spacing: 10, runSpacing: 8, children: [
               TextButton(onPressed: _retry, child: Text(t.commonRetry)),
               FilledButton.tonalIcon(
-                onPressed: () => withFetch(context, 1, () => _services.platform.openFile(f)),
+                onPressed: () => withFetch(context, 1, () => _services.platform.openFile(f, auth: LibraryScope.read(context).auth)),
                 icon: const Icon(AppIcons.externalLink, size: 18),
                 label: Text(t.viewerOpenElsewhere),
               ),

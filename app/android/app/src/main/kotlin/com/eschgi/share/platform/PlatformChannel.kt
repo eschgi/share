@@ -26,6 +26,7 @@ import com.eschgi.share.data.SecretStore
 import com.eschgi.share.data.ServerStore
 import com.eschgi.share.net.RouteMonitor
 import com.eschgi.share.net.RouteStatus
+import com.eschgi.share.transfer.Credentials
 import com.eschgi.share.transfer.Downloads
 import com.eschgi.share.transfer.Fetcher
 import com.eschgi.share.transfer.FileRef
@@ -163,7 +164,7 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
             }
             "transfer.download" -> {
                 askForNotifications()
-                background(result) { Downloads.enqueue(app, FileRef.parseList(call.argument<String>("files"))) }
+                background(result) { Downloads.enqueue(app, FileRef.parseList(call.argument<String>("files")), auth(call)) }
             }
             "transfer.cancel" -> {
                 val batch = call.argument<String>("batch") ?: ""
@@ -198,7 +199,7 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
             "transfer.saved" -> background(result) { Downloads.saved(app, call.argument<List<String>>("ids") ?: emptyList()) }
             "file.share" -> background(result) {
                 val files = FileRef.parseList(call.argument<String>("files"))
-                val uris = Fetcher.fetch(app, files) ?: return@background null
+                val uris = Fetcher.fetch(app, files, auth(call)) ?: return@background null
                 main.post { share(files, uris) }
                 null
             }
@@ -206,7 +207,7 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
                 io.execute {
                     try {
                         val file = FileRef.parseList("[" + call.argument<String>("file") + "]").single()
-                        val uri = Fetcher.fetch(app, listOf(file))?.single()
+                        val uri = Fetcher.fetch(app, listOf(file), auth(call))?.single()
                         main.post {
                             if (uri == null) {
                                 result.success(null)
@@ -228,7 +229,7 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
                 }
             }
             "file.play" -> background(result) {
-                Playback.source(app, FileRef.parseList("[" + call.argument<String>("file") + "]").single())
+                Playback.source(app, FileRef.parseList("[" + call.argument<String>("file") + "]").single(), auth(call))
             }
             "screen.awake" -> {
                 // While something plays, the screen stays on.
@@ -266,6 +267,9 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
     }
 
     /** What to send: from the photo picker, or any files from the document picker. */
+    /** Whose key a call's files go with: the phone's, unless it says a PIN's. */
+    private fun auth(call: MethodCall) = if (call.argument<String>("auth") == Credentials.PIN) Credentials.PIN else Credentials.DEVICE
+
     private fun pick(what: String?, auth: String, folder: String?, result: MethodChannel.Result) {
         val intent = if (what == "documents") {
             ActivityResultContracts.OpenMultipleDocuments().createIntent(activity, arrayOf("*/*"))

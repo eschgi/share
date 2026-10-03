@@ -3,9 +3,6 @@ package com.eschgi.share.transfer
 import android.content.Context
 import android.util.Log
 import androidx.core.net.toUri
-import com.eschgi.share.data.SecretStore
-import com.eschgi.share.data.ServerConfig
-import com.eschgi.share.data.ServerStore
 import com.eschgi.share.net.RouteMonitor
 import com.eschgi.share.net.ServerConnection
 import com.eschgi.share.net.readLimited
@@ -95,7 +92,7 @@ object UploadEngine {
                     queue.pauseBatch(batch.id, UploadBatch.FOLDER_GONE)
                     continue
                 }
-                val credentials = credentials(app, batch.auth)
+                val credentials = Credentials.of(app, batch.auth)
                 if (credentials == null) {
                     queue.pause(batch.auth, if (batch.auth == UploadBatch.PIN) "pin_ended" else "signed_out")
                     continue
@@ -171,15 +168,6 @@ object UploadEngine {
         } finally {
             synchronized(lock) { running = false }
         }
-    }
-
-    /** The key and the server of a batch: the phone's, or the PIN's. */
-    private fun credentials(app: Context, auth: String): Pair<String, ServerConfig>? {
-        val secrets = SecretStore(app)
-        val servers = ServerStore(app)
-        val token = secrets.read(if (auth == UploadBatch.PIN) SecretStore.PIN_TOKEN else SecretStore.DEVICE_TOKEN) ?: return null
-        val config = (if (auth == UploadBatch.PIN) servers.pinConfig() else servers.config()) ?: return null
-        return token to config
     }
 
     /** What the server takes in one request over the public address (config: chunk_size_mib). */

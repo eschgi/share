@@ -90,9 +90,13 @@ class FakePlatform implements Platform {
   @override
   Future<void> copySecret(String text) async => copiedSecrets.add(text);
 
+  /// Whose key each download, share, open and play went with.
+  final auths = <SendAuth>[];
+
   @override
-  Future<String> download(List<FileInfo> files) async {
+  Future<String> download(List<FileInfo> files, {SendAuth auth = SendAuth.device}) async {
     downloads.add(files);
+    auths.add(auth);
     return 'batch-${downloads.length}';
   }
 
@@ -106,15 +110,17 @@ class FakePlatform implements Platform {
   Future<Set<String>> savedIds(Iterable<String> ids) async => ids.where(saved.contains).toSet();
 
   @override
-  Future<void> shareFiles(List<FileInfo> files) async {
+  Future<void> shareFiles(List<FileInfo> files, {SendAuth auth = SendAuth.device}) async {
     if (openError != null) throw openError!;
     shared.add(files);
+    auths.add(auth);
   }
 
   @override
-  Future<void> openFile(FileInfo file) async {
+  Future<void> openFile(FileInfo file, {SendAuth auth = SendAuth.device}) async {
     if (openError != null) throw openError!;
     opened.add('file:${file.id}');
+    auths.add(auth);
   }
 
   /// What play answers: a stream from the server unless a test says otherwise.
@@ -123,9 +129,10 @@ class FakePlatform implements Platform {
   bool screenOn = false;
 
   @override
-  Future<PlaySource?> play(FileInfo file) async {
+  Future<PlaySource?> play(FileInfo file, {SendAuth auth = SendAuth.device}) async {
     if (openError != null) throw openError!;
     played.add(file.id);
+    auths.add(auth);
     return playSource != null
         ? playSource!(file)
         : PlaySource(Uri.parse('https://share.example.com/api/files/${file.id}/content'), headers: const {'Authorization': 'Bearer shd_x'});

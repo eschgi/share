@@ -1,6 +1,8 @@
 @Tags(['golden'])
 library;
 
+import 'dart:convert';
+
 import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -312,6 +314,19 @@ void main() {
     await tester.enterText(find.byType(TextField), 'K7M2Q');
     await tester.tap(find.text('Unlock'));
     await shot(tester, 'en/45-pin-into-folder');
+  }));
+
+  testWidgets('a PIN that shows its folder', (tester) => atTen(() async {
+    final server = library()
+      ..pinFolderName = 'Wedding Anna & Marco'
+      ..pinShowsFolder = true;
+    server.folders = [{...FakeServer.folder(wedding, 'Wedding Anna & Marco', files: 412, bytes: 9800000000, people: 2), 'senders': 23}];
+    final platform = FakePlatform()
+      ..secrets['pin_token'] = 'shp_x'
+      ..secrets['pin_session'] = jsonEncode({'server': 'https://share.example.com', 'pin_kind': 'day', 'expires_at': null});
+    await startApp(tester, platform, server);
+    await tester.tap(find.text('See'));
+    await shot(tester, 'en/46-pin-sees-folder');
   }));
 
   testWidgets('a PIN, without an account', (tester) => atTen(() async {

@@ -2,12 +2,12 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
-import '../../app.dart';
 import '../../data/models.dart';
 import '../format.dart';
 import '../icons.dart';
 import '../theme.dart';
 import 'library_controller.dart';
+import 'scope.dart';
 
 /// A file's thumbnail, or its placeholder: a muted tone for photos and videos, the
 /// extension for documents.
@@ -40,7 +40,7 @@ class _ThumbImageState extends State<ThumbImage> {
 
   Future<void> _load() async {
     if (!widget.file.hasThumb) return;
-    final bytes = await Services.read(context).library.thumb(widget.file);
+    final bytes = await LibraryScope.read(context).thumb(widget.file);
     if (mounted && bytes != null) setState(() => _bytes = bytes);
   }
 
@@ -171,11 +171,12 @@ class _Badge extends StatelessWidget {
 }
 
 /// The heading of an upload day, with its circle for taking the whole day.
+/// A day's title and what it holds; with [onCircle], the circle that selects the whole day.
 class DayHeader extends StatelessWidget {
-  const DayHeader({super.key, required this.title, required this.meta, required this.selection, required this.onCircle, required this.circleLabel});
+  const DayHeader({super.key, required this.title, required this.meta, this.selection = DaySelection.none, this.onCircle, this.circleLabel = ''});
   final String title, meta, circleLabel;
   final DaySelection selection;
-  final VoidCallback onCircle;
+  final VoidCallback? onCircle;
 
   @override
   Widget build(BuildContext context) {
@@ -190,38 +191,39 @@ class DayHeader extends StatelessWidget {
             Text(meta, style: TextStyle(fontSize: 12.5, color: c.text3)),
           ]),
         ),
-        Semantics(
-          button: true,
-          label: circleLabel,
-          child: InkResponse(
-            onTap: onCircle,
-            radius: 24,
-            child: Padding(
-              padding: const EdgeInsets.all(10),
-              child: Container(
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: selection == DaySelection.all ? c.accent : null,
-                  border: Border.all(
-                    width: 2,
-                    color: switch (selection) {
-                      DaySelection.all => c.accent,
-                      DaySelection.some => c.accentText,
-                      DaySelection.none => c.text3,
-                    },
+        if (onCircle != null)
+          Semantics(
+            button: true,
+            label: circleLabel,
+            child: InkResponse(
+              onTap: onCircle,
+              radius: 24,
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: selection == DaySelection.all ? c.accent : null,
+                    border: Border.all(
+                      width: 2,
+                      color: switch (selection) {
+                        DaySelection.all => c.accent,
+                        DaySelection.some => c.accentText,
+                        DaySelection.none => c.text3,
+                      },
+                    ),
                   ),
+                  child: switch (selection) {
+                    DaySelection.all => const Icon(AppIcons.check, size: 14, color: Colors.white),
+                    DaySelection.some => Icon(AppIcons.minus, size: 14, color: c.accentText),
+                    DaySelection.none => null,
+                  },
                 ),
-                child: switch (selection) {
-                  DaySelection.all => const Icon(AppIcons.check, size: 14, color: Colors.white),
-                  DaySelection.some => Icon(AppIcons.minus, size: 14, color: c.accentText),
-                  DaySelection.none => null,
-                },
               ),
             ),
           ),
-        ),
       ]),
     );
   }

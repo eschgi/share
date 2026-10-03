@@ -5,8 +5,6 @@ import android.os.Environment
 import android.os.StatFs
 import android.util.Log
 import androidx.core.net.toUri
-import com.eschgi.share.data.SecretStore
-import com.eschgi.share.data.ServerStore
 import com.eschgi.share.net.RouteMonitor
 import com.eschgi.share.net.ServerConnection
 import java.io.FileNotFoundException
@@ -66,7 +64,8 @@ object DownloadEngine {
             while (true) {
                 val stopped = runOnce(app, host, seen)
                 synchronized(lock) {
-                    if (stopped == null && !host.isStopped && TransferDb.get(app).hasQueued()) return@synchronized
+                    // Signed out, what a PIN fetches may still go on.
+                    if (stopped != Stop.OFFLINE && !host.isStopped && TransferDb.get(app).hasQueued()) return@synchronized
                     running = false
                     return when {
                         // Stopped by the system (or the person): the host decides what's next.
@@ -90,14 +89,13 @@ object DownloadEngine {
     /** One pass over the queue; returns why it stopped early, if it did. */
     private fun runOnce(app: Context, host: TransferHost, seen: MutableSet<String>): Stop? {
         val db = TransferDb.get(app)
-        val token = SecretStore(app).read(SecretStore.DEVICE_TOKEN)
-        val config = ServerStore(app).config()
-        if (token == null || config == null) {
-            signedOut(app)
-            return Stop.SIGNED_OUT
+        // Each batch goes with its own key: the phone's, or a PIN's.
+        val servers = HashMap<String, ServerConnection>()
+        for (auth in listOf(Credentials.DEVICE, Credentials.PIN)) {
+            val credentials = Credentials.of(app, auth)
+            if (credentials == null) keyGone(app, auth) else servers[auth] = ServerConnection(credentials.second, credentials.first)
         }
-        val server = ServerConnection(config, token)
-        RouteMonitor.check(app) // a fresh look before every run
+        if (Credentials.DEVICE in servers) RouteMonitor.check(app) // a fresh look before every run
 
         val stop = AtomicReference<Stop?>(null)
         val claimed = HashSet<String>()
@@ -109,6 +107,7 @@ object DownloadEngine {
                     } ?: break
                     synchronized(seen) { seen += item.batch }
                     try {
+                        val server = servers[item.auth] ?: throw IllegalStateException("no key for ${item.auth}")
                         download(app, db, server, item, host, stop)
                     } catch (e: Exception) {
                         Log.w(TAG, "download of ${item.file.id} failed", e)
@@ -131,7 +130,7 @@ object DownloadEngine {
         }
         db.finishDrained()
         Downloads.publish(app, published)
-        if (stop.get() == Stop.SIGNED_OUT) signedOut(app)
+        if (stop.get() == Stop.SIGNED_OUT) keyGone(app, Credentials.DEVICE)
         return stop.get()
     }
 
@@ -169,7 +168,8 @@ object DownloadEngine {
                         db.setTarget(item.batch, file.id, target)
                     }
                 val route = RouteMonitor.settled(app)
-                val outcome = downloader.fetch(file.id, file.size, sink, open = { server.open(it, route.isLocal) }, abort = abort) {
+                val home = Credentials.atHome(item.auth, route.isLocal)
+                val outcome = downloader.fetch(file.id, file.size, sink, open = { server.open(it, home) }, abort = abort) {
                     live[file.id] = it
                 }
                 when (outcome) {
@@ -181,7 +181,8 @@ object DownloadEngine {
                         return
                     }
                     Downloader.Outcome.SignedOut -> {
-                        stop.compareAndSet(null, Stop.SIGNED_OUT)
+                        // A PIN that ended stops only what it fetches; the phone signed out stops all.
+                        if (item.auth == Credentials.PIN) keyGone(app, Credentials.PIN) else stop.compareAndSet(null, Stop.SIGNED_OUT)
                         return
                     }
                     Downloader.Outcome.Gone -> return fail(db, item, sink, "deleted on the server")
@@ -215,7 +216,7 @@ object DownloadEngine {
                             db.finish(item.batch, file.id, TransferItem.FAILED, error)
                             return
                         }
-                        if (route.isLocal) RouteMonitor.check(app) // maybe the local address went away
+                        if (home) RouteMonitor.check(app) // maybe the local address went away
                         pause(outcome.retryAfterMs ?: backoff(attempts), abort, host)
                     }
                 }
@@ -235,11 +236,11 @@ object DownloadEngine {
         db.finish(item.batch, item.file.id, TransferItem.FAILED, error)
     }
 
-    /** The phone's key stopped working: nothing queued can be fetched any more. */
-    private fun signedOut(app: Context) {
+    /** A key stopped working, or is gone: nothing queued with it can be fetched any more. */
+    private fun keyGone(app: Context, auth: String) {
         val resolver = app.contentResolver
-        abortAll()
-        for (item in TransferDb.get(app).failQueued("signed out")) {
+        if (auth == Credentials.DEVICE) abortAll()
+        for (item in TransferDb.get(app).failQueued(if (auth == Credentials.PIN) "PIN ended" else "signed out", auth)) {
             item.target?.let { MediaStoreSink(resolver, it.toUri()).discard() }
         }
         Downloads.publish(app, HashMap())

@@ -35,32 +35,47 @@ class LibraryFilter {
   int get hashCode => Object.hash(folder, kind, query);
 }
 
+/// A PIN that shows its folder: where it was unlocked, and its key.
+typedef PinAccess = ({Uri server, String token});
+
 class LibraryRepository {
-  LibraryRepository({required this.api, required this.platform});
+  LibraryRepository({required this.api, required this.platform}) : pin = null;
+
+  /// The folder a PIN shows (screen 46): over the public address, with the PIN's key.
+  LibraryRepository.pin({required this.api, required this.platform, required PinAccess this.pin});
 
   final Api api;
   final Platform platform;
+  final PinAccess? pin;
+
+  /// Whose key the files go with when they're saved, shared, opened or played.
+  SendAuth get auth => pin == null ? SendAuth.device : SendAuth.pin;
+
+  Future<Json> _get(String path, {Map<String, String>? query}) =>
+      pin == null ? api.get(path, query: query) : api.getFrom(pin!.server, path, query: query, bearer: pin!.token);
+
+  Future<Uint8List> _bytes(String path) => pin == null ? api.bytes(path) : api.bytesFrom(pin!.server, path, bearer: pin!.token);
 
   /// The folders the person sees, the oldest first.
   /// GET /api/folders as the server sent it, which the folder store keeps on the phone.
-  Future<Json> folders() => api.get('/api/folders');
+  Future<Json> folders() => _get('/api/folders');
 
   Future<LibraryOverview> overview(LibraryFilter filter) async =>
-      LibraryOverview.fromJson(await api.get('/api/library', query: filter.toQuery()));
+      LibraryOverview.fromJson(await _get('/api/library', query: filter.toQuery()));
 
   Future<FilePage> page(LibraryFilter filter, {String? cursor, int limit = 200}) async => FilePage.fromJson(
-        await api.get('/api/files', query: {...filter.toQuery(), 'limit': '$limit', 'cursor': ?cursor}),
+        await _get('/api/files', query: {...filter.toQuery(), 'limit': '$limit', 'cursor': ?cursor}),
       );
 
   Future<FileIds> ids(LibraryFilter filter, {String? day}) async =>
-      FileIds.fromJson(await api.get('/api/files/ids', query: filter.toQuery(day: day)));
+      FileIds.fromJson(await _get('/api/files/ids', query: filter.toQuery(day: day)));
 
   /// Every file of one day, for selecting a whole day that isn't loaded yet.
   Future<List<FileInfo>> day(LibraryFilter filter, String day) async {
     final out = <FileInfo>[];
     String? cursor;
     do {
-      final p = FilePage.fromJson(await api.get('/api/files',
+      final p = FilePage.fromJson(await _get('/api/files',
           query: {...filter.toQuery(day: day), 'limit': '500', 'cursor': ?cursor}));
       out.addAll(p.files);
       cursor = p.nextCursor;
@@ -78,7 +93,7 @@ class LibraryRepository {
     final dir = _originals ??= await Directory('$base/originals').create(recursive: true);
     final file = File('${dir.path}/${f.id}');
     if (await file.exists() && await file.length() == f.size) return file;
-    final bytes = await api.bytes('/api/files/${f.id}/content');
+    final bytes = await _bytes('/api/files/${f.id}/content');
     await file.writeAsBytes(bytes, flush: false);
     final all = [await for (final e in dir.list()) if (e is File) e];
     if (all.length > 30) {
@@ -111,7 +126,7 @@ class LibraryRepository {
       file.setLastModified(clock.now()).ignore();
     } else {
       try {
-        bytes = await api.bytes('/api/files/${f.id}/thumb');
+        bytes = await _bytes('/api/files/${f.id}/thumb');
       } on ApiException {
         return null;
       }

@@ -37,8 +37,8 @@ data class UploadRow(
 /** A batch of files sent together; signed in, into [folder] (a PIN sends into its own). */
 data class UploadBatch(val id: String, val auth: String, val state: String, val paused: String?, val createdAt: Long, val folder: String? = null) {
     companion object {
-        const val DEVICE = "device" // signed in
-        const val PIN = "pin"
+        const val DEVICE = Credentials.DEVICE // signed in
+        const val PIN = Credentials.PIN
 
         /** Why a batch is paused: its folder is gone, or no longer the person's. */
         const val FOLDER_GONE = "folder_gone"

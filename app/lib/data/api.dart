@@ -95,9 +95,14 @@ class Api {
 
   Future<Uint8List> bytes(String path) async => (await _send('GET', path, raw: true)).bodyBytes;
 
-  /// A request to a server this phone isn't set up for yet, e.g. to look at an invite.
-  Future<Json> getFrom(Uri server, String path, {String? bearer}) async =>
-      _json(await _request(_public, server, 'GET', path, auth: false, bearer: bearer));
+  /// A request to a server this phone isn't set up for yet, e.g. to look at an invite; with
+  /// [bearer], as a PIN session.
+  Future<Json> getFrom(Uri server, String path, {Map<String, String>? query, String? bearer}) async =>
+      _json(await _request(_public, server, 'GET', path, query: query, auth: false, bearer: bearer));
+
+  /// The bytes of a file, such as a thumbnail, as a PIN session sees them.
+  Future<Uint8List> bytesFrom(Uri server, String path, {String? bearer}) async =>
+      (await _request(_public, server, 'GET', path, auth: false, bearer: bearer)).bodyBytes;
 
   /// A request to a server this phone isn't signed in to, e.g. to look at an invite; with
   /// [bearer], as a PIN session.
