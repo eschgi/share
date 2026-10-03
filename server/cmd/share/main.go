@@ -30,21 +30,25 @@ Usage:
   share serve                 run the server
   share init                  create the storage folder layout (once, with the drive mounted)
   share check                 check config, folders and drives
-  share pin create --permanent|--day
-                              make an upload PIN and print its link
+  share folders               list the folders, with what they hold and who sees them
+  share pin create --permanent|--day [--folder NAME] [--show]
+                              make an upload PIN into a folder and print its link;
+                              --show lets guests with it also see the folder
   share pin list              list PINs
   share pin end CODE          end a PIN now
   share pin new-code CODE     replace a PIN's code; the old code stops working
-  share invite --name NAME [--admin]
-                              print a link that signs someone's phone in, once, within 24 hours
+  share invite --name NAME [--admin] [--folder NAME]...
+                              print a link that signs someone's phone in, once, within 24 hours;
+                              a member sees the folders named
   share invite --for USER     print a link that signs in another phone for USER (username or id)
   share users                 list the people with an account and their phones
-  share password USERNAME [--name NAME] [--admin]
+  share password USERNAME [--name NAME] [--admin] [--folder NAME]...
                               give USERNAME a new password (making the account if needed)
   share cert                  show the https port's own certificate
   share cert regenerate       replace it; phones learn the new one by themselves
   share version               print the version
 
+--folder may be left out while there is only one folder.
 Every command takes --config PATH (default ./config.json).
 `
 
@@ -69,6 +73,8 @@ func run(args []string) error {
 		return initStorage(rest)
 	case "check":
 		return check(rest)
+	case "folders":
+		return folders(rest)
 	case "pin":
 		return pin(rest)
 	case "invite":
@@ -202,6 +208,8 @@ func pin(args []string) error {
 	f := newFlags("pin " + sub)
 	permanent := f.fs.Bool("permanent", false, "the PIN works until it is ended")
 	day := f.fs.Bool("day", false, "the PIN works for 24 hours")
+	folder := f.fs.String("folder", "", "the folder it sends into")
+	show := f.fs.Bool("show", false, "guests with the PIN also see and download what is in the folder")
 	positional, err := f.parse(rest)
 	if err != nil {
 		return err
@@ -226,11 +234,15 @@ func pin(args []string) error {
 		if *day {
 			kind = db.PinDay
 		}
-		folder, err := oldestFolder(ctx, d)
+		var names []string
+		if *folder != "" {
+			names = []string{*folder}
+		}
+		into, err := pickFolders(ctx, d, names)
 		if err != nil {
 			return err
 		}
-		p, err := svc.CreatePin(ctx, auth.PinSpec{Kind: kind, FolderID: folder.ID}, "cli")
+		p, err := svc.CreatePin(ctx, auth.PinSpec{Kind: kind, FolderID: into[0], ShowsFolder: *show}, "cli")
 		if err != nil {
 			return err
 		}
@@ -241,10 +253,21 @@ func pin(args []string) error {
 		if err != nil {
 			return err
 		}
+		names := map[string]string{}
+		if live, err := d.LiveFolders(ctx); err == nil {
+			for _, f := range live {
+				names[f.ID] = f.Name
+			}
+		}
 		w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
-		fmt.Fprintln(w, "CODE\tKIND\tSTATUS\tCREATED")
+		fmt.Fprintln(w, "CODE\tKIND\tFOLDER\tGUESTS SEE IT\tSTATUS\tCREATED")
 		for _, p := range pins {
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", p.Code, p.Kind, status(cfg, p), p.CreatedAt.In(cfg.Location).Format("2006-01-02 15:04"))
+			sees := "no"
+			if p.ShowsFolder {
+				sees = "yes"
+			}
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", p.Code, p.Kind, orDash(names[p.FolderID]), sees, status(cfg, p),
+				p.CreatedAt.In(cfg.Location).Format("2006-01-02 15:04"))
 		}
 		return w.Flush()
 	case "end", "new-code":
@@ -280,6 +303,9 @@ func printPin(cfg *config.Config, p db.Pin) {
 	fmt.Printf("PIN:   %s\n", p.Code)
 	fmt.Printf("Link:  %s/#%s\n", strings.TrimSuffix(cfg.PublicURL, "/"), p.Code)
 	fmt.Printf("Works: %s\n", status(cfg, p))
+	if p.ShowsFolder {
+		fmt.Println("Guests with it also see and download what is in its folder.")
+	}
 }
 
 func status(cfg *config.Config, p db.Pin) string {

@@ -261,8 +261,9 @@ On Windows:
 - If PowerShell refuses to run the scripts, start them with
   `powershell -ExecutionPolicy Bypass -File scripts\build-windows.ps1`.
 
-`share` without arguments lists the other commands: PINs, invites, people, passwords and the https
-port's own certificate.
+`share` without arguments lists the other commands: folders, PINs, invites, people, passwords and
+the https port's own certificate. Once there are several folders, `share pin create` and
+`share invite` need `--folder NAME` to say which.
 
 People get the app from the invite page, which offers the APK set in `app.apk_file` and then hands
 the invite to the app; or they use the website in their browser instead, as on an iPhone. Each

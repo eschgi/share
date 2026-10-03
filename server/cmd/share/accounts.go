@@ -36,23 +36,13 @@ func openDB(ctx context.Context, cfg *config.Config) (*db.DB, *auth.Service, err
 	return d, auth.NewService(d, time.Now, cfg.Proxies, cfg.ClientIPHeader()), nil
 }
 
-// oldestFolder is where things go when the command doesn't say: the oldest folder.
-func oldestFolder(ctx context.Context, d *db.DB) (db.Folder, error) {
-	live, err := d.LiveFolders(ctx)
-	if err != nil {
-		return db.Folder{}, err
-	}
-	if len(live) == 0 {
-		return db.Folder{}, errors.New("there is no folder")
-	}
-	return live[0], nil
-}
-
 func invite(args []string) error {
 	f := newFlags("invite")
 	name := f.fs.String("name", "", "who the invite is for")
 	admin := f.fs.Bool("admin", false, "make them an admin")
 	forUser := f.fs.String("for", "", "sign in another phone for this person (username or id)")
+	var names folderNames
+	f.fs.Var(&names, "folder", "a folder the new member sees; give it once per folder")
 	if _, err := f.parse(args); err != nil {
 		return err
 	}
@@ -74,14 +64,22 @@ func invite(args []string) error {
 		role = db.RoleAdmin
 	}
 	userID := ""
-	if *forUser != "" {
+	var into []string
+	switch {
+	case *forUser != "":
 		u, err := findUser(ctx, d, *forUser)
 		if err != nil {
 			return err
 		}
 		userID = u.ID
+	case *admin && len(names) > 0:
+		return errors.New("admins see every folder; leave out --folder")
+	case !*admin:
+		if into, err = pickFolders(ctx, d, names); err != nil {
+			return err
+		}
 	}
-	token, in, err := svc.CreateInvite(ctx, *name, role, userID, "cli", nil, auth.InviteLifetime)
+	token, in, err := svc.CreateInvite(ctx, *name, role, userID, "cli", into, auth.InviteLifetime)
 	if err != nil {
 		return err
 	}
@@ -159,6 +157,8 @@ func password(args []string) error {
 	f := newFlags("password")
 	name := f.fs.String("name", "", "the name shown in the app, for a new account")
 	admin := f.fs.Bool("admin", false, "make a new account an admin")
+	var names folderNames
+	f.fs.Var(&names, "folder", "a folder a new member sees; give it once per folder")
 	positional, err := f.parse(args)
 	if err != nil {
 		return err
@@ -193,15 +193,17 @@ func password(args []string) error {
 			display = username
 		}
 		u = db.User{ID: ids.New(), Name: display, Role: role, CreatedAt: time.Now(), CreatedBy: "cli"}
+		var into []string
+		if role == db.RoleMember {
+			if into, err = pickFolders(ctx, d, names); err != nil {
+				return err
+			}
+		}
 		if err := d.InsertUser(ctx, u); err != nil {
 			return err
 		}
-		if role == db.RoleMember {
-			folder, err := oldestFolder(ctx, d)
-			if err != nil {
-				return err
-			}
-			if err := d.SetFolderPerson(ctx, folder.ID, u.ID, true); err != nil {
+		for _, folder := range into {
+			if err := d.SetFolderPerson(ctx, folder, u.ID, true); err != nil {
 				return err
 			}
 		}
