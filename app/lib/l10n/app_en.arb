@@ -245,6 +245,28 @@
   "folderNameBad": "A folder needs a name, and it can't be a date like 2026-09-27.",
   "folderBusy": "The folder's files are still moving after its last rename. Try again in a few minutes.",
   "folderLastFolder": "The last folder can't be deleted: everything is sent into a folder.",
+  "moveSelected": "Move to another folder",
+  "moveTitle": "{count, plural, =1{Move 1 file} other{Move {count} files}}",
+  "@moveTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "moveLead": "Who sees them changes with the folder.",
+  "moveHereNow": "Here now",
+  "moveDone": "{count, plural, =1{1 file is in “{folder}” now.} other{{count} files are in “{folder}” now.}}",
+  "@moveDone": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "folder": {
+        "type": "String"
+      }
+    }
+  },
   "filterAll": "All",
   "filterPhotos": "Photos",
   "filterVideos": "Videos",

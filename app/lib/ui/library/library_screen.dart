@@ -20,6 +20,7 @@ import '../theme.dart';
 import '../viewer.dart';
 import '../widgets.dart';
 import 'library_controller.dart';
+import 'move_sheet.dart';
 import 'tiles.dart';
 
 /// Screens 11 and 12: everything that was sent, newest day first, and selecting many.
@@ -227,6 +228,47 @@ class _LibraryScreenState extends State<LibraryScreen> with WidgetsBindingObserv
     }
   }
 
+  /// Admins, from the second folder on (screen 49): the files go into another folder, and out of
+  /// the one shown. Files that were all in one folder can go back there.
+  Future<void> _move() async {
+    final t = AppLocalizations.of(context);
+    final admin = Services.read(context).admin;
+    final files = _c.selectedFiles;
+    final ids = [for (final f in files) f.id];
+    final from = {for (final f in files) f.folder}.singleOrNull; // where they all are
+    final to = await showMoveSheet(context, count: ids.length, list: _folders.list ?? const [], here: from);
+    if (to == null || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final n = await admin.moveFiles(ids, to.id);
+      _c.clearSelection();
+      if (_c.filter.folder != null) {
+        _c.remove(ids);
+      } else {
+        unawaited(_c.reload());
+      }
+      unawaited(_folders.load());
+      messenger.showSnackBar(SnackBar(
+        content: Text(t.moveDone(n, to.name)),
+        action: from == null
+            ? null
+            : SnackBarAction(
+                label: t.commonUndo,
+                onPressed: () async {
+                  try {
+                    await admin.moveFiles(ids, from);
+                  } on Exception {
+                    messenger.showSnackBar(SnackBar(content: Text(t.commonFailed)));
+                  }
+                  await Future.wait([_c.reload(), _folders.load()]);
+                },
+              ),
+      ));
+    } on Exception {
+      messenger.showSnackBar(SnackBar(content: Text(t.commonFailed)));
+    }
+  }
+
   void _open(int index) {
     Navigator.push(
       context,
@@ -409,6 +451,18 @@ class _LibraryScreenState extends State<LibraryScreen> with WidgetsBindingObserv
             child: SizedBox(width: 56, height: 56, child: Icon(AppIcons.share, size: 22, semanticLabel: t.shareSelected)),
           ),
         ),
+        if (widget.user.isAdmin && _folders.choices) ...[
+          const SizedBox(width: 10),
+          Material(
+            color: c.s2,
+            borderRadius: BorderRadius.circular(16),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: _move,
+              child: SizedBox(width: 56, height: 56, child: Icon(AppIcons.folder, size: 22, semanticLabel: t.moveSelected)),
+            ),
+          ),
+        ],
         if (widget.user.isAdmin) ...[
           const SizedBox(width: 10),
           Material(

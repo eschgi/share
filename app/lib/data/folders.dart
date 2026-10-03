@@ -44,6 +44,9 @@ List<Seer> whoSees(People people, String folder) => [
 /// oldest.
 List<String> inviteDefault(List<FolderInfo> list, String? shown) => [?(validShown(list, shown) ?? list.firstOrNull?.id)];
 
+/// The folder files move into at first: the first one they aren't in already.
+String? moveDefault(List<FolderInfo> list, String? here) => list.where((f) => f.id != here).firstOrNull?.id;
+
 /// What all the folders hold together.
 ({int files, int bytes}) allTotals(List<FolderInfo> list) =>
     (files: list.fold(0, (s, f) => s + f.files), bytes: list.fold(0, (s, f) => s + f.bytes));

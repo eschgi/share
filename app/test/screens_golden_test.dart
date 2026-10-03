@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:share_app/data/models.dart';
 import 'package:share_app/data/platform.dart';
+import 'package:share_app/ui/library/tiles.dart';
 import 'package:share_app/ui/settings_screen.dart';
 
 import 'app_test.dart' show daysAgo, inviteToken, signedInPhone, startApp, today;
@@ -187,6 +188,18 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('New PIN'));
     await shot(tester, 'en/43-new-pin-folder');
+  }));
+
+  testWidgets('moving files to another folder', (tester) => atTen(() async {
+    await startApp(tester, signedInPhone()..secrets['folder'] = family, adminFolders());
+    await tester.tap(find.bySemanticsLabel('Select the day').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(LibraryTile).first); // five of the day's six
+    await tester.pumpAndSettle();
+    await tester.tap(find.bySemanticsLabel('Move to another folder'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Taxes 2026'));
+    await shot(tester, 'en/49-move');
   }));
 
   testWidgets("a person's folders", (tester) => atTen(() async {

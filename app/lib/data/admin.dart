@@ -79,6 +79,10 @@ class AdminRepository {
   Future<void> setFolderInvite(String folder, String inviteId, {required bool gets}) =>
       gets ? api.put('/api/folders/$folder/invites/$inviteId', const {}) : api.delete('/api/folders/$folder/invites/$inviteId');
 
+  /// Moves files of the library into [folder]; who sees them changes with it. Returns how many
+  /// moved: files already in it are left alone.
+  Future<int> moveFiles(List<String> ids, String folder) => _inParts('/api/files/move', ids, {'folder': folder});
+
   /// Moves files to Recently deleted; returns how many were in the library.
   Future<int> deleteFiles(List<String> ids) => _inParts('/api/files/delete', ids);
 
@@ -98,11 +102,11 @@ class AdminRepository {
     return info;
   }
 
-  Future<int> _inParts(String path, List<String> ids) async {
+  Future<int> _inParts(String path, List<String> ids, [Json more = const {}]) async {
     var changed = 0;
     for (var i = 0; i < ids.length; i += idsPerRequest) {
       final part = ids.sublist(i, (i + idsPerRequest).clamp(0, ids.length));
-      final res = await api.post(path, {'ids': part});
+      final res = await api.post(path, {'ids': part, ...more});
       changed += (res['changed'] as num?)?.toInt() ?? 0;
     }
     return changed;

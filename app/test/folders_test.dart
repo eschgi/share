@@ -433,4 +433,80 @@ void main() {
     expect(find.byIcon(AppIcons.folder), findsNothing);
     expect(find.text("Others with this PIN can't see what you send."), findsOneWidget);
   });
+
+  testWidgets('admins move files to another folder, and can take it back', (tester) async {
+    final server = adminFolders();
+    await startApp(tester, signedInPhone()..secrets['folder'] = family, server);
+    expect(find.byType(LibraryTile), findsNWidgets(6));
+    await tester.tap(find.bySemanticsLabel('Select the day').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(LibraryTile).first); // five of six
+    await tester.pumpAndSettle();
+    await tester.tap(find.bySemanticsLabel('Move to another folder'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Who sees them changes with the folder.'), findsOneWidget);
+    expect(find.text('Here now · 4 people'), findsOneWidget);
+    await tester.tap(find.text('Taxes 2026'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Move 5 files'));
+    await tester.pumpAndSettle();
+    final moved = jsonDecode(server.requests.lastWhere((r) => r.url.path == '/api/files/move').body) as Map;
+    expect(moved['folder'], taxes);
+    expect(moved['ids'], hasLength(5));
+    expect(find.text('5 files are in “Taxes 2026” now.'), findsOneWidget);
+    expect(find.byType(LibraryTile), findsNWidgets(1), reason: 'they left the folder shown');
+    expect(server.files.where((f) => f['folder'] == taxes), hasLength(5));
+
+    await tester.tap(find.text('Undo'));
+    await tester.pumpAndSettle();
+    expect(server.files.where((f) => f['folder'] == family), hasLength(6));
+    expect(find.byType(LibraryTile), findsNWidgets(6));
+  });
+
+  testWidgets('with all folders shown, moved files stay in view; from one folder they can go back', (tester) async {
+    final server = adminFolders();
+    await startApp(tester, signedInPhone(), server);
+    await tester.longPress(find.byType(LibraryTile).first); // one of Family's
+    await tester.pumpAndSettle();
+    await tester.tap(find.bySemanticsLabel('Move to another folder'));
+    await tester.pumpAndSettle();
+    expect(find.text('Here now · 4 people'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Move 1 file'));
+    await tester.pumpAndSettle();
+    expect(find.text('1 file is in “Wedding Anna & Marco” now.'), findsOneWidget, reason: 'the first other folder, at first');
+    expect(find.byType(LibraryTile), findsNWidgets(10));
+    await tester.tap(find.text('Undo'));
+    await tester.pumpAndSettle();
+    expect(server.files.where((f) => f['folder'] == family), hasLength(6));
+
+    // Files from two folders have no "here", and no way back.
+    await tester.longPress(find.byType(LibraryTile).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(LibraryTile).last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.bySemanticsLabel('Move to another folder'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Here now'), findsNothing);
+    await tester.tap(find.text('Taxes 2026'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Move 2 files'));
+    await tester.pumpAndSettle();
+    expect(find.text('2 files are in “Taxes 2026” now.'), findsOneWidget);
+    expect(find.text('Undo'), findsNothing);
+  });
+
+  testWidgets('members, and admins with one folder, have no Move', (tester) async {
+    await startApp(tester, signedInPhone(), threeFolders()..addDay(today(), 1, startId: 300));
+    await tester.longPress(find.byType(LibraryTile).first);
+    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('Move to another folder'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+
+    await startApp(tester, signedInPhone(), adminServer()..addDay(today(), 2));
+    await tester.longPress(find.byType(LibraryTile).first);
+    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('Move to another folder'), findsNothing);
+    expect(find.bySemanticsLabel('Delete'), findsOneWidget);
+  });
 }

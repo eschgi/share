@@ -157,6 +157,21 @@ class FakeServer {
           pins.add(pin);
           return json(pin, 201);
         },
+        'POST /api/files/move': (req) {
+          final b = _body(req);
+          final to = b['folder'] as String;
+          if (!folders.any((f) => f['id'] == to)) return _error(404, 'not_found');
+          final ids = (b['ids'] as List).cast<String>().toSet();
+          var changed = 0;
+          for (final f in files) {
+            if (ids.contains(f['id']) && f['folder'] != to) {
+              f['folder'] = to;
+              changed++;
+            }
+          }
+          if (changed > 0) version++;
+          return json({'changed': changed});
+        },
         'POST /api/folders': (req) {
           final name = (_body(req)['name'] as String? ?? '').trim();
           final problem = _folderName(name);
