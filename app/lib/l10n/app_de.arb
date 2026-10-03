@@ -159,7 +159,7 @@
   "routeChecking": "Wird geprüft …",
   "serverCheckAgain": "Erneut prüfen",
   "serverInviteFills": "Eine Einladung trägt beide Adressen ein.",
-  "serverLocalBadAddress": "Gib sie so ein: http://192.168.8.1:8080. Unverschlüsseltes http geht nur für eine Adresse zu Hause.",
+  "serverLocalBadAddress": "Gib sie so ein: http://192.168.1.20:8080. Unverschlüsseltes http geht nur für eine Adresse zu Hause.",
   "settingsTitle": "Einstellungen",
   "settingsSignedInHere": "Auf diesem Handy angemeldet",
   "aboutTitle": "Über Share",

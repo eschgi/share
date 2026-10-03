@@ -840,7 +840,7 @@
   <header class="page-head">
     <h1>Share, dark</h1>
     <p class="lede">A dark take on your orientation mockups, stretched over the whole system. One Go binary serves the website and the API
-      and keeps every file in a folder set in <code>config.json</code>: on the router for now, maybe on a Hetzner VPS later. The <b>website</b> is for sending: anyone with a PIN, no account. People with an account can do everything there that the app does (22–37). Nothing is family-specific; friends and anyone else
+      and keeps every file in a folder set in <code>config.json</code>, on whatever machine runs it: a small computer at home, a VPS or a container. The <b>website</b> is for sending: anyone with a PIN, no account. People with an account can do everything there that the app does (22–37). Nothing is family-specific; friends and anyone else
       with a PIN or an invite see the same screens.
       The <b>app</b> is for seeing and downloading, and for admins, for running the whole thing. Numbers follow the order in which you'd meet the screens.</p>
     <div class="legend">
@@ -857,8 +857,8 @@
       <h2>Anyone with a PIN can send</h2>
       <p>Uppy runs headless underneath: tus for resumable uploads, Golden Retriever to survive a closed tab. The screens on top are our own,
         because Uppy's stock Dashboard shows far more than someone sending a few photos needs. Tablets and computers get their own layouts, below.
-        The language comes from the browser; the globe button on the first screens switches it. Cloudflare sits in front and
-        provides the HTTPS a PWA needs.</p>
+        The language comes from the browser; the globe button on the first screens switches it. A tunnel or a reverse proxy in
+        front provides the HTTPS a PWA needs.</p>
     </div>
     <div class="board">
 
@@ -1327,9 +1327,9 @@
           <div class="wb">
             <div class="label t0">Public address</div>
             <div class="input">https://share.example.com</div>
-            <p class="help">Works everywhere, through Cloudflare.</p>
+            <p class="help">Works everywhere, over the internet.</p>
             <div class="label">Local address <span class="optional">optional</span></div>
-            <div class="input">https://192.168.8.1:8443</div>
+            <div class="input">https://192.168.1.20:8443</div>
             <p class="help">Used automatically when this phone can reach it, for example on the home Wi-Fi.</p>
             <div class="card state"><span class="ri ok"><span data-i="check"></span></span><div><b>Using the local address</b><span>Reached in 12 ms · same server as the public address</span></div></div>
             <div class="grow"></div>
@@ -1375,7 +1375,7 @@
             </div>
             <div class="glabel">Storage</div>
             <div class="group store">
-              <div class="top"><span class="ri"><span data-i="hdd"></span></span><div class="rt"><code>/mnt/usb/share</code><span>Set in config.json on the server</span></div></div>
+              <div class="top"><span class="ri"><span data-i="hdd"></span></span><div class="rt"><code>/srv/share</code><span>Set in config.json on the server</span></div></div>
               <div class="bar"><i style="width:15%"></i></div>
               <div class="foot"><span>142 GB of 931 GB used</span><span>3,812 files</span></div>
             </div>
@@ -1660,7 +1660,7 @@
     <div class="sec-head">
       <div class="sec-tag">Proposal · folders</div>
       <h2>Folders, each with its own people</h2>
-      <p>Every file lies in exactly one folder, and every folder has its own people. Admins see every folder. Members see the folders they were given, and nothing tells them about the others. A PIN sends into one folder and, as today, sees nothing. A server with one folder looks exactly as it does now: the folder's name, the choices and the folder column only appear with the second folder. On the drive each folder is a real one with the day folders inside, e.g. <code>/mnt/usb/share/Wedding Anna &amp; Marco/2026-09-26/IMG_0001.jpg</code>; what is there today becomes the first folder. Shown as Maria, a member with three folders, and Stefan, the admin.</p>
+      <p>Every file lies in exactly one folder, and every folder has its own people. Admins see every folder. Members see the folders they were given, and nothing tells them about the others. A PIN sends into one folder and, as today, sees nothing. A server with one folder looks exactly as it does now: the folder's name, the choices and the folder column only appear with the second folder. On the drive each folder is a real one with the day folders inside, e.g. <code>/srv/share/Wedding Anna &amp; Marco/2026-09-26/IMG_0001.jpg</code>; what is there today becomes the first folder. Shown as Maria, a member with three folders, and Stefan, the admin.</p>
     </div>
     <p class="sub-h">In the app</p>
     <div class="board">
@@ -2514,9 +2514,9 @@
           "Öffentliche Adresse",
           "Indirizzo pubblico"
       ],
-      "Works everywhere, through Cloudflare.": [
-          "Funktioniert überall, über Cloudflare.",
-          "Funziona ovunque, tramite Cloudflare."
+      "Works everywhere, over the internet.": [
+          "Funktioniert überall, über das Internet.",
+          "Funziona ovunque, tramite internet."
       ],
       "Local address": [
           "Lokale Adresse",
@@ -3152,7 +3152,7 @@
       ]
   };
   // Names, codes, numbers and file names that stay the same in every language.
-  const KEEP = /^(?:[A-Z0-9]|\d+(?::\d+)?|Stefan|Maria|Peter|maria|Admin|PIN|PDF|DOCX|ZIP|XLSX|•+|\d{8}_\d{6}\.(?:jpg|mp4)|\/mnt\/usb\/share|(?:https:\/\/)?share\.example\.com(?:\/[a-z\/-]*)?|https:\/\/192\.168\.8\.1:8443|\d+ (?:KB|MB|GB)|@maria|Pixel 8|Chrome · Windows|IMG_\d+\.jpg|image\/jpeg)$/;
+  const KEEP = /^(?:[A-Z0-9]|\d+(?::\d+)?|Stefan|Maria|Peter|maria|Admin|PIN|PDF|DOCX|ZIP|XLSX|•+|\d{8}_\d{6}\.(?:jpg|mp4)|\/srv\/share|(?:https:\/\/)?share\.example\.com(?:\/[a-z\/-]*)?|https:\/\/192\.168\.1\.20:8443|\d+ (?:KB|MB|GB)|@maria|Pixel 8|Chrome · Windows|IMG_\d+\.jpg|image\/jpeg)$/;
   const LANGS = ['en', 'de', 'it'];
   const original = new WeakMap();
   function setLang(lang) {

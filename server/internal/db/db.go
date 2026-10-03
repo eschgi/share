@@ -31,8 +31,8 @@ type DB struct {
 }
 
 // Open opens (or creates) the database at path. WAL keeps readers and the writer out of each
-// other's way; synchronous=FULL makes every commit survive a power cut, which on a router is
-// the usual way the process stops.
+// other's way; synchronous=FULL makes every commit survive a power cut, which on a small
+// machine at home is the usual way the process stops.
 func Open(path string) (*DB, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return nil, err

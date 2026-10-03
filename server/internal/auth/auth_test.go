@@ -283,7 +283,7 @@ func TestWrongPinLimits(t *testing.T) {
 	if _, err := s.Unlock(ctx, unlockReq(phone, "203.0.113.1"), "abc", "web"); !errors.Is(err, ErrPINFormat) {
 		t.Fatalf("malformed: err = %v", err)
 	}
-	// Another guest behind the same router is not locked out by that phone.
+	// Another guest on the same Wi-Fi is not locked out by that phone.
 	if _, err := s.Unlock(ctx, unlockReq("other-guest-aaaaaaaaaa", "203.0.113.1"), "22222", "web"); errors.As(err, &locked) {
 		t.Fatal("a second phone behind the same IP is locked by the first one's tries")
 	}

@@ -1,5 +1,5 @@
 // Package localtls is the certificate of the optional local address, such as
-// https://192.168.8.1:8443. It is self-signed: the app trusts it because it pinned its SHA-256,
+// https://192.168.1.20:8443. It is self-signed: the app trusts it because it pinned its SHA-256,
 // which it learned over the public address.
 package localtls
 

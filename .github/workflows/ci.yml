@@ -59,7 +59,7 @@ jobs:
       - run: GOOS=windows go vet ./...
       - name: Test (with the race detector and the 120 MiB upload)
         run: go test -race ./...
-      - name: Build for the router, a VPS and Windows
+      - name: Build for Linux and Windows, on arm64 and amd64
         # As scripts/build-linux.sh and scripts/build-windows.sh do, with the website from above.
         run: |
           version=$(git describe --tags --always)

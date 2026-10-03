@@ -1,6 +1,6 @@
 #!/bin/sh
-# Builds the website into the server, then the server for the router (linux/arm64) and for
-# a VPS (linux/amd64). Output: dist/share-linux-arm64, dist/share-linux-amd64.
+# Builds the website into the server, then the server for Linux on arm64 (e.g. a Raspberry Pi
+# or an ARM server) and on amd64. Output: dist/share-linux-arm64, dist/share-linux-amd64.
 #
 #   scripts/build-linux.sh            version from git (e.g. v0.1.0-3-gabc1234, or the commit)
 #   VERSION=0.1.0 scripts/build-linux.sh

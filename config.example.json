@@ -1,11 +1,10 @@
 {
   "name": "Share",
   "public_url": "https://share.example.com",
-  "home_url": "http://192.168.8.1:8080",
   "http": {
     "listen": ":8080"
   },
-  "storage_dir": "/mnt/usb/share",
+  "storage_dir": "/srv/share",
   "time_zone": "Europe/Rome",
   "languages": ["en", "de", "it"],
   "default_language": "en",
@@ -17,6 +16,6 @@
   },
   "trash_days": 30,
   "app": {
-    "apk_file": "/mnt/usb/share/.share/share.apk"
+    "apk_file": "/srv/share/.share/share.apk"
   }
 }

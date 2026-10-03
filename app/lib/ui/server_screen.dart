@@ -101,7 +101,7 @@ class _ServerScreenState extends State<ServerScreen> {
             controller: _local,
             keyboardType: TextInputType.url,
             autocorrect: false,
-            decoration: InputDecoration(hintText: 'http://192.168.8.1:8080', errorText: _localError, errorMaxLines: 3),
+            decoration: InputDecoration(hintText: 'http://192.168.1.20:8080', errorText: _localError, errorMaxLines: 3),
             onSubmitted: (_) => _check(),
           ),
           Help(t.serverLocalHelp),

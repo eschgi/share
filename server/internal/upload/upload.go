@@ -43,7 +43,8 @@ type Config struct {
 	FreeSpace func() (int64, error)
 }
 
-// DefaultConfig is sized for a router: a few parallel streams per phone, not too many overall.
+// DefaultConfig is sized for a small machine: a few parallel streams per phone, not too many
+// overall.
 func DefaultConfig() Config {
 	return Config{MaxUnfinished: 200, PerPrincipal: 4, Global: 16, QueueWait: 15 * time.Second}
 }

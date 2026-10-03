@@ -14,8 +14,8 @@ import (
 	"sync"
 )
 
-// passwordIterations follows OWASP's advice for PBKDF2 with SHA-256. On the router one check
-// takes a few hundred milliseconds, so at most two run at once.
+// passwordIterations follows OWASP's advice for PBKDF2 with SHA-256. On a small machine one
+// check takes a few hundred milliseconds, so at most two run at once.
 const passwordIterations = 600_000
 
 var hashing = make(chan struct{}, 2)

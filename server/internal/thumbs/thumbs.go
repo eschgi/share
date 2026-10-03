@@ -40,9 +40,9 @@ const (
 	quality = 80
 	// delay gives the uploader time to send a thumbnail before the server makes one.
 	delay = 2 * time.Minute
-	// maxDecodeBytes is the most memory decoding one photo may take; the router has little.
+	// maxDecodeBytes is the most memory decoding one photo may take; a small machine has little.
 	maxDecodeBytes = 128 << 20
-	// maxPixels keeps the decoding time reasonable on a router's processor.
+	// maxPixels keeps the decoding time reasonable on a small machine's processor.
 	maxPixels = 40_000_000
 	// tries is how often a photo is tried again after a read error before it is given up.
 	tries = 3
@@ -180,7 +180,7 @@ func (s *Store) MakePending(ctx context.Context) (int, error) {
 		return 0, err
 	}
 	if len(files) > 0 {
-		defer debug.FreeOSMemory() // hand a big decoded photo's memory back to the router
+		defer debug.FreeOSMemory() // hand a big decoded photo's memory back to the system
 	}
 	for i, f := range files {
 		if err := ctx.Err(); err != nil {

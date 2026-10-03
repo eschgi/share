@@ -25,7 +25,7 @@ import (
 var dist embed.FS
 
 func init() {
-	// Routers rarely have /etc/mime.types, so don't rely on it.
+	// Small systems, containers and Windows rarely have /etc/mime.types, so don't rely on it.
 	for ext, typ := range map[string]string{
 		".woff2": "font/woff2", ".woff": "font/woff", ".webmanifest": "application/manifest+json",
 		".ico": "image/x-icon", ".svg": "image/svg+xml", ".js": "text/javascript; charset=utf-8",

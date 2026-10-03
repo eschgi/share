@@ -207,8 +207,8 @@ func TestExampleIsValid(t *testing.T) {
 	if err != nil {
 		t.Fatalf("config.example.json: %v", err)
 	}
-	if cfg.HomeURL != "http://192.168.8.1:8080" || cfg.App.LinkScheme != "com.eschgi.share" {
-		t.Errorf("home = %q, app = %+v", cfg.HomeURL, cfg.App)
+	if cfg.StorageDir != "/srv/share" || cfg.App.LinkScheme != "com.eschgi.share" {
+		t.Errorf("storage = %q, app = %+v", cfg.StorageDir, cfg.App)
 	}
 }
 

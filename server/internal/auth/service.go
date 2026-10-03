@@ -113,7 +113,7 @@ type Service struct {
 	Now func() time.Time
 
 	// Wrong-PIN limits: per browser or app, per IP address (one guest can't lock out a whole
-	// party behind the same router), and overall against distributed guessing.
+	// party on the same Wi-Fi), and overall against distributed guessing.
 	perClient *ratelimit.Limiter
 	perIP     *ratelimit.Limiter
 	global    *ratelimit.Limiter
