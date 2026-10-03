@@ -43,10 +43,12 @@ void main() {
     await tester.tap(find.text('See'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Wedding Anna & Marco'), findsOneWidget);
+    expect(find.widgetWithText(AppBar, 'Wedding Anna & Marco'), findsOneWidget);
     expect(find.text('6 files from 23 people'), findsOneWidget);
+    expect(find.textContaining('Download all · '), findsOneWidget);
     expect(find.byType(LibraryTile), findsNWidgets(6));
-    expect(find.text('Everyone with this PIN sees these files.'), findsOneWidget);
+    final bar = tester.widget<NavigationBar>(find.byType(NavigationBar));
+    expect([bar.selectedIndex, bar.destinations.length], [1, 2], reason: 'See, beside Send, in the bar at the bottom');
     final asked = server.requests.where((r) => r.url.path == '/api/library' || r.url.path == '/api/files' || r.url.path == '/api/folders');
     expect(asked, isNotEmpty);
     for (final r in asked) {
@@ -79,10 +81,11 @@ void main() {
     expect(platform.auths.last, SendAuth.pin);
   });
 
-  testWidgets('a PIN that only sends has no See tab', (tester) async {
+  testWidgets('a PIN that only sends has no See, and no bar at the bottom', (tester) async {
     await startApp(tester, pinPhone(shows: false), weddingServer(shows: false));
     expect(find.text('Wedding Anna & Marco'), findsOneWidget, reason: 'where the files go');
     expect(find.text('See'), findsNothing);
+    expect(find.byType(NavigationBar), findsNothing);
     expect(find.text("Others with this PIN can't see what you send."), findsOneWidget);
   });
 

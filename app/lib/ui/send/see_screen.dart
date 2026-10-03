@@ -21,19 +21,22 @@ import '../theme.dart';
 import '../viewer.dart';
 
 /// Screen 46: what everyone sent into the folder a PIN shows, by day, to look at and save, with
-/// the PIN's key. Nothing can be deleted, and nobody's name shows.
-class SeeView extends StatefulWidget {
-  const SeeView({super.key, required this.access, this.folderName});
+/// the PIN's key. Nothing can be deleted, and nobody's name shows. It shares the bar at the
+/// bottom ([navigation]) and the menu with sending.
+class SeeScreen extends StatefulWidget {
+  const SeeScreen({super.key, required this.access, this.folderName, required this.navigation, required this.menu});
   final PinAccess access;
 
   /// The folder's name as the session says it, until the folder itself is fetched.
   final String? folderName;
+  final Widget navigation;
+  final Widget menu;
 
   @override
-  State<SeeView> createState() => _SeeViewState();
+  State<SeeScreen> createState() => _SeeScreenState();
 }
 
-class _SeeViewState extends State<SeeView> {
+class _SeeScreenState extends State<SeeScreen> {
   late final AppServices _services = Services.read(context);
   late final LibraryRepository _library = LibraryRepository.pin(api: _services.api, platform: _services.platform, pin: widget.access);
   late final LibraryController _c = LibraryController(repo: _library, platform: _services.platform)..addListener(_changed);
@@ -110,17 +113,28 @@ class _SeeViewState extends State<SeeView> {
     final locale = Localizations.localeOf(context).languageCode;
     final now = clock.now();
     final f = _folder;
+    // How much the folder holds, from how many people, and saving it all.
     final slivers = <Widget>[
       SliverPadding(
-        padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
         sliver: SliverToBoxAdapter(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(f?.name ?? widget.folderName ?? '', style: Theme.of(context).textTheme.headlineSmall),
-            if (f != null) ...[
-              const SizedBox(height: 4),
-              Text([FolderLines(context).count(f.files), if (f.senders > 0) t.seeFrom(f.senders)].join(' '),
-                  style: TextStyle(fontSize: 15, color: c.text2)),
-            ],
+            Text(f == null ? '' : [FolderLines(context).count(f.files), if (f.senders > 0) t.seeFrom(f.senders)].join(' '),
+                style: TextStyle(fontSize: 15, color: c.text2)),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: c.accentSoft,
+                foregroundColor: c.accentText,
+                minimumSize: const Size(0, 42),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                textStyle: const TextStyle(fontFamily: 'Roboto', fontSize: 15, fontWeight: FontWeight.w600),
+              ),
+              onPressed: f == null || f.files == 0 || _saving ? null : _saveAll,
+              icon: const Icon(AppIcons.download, size: 19),
+              label: Text(t.seeDownloadAll(formatBytes(f?.bytes ?? 0, locale))),
+            ),
           ]),
         ),
       ),
@@ -171,29 +185,19 @@ class _SeeViewState extends State<SeeView> {
     }
     return LibraryScope(
       library: _library,
-      child: Column(children: [
-        Expanded(
-          child: RefreshIndicator(
-            onRefresh: () => Future.wait([_c.reload(), _loadFolder()]),
-            child: CustomScrollView(controller: _scroll, physics: const AlwaysScrollableScrollPhysics(), slivers: slivers),
-          ),
+      child: Scaffold(
+        appBar: AppBar(
+          titleSpacing: 22,
+          // A folder's name is longer than the other screens' titles.
+          title: Text(f?.name ?? widget.folderName ?? '', overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 24)),
+          actions: [widget.menu],
         ),
-        SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
-              FilledButton.icon(
-                onPressed: f == null || f.files == 0 || _saving ? null : _saveAll,
-                icon: const Icon(AppIcons.download, size: 22),
-                label: Text(t.seeDownloadAll(formatBytes(f?.bytes ?? 0, locale))),
-              ),
-              const SizedBox(height: 8),
-              Text(t.seeNote, textAlign: TextAlign.center, style: TextStyle(fontSize: 13.5, color: c.text3)),
-            ]),
-          ),
+        bottomNavigationBar: widget.navigation,
+        body: RefreshIndicator(
+          onRefresh: () => Future.wait([_c.reload(), _loadFolder()]),
+          child: CustomScrollView(controller: _scroll, physics: const AlwaysScrollableScrollPhysics(), slivers: slivers),
         ),
-      ]),
+      ),
     );
   }
 }

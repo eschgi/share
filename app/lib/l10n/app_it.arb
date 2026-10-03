@@ -369,7 +369,6 @@
   "pinTabSee": "Guarda",
   "seeFrom": "{count, plural, =1{da 1 persona} other{da {count} persone}}",
   "seeDownloadAll": "Scarica tutto · {size}",
-  "seeNote": "Tutti quelli con questo PIN vedono questi file.",
   "seeEmpty": "Qui non c'è ancora niente. Quello che viene inviato con questo PIN appare qui.",
   "pinValidUntil": "Questo PIN vale fino a {when}",
   "pinSendTo": "A {host}",

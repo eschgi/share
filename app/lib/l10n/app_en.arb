@@ -1109,7 +1109,6 @@
       }
     }
   },
-  "seeNote": "Everyone with this PIN sees these files.",
   "seeEmpty": "Nothing here yet. What people send with this PIN shows up here.",
   "pinValidUntil": "This PIN works until {when}",
   "@pinValidUntil": {

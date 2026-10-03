@@ -340,6 +340,8 @@ void main() {
     await startApp(tester, platform, server);
     await tester.tap(find.text('See'));
     await shot(tester, 'en/46-pin-sees-folder');
+    await tester.tap(find.text('Send').last);
+    await shot(tester, 'en/46-pin-send-beside-see');
   }));
 
   testWidgets('a PIN, without an account', (tester) => atTen(() async {

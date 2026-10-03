@@ -15,7 +15,7 @@ import '../sign_in.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'pin_entry_screen.dart';
-import 'see_view.dart';
+import 'see_screen.dart';
 import 'send_panel.dart';
 import 'shared.dart';
 
@@ -136,7 +136,8 @@ class _WaitingShared extends StatelessWidget {
 
 /// Screen 15 without an account: sending with a PIN, as on the website.
 ///
-/// A PIN that shows its folder also has a See tab: what everyone sent into it (screen 46).
+/// A PIN that shows its folder also has See, what everyone sent into it (screen 46): the two are
+/// places in a bar at the bottom, as Library, Send and Settings are for someone signed in.
 class PinSendScreen extends StatefulWidget {
   const PinSendScreen({super.key, required this.session});
   final PinSession session;
@@ -146,7 +147,7 @@ class PinSendScreen extends StatefulWidget {
 }
 
 class _PinSendScreenState extends State<PinSendScreen> {
-  bool _seeing = false;
+  int _tab = 0; // sending, or the folder
   PinAccess? _access; // while the PIN shows its folder
 
   @override
@@ -169,6 +170,24 @@ class _PinSendScreenState extends State<PinSendScreen> {
   void _newPin(BuildContext context) =>
       Navigator.push(context, MaterialPageRoute<void>(builder: (_) => PinEntryScreen(server: widget.session.server)));
 
+  /// Another PIN, signing in instead, or About.
+  Widget _menu(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    return PopupMenuButton<String>(
+      icon: const Icon(AppIcons.more),
+      onSelected: (choice) async {
+        if (choice == 'pin') return _newPin(context);
+        final screen = choice == 'about' ? const AboutScreen(signedIn: false) : const SignInScreen();
+        await Navigator.push(context, MaterialPageRoute<void>(builder: (_) => screen));
+      },
+      itemBuilder: (_) => [
+        PopupMenuItem(value: 'pin', child: Text(t.pinOther)),
+        PopupMenuItem(value: 'sign-in', child: Text(t.pinSignIn)),
+        PopupMenuItem(value: 'about', child: Text(t.aboutTitle)),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
@@ -177,127 +196,82 @@ class _PinSendScreenState extends State<PinSendScreen> {
     final session = widget.session;
     final expires = session.expiresAt;
     final access = session.showsFolder && !session.ended ? _access : null;
-    final seeing = _seeing && access != null;
-    // Files shared from another app go out with the PIN.
+    final tab = access == null ? 0 : _tab;
+    final nav = access == null
+        ? null
+        : NavigationBar(
+            selectedIndex: tab,
+            onDestinationSelected: (i) => setState(() => _tab = i),
+            destinations: [
+              NavigationDestination(icon: const Icon(AppIcons.upload), label: t.navSend),
+              NavigationDestination(icon: const Icon(AppIcons.images), label: t.pinTabSee),
+            ],
+          );
+    final send = Scaffold(
+      appBar: AppBar(titleSpacing: 22, title: Text(t.sendTitle), actions: [_menu(context)]),
+      bottomNavigationBar: nav,
+      body: ListView(padding: const EdgeInsets.fromLTRB(16, 0, 16, 24), children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(6, 0, 6, 18),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(t.pinSendTo(session.server.host), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            // Where the files go, where the server has several folders (screen 45).
+            if (session.folderName != null) ...[
+              const SizedBox(height: 10),
+              Container(
+                height: 34,
+                padding: const EdgeInsets.symmetric(horizontal: 13),
+                decoration: BoxDecoration(color: c.accentSoft, borderRadius: BorderRadius.circular(17)),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(AppIcons.folder, size: 16, color: c.accentText),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(session.folderName!,
+                        maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: c.accentText)),
+                  ),
+                ]),
+              ),
+              const SizedBox(height: 4),
+            ],
+            if (session.kind == PinKind.day && expires != null) ...[
+              const SizedBox(height: 4),
+              Text(t.pinValidUntil(formatWhen(expires, clock.now(), locale)), style: TextStyle(fontSize: 14.5, color: c.warn)),
+            ],
+            const SizedBox(height: 8),
+            Text(session.showsFolder ? t.pinSendLeadSeen : t.pinSendLead, style: TextStyle(fontSize: 16, height: 1.5, color: c.text2)),
+          ]),
+        ),
+        if (session.ended) ...[
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: c.s1, borderRadius: BorderRadius.circular(18), border: Border.all(color: c.lineSoft)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Text(t.sendPinEnded, style: TextStyle(fontSize: 15.5, height: 1.5, color: c.text2)),
+              const SizedBox(height: 12),
+              FilledButton(onPressed: () => _newPin(context), child: Text(t.sendNewPin)),
+            ]),
+          ),
+          const SizedBox(height: 16),
+        ],
+        SendPanel(auth: SendAuth.pin, onNewPin: () => _newPin(context)),
+      ]),
+    );
+    // Files shared from another app go out with the PIN. Each place's Scaffold shows the app's
+    // snack bar in a Hero; only the place in view may take part when a screen opens on top.
     return SharedSender(
       auth: SendAuth.pin,
       onShared: () {
         Navigator.of(context).popUntil((r) => r.isFirst);
-        setState(() => _seeing = false);
+        setState(() => _tab = 0);
       },
-      child: Scaffold(
-        appBar: AppBar(
-          titleSpacing: access == null ? 22 : 16,
-          title: access == null
-              ? Text(t.sendTitle)
-              : _Tabs(seeing: seeing, onChanged: (see) => setState(() => _seeing = see)),
-          actions: [
-            PopupMenuButton<String>(
-              icon: const Icon(AppIcons.more),
-              onSelected: (choice) async {
-                if (choice == 'pin') return _newPin(context);
-                final screen = choice == 'about' ? const AboutScreen(signedIn: false) : const SignInScreen();
-                await Navigator.push(context, MaterialPageRoute<void>(builder: (_) => screen));
-              },
-              itemBuilder: (_) => [
-                PopupMenuItem(value: 'pin', child: Text(t.pinOther)),
-                PopupMenuItem(value: 'sign-in', child: Text(t.pinSignIn)),
-                PopupMenuItem(value: 'about', child: Text(t.aboutTitle)),
-              ],
-            ),
-          ],
-        ),
-        body: IndexedStack(index: seeing ? 1 : 0, children: [
-          ListView(padding: const EdgeInsets.fromLTRB(16, 0, 16, 24), children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(6, 0, 6, 18),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(t.pinSendTo(session.server.host), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                // Where the files go, where the server has several folders (screen 45).
-                if (session.folderName != null) ...[
-                  const SizedBox(height: 10),
-                  Container(
-                    height: 34,
-                    padding: const EdgeInsets.symmetric(horizontal: 13),
-                    decoration: BoxDecoration(color: c.accentSoft, borderRadius: BorderRadius.circular(17)),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(AppIcons.folder, size: 16, color: c.accentText),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(session.folderName!,
-                            maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: c.accentText)),
-                      ),
-                    ]),
-                  ),
-                  const SizedBox(height: 4),
-                ],
-                if (session.kind == PinKind.day && expires != null) ...[
-                  const SizedBox(height: 4),
-                  Text(t.pinValidUntil(formatWhen(expires, clock.now(), locale)), style: TextStyle(fontSize: 14.5, color: c.warn)),
-                ],
-                const SizedBox(height: 8),
-                Text(session.showsFolder ? t.pinSendLeadSeen : t.pinSendLead, style: TextStyle(fontSize: 16, height: 1.5, color: c.text2)),
-              ]),
-            ),
-            if (session.ended) ...[
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: c.s1, borderRadius: BorderRadius.circular(18), border: Border.all(color: c.lineSoft)),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  Text(t.sendPinEnded, style: TextStyle(fontSize: 15.5, height: 1.5, color: c.text2)),
-                  const SizedBox(height: 12),
-                  FilledButton(onPressed: () => _newPin(context), child: Text(t.sendNewPin)),
-                ]),
-              ),
-              const SizedBox(height: 16),
-            ],
-            SendPanel(auth: SendAuth.pin, onNewPin: () => _newPin(context)),
-          ]),
-          if (access != null) SeeView(key: ValueKey(access), access: access, folderName: session.folderName),
-        ]),
-      ),
-    );
-  }
-}
-
-/// Send | See, for a PIN that shows its folder.
-class _Tabs extends StatelessWidget {
-  const _Tabs({required this.seeing, required this.onChanged});
-  final bool seeing;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = AppLocalizations.of(context);
-    final c = context.colors;
-    Widget tab(bool see, String label) {
-      final on = seeing == see;
-      return Expanded(
-        child: Semantics(
-          selected: on,
-          button: true,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: () => onChanged(see),
-            child: Container(
-              height: 40,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(color: on ? c.accentSoft : null, borderRadius: BorderRadius.circular(12)),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                if (on) ...[Icon(AppIcons.check, size: 18, color: c.accentText), const SizedBox(width: 6)],
-                Text(label, style: TextStyle(fontFamily: 'Roboto', fontSize: 16, fontWeight: FontWeight.w600, color: on ? c.accentText : c.text2)),
-              ]),
-            ),
+      child: IndexedStack(index: tab, children: [
+        HeroMode(enabled: tab == 0, child: send),
+        if (access != null)
+          HeroMode(
+            enabled: tab == 1,
+            child: SeeScreen(key: ValueKey(access), access: access, folderName: session.folderName, navigation: nav!, menu: _menu(context)),
           ),
-        ),
-      );
-    }
-
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 320),
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(color: c.s1, borderRadius: BorderRadius.circular(16), border: Border.all(color: c.line)),
-      child: Row(children: [tab(false, t.sendTitle), tab(true, t.pinTabSee)]),
+      ]),
     );
   }
 }

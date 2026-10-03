@@ -84,7 +84,7 @@ small Linux machine with a USB drive, or on a VPS. The website is embedded in it
   <tr>
     <td align="center"><img src="docs/screenshots/app-folders.png" width="180" alt="An admin's folders, each with its files, its PINs and who sees it"><br><sub>Folders, for an admin</sub></td>
     <td align="center"><img src="docs/screenshots/app-folder.png" width="180" alt="A folder: who sees it, with a switch for each person, and the PINs that send into it"><br><sub>Who sees a folder</sub></td>
-    <td align="center"><img src="docs/screenshots/app-pin-sees.png" width="180" alt="A PIN that shows its folder: Send and See, the folder's files by day, and Download all"><br><sub>A PIN that shows its folder</sub></td>
+    <td align="center"><img src="docs/screenshots/app-pin-sees.png" width="180" alt="A PIN that shows its folder: its files by day and Download all, with Send and See in a bar at the bottom"><br><sub>A PIN that shows its folder</sub></td>
   </tr>
 </table>
 
