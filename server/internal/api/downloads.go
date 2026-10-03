@@ -50,7 +50,7 @@ type DownloadInfo struct {
 }
 
 func (a *API) createDownload(w http.ResponseWriter, r *http.Request) {
-	p, ok := a.device(w, r)
+	p, folders, ok := a.viewer(w, r)
 	if !ok {
 		return
 	}
@@ -73,17 +73,19 @@ func (a *API) createDownload(w http.ResponseWriter, r *http.Request) {
 		internal(w, "download", err)
 		return
 	}
+	files = inFolders(files, folders)
 	if len(files) == 0 {
 		httpx.WriteError(w, http.StatusNotFound, "not_found", "None of these files is in the library.")
 		return
 	}
-	zipOrder(files)
-	z, err := a.zipOf(files)
+	dirs := zipDirs(files, folders)
+	zipOrder(files, dirs)
+	z, err := a.zipOf(files, dirs)
 	if err != nil {
 		internal(w, "download", err)
 		return
 	}
-	sel := a.Downloads.Add(p.UserID, z.ids(), a.zipName(files))
+	sel := a.Downloads.Add(p.Key(), z.ids(), a.zipName(files, folders), dirs != nil)
 	info := DownloadInfo{ID: sel.ID, Name: sel.Name, Size: z.archive.Size(), Count: len(files), Files: make([]DownloadFile, len(files))}
 	for i, f := range files {
 		info.Files[i] = DownloadFile{ID: f.ID, Path: z.paths[i], Size: f.Size}
@@ -95,11 +97,11 @@ func (a *API) createDownload(w http.ResponseWriter, r *http.Request) {
 // times, so http.ServeContent can answer Range and If-Range like for a single file; a file
 // deleted meanwhile is left out, which changes the ETag, so a resumed download starts over.
 func (a *API) download(w http.ResponseWriter, r *http.Request) {
-	p, ok := a.device(w, r)
+	p, folders, ok := a.viewer(w, r)
 	if !ok {
 		return
 	}
-	sel, ok := a.Downloads.Get(r.PathValue("id"), p.UserID)
+	sel, ok := a.Downloads.Get(r.PathValue("id"), p.Key())
 	if !ok {
 		httpx.WriteError(w, http.StatusNotFound, "not_found", "No such download, or it's over a day old. Choose the files again.")
 		return
@@ -109,11 +111,16 @@ func (a *API) download(w http.ResponseWriter, r *http.Request) {
 		internal(w, "download", err)
 		return
 	}
+	files = inFolders(files, folders)
 	if len(files) == 0 {
 		httpx.WriteError(w, http.StatusNotFound, "not_found", "None of these files is in the library any more.")
 		return
 	}
-	z, err := a.zipOf(files)
+	var dirs map[string]string
+	if sel.ByFolder {
+		dirs = folderDirs(folders)
+	}
+	z, err := a.zipOf(files, dirs)
 	if err != nil {
 		internal(w, "download", err)
 		return
@@ -126,7 +133,7 @@ func (a *API) download(w http.ResponseWriter, r *http.Request) {
 	h.Set("X-Content-Type-Options", "nosniff")
 	h.Set("ETag", z.etag)
 	if r.Method != http.MethodHead {
-		release, ok := a.Downloads.Stream(p.UserID)
+		release, ok := a.Downloads.Stream(p.Key())
 		if !ok {
 			h.Set("Retry-After", "30")
 			httpx.WriteError(w, http.StatusServiceUnavailable, "busy", "Too many downloads at once; this one can start in a moment.")
@@ -140,17 +147,58 @@ func (a *API) download(w http.ResponseWriter, r *http.Request) {
 	http.ServeContent(newDeadlineWriter(w), r, "", time.Time{}, reader)
 }
 
+// inFolders keeps the files that lie in one of the folders.
+func inFolders(files []db.File, folders []db.Folder) []db.File {
+	seen := folderDirs(folders)
+	out := files[:0]
+	for _, f := range files {
+		if _, ok := seen[f.FolderID]; ok {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// folderDirs maps folder ids to their directories.
+func folderDirs(folders []db.Folder) map[string]string {
+	out := make(map[string]string, len(folders))
+	for _, f := range folders {
+		out[f.ID] = f.Dir
+	}
+	return out
+}
+
+// zipDirs gives, when the files are from several folders, the directory each one's path in
+// the ZIP starts with: its folder's, as on the server's drive. Files from one folder need
+// none (nil): their paths start with the day.
+func zipDirs(files []db.File, folders []db.Folder) map[string]string {
+	for _, f := range files[1:] {
+		if f.FolderID != files[0].FolderID {
+			return folderDirs(folders)
+		}
+	}
+	return nil
+}
+
+// zipPath is where a file goes in a ZIP, before names that differ only in case are numbered.
+func zipPath(f db.File, dirs map[string]string) string {
+	if dirs == nil {
+		return f.RelPath
+	}
+	return path.Join(dirs[f.FolderID], f.RelPath)
+}
+
 // zipOrder puts the files whose checksum is known first, by path, and the others after them,
 // the smallest first: the ZIP starts at once, and the missing checksums are worked out while
 // the first files go out.
-func zipOrder(files []db.File) {
+func zipOrder(files []db.File, dirs map[string]string) {
 	sort.SliceStable(files, func(i, j int) bool {
 		ki, kj := files[i].CRC32 != nil, files[j].CRC32 != nil
 		switch {
 		case ki != kj:
 			return ki
 		case ki:
-			return files[i].RelPath < files[j].RelPath
+			return zipPath(files[i], dirs) < zipPath(files[j], dirs)
 		default:
 			return files[i].Size < files[j].Size
 		}
@@ -174,17 +222,17 @@ func (z *zip) ids() []string {
 }
 
 // zipOf lays out the archive of files, in their order. Each file goes into its day's folder,
-// as on the server's drive. Names that differ only in case are numbered: the server tells
-// them apart, but Windows and macOS don't.
-func (a *API) zipOf(files []db.File) (*zip, error) {
+// as on the server's drive, inside its folder's directory when dirs has them. Names that
+// differ only in case are numbered: the server tells them apart, but Windows and macOS don't.
+func (a *API) zipOf(files []db.File, dirs map[string]string) (*zip, error) {
 	z := &zip{files: files, paths: make([]string, len(files))}
 	taken := map[string]bool{}
 	entries := make([]zipstream.Entry, len(files))
 	h := sha256.New()
 	io.WriteString(h, "z1")
 	for i, f := range files {
-		dir, name := path.Split(f.RelPath)
-		p := f.RelPath
+		p := zipPath(f, dirs)
+		dir, name := path.Split(p)
 		for n := 2; taken[strings.ToLower(p)]; n++ {
 			p = dir + storage.Numbered(name, n)
 		}
@@ -208,9 +256,10 @@ func (a *API) zipOf(files []db.File) (*zip, error) {
 	return z, nil
 }
 
-// zipName is the ZIP's file name: the server's name and the day the files arrived, or today
-// if they came on several days.
-func (a *API) zipName(files []db.File) string {
+// zipName is the ZIP's file name: the server's name, or the folder's when the files are all
+// from one folder and the caller sees others too, and the day the files arrived, or today if
+// they came on several days.
+func (a *API) zipName(files []db.File, folders []db.Folder) string {
 	day := files[0].UploadDay
 	for _, f := range files[1:] {
 		if f.UploadDay != day {
@@ -218,7 +267,15 @@ func (a *API) zipName(files []db.File) string {
 			break
 		}
 	}
-	return storage.SanitizeName(a.Cfg.Name + " " + day + ".zip")
+	name := a.Cfg.Name
+	if len(folders) > 1 && zipDirs(files, folders) == nil {
+		for _, f := range folders {
+			if f.ID == files[0].FolderID {
+				name = f.Name
+			}
+		}
+	}
+	return storage.SanitizeName(name + " " + day + ".zip")
 }
 
 // zipSource gives an archive its files from the library. The first checksum it is asked for

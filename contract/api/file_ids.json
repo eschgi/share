@@ -9,5 +9,5 @@
     ],
     "bytes": 74000000
   },
-  "notes": "Every matching file, for Select all, with their total size. Same filters as /api/files."
+  "notes": "Every matching file, for Select all, with their total size. Same filters as /api/files; without day, every day."
 }

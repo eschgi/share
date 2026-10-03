@@ -7,6 +7,7 @@
     "files": [
       {
         "id": "q3ld5x2k7mbqz4bwdbyj6qsqxa",
+        "folder": "f4mily5x2k7mbqz4bwdbyj6qsq",
         "name": "IMG_0001.jpg",
         "size": 3145728,
         "mime": "image/jpeg",
@@ -23,5 +24,5 @@
     ],
     "next_cursor": "MTc5MDQ5MzYwMDAwMC5xM2xkNXgyazdtYnF6NGJ3ZGJ5ajZxc3F4YQ"
   },
-  "notes": "Newest first; limit is 1 to 500 (200 if left out). Pass next_cursor as cursor for the next page; it is null on the last. Filters: kind, q, day. from is the sender's name when they have an account, null for a PIN. width, height and duration_ms are null when unknown."
+  "notes": "Newest first; limit is 1 to 500 (200 if left out). Pass next_cursor as cursor for the next page; it is null on the last. Filters: folder (one folder's id; 404 not_found for a folder the caller doesn't see), kind, q, day. Without folder: every folder the caller sees. folder in a file is the id of the folder it lies in. from is the sender's name when they have an account, null for a PIN. width, height and duration_ms are null when unknown."
 }

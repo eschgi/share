@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -148,5 +149,61 @@ func TestNewMembersGetTheirFolders(t *testing.T) {
 	}
 	if len(seen) != 2 || !slices.Contains(seen, family) || !slices.Contains(seen, kindergarten) {
 		t.Fatalf("the former admin sees %v", seen)
+	}
+}
+
+func TestNoFoldersShowNothing(t *testing.T) {
+	d := openTest(t)
+	ctx := context.Background()
+	family := testFolder(t, d, "Family")
+	f := File{ID: ids.New(), Name: "a.jpg", Size: 10, CreatedAt: t0, UpdatedAt: t0, FolderID: family}
+	if err := d.InsertReceiving(ctx, f); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.MarkFinalizing(ctx, f.ID, "2026-09-27/a.jpg", "2026-09-27", t0); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.MarkReady(ctx, f.ID, "image/jpeg", KindPhoto, t0); err != nil {
+		t.Fatal(err)
+	}
+	if days, _ := d.LibraryDays(ctx, LibraryFilter{}); len(days) != 0 {
+		t.Fatalf("no folders showed %v", days)
+	}
+	if ids, _, _ := d.LibraryIDs(ctx, LibraryFilter{}); len(ids) != 0 {
+		t.Fatalf("no folders showed %v", ids)
+	}
+	if days, _ := d.LibraryDays(ctx, LibraryFilter{Folders: []string{family}}); len(days) != 1 {
+		t.Fatalf("the folder showed %v", days)
+	}
+}
+
+// The library's pages come newest first without sorting: from files_by_folder for one
+// folder, and from files_ready_by_time for several.
+func TestLibraryPagesUseTheirIndexes(t *testing.T) {
+	d := openTest(t)
+	for _, tc := range []struct {
+		folders []string
+		index   string
+	}{
+		{[]string{"a"}, "files_by_folder"},
+		{[]string{"a", "b", "c"}, "files_ready_by_time"},
+	} {
+		w, args := LibraryFilter{Folders: tc.folders}.where()
+		rows, err := d.Query("EXPLAIN QUERY PLAN SELECT id FROM files WHERE "+w+" ORDER BY uploaded_at DESC, id LIMIT 10", args...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var plan []string
+		for rows.Next() {
+			var id, parent, unused int
+			var detail string
+			rows.Scan(&id, &parent, &unused, &detail)
+			plan = append(plan, detail)
+		}
+		rows.Close()
+		got := strings.Join(plan, "; ")
+		if !strings.Contains(got, tc.index) || strings.Contains(got, "TEMP B-TREE") {
+			t.Errorf("%d folders: %s", len(tc.folders), got)
+		}
 	}
 }

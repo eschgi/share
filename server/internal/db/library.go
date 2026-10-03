@@ -8,14 +8,29 @@ import (
 
 // LibraryFilter narrows what the library shows.
 type LibraryFilter struct {
-	Kind  string // photo, video or document; empty for all
-	Query string // part of the file name, not case-sensitive
-	Day   string // YYYY-MM-DD; empty for all days
+	Folders []string // the folders to show files of; none shows nothing
+	Kind    string   // photo, video or document; empty for all
+	Query   string   // part of the file name, not case-sensitive
+	Day     string   // YYYY-MM-DD; empty for all days
 }
 
 func (f LibraryFilter) where() (string, []any) {
 	w := "state = 'ready'"
 	var args []any
+	switch len(f.Folders) {
+	case 0:
+		w += " AND 0"
+	case 1:
+		w += " AND folder_id = ?"
+		args = append(args, f.Folders[0])
+	default:
+		// The + keeps SQLite on files_ready_by_time, newest first, rather than reading all of
+		// these folders' files to sort them.
+		w += " AND +folder_id IN (?" + strings.Repeat(", ?", len(f.Folders)-1) + ")"
+		for _, id := range f.Folders {
+			args = append(args, id)
+		}
+	}
 	if f.Kind != "" {
 		w += " AND kind = ?"
 		args = append(args, f.Kind)

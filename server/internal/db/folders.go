@@ -121,6 +121,17 @@ func (d *DB) EnsureFirstFolder(ctx context.Context, f Folder, now time.Time) (Fo
 	return folders[0], made, nil
 }
 
+// InsertFolder stores a new folder. It returns ErrConflict if a live folder has its name, or
+// any folder its directory.
+func (d *DB) InsertFolder(ctx context.Context, f Folder) error {
+	return d.Tx(ctx, func(tx *sql.Tx) error {
+		if err := insertFolder(ctx, tx, f); err != nil {
+			return err
+		}
+		return bumpLibraryVersion(ctx, tx)
+	})
+}
+
 func insertFolder(ctx context.Context, tx *sql.Tx, f Folder) error {
 	_, err := tx.ExecContext(ctx, "INSERT INTO folders ("+folderColumns+") VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
 		f.ID, f.Name, f.Dir, f.RenamingFrom, f.CreatedBy, ms(f.CreatedAt), nullMS(f.DeletedAt), nullString(f.DeletedBy))
@@ -138,14 +149,14 @@ func (d *DB) FolderByID(ctx context.Context, id string) (Folder, error) {
 // LiveFolders lists the folders that aren't deleted, the oldest first: the first one is where
 // things go when nobody says.
 func (d *DB) LiveFolders(ctx context.Context) ([]Folder, error) {
-	return queryFolders(ctx, d, "SELECT "+folderColumns+" FROM folders WHERE deleted_at IS NULL ORDER BY created_at, id")
+	return queryFolders(ctx, d, "SELECT "+folderColumns+" FROM folders WHERE deleted_at IS NULL ORDER BY created_at, rowid")
 }
 
 // FoldersOf lists the live folders a member was given, the oldest first. Admins see every
 // folder whatever this says.
 func (d *DB) FoldersOf(ctx context.Context, userID string) ([]Folder, error) {
 	return queryFolders(ctx, d, "SELECT "+folderColumns+` FROM folders
-		WHERE deleted_at IS NULL AND id IN (SELECT folder_id FROM folder_people WHERE user_id = ?) ORDER BY created_at, id`, userID)
+		WHERE deleted_at IS NULL AND id IN (SELECT folder_id FROM folder_people WHERE user_id = ?) ORDER BY created_at, rowid`, userID)
 }
 
 // SetFolderPerson gives a person a folder, or takes it away. Doing it twice changes nothing.
@@ -167,11 +178,92 @@ func (d *DB) DirTaken(ctx context.Context, dir string) (bool, error) {
 
 // Relocating lists the folders whose files may still lie under an older directory.
 func (d *DB) Relocating(ctx context.Context) ([]Folder, error) {
-	return queryFolders(ctx, d, "SELECT "+folderColumns+" FROM folders WHERE renaming_from IS NOT NULL ORDER BY created_at, id")
+	return queryFolders(ctx, d, "SELECT "+folderColumns+" FROM folders WHERE renaming_from IS NOT NULL ORDER BY created_at, rowid")
 }
 
 // FinishRelocation notes that nothing is left under a folder's older directory from.
 func (d *DB) FinishRelocation(ctx context.Context, id, from string) error {
 	_, err := d.ExecContext(ctx, "UPDATE folders SET renaming_from = NULL WHERE id = ? AND renaming_from = ?", id, from)
 	return err
+}
+
+// FolderStat is what a folder holds: its files in the library, their bytes, and how many
+// people and PIN sessions sent them.
+type FolderStat struct {
+	Files   int
+	Bytes   int64
+	Senders int
+}
+
+// FolderStats counts the library's files by folder.
+func (d *DB) FolderStats(ctx context.Context) (map[string]FolderStat, error) {
+	rows, err := d.QueryContext(ctx, `SELECT folder_id, COUNT(*), SUM(size), COUNT(DISTINCT COALESCE(user_id, 'pin:' || pin_session_id))
+		FROM files WHERE state = 'ready' GROUP BY folder_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]FolderStat{}
+	for rows.Next() {
+		var id sql.NullString
+		var s FolderStat
+		if err := rows.Scan(&id, &s.Files, &s.Bytes, &s.Senders); err != nil {
+			return nil, err
+		}
+		out[id.String] = s
+	}
+	return out, rows.Err()
+}
+
+// FolderCover is a folder's newest photo or video that has a thumbnail; ErrNotFound if it has
+// none.
+func (d *DB) FolderCover(ctx context.Context, folderID string) (File, error) {
+	return scanFile(d.QueryRowContext(ctx, "SELECT "+fileColumns+` FROM files
+		WHERE folder_id = ? AND state = 'ready' AND kind IN ('photo', 'video') AND thumb IN ('client', 'server')
+		ORDER BY uploaded_at DESC, id LIMIT 1`, folderID))
+}
+
+// FolderPeople says who sees the folders: Members counts, by folder, the members who were
+// given it and the open invites for new members that give it; admins and open invites for
+// new admins see every folder, and Admins counts them.
+type FolderPeople struct {
+	Members map[string]int
+	Admins  int
+}
+
+// CountFolderPeople counts who sees the folders.
+func (d *DB) CountFolderPeople(ctx context.Context, now time.Time) (FolderPeople, error) {
+	out := FolderPeople{Members: map[string]int{}}
+	for _, q := range []struct {
+		sql  string
+		args []any
+	}{
+		{`SELECT fp.folder_id, COUNT(*) FROM folder_people fp JOIN users u ON u.id = fp.user_id
+			WHERE u.role = 'member' GROUP BY fp.folder_id`, nil},
+		{`SELECT i.folder_id, COUNT(*) FROM invite_folders i JOIN invites v ON v.id = i.invite_id
+			WHERE v.user_id IS NULL AND v.role = 'member' AND v.used_at IS NULL AND v.revoked_at IS NULL AND v.expires_at > ?
+			GROUP BY i.folder_id`, []any{ms(now)}},
+	} {
+		rows, err := d.QueryContext(ctx, q.sql, q.args...)
+		if err != nil {
+			return out, err
+		}
+		for rows.Next() {
+			var id string
+			var n int
+			if err := rows.Scan(&id, &n); err != nil {
+				rows.Close()
+				return out, err
+			}
+			out.Members[id] += n
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return out, err
+		}
+	}
+	err := d.QueryRowContext(ctx, `SELECT (SELECT COUNT(*) FROM users WHERE role = 'admin') +
+		(SELECT COUNT(*) FROM invites WHERE user_id IS NULL AND role = 'admin' AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ?)`,
+		ms(now)).Scan(&out.Admins)
+	return out, err
 }

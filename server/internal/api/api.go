@@ -41,6 +41,8 @@ type API struct {
 	ServerVersion string
 	// CheckStorage looks at the drives, for what the admins' storage page warns about.
 	CheckStorage func() storage.Report
+
+	folderCache folderCache
 }
 
 // Register adds the API routes to mux.
@@ -66,6 +68,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/server", a.serverInfo)
 	mux.HandleFunc("GET /api/about", a.about)
 
+	mux.HandleFunc("GET /api/folders", a.folders)
 	mux.HandleFunc("GET /api/library", a.library)
 	mux.HandleFunc("GET /api/files", a.files)
 	mux.HandleFunc("GET /api/files/ids", a.fileIDs)

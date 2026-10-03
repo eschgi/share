@@ -1,0 +1,37 @@
+{
+  "method": "GET",
+  "path": "/api/folders",
+  "auth": "device",
+  "status": 200,
+  "response": {
+    "folders": [
+      {
+        "id": "f4mily5x2k7mbqz4bwdbyj6qsq",
+        "name": "Family",
+        "files": 2340,
+        "bytes": 44023414784,
+        "senders": 14,
+        "people": 4,
+        "admins_only": false,
+        "cover": {
+          "id": "q3ld5x2k7mbqz4bwdbyj6qsqxa",
+          "folder": "f4mily5x2k7mbqz4bwdbyj6qsq",
+          "name": "IMG_0001.jpg",
+          "size": 3145728,
+          "mime": "image/jpeg",
+          "kind": "photo",
+          "day": "2026-09-27",
+          "uploaded_at": "2026-09-27T10:00:00Z",
+          "updated_at": "2026-09-27T10:02:00Z",
+          "width": 4032,
+          "height": 3024,
+          "duration_ms": null,
+          "has_thumb": true,
+          "from": "Maria"
+        },
+        "created_at": "2026-09-12T08:00:00Z"
+      }
+    ]
+  },
+  "notes": "The folders the caller sees, the oldest first: admins every folder, members the ones they were given. files, bytes: what is in the library (not the trash); senders: how many people and PIN sessions sent them. people: who sees the folder: the admins, the members given it and open invites that give it. admins_only: no member sees it. cover: the newest photo or video with a thumbnail, as in /api/files, or null. The list changes with the library's version."
+}

@@ -13,7 +13,7 @@ func (c *clock) now() time.Time { return c.t }
 func TestSelectionsBelongToTheirPersonAndExpire(t *testing.T) {
 	c := &clock{time.Date(2026, 9, 27, 10, 0, 0, 0, time.UTC)}
 	s := &Store{Now: c.now}
-	sel := s.Add("maria", []string{"a", "b"}, "Share 2026-09-27.zip")
+	sel := s.Add("maria", []string{"a", "b"}, "Share 2026-09-27.zip", false)
 	if got, ok := s.Get(sel.ID, "maria"); !ok || got.Name != "Share 2026-09-27.zip" || len(got.FileIDs) != 2 {
 		t.Fatalf("Get: %+v %v", got, ok)
 	}
@@ -41,7 +41,7 @@ func TestTooManySelectionsDropTheOldest(t *testing.T) {
 	var first []string
 	for i := range perPerson + 2 {
 		c.t = c.t.Add(time.Second)
-		sel := s.Add("maria", nil, strconv.Itoa(i))
+		sel := s.Add("maria", nil, strconv.Itoa(i), false)
 		if i < 2 {
 			first = append(first, sel.ID)
 		}
@@ -53,7 +53,7 @@ func TestTooManySelectionsDropTheOldest(t *testing.T) {
 	}
 	for i := range total {
 		c.t = c.t.Add(time.Second)
-		s.Add("user"+strconv.Itoa(i), nil, "")
+		s.Add("user"+strconv.Itoa(i), nil, "", false)
 	}
 	if n := len(s.sel); n != total {
 		t.Errorf("%d selections, want at most %d", n, total)

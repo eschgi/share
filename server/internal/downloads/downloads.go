@@ -14,21 +14,24 @@ import (
 const (
 	// Keep is how long a selection lasts after it was last used.
 	Keep = 24 * time.Hour
-	// A person's oldest selections go beyond this many, and the oldest of all beyond total.
+	// The oldest selections of one person (or PIN session) go beyond this many, and the oldest of
+	// all beyond total.
 	perPerson = 10
 	total     = 50
-	// ZIPs being sent at once, per person and in all: each one keeps the drive busy.
+	// ZIPs being sent at once, per person (or PIN session) and in all: each one keeps the drive
+	// busy.
 	streamsPerPerson = 2
 	streamsTotal     = 4
 )
 
 // Selection is one ZIP someone asked for.
 type Selection struct {
-	ID      string
-	UserID  string
-	FileIDs []string // in the archive's order
-	Name    string   // the ZIP's file name
-	used    time.Time
+	ID       string
+	Owner    string   // who asked: a person or a PIN session (auth.Principal.Key)
+	FileIDs  []string // in the archive's order
+	Name     string   // the ZIP's file name
+	ByFolder bool     // the files are from several folders: each path starts with its folder's
+	used     time.Time
 }
 
 // Store keeps selections in memory: after a restart, a download starts over.
@@ -41,16 +44,16 @@ type Store struct {
 	streaming int
 }
 
-// Add keeps a new selection for userID.
-func (s *Store) Add(userID string, fileIDs []string, name string) *Selection {
+// Add keeps a new selection for owner.
+func (s *Store) Add(owner string, fileIDs []string, name string, byFolder bool) *Selection {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.sel == nil {
 		s.sel = map[string]*Selection{}
 	}
-	sel := &Selection{ID: ids.New(), UserID: userID, FileIDs: fileIDs, Name: name, used: s.Now()}
+	sel := &Selection{ID: ids.New(), Owner: owner, FileIDs: fileIDs, Name: name, ByFolder: byFolder, used: s.Now()}
 	s.sel[sel.ID] = sel
-	s.trim(func(o *Selection) bool { return o.UserID == userID }, perPerson)
+	s.trim(func(o *Selection) bool { return o.Owner == owner }, perPerson)
 	s.trim(func(*Selection) bool { return true }, total)
 	return sel
 }
@@ -72,13 +75,13 @@ func (s *Store) trim(match func(*Selection) bool, max int) {
 	}
 }
 
-// Get returns userID's selection id, and counts it as used.
-func (s *Store) Get(id, userID string) (*Selection, bool) {
+// Get returns owner's selection id, and counts it as used.
+func (s *Store) Get(id, owner string) (*Selection, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	sel, ok := s.sel[id]
 	now := s.Now()
-	if !ok || sel.UserID != userID || now.Sub(sel.used) >= Keep {
+	if !ok || sel.Owner != owner || now.Sub(sel.used) >= Keep {
 		return nil, false
 	}
 	sel.used = now
@@ -97,26 +100,26 @@ func (s *Store) Prune() {
 	}
 }
 
-// Stream takes a slot for sending a ZIP to userID, if one is free; release gives it back.
-func (s *Store) Stream(userID string) (release func(), ok bool) {
+// Stream takes a slot for sending a ZIP to owner, if one is free; release gives it back.
+func (s *Store) Stream(owner string) (release func(), ok bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.streams == nil {
 		s.streams = map[string]int{}
 	}
-	if s.streaming >= streamsTotal || s.streams[userID] >= streamsPerPerson {
+	if s.streaming >= streamsTotal || s.streams[owner] >= streamsPerPerson {
 		return nil, false
 	}
 	s.streaming++
-	s.streams[userID]++
+	s.streams[owner]++
 	var once sync.Once
 	return func() {
 		once.Do(func() {
 			s.mu.Lock()
 			defer s.mu.Unlock()
 			s.streaming--
-			if s.streams[userID]--; s.streams[userID] == 0 {
-				delete(s.streams, userID)
+			if s.streams[owner]--; s.streams[owner] == 0 {
+				delete(s.streams, owner)
 			}
 		})
 	}, true

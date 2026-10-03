@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -18,6 +19,7 @@ import (
 // FileInfo is a file in the library.
 type FileInfo struct {
 	ID         string    `json:"id"`
+	Folder     string    `json:"folder"` // the id of the folder it lies in
 	Name       string    `json:"name"`
 	Size       int64     `json:"size"`
 	Mime       string    `json:"mime"`
@@ -34,7 +36,7 @@ type FileInfo struct {
 
 func fileInfo(f db.File, names map[string]string) FileInfo {
 	info := FileInfo{
-		ID: f.ID, Name: f.Name, Size: f.Size, Mime: f.Mime, Kind: f.Kind, Day: f.UploadDay, UpdatedAt: f.UpdatedAt,
+		ID: f.ID, Folder: f.FolderID, Name: f.Name, Size: f.Size, Mime: f.Mime, Kind: f.Kind, Day: f.UploadDay, UpdatedAt: f.UpdatedAt,
 		Width: f.Width, Height: f.Height, DurationMS: f.DurationMS,
 		HasThumb: f.Thumb == db.ThumbClient || f.Thumb == db.ThumbServer,
 	}
@@ -60,10 +62,20 @@ func (a *API) userNames(r *http.Request) (map[string]string, error) {
 	return names, nil
 }
 
-// filter reads kind, q and day from the query.
-func filter(w http.ResponseWriter, r *http.Request) (db.LibraryFilter, bool) {
+// filter reads folder, kind, q and day from the query. Without a folder it shows all the
+// folders the caller sees; a folder they don't see is answered with 404.
+func filter(w http.ResponseWriter, r *http.Request, folders []db.Folder) (db.LibraryFilter, bool) {
 	q := r.URL.Query()
 	f := db.LibraryFilter{Kind: q.Get("kind"), Query: strings.TrimSpace(q.Get("q")), Day: q.Get("day")}
+	if want := q.Get("folder"); want != "" {
+		if !slices.ContainsFunc(folders, func(x db.Folder) bool { return x.ID == want }) {
+			httpx.WriteError(w, http.StatusNotFound, "not_found", "No such folder.")
+			return f, false
+		}
+		f.Folders = []string{want}
+	} else {
+		f.Folders = folderIDs(folders)
+	}
 	switch f.Kind {
 	case "", db.KindPhoto, db.KindVideo, db.KindDocument:
 	default:
@@ -97,10 +109,11 @@ type Library struct {
 }
 
 func (a *API) library(w http.ResponseWriter, r *http.Request) {
-	if _, ok := a.device(w, r); !ok {
+	_, folders, ok := a.viewer(w, r)
+	if !ok {
 		return
 	}
-	f, ok := filter(w, r)
+	f, ok := filter(w, r, folders)
 	if !ok {
 		return
 	}
@@ -129,10 +142,11 @@ type FilePage struct {
 }
 
 func (a *API) files(w http.ResponseWriter, r *http.Request) {
-	if _, ok := a.device(w, r); !ok {
+	_, folders, ok := a.viewer(w, r)
+	if !ok {
 		return
 	}
-	f, ok := filter(w, r)
+	f, ok := filter(w, r, folders)
 	if !ok {
 		return
 	}
@@ -204,10 +218,11 @@ type FileIDs struct {
 }
 
 func (a *API) fileIDs(w http.ResponseWriter, r *http.Request) {
-	if _, ok := a.device(w, r); !ok {
+	_, folders, ok := a.viewer(w, r)
+	if !ok {
 		return
 	}
-	f, ok := filter(w, r)
+	f, ok := filter(w, r, folders)
 	if !ok {
 		return
 	}
@@ -225,10 +240,10 @@ func (a *API) readyFile(w http.ResponseWriter, r *http.Request) (db.File, bool) 
 	return a.libraryFile(w, r, false)
 }
 
-// libraryFile loads the file a request is about. With trash, admins also get deleted files:
-// Recently deleted shows their thumbnails.
+// libraryFile loads the file a request is about, if it is in a folder the caller sees. With
+// trash, admins also get deleted files: Recently deleted shows their thumbnails.
 func (a *API) libraryFile(w http.ResponseWriter, r *http.Request, trash bool) (db.File, bool) {
-	p, ok := a.device(w, r)
+	p, folders, ok := a.viewer(w, r)
 	if !ok {
 		return db.File{}, false
 	}
@@ -238,7 +253,8 @@ func (a *API) libraryFile(w http.ResponseWriter, r *http.Request, trash bool) (d
 		return db.File{}, false
 	}
 	f, err := a.Auth.DB.FileByID(r.Context(), id)
-	visible := f.State == db.StateReady || (trash && f.State == db.StateTrashed && p.Role == db.RoleAdmin)
+	seen := slices.ContainsFunc(folders, func(x db.Folder) bool { return x.ID == f.FolderID })
+	visible := (f.State == db.StateReady && seen) || (trash && f.State == db.StateTrashed && p.Role == db.RoleAdmin)
 	if errors.Is(err, db.ErrNotFound) || (err == nil && !visible) {
 		httpx.WriteError(w, http.StatusNotFound, "not_found", "No such file.")
 		return f, false

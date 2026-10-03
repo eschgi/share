@@ -13,5 +13,5 @@
       }
     ]
   },
-  "notes": "The upload days that have files, newest first. version grows with every change to the library (new files, thumbnails, deletions): poll this and reload when it changes. kind is photo, video or document; q matches part of the file name. PIN sessions get 403 forbidden on every library endpoint."
+  "notes": "The upload days that have files, newest first. version grows with every change to the library (new files, thumbnails, deletions): poll this and reload when it changes. folder narrows it to one folder (404 not_found for a folder the caller doesn't see); without it, every folder the caller sees: admins every folder, members the ones they were given. kind is photo, video or document; q matches part of the file name. PIN sessions get 403 forbidden on every library endpoint."
 }
