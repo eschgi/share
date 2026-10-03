@@ -4,10 +4,11 @@ A self-hosted place where family and friends drop photos, videos and documents.
 
 - **Sending** works in any browser with a 5-character PIN: no app, no account. Uploads go in
   pieces and continue after a dropped connection, so videos of several gigabytes get through,
-  also behind Cloudflare's 100 MB request limit.
+  also behind proxies that limit a request's size, such as Cloudflare's 100 MB.
 - **Seeing and downloading** is for people with an account, in the Android app or in any browser,
   on iPhones and computers too. They join with an invite, without a password, and send from there
-  as well, without a PIN. At home the app uses the server's local address and skips the internet.
+  as well, without a PIN. With the server at home, the app uses its address at home there and
+  skips the internet.
   Admins manage PINs, people and folders in either, and deleted files wait 30 days in Recently
   deleted.
 - **Folders, each with its own people.** Admins see every folder; everyone else sees the folders
@@ -16,8 +17,9 @@ A self-hosted place where family and friends drop photos, videos and documents.
 - Files are stored unchanged, in a directory per folder with one folder per upload day inside:
   `<storage_dir>/Family/2026-09-30/IMG_0001.jpg`.
 
-The server is one Go program without dependencies at runtime. It runs on a router or another
-small Linux machine with a USB drive, or on a VPS. The website is embedded in it.
+The server is one Go program without dependencies at runtime, with the website embedded in it.
+It runs on Linux and Windows: on a small computer at home such as a Raspberry Pi or a NAS, on a
+VPS, or in Docker. [Hosting](#hosting) shows the ways to reach it.
 
 ## Screenshots
 
@@ -132,7 +134,9 @@ Both speak English, German and Italian.
 | Android app: videos and sound in the viewer, deleting there, one's own phones and browsers | built and tested, not yet tried on a phone |
 | Android app: Share into Share, new passwords, the drive's warnings, About | built and tested, not yet tried on a phone |
 | Android app: folders, sending into one, a PIN's folder to see, moving files | built and tested, not yet tried on a phone |
-| Self-updating app, Google Play, a VPS setup | planned |
+| Server: behind Cloudflare's tunnel or a reverse proxy (Caddy, nginx, Traefik), next to other apps | built and tested, not yet tried behind a reverse proxy |
+| Docker image for amd64 and arm64, with setups for Caddy and a Cloudflare Tunnel | built, not yet tried |
+| Self-updating app, Google Play | planned |
 
 The plan and the screens are in [`docs/`](docs/).
 
@@ -151,8 +155,8 @@ The plan and the screens are in [`docs/`](docs/).
 - The app shows the library by day. It saves photos and videos into the gallery, in the album
   "Share", and documents into Downloads. It sends the same way as the website. Transfers keep going
   when the app is closed, and continue where they stopped after an interruption.
-- At home the app reaches the server on its address at home (`home_url`), plain http or https,
-  without Cloudflare and the internet.
+- With the server at home, the app reaches it there on its address at home (`home_url`), plain
+  http or https, without the internet.
 - People with an account can use the website instead of the app, signed in with their password or
   an invite: the library by day, a viewer that also plays videos, selecting many, sending without a
   PIN, and an admin's settings. One file downloads as it is; several as one ZIP, whose exact size is
@@ -197,7 +201,7 @@ The plan and the screens are in [`docs/`](docs/).
 - A browser signs in like a phone, with a password or an invite, and keeps its key in a cookie
   that the page's scripts can't read. It stays signed in until 400 days after it was last used.
   Admins can sign it out like a phone, and everyone can sign out their own phones and browsers.
-- Cookies belong to an address, not to a network: a browser signed in at `http://192.168.8.1:8080`
+- Cookies belong to an address, not to a network: a browser signed in at `http://192.168.1.20:8080`
   would hand its key to whatever has that address on someone else's Wi-Fi. So a browser that signs
   in at home (plain http, or the https port from the home network) gets a session that works only
   at home; seen anywhere else, it is signed out at once.
@@ -210,8 +214,8 @@ The plan and the screens are in [`docs/`](docs/).
   doesn't hand its key to another device. The server gives the proof only to the home network.
 - An https port at home uses a certificate the server makes itself. The app trusts it only because
   it learned the fingerprint over the public address.
-- PINs and invites in links come after the `#`, which browsers don't send to the server or to
-  Cloudflare, and the pages remove them from the address bar.
+- PINs and invites in links come after the `#`, which browsers don't send to the server or to a
+  proxy in front of it, and the pages remove them from the address bar.
 - A password an admin makes up for someone is shown once and kept only as a hash; it isn't for the
   admin's own account, the person's phones and browsers stay signed in, and the log notes only who
   gave it to whom, by id. The app copies it marked as sensitive, so Android hides it in the
@@ -228,11 +232,17 @@ The plan and the screens are in [`docs/`](docs/).
   Policy. Its cookies are HttpOnly and SameSite=Strict, and `__Host-` except over plain http at
   home, where browsers keep no secure ones. Only Share's own pages can change something: a request
   from another site, or one with the website's cookie that doesn't say where it comes from, is
-  turned away. Downloads are marked so that Cloudflare neither caches nor changes them.
+  turned away. Downloads are marked so that proxies such as Cloudflare neither cache nor change
+  them.
+- Behind a proxy, Share takes the visitor's address and whether they came over https only from the
+  proxy `config.json` names (`proxy`), and only from addresses at home or on the server itself.
+  That proxy must say who is visiting, or its requests are refused. A proxy Share wasn't told about
+  is refused too, so it can't make its visitors look like visitors at home, with the home proof and
+  sessions meant for home.
 
 ## Try it locally
 
-You need Go 1.25 or newer and Node 22.
+You need Go 1.26 or newer and Node 22. With Docker instead, see [`deploy/docker`](deploy/docker/README.md).
 
 ```sh
 cd web && npm ci && npm run build && cd ..        # the website, into server/internal/webui/dist
@@ -260,31 +270,43 @@ For work on the website, `cd web && npm run dev` serves it with hot reload and f
 the server on `127.0.0.1:8080`; `npm run dev -- --host` makes it reachable from phones at home
 (`http://192.168.1.20:5173`).
 
-## Running it
+## Hosting
+
+Share runs wherever you like. How visitors reach it decides the setup:
+
+| Where Share runs | How visitors reach it | Guide |
+|------------------|-----------------------|-------|
+| A computer at home, such as a small server, a NAS or a Raspberry Pi, without a public address | A Cloudflare Tunnel: nothing to open in the firewall | [`deploy/cloudflared`](deploy/cloudflared/README.md) |
+| A VPS or another server with a public address, also next to other apps under other names | A reverse proxy that makes the certificates: Caddy, nginx or Traefik | [`deploy/reverse-proxy`](deploy/reverse-proxy/README.md) |
+| A server with a public address, without a proxy | Share's own HTTPS, with a certificate from files | [below](#https-without-a-proxy) |
+| Docker, on any of these | The image `ghcr.io/eschgi/share`, with Caddy or a tunnel | [`deploy/docker`](deploy/docker/README.md) |
+
+Without Docker:
 
 1. Take the server for the machine from the [latest release](https://github.com/eschgi/share/releases/latest):
-   `share-linux-arm64` for the router, `share-linux-amd64` for a VPS, `share-windows-amd64.exe` or
-   `share-windows-arm64.exe` for a PC, checked against `SHA256SUMS`. Or build them:
-   `scripts/build-linux.sh` makes the Linux ones in `dist/`, `scripts/build-windows.sh` the Windows
-   ones, and on Windows the PowerShell scripts `scripts\build-linux.ps1` and
-   `scripts\build-windows.ps1` do the same.
-2. Write `config.json` from `config.example.json`, with at least `public_url` and `storage_dir`.
-3. With the drive mounted, run `share init` once. `share check` says whether the drive suits: ext4
-   is best, FAT32 can't hold files over 4 GiB.
-4. Run `share serve` as a service. The first start prints an invite for the first admin, who opens
-   it on their phone, or in a browser.
-5. Put it behind a Cloudflare Tunnel ([`deploy/cloudflared`](deploy/cloudflared/README.md)), or let
-   it serve HTTPS itself: `"https": {"listen": ":443", "certificate": {"cert_file": "…", "key_file": "…"}}`.
+   `share-linux-arm64` or `share-linux-amd64` for Linux on arm64 (e.g. a Raspberry Pi) or amd64,
+   `share-windows-amd64.exe` or `share-windows-arm64.exe` for Windows, checked against
+   `SHA256SUMS`. Or build them: `scripts/build-linux.sh` makes the Linux ones in `dist/`,
+   `scripts/build-windows.sh` the Windows ones, and on Windows the PowerShell scripts
+   `scripts\build-linux.ps1` and `scripts\build-windows.ps1` do the same.
+2. Write `config.json` from `config.example.json`, with at least `public_url` and `storage_dir`,
+   and the `proxy` line from the guide you follow.
+3. Run `share init` once; with the files on a drive of their own, mount it first. `share check`
+   says whether the drive suits: ext4 is best, FAT32 can't hold files over 4 GiB.
+4. Run `share serve` as a service, on Linux with
+   [`deploy/systemd/share.service`](deploy/systemd/share.service). The first start prints an invite
+   for the first admin, who opens it on their phone, or in a browser.
 
-Upgrading from a version without folders: the first start puts every file and PIN into a first
-folder named after the server (`name` in `config.json`, "Share" unless set) and moves the day
-folders into its directory, `<storage_dir>/Share/`. These are renames on the same drive. If the
-server stops halfway, the next start carries on, and files can be downloaded all the while. A file
-whose name is taken in the new place stays where it is, and the log says so. The database copy that
-the upgrade leaves in `<data_dir>/backups` knows only the old layout: to go back to it, move the
-day folders back out first.
+### HTTPS without a proxy
 
-On Windows:
+Share can serve HTTPS itself, on a server with a public address:
+`"https": {"listen": ":443", "certificate": {"cert_file": "…", "key_file": "…"}}`, e.g. with a
+certificate from Let's Encrypt's `certbot`. Share reads the certificate when it starts, so restart
+it after each renewal (`certbot … --deploy-hook "systemctl restart share"`). Port 443 needs the
+right to bind it, which the systemd unit can grant (`AmbientCapabilities=CAP_NET_BIND_SERVICE`).
+Visitors then reach Share directly, without Cloudflare's limits.
+
+### On Windows
 
 - Write paths in `config.json` with forward slashes, `"storage_dir": "D:/Share"`, or with doubled
   backslashes.
@@ -292,6 +314,8 @@ On Windows:
   uploads back before the drive is full, and FAT32's 4 GiB limit goes unnoticed. Use an NTFS drive.
 - If PowerShell refuses to run the scripts, start them with
   `powershell -ExecutionPolicy Bypass -File scripts\build-windows.ps1`.
+
+### Commands and the app
 
 `share` without arguments lists the other commands: folders, PINs, invites, people, passwords and
 the https port's own certificate. Once there are several folders, `share pin create` and
@@ -302,6 +326,20 @@ the invite to the app; or they use the website in their browser instead, as on a
 release has the APK as `share.apk`, with `share.apk.json` (its version) to put next to it. How to
 build the APK yourself is in [`app/README.md`](app/README.md).
 
+### Upgrading
+
+From a version before `proxy`: Share no longer trusts Cloudflare's tunnel by default. Behind a
+tunnel, add `"proxy": "cloudflare"` to `config.json` (the old `cloudflare` setting is refused with
+that hint). Without it, every request through the tunnel is turned away, and the log says why.
+
+From a version without folders: the first start puts every file and PIN into a first
+folder named after the server (`name` in `config.json`, "Share" unless set) and moves the day
+folders into its directory, `<storage_dir>/Share/`. These are renames on the same drive. If the
+server stops halfway, the next start carries on, and files can be downloaded all the while. A file
+whose name is taken in the new place stays where it is, and the log says so. The database copy that
+the upgrade leaves in `<data_dir>/backups` knows only the old layout: to go back to it, move the
+day folders back out first.
+
 ## Configuration
 
 `config.example.json` has the common settings. Everything except `public_url` and `storage_dir`
@@ -311,23 +349,28 @@ settings of earlier versions with where they went.
 The ports:
 
 - `http`, `{"listen": ":8080"}` unless set otherwise: the website, the API and uploads over plain
-  http. Cloudflare's tunnel comes in here. Browsers and the app may use it directly only from a home
-  network (`192.168.…`, `10.…`, `172.16–31.…`, `fd…`) or the server itself; pages from anywhere
-  else go to `public_url`, and the API turns them away. `"http": null` switches it off.
+  http. A tunnel or a reverse proxy passes requests on here; with the proxy on the same machine,
+  `"listen": "127.0.0.1:8080"` keeps everyone else out. Browsers and the app may use it directly
+  only from a home network (`192.168.…`, `10.…`, `172.16–31.…`, `fd…`) or the server itself;
+  pages from anywhere else go to `public_url`, and the API turns them away. `"http": null`
+  switches it off.
 - `https`, off unless set, e.g. `{"listen": ":8443"}`: the same over https, with a certificate the
   server makes itself (`share cert` shows it), or with
   `"certificate": {"cert_file": "…", "key_file": "…"}`.
-- `cloudflare`, `true` unless set: requests from `cloudflared` on this machine carry the visitor's
-  address. `{"trusted_proxies": ["192.168.8.20"]}` when `cloudflared` runs elsewhere, `false`
-  without a tunnel.
+- `proxy`, none unless set: what passes requests on to Share. `"cloudflare"` for `cloudflared` on
+  the same machine, `"x-forwarded"` for Caddy, nginx, Traefik and the like on the same machine, or
+  `{"headers": "cloudflare" or "x-forwarded", "trusted_proxies": ["192.168.1.30"]}` for a proxy
+  elsewhere, e.g. on another machine at home or in another container. Share takes the visitor's
+  address and https from these headers only from those addresses, which must be at home or on this
+  machine. `share check` says which proxy Share trusts.
 
-Behind a Cloudflare Tunnel, [`deploy/cloudflared`](deploy/cloudflared/README.md) lists the
-hostname and the Cloudflare settings Share needs.
+The guides in [`deploy/`](deploy/) show each setup, with the settings it needs.
 
 For the app, two settings matter:
 
-- `home_url`: the address the app uses whenever the phone reaches it, at home: plain http, e.g.
-  `http://192.168.8.1:8080`, or the https port, e.g. `https://192.168.8.1:8443`. The app trusts
+- `home_url`: with the server at home, the address the app uses whenever the phone reaches it
+  there: plain http, e.g. `http://192.168.1.20:8080`, or the https port, e.g.
+  `https://192.168.1.20:8443`. The app trusts
   the https port's own certificate only because it learned the fingerprint over the public address.
 - `app.apk_file`: the APK the invite page offers for download, with `share.apk.json` next to it for
   its version. Without it, the page only offers `app.play_store_url`, once there is one.
@@ -340,7 +383,8 @@ For the app, two settings matter:
 | `web/` | The website: Vite, TypeScript, Preact and Uppy |
 | `app/` | The Android app: Flutter, with Kotlin for transfers, the local address and the phone's key ([README](app/README.md)) |
 | `contract/` | JSON fixtures the server, website and app tests share: PIN rules, error codes, API responses |
-| `deploy/` | The Cloudflare Tunnel settings |
+| `deploy/` | Hosting guides: a Cloudflare Tunnel, a reverse proxy (Caddy, nginx, Traefik), Docker, a systemd service |
+| `Dockerfile` | The Docker image: the website and the server, built for amd64 and arm64 |
 | `scripts/` | `build-linux` and `build-windows`, each as `.sh` and `.ps1`: the website, then the server for arm64 and amd64 |
 | `docs/` | The plan, the screen mockups and the screenshots above |
 
@@ -353,12 +397,14 @@ For the app, two settings matter:
 (cd app/android && ./gradlew testDirectDebugUnitTest testPlayDebugUnitTest)
 scripts/build-linux.sh                         # dist/share-linux-arm64, dist/share-linux-amd64
 scripts/build-windows.sh                       # dist/share-windows-{amd64,arm64}.exe
+docker build -t share .                        # the Docker image
 ```
 
 CI checks every push and pull request. A push to `main` also leaves the server for Linux and
 Windows as the artifact `share-server` for a day, and the signed APK as `share-apk` once the
 signing secrets are set ([`app/README.md`](app/README.md)). A version tag makes a release with all of
-them and `SHA256SUMS`:
+them and `SHA256SUMS`, and publishes the Docker image as `ghcr.io/eschgi/share` (after the first
+one, make the package public once in GitHub's package settings):
 
 ```sh
 git tag v0.4.0 && git push origin v0.4.0      # a tag with a dash (v0.4.0-rc1) is a pre-release

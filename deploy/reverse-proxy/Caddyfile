@@ -1,0 +1,10 @@
+# Share behind Caddy on the same machine, which gets and renews the certificates itself.
+# Share's config.json: "http": {"listen": "127.0.0.1:8080"}, "proxy": "x-forwarded".
+share.example.com {
+	reverse_proxy 127.0.0.1:8080
+}
+
+# Another app on the same server, under its own name.
+other.example.com {
+	reverse_proxy 127.0.0.1:3000
+}

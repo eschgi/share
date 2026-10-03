@@ -1,0 +1,39 @@
+# Share as a systemd service on Linux. To install it:
+#
+#   sudo useradd --system --home-dir /srv/share --shell /usr/sbin/nologin share
+#   sudo install -m 755 share-linux-amd64 /usr/local/bin/share     (or share-linux-arm64)
+#   sudo mkdir -p /etc/share /srv/share && sudo chown share: /srv/share
+#   sudo cp config.json /etc/share/                                  (storage_dir: /srv/share)
+#   sudo -u share share init --config /etc/share/config.json
+#   sudo cp share.service /etc/systemd/system/ && sudo systemctl enable --now share
+#   journalctl -u share                                              (the first admin's invite)
+#
+# Commands then run as the same user: sudo -u share share pin create --day --config /etc/share/config.json
+# With data_dir outside storage_dir, add it to ReadWritePaths too.
+
+[Unit]
+Description=Share
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=share
+Group=share
+WorkingDirectory=/etc/share
+ExecStart=/usr/local/bin/share serve
+Restart=on-failure
+# Share gives running requests 20 seconds when it stops.
+TimeoutStopSec=30
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/srv/share
+
+# For Share's own https on port 443: the right to bind it. The user share must also be able to
+# read the certificate's key, e.g. a copy that certbot's deploy hook puts into /etc/share.
+# AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+[Install]
+WantedBy=multi-user.target

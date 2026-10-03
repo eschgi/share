@@ -12,8 +12,10 @@ app will go on Google Play later.
 ## Parts
 
 - **Server**: one Go binary. It serves the website, the API, uploads and downloads, and keeps every
-  file in one of its folders, each a directory inside the storage folder set in `config.json`. It runs on the GL.iNet router for now and maybe on a Hetzner VPS
-  later, so it must not depend on anything router-specific.
+  file in one of its folders, each a directory inside the storage folder set in `config.json`. It
+  runs wherever its owner wants: a small computer at home, a VPS, or a container. So it must not
+  depend on anything machine-specific, and it works behind a tunnel, behind a reverse proxy, or on
+  its own.
 - **Website** (PWA): for sending with a PIN (1–6), and for people with an account everything the app
   does (22–37). Uppy runs headless under our own screens: tus for uploads, Golden Retriever to survive
   a closed tab. Phones get one column and the app's bars; tablets and computers a card in the middle,
@@ -74,11 +76,16 @@ app will go on Google Play later.
 
 ## Network
 
-- **Two addresses per phone** (16). The public address is required and goes through Cloudflare. The
-  local address is optional and is preferred whenever it answers. The app checks when the network changes
+- **How visitors reach it.** At home without a public address, through a Cloudflare Tunnel; on a server
+  with one, behind a reverse proxy such as Caddy, nginx or Traefik, or with Share's own HTTPS; on
+  either, in Docker. `config.json` names the proxy (`proxy`), and Share believes a visitor's address and
+  https only from it. A proxy Share wasn't told about is refused, so it can't make the internet look
+  like the home network.
+- **Two addresses per phone** (16). The public address is required. The local address is optional,
+  for a server at home, and is preferred whenever it answers. The app checks when the network changes
   and before each batch, with a short timeout. Without a local address everything uses the public one,
-  e.g. on a VPS. Both addresses come with an invite; nothing changes on the router.
-- **Is the local address really this server?** Many homes use 192.168.8.x, so over https the server uses
+  e.g. on a VPS. Both addresses come with an invite; nothing needs to be opened in the firewall at home.
+- **Is the local address really this server?** Many homes use the same 192.168.x addresses, so over https the server uses
   its own self-signed certificate there, and the app pins that certificate's fingerprint, which it learns
   over the public address. Over plain http there is no certificate: before the app sends its key there,
   the server proves it keeps the hash of that key, with an HMAC of a nonce the app picked. It gives that
@@ -91,8 +98,8 @@ app will go on Google Play later.
   A running upload can switch between the two addresses, because both reach the same tus upload.
 - **Downloads** have no size limit through Cloudflare. They resume with HTTP range requests.
 - **Cloudflare's terms** want video and other large files served through its paid products, not the
-  normal proxy. Downloads over the local address avoid it at home. On a VPS, Cloudflare can be DNS-only,
-  which also removes the 100 MB limit.
+  normal proxy. Downloads over the local address avoid it at home. On a server with a public address,
+  Cloudflare can be DNS-only in front of a reverse proxy, which also removes the 100 MB limit.
 - **Videos and sound play in the app.** A copy on the phone plays first. Otherwise the player streams
   with the phone's key: at home over the local address (plain http after the proof), away through the
   public address, which loads only what is watched rather than the whole file. Over the https port at
@@ -135,8 +142,9 @@ app, JSON on the website), so others can add languages.
 - No secrets in the repository: commit `config.example.json`, keep the real `config.json` out of git.
 - Nothing hard-coded: addresses, storage folder, ports, languages and the optional Play link come from
   configuration.
-- The server stays pure Go (no cgo), so it cross-compiles for the router and the VPS; for a database,
-  e.g. SQLite through `modernc.org/sqlite`. CI builds release binaries for those platforms.
+- The server stays pure Go (no cgo), so it cross-compiles for Linux and Windows on arm64 and amd64; for
+  a database, e.g. SQLite through `modernc.org/sqlite`. CI builds release binaries for those platforms
+  and a Docker image.
 - Apache-2.0 ([`LICENSE`](../LICENSE)): anyone may use, change and host it, also commercially, as long
   as they keep the notices. The fonts and icons keep their own licenses, listed in
   [`NOTICE`](../NOTICE).
