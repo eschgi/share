@@ -100,6 +100,16 @@ func (e *env) newPin(kind string) db.Pin {
 	return p
 }
 
+// disk is where a file of the library is on the drive: in its folder's directory.
+func (e *env) disk(f db.File) string {
+	e.t.Helper()
+	folder, err := e.app.DB.FolderByID(context.Background(), f.FolderID)
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	return filepath.Join(e.cfg.StorageDir, folder.Dir, filepath.FromSlash(f.RelPath))
+}
+
 // firstFolder is the oldest folder, which every server has.
 func (e *env) firstFolder() db.Folder {
 	e.t.Helper()
@@ -312,7 +322,7 @@ func TestUploadInChunksLandsInTheDayFolder(t *testing.T) {
 	if f.State != db.StateReady || f.Kind != db.KindVideo || f.UploadDay != "2026-09-27" {
 		t.Fatalf("file row: %+v", f)
 	}
-	stored, err := os.ReadFile(filepath.Join(e.cfg.StorageDir, "2026-09-27", "Holiday video.mp4"))
+	stored, err := os.ReadFile(e.disk(f))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -383,7 +393,7 @@ func TestInterruptedPatchResumesWhereItStopped(t *testing.T) {
 		t.Fatalf("HEAD after the break: %d, offset %d", r.status, offset)
 	}
 	c.send(loc, data, offset, 1<<20)
-	stored, _ := os.ReadFile(filepath.Join(e.cfg.StorageDir, "2026-09-27", "clip.mov"))
+	stored, _ := os.ReadFile(e.disk(e.file(idOf(loc))))
 	if sha256.Sum256(stored) != sha256.Sum256(data) {
 		t.Fatalf("stored file differs after resuming at %d", offset)
 	}

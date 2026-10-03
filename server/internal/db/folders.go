@@ -64,8 +64,10 @@ func queryFolders(ctx context.Context, q interface {
 
 // EnsureFirstFolder makes the first folder if there is none yet, in one transaction: f gets
 // every file and PIN there is, every member and every open invite for a new member, and dates
-// from the oldest file. It returns the oldest live folder and whether it made f. Once any
-// folder exists it changes nothing, so the server and the command line can both call it.
+// from the oldest file. With files, it notes that their day folders still lie in storage_dir
+// itself, to be moved into f's directory (RenamingFrom ""). It returns the oldest live folder
+// and whether it made f. Once any folder exists it changes nothing, so the server and the
+// command line can both call it.
 func (d *DB) EnsureFirstFolder(ctx context.Context, f Folder, now time.Time) (Folder, bool, error) {
 	made := false
 	err := d.Tx(ctx, func(tx *sql.Tx) error {
@@ -80,9 +82,10 @@ func (d *DB) EnsureFirstFolder(ctx context.Context, f Folder, now time.Time) (Fo
 		if err := tx.QueryRowContext(ctx, "SELECT MIN(created_at) FROM files").Scan(&oldest); err != nil {
 			return err
 		}
-		f.CreatedAt = now
+		f.CreatedAt, f.RenamingFrom = now, nil
 		if oldest.Valid {
-			f.CreatedAt = fromMS(oldest.Int64)
+			root := ""
+			f.CreatedAt, f.RenamingFrom = fromMS(oldest.Int64), &root
 		}
 		if err := insertFolder(ctx, tx, f); err != nil {
 			return err
@@ -152,5 +155,23 @@ func (d *DB) SetFolderPerson(ctx context.Context, folderID, userID string, sees 
 		q = "DELETE FROM folder_people WHERE folder_id = ? AND user_id = ?"
 	}
 	_, err := d.ExecContext(ctx, q, folderID, userID)
+	return err
+}
+
+// DirTaken reports whether a folder, deleted or not, has a directory, ignoring case.
+func (d *DB) DirTaken(ctx context.Context, dir string) (bool, error) {
+	var n int
+	err := d.QueryRowContext(ctx, "SELECT COUNT(*) FROM folders WHERE dir = ? COLLATE NOCASE", dir).Scan(&n)
+	return n > 0, err
+}
+
+// Relocating lists the folders whose files may still lie under an older directory.
+func (d *DB) Relocating(ctx context.Context) ([]Folder, error) {
+	return queryFolders(ctx, d, "SELECT "+folderColumns+" FROM folders WHERE renaming_from IS NOT NULL ORDER BY created_at, id")
+}
+
+// FinishRelocation notes that nothing is left under a folder's older directory from.
+func (d *DB) FinishRelocation(ctx context.Context, id, from string) error {
+	_, err := d.ExecContext(ctx, "UPDATE folders SET renaming_from = NULL WHERE id = ? AND renaming_from = ?", id, from)
 	return err
 }

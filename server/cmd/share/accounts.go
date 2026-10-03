@@ -29,7 +29,7 @@ func openDB(ctx context.Context, cfg *config.Config) (*db.DB, *auth.Service, err
 		d.Close()
 		return nil, nil, err
 	}
-	if _, err := storage.EnsureFirstFolder(ctx, d, cfg.Name, time.Now()); err != nil {
+	if _, err := storage.EnsureFirstFolder(ctx, d, cfg.StorageDir, cfg.Name, time.Now()); err != nil {
 		d.Close()
 		return nil, nil, err
 	}

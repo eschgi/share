@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"path"
 	"path/filepath"
 	"testing"
 	"time"
@@ -26,9 +27,18 @@ func (fx *fixture) ready(t *testing.T, name, content string) db.File {
 	return f
 }
 
+// exists reports whether a path in the storage folder exists.
 func (fx *fixture) exists(rel string) bool {
 	_, err := os.Stat(filepath.Join(fx.layout.StorageDir, filepath.FromSlash(rel)))
 	return err == nil
+}
+
+// inFolder is a path in the first folder's directory, as a path in the storage folder.
+func (fx *fixture) inFolder(rel string) string { return path.Join(fx.folder.Dir, rel) }
+
+// disk is where a path in the first folder is on the drive.
+func (fx *fixture) disk(rel string) string {
+	return filepath.Join(fx.layout.StorageDir, filepath.FromSlash(fx.inFolder(rel)))
 }
 
 func TestTrashAndRestore(t *testing.T) {
@@ -42,10 +52,10 @@ func TestTrashAndRestore(t *testing.T) {
 	if err != nil || len(trashed) != 2 {
 		t.Fatalf("Trash: %d files, %v", len(trashed), err)
 	}
-	if fx.exists(a.RelPath) || !fx.exists(".trash/"+a.ID) {
+	if fx.exists(fx.inFolder(a.RelPath)) || !fx.exists(".trash/"+a.ID) {
 		t.Fatal("the bytes didn't move to the trash")
 	}
-	if fx.exists("2026-09-27") {
+	if fx.exists(fx.inFolder("2026-09-27")) {
 		t.Error("the empty day folder is still there")
 	}
 	if v, _ := fx.db.LibraryVersion(ctx); v == before {
@@ -64,7 +74,7 @@ func TestTrashAndRestore(t *testing.T) {
 	if err != nil || len(restored) != 1 || restored[0].RelPath != a.RelPath {
 		t.Fatalf("Restore: %+v, %v", restored, err)
 	}
-	data, err := os.ReadFile(filepath.Join(fx.layout.StorageDir, filepath.FromSlash(a.RelPath)))
+	data, err := os.ReadFile(fx.disk(a.RelPath))
 	if err != nil || string(data) != "one" {
 		t.Fatalf("restored file: %q, %v", data, err)
 	}
@@ -89,7 +99,7 @@ func TestRestoreNumbersANameThatWasTakenMeanwhile(t *testing.T) {
 		t.Fatalf("Restore: %+v, %v", restored, err)
 	}
 	for rel, want := range map[string]string{newer.RelPath: "new", restored[0].RelPath: "old"} {
-		if data, _ := os.ReadFile(filepath.Join(fx.layout.StorageDir, filepath.FromSlash(rel))); string(data) != want {
+		if data, _ := os.ReadFile(fx.disk(rel)); string(data) != want {
 			t.Errorf("%s = %q, want %q", rel, data, want)
 		}
 	}
@@ -126,8 +136,8 @@ func TestPurge(t *testing.T) {
 	if err != nil || len(gone) != 1 || gone[0].ID != b.ID {
 		t.Fatalf("Purge: %+v, %v", gone, err)
 	}
-	if len(purged) != 2 || !fx.exists(c.RelPath) {
-		t.Fatalf("purged %v; c still there: %v", purged, fx.exists(c.RelPath))
+	if len(purged) != 2 || !fx.exists(fx.inFolder(c.RelPath)) {
+		t.Fatalf("purged %v; c still there: %v", purged, fx.exists(fx.inFolder(c.RelPath)))
 	}
 }
 
@@ -160,10 +170,10 @@ func TestReconcileFinishesCutShortTrashRestoreAndPurge(t *testing.T) {
 	if err := fx.lib.Reconcile(ctx, time.Hour); err != nil {
 		t.Fatal(err)
 	}
-	if fx.exists(a.RelPath) || !fx.exists(".trash/"+a.ID) {
+	if fx.exists(fx.inFolder(a.RelPath)) || !fx.exists(".trash/"+a.ID) {
 		t.Error("a's bytes weren't moved to the trash")
 	}
-	if !fx.exists(b.RelPath) || fx.exists(".trash/"+b.ID) {
+	if !fx.exists(fx.inFolder(b.RelPath)) || fx.exists(".trash/"+b.ID) {
 		t.Error("b's bytes weren't moved back")
 	}
 	if fx.exists(".trash/" + c.ID) {

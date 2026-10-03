@@ -90,7 +90,7 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 		d.Close()
 		return nil, err
 	}
-	if _, err := storage.EnsureFirstFolder(ctx, d, cfg.Name, now()); err != nil {
+	if _, err := storage.EnsureFirstFolder(ctx, d, cfg.StorageDir, cfg.Name, now()); err != nil {
 		d.Close()
 		return nil, err
 	}

@@ -87,7 +87,11 @@ type fixture struct {
 	folder db.Folder // the first folder, which every library has
 }
 
-func newFixture(t *testing.T) *fixture {
+func newFixture(t *testing.T) *fixture { return newFixtureWith(t, nil) }
+
+// newFixtureWith runs before on the new storage and database, before the first folder is made:
+// to set up a library as it was before folders.
+func newFixtureWith(t *testing.T, before func(d *db.DB, l Layout)) *fixture {
 	t.Helper()
 	dir := t.TempDir()
 	l := Layout{StorageDir: filepath.Join(dir, "storage"), DataDir: filepath.Join(dir, "data")}
@@ -102,7 +106,10 @@ func newFixture(t *testing.T) *fixture {
 	if err := d.Migrate(context.Background(), l.BackupDir()); err != nil {
 		t.Fatal(err)
 	}
-	folder, err := EnsureFirstFolder(context.Background(), d, "Share", t0)
+	if before != nil {
+		before(d, l)
+	}
+	folder, err := EnsureFirstFolder(context.Background(), d, l.StorageDir, "Share", t0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +157,7 @@ func TestFinalizeMovesIntoTheDayFolder(t *testing.T) {
 	if got.State != db.StateReady || got.RelPath != "2026-09-27/IMG_1.jpg" || got.UploadDay != "2026-09-27" {
 		t.Fatalf("after Finalize: %+v", got)
 	}
-	data, err := os.ReadFile(filepath.Join(fx.layout.StorageDir, "2026-09-27", "IMG_1.jpg"))
+	data, err := os.ReadFile(fx.disk("2026-09-27/IMG_1.jpg"))
 	if err != nil || string(data) != "jpegbytes" {
 		t.Fatalf("library file: %q, %v", data, err)
 	}
@@ -180,11 +187,11 @@ func TestFinalizeNumbersNameCollisionsIgnoringCase(t *testing.T) {
 	ctx := context.Background()
 	a := fx.receiving(t, "IMG.jpg", "a", 1)
 	b := fx.receiving(t, "img.JPG", "b", 1)
-	if err := os.MkdirAll(filepath.Join(fx.layout.StorageDir, "2026-09-27"), 0o755); err != nil {
+	if err := os.MkdirAll(fx.disk("2026-09-27"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	// Someone copied a file with the next free name into the folder by hand.
-	if err := os.WriteFile(filepath.Join(fx.layout.StorageDir, "2026-09-27", "img (2).JPG"), []byte("x"), 0o644); err != nil {
+	if err := os.WriteFile(fx.disk("2026-09-27/img (2).JPG"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	for _, id := range []string{a, b} {
@@ -212,8 +219,8 @@ func TestFinalizeResumesAfterACrash(t *testing.T) {
 	if ok, err := fx.db.MarkFinalizing(ctx, b, "2026-09-27/b.pdf", "2026-09-27", t0); !ok || err != nil {
 		t.Fatal(ok, err)
 	}
-	os.MkdirAll(filepath.Join(fx.layout.StorageDir, "2026-09-27"), 0o755)
-	if err := os.Rename(filepath.Join(fx.layout.UploadsDir(), b), filepath.Join(fx.layout.StorageDir, "2026-09-27", "b.pdf")); err != nil {
+	os.MkdirAll(fx.disk("2026-09-27"), 0o755)
+	if err := os.Rename(filepath.Join(fx.layout.UploadsDir(), b), fx.disk("2026-09-27/b.pdf")); err != nil {
 		t.Fatal(err)
 	}
 

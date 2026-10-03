@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/eschgi/share/server/internal/db"
@@ -33,7 +32,7 @@ func TestEveryFileAndPinGoesIntoAFolder(t *testing.T) {
 		if f.FolderID != first.ID || f.State != db.StateReady {
 			t.Fatalf("file %s: folder %q, state %s", f.Name, f.FolderID, f.State)
 		}
-		if _, err := os.Stat(filepath.Join(e.app.Cfg.StorageDir, first.Dir, f.RelPath)); err != nil {
+		if _, err := os.Stat(e.disk(f)); err != nil {
 			t.Fatalf("%s isn't on the drive: %v", f.RelPath, err)
 		}
 	}

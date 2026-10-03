@@ -10,7 +10,8 @@ A self-hosted place where family and friends drop photos, videos and documents.
   send from there as well, without a PIN. At home the app uses the server's local address and skips
   the internet. Admins manage PINs and people in either, and deleted files wait 30 days in Recently
   deleted.
-- Files are stored unchanged in one folder per upload day: `<storage_dir>/2026-09-30/IMG_0001.jpg`.
+- Files are stored unchanged, in a directory per folder with one folder per upload day inside:
+  `<storage_dir>/Family/2026-09-30/IMG_0001.jpg`.
 
 The server is one Go program without dependencies at runtime. It runs on a router or another
 small Linux machine with a USB drive, or on a VPS. The website is embedded in it.
@@ -242,6 +243,14 @@ the server on `127.0.0.1:8080`; `npm run dev -- --host` makes it reachable from 
    it on their phone, or in a browser.
 5. Put it behind a Cloudflare Tunnel ([`deploy/cloudflared`](deploy/cloudflared/README.md)), or let
    it serve HTTPS itself: `"https": {"listen": ":443", "certificate": {"cert_file": "…", "key_file": "…"}}`.
+
+Upgrading from a version without folders: the first start puts every file and PIN into a first
+folder named after the server (`name` in `config.json`, "Share" unless set) and moves the day
+folders into its directory, `<storage_dir>/Share/`. These are renames on the same drive. If the
+server stops halfway, the next start carries on, and files can be downloaded all the while. A file
+whose name is taken in the new place stays where it is, and the log says so. The database copy that
+the upgrade leaves in `<data_dir>/backups` knows only the old layout: to go back to it, move the
+day folders back out first.
 
 On Windows:
 

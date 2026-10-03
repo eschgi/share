@@ -19,7 +19,7 @@ const MarkerName = ".share-storage"
 
 // Layout names the folders.
 type Layout struct {
-	StorageDir string // the library, one folder per upload day
+	StorageDir string // the library: a directory per folder, with the day folders inside
 	DataDir    string // database, thumbnails, certificates
 }
 

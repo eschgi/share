@@ -10,7 +10,6 @@ import (
 	"image/png"
 	"net/http"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -221,7 +220,7 @@ func TestServerThumbnailsSurviveBadPhotos(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("root reads files whatever their permissions")
 	}
-	lockedPath := filepath.Join(e.cfg.StorageDir, e.file(locked).RelPath)
+	lockedPath := e.disk(e.file(locked))
 	if err := os.Chmod(lockedPath, 0); err != nil {
 		t.Fatal(err)
 	}

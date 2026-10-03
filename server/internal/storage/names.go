@@ -3,6 +3,7 @@ package storage
 import (
 	"net/http"
 	"path"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -100,6 +101,32 @@ func FolderName(name string) string {
 		n++
 	}
 	return strings.TrimSpace(b.String())
+}
+
+// dayName is what a day folder is called: 2026-09-27.
+var dayName = regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2}$`)
+
+// FolderDir is the directory for a folder called name, the n-th choice when earlier ones are
+// taken: "Wedding (2)". It is made safe like a file name (a slash becomes "_"), and never
+// looks like a day: those are the day folders from before folders.
+func FolderDir(name string, n int) string {
+	name = strings.NewReplacer("/", "_", `\`, "_").Replace(name)
+	if strings.Trim(name, ". ") == "" {
+		name = "Folder"
+	}
+	dir := SanitizeName(name)
+	if dayName.MatchString(dir) && n < 2 {
+		n = 2
+	}
+	if n < 2 {
+		return dir
+	}
+	suffix := " (" + strconv.Itoa(n) + ")"
+	for len(dir)+len(suffix) > maxNameBytes {
+		_, size := utf8.DecodeLastRuneInString(dir)
+		dir = dir[:len(dir)-size]
+	}
+	return dir + suffix
 }
 
 // Numbered gives the n-th alternative for a taken name: "IMG_1 (2).jpg", still at most

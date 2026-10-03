@@ -32,8 +32,9 @@ type Library struct {
 	// OnPurged is called after a file is removed for good (its thumbnail goes too).
 	OnPurged func(id string)
 
-	root *os.Root // the storage folder; every library path is opened through it
-	mu   sync.Mutex
+	root     *os.Root // the storage folder; every library path is opened through it
+	mu       sync.Mutex
+	leftOver map[string]bool // folders whose files couldn't all be moved, already logged
 }
 
 // OpenLibrary opens the storage folder for the library.
@@ -65,13 +66,27 @@ func (lib *Library) folderOf(ctx context.Context, f db.File) (db.Folder, error) 
 	return lib.DB.FolderByID(ctx, f.FolderID)
 }
 
-// locate finds a file's bytes on the drive: the path in its folder's directory.
+// locate finds a file's bytes on the drive: the path in its folder's directory, or the one
+// under the folder's older directory while its files are being moved there.
 func (lib *Library) locate(ctx context.Context, f db.File) (string, error) {
 	folder, err := lib.folderOf(ctx, f)
 	if err != nil {
 		return "", err
 	}
-	return inFolder(folder, f.RelPath), nil
+	p := inFolder(folder, f.RelPath)
+	if folder.RenamingFrom != nil {
+		if _, err := lib.root.Lstat(p); errors.Is(err, fs.ErrNotExist) {
+			if old := path.Join(*folder.RenamingFrom, f.RelPath); lib.exists(old) {
+				return old, nil
+			}
+		}
+	}
+	return p, nil
+}
+
+func (lib *Library) exists(p string) bool {
+	_, err := lib.root.Lstat(p)
+	return err == nil
 }
 
 // Open opens a file of the library for reading. A row read before a rename or a move may
@@ -186,8 +201,11 @@ func (lib *Library) freePath(ctx context.Context, folder db.Folder, day, name st
 		if taken {
 			continue
 		}
-		if _, err := lib.root.Lstat(inFolder(folder, rel)); err == nil {
+		if lib.exists(inFolder(folder, rel)) {
 			continue // a file someone put there by hand
+		}
+		if folder.RenamingFrom != nil && lib.exists(path.Join(*folder.RenamingFrom, rel)) {
+			continue // a file still to be moved into the folder's directory
 		}
 		return rel, nil
 	}
@@ -247,12 +265,16 @@ func (lib *Library) Terminate(ctx context.Context, id string) error {
 
 // Reconcile repairs what a crash or an abandoned upload leaves behind. It runs before the
 // server starts listening and then every few minutes:
+//   - files still under a folder's older directory move into the new one;
 //   - uploads stuck halfway through finalizing are finished;
 //   - receiving uploads whose bytes are all there are finalized (the response was lost);
 //   - receiving uploads idle for longer than ttl are dropped;
 //   - files in .uploads without a row, and rows without files, are removed after an hour;
 //   - a trash, restore or purge that was cut short is finished.
 func (lib *Library) Reconcile(ctx context.Context, ttl time.Duration) error {
+	if err := lib.relocate(ctx); err != nil {
+		return err
+	}
 	now := lib.Now()
 	rows, err := lib.DB.FilesInStates(ctx, db.StateFinalizing, db.StateReceiving)
 	if err != nil {
