@@ -61,3 +61,8 @@ export function inviteDefault(list: readonly FolderInfo[], shown: string | null)
   const first = (shown !== null && list.some((f) => f.id === shown) ? shown : list[0]?.id) ?? null;
   return first === null ? [] : [first];
 }
+
+/** The folder files move into at first: the first one they aren't in already. */
+export function moveDefault(list: readonly FolderInfo[], here: string | null): string | null {
+  return list.find((f) => f.id !== here)?.id ?? null;
+}

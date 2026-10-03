@@ -10,6 +10,7 @@ import {
   zipUrl,
   type FileInfo,
   type FileKind,
+  type FolderInfo,
   type LibraryDay,
   type LibraryFilter,
 } from '../../api';
@@ -23,6 +24,7 @@ import { Confirm } from '../components/Modal';
 import { useAccount } from '../context';
 import { hasChoices } from '../folders/folders';
 import { FolderColumn, FolderSheet, FolderTitle } from '../folders/Folders';
+import { MoveDialog } from '../folders/MoveDialog';
 import { folderGone, refreshFolders, useFolders } from '../folders/store';
 import { canSaveToFolder } from '../save/folder';
 import { useSavedMarks } from '../save/marks';
@@ -37,6 +39,7 @@ import {
   filesToShare,
   knownTrashDays,
   learnTrashDays,
+  moveMany,
   restoreMany,
   shareLimit,
   startDownload,
@@ -93,6 +96,8 @@ export function Library() {
   }, []);
   const [, redraw] = useState(0);
   const [picking, setPicking] = useState(false);
+  const [moving, setMoving] = useState(false);
+  const [moveProblem, setMoveProblem] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
   const [viewing, setViewing] = useState<string | null>(null);
@@ -445,6 +450,44 @@ export function Library() {
     });
   }
 
+  /** Screen 49: the selected files go into another folder; out of the one shown, with Undo. */
+  async function move(to: FolderInfo) {
+    setBusy(true);
+    setMoveProblem(null);
+    const from = shownId;
+    let ids: string[];
+    let n: number;
+    try {
+      ids = await selectedIds(sel, idsOfDay);
+      n = await moveMany(ids, to.id);
+    } catch (e) {
+      setBusy(false);
+      return setMoveProblem(problemText(e));
+    }
+    setBusy(false);
+    setMoving(false);
+    clear();
+    if (from) model.remove(ids);
+    else void model.reload();
+    void refreshFolders();
+    toast({
+      text: tn('move.done', n, { folder: to.name }),
+      action: from
+        ? {
+            label: t('common.undo'),
+            run: () =>
+              void moveMany(ids, from).then(
+                () => {
+                  void model.reload();
+                  void refreshFolders();
+                },
+                () => toast({ text: t('common.failed') }),
+              ),
+          }
+        : undefined,
+    });
+  }
+
   const closeSearch = () => {
     setSearching(false);
     setQuery('');
@@ -624,6 +667,20 @@ export function Library() {
               <span class="lbl">{t('select.share')}</span>
             </button>
           )}
+          {admin && choices && (
+            <button
+              type="button"
+              class="abtn"
+              disabled={busy}
+              onClick={() => {
+                setMoveProblem(null);
+                setMoving(true);
+              }}
+            >
+              <Icon name="folder" />
+              <span class="lbl">{t('select.move')}</span>
+            </button>
+          )}
           {admin && (
             <button type="button" class="abtn danger" disabled={busy} onClick={askDelete}>
               <Icon name="trash" />
@@ -657,6 +714,17 @@ export function Library() {
         />
       )}
       {picking && folders.list && <FolderSheet list={folders.list} shown={folders.shown} onClose={() => setPicking(false)} />}
+      {moving && folders.list && (
+        <MoveDialog
+          count={picked.count}
+          list={folders.list}
+          here={shownId}
+          busy={busy}
+          problem={moveProblem}
+          onMove={(to) => void move(to)}
+          onClose={() => setMoving(false)}
+        />
+      )}
       {choosing && (
         <SaveChoice
           count={picked.count}

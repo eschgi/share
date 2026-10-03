@@ -316,6 +316,9 @@ export const deleteFiles = (ids: string[]) => request<{ changed: number }>('POST
 
 export const restoreFiles = (ids: string[]) => request<{ changed: number }>('POST', '/api/trash/restore', { ids });
 
+/** Admins: files go into another folder, and who sees them with it. At most 1000 ids at once. */
+export const moveFiles = (ids: string[], folder: string) => request<{ changed: number }>('POST', '/api/files/move', { ids, folder });
+
 /** Admins: the drive, the library and Recently deleted. */
 export interface Storage {
   storage_dir: string;

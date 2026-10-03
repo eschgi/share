@@ -1,6 +1,6 @@
 // What can be done with files: download them, one or as a ZIP; share them on a phone; delete
 // them and bring them back (admins).
-import { contentUrl, createDownload, deleteFiles, getStorage, restoreFiles, zipUrl, type FileInfo, type ZipDownload } from '../../api';
+import { contentUrl, createDownload, deleteFiles, getStorage, moveFiles, restoreFiles, zipUrl, type FileInfo, type ZipDownload } from '../../api';
 
 /** The most files one ZIP takes (the server's limit). */
 export const zipLimit = 10_000;
@@ -36,6 +36,7 @@ export async function inParts(ids: string[], send: (part: string[]) => Promise<{
 
 export const deleteMany = (ids: string[]) => inParts(ids, deleteFiles);
 export const restoreMany = (ids: string[]) => inParts(ids, restoreFiles);
+export const moveMany = (ids: string[], folder: string) => inParts(ids, (part) => moveFiles(part, folder));
 
 let trashDays = 30;
 let askedTrashDays = false;

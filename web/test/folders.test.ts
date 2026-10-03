@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FolderInfo, OpenInvite, People, Person } from '../src/api';
-import { allTotals, dropTarget, hasChoices, inviteDefault, sendTarget, validShown, whoSees } from '../src/account/folders/folders';
+import { allTotals, dropTarget, hasChoices, inviteDefault, moveDefault, sendTarget, validShown, whoSees } from '../src/account/folders/folders';
 import { uploadMeta } from '../src/uploader';
 
 function folder(id: string, files = 1, bytes = 100): FolderInfo {
@@ -82,5 +82,14 @@ describe('an invite for a new member', () => {
     expect(inviteDefault(list, null)).toEqual(['family']);
     expect(inviteDefault(list, 'gone')).toEqual(['family']);
     expect(inviteDefault([], null)).toEqual([]);
+  });
+});
+
+describe('moving files', () => {
+  it('goes at first into the first folder they are not in', () => {
+    const list = [folder('family'), folder('wedding'), folder('taxes')];
+    expect(moveDefault(list, 'family')).toBe('wedding');
+    expect(moveDefault(list, null)).toBe('family');
+    expect(moveDefault([folder('family')], 'family')).toBe(null);
   });
 });
