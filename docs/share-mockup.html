@@ -709,6 +709,70 @@
     --text:#2A1F18;--text-2:#5F5147;--text-3:#85766A;--accent:#C45A30;--on-accent:#FFFFFF;--accent-text:#A4461F;--accent-soft:rgba(196,90,48,.12);
     --ok:#257346;--ok-soft:rgba(46,133,83,.12);--danger:#B23A2B;--danger-soft:rgba(200,70,58,.11);--warn:#8A5C00;--warn-soft:rgba(233,187,104,.18)}
   .linen .chrome{background:#E2D8CC} .linen .wdots i{background:#CBBDAF} .linen .addr .u{background:#FFFCF8}
+  /* ---------- folders (38–49), a proposal: each folder with its own people ---------- */
+  .ic.down{transform:rotate(90deg)}
+  .ab h2.fpick{display:flex;align-items:center;gap:6px;min-width:0}
+  .ab h2.fpick .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ab h2.fpick .ic{width:22px;height:22px;color:var(--text-3)}
+  .fcov{width:44px;height:44px;border-radius:12px;flex:none;display:grid;place-items:center}
+  .fcov .ic{width:19px;height:19px;color:rgba(255,255,255,.62)}
+  .fcov.doc{background:var(--s2);border:1px solid var(--line-soft)} .fcov.doc .ic{color:var(--text-2)}
+  .sheet .fcov.doc,.ddlg .fcov.doc{background:var(--s3)}
+  .fcov.all{background:var(--accent-soft)} .fcov.all .ic{color:var(--accent-text)}
+  .fcov.lg{width:64px;height:64px;border-radius:16px} .fcov.lg .ic{width:26px;height:26px}
+  .row .tick{color:var(--accent-text);width:22px;height:22px}
+  .row .tick svg{stroke-width:2.8}
+  .avs{display:flex;flex:none}
+  .avs .av{width:26px;height:26px;font-size:11.5px;margin-left:-7px;box-shadow:0 0 0 2px var(--s1)}
+  .avs .av:first-child{margin-left:0}
+  .avs .av.pend{background:var(--s2);border-width:1.5px}
+  .sw{width:46px;height:28px;border-radius:14px;background:var(--s3);position:relative;flex:none}
+  .sw::after{content:"";position:absolute;top:4px;left:4px;width:20px;height:20px;border-radius:50%;background:var(--text-3)}
+  .sw.on{background:var(--accent)} .sw.on::after{left:22px;background:#fff}
+  .sw.lock{opacity:.45}
+  .sheet .sw:not(.on){background:var(--line)}
+  .cbx{width:24px;height:24px;border-radius:7px;border:2px solid var(--text-3);display:grid;place-items:center;flex:none}
+  .cbx.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .cbx .ic{width:14px;height:14px} .cbx svg{stroke-width:3.2}
+  .fhead{display:flex;align-items:center;gap:16px;background:var(--s1);border-radius:20px;padding:14px 16px}
+  .fhead b{display:block;font-size:17px;font-weight:600}
+  .fhead span{display:block;font-size:13px;color:var(--text-3);margin-top:3px}
+  .pills{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px;flex:none}
+  .pills > *{margin:0}
+  .fpill{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 13px;border-radius:17px;background:var(--accent-soft);
+    color:var(--accent-text);font-size:14px;font-weight:600;white-space:nowrap}
+  .fpill .ic{width:16px;height:16px}
+  .ftag{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 9px;border-radius:13px;background:var(--s2);color:var(--text-2);
+    font-size:12.5px;font-weight:600}
+  .ftag .ic{width:13px;height:13px}
+  .fsel{display:flex;align-items:center;gap:12px;padding:10px 14px 10px 10px;border:1.5px solid var(--line);border-radius:16px;background:var(--s1);flex:none}
+  .sheet .fsel,.ddlg .fsel{background:var(--s2)}
+  .fsel > .ic{color:var(--text-3)}
+  .swrow{display:flex;align-items:center;gap:14px;margin-top:18px}
+  .swrow .rt b{font-size:15.5px;font-weight:500}
+  .swrow .rt span{font-size:13px;line-height:1.45}
+  .sheet .help.sm,.help.sm{font-size:13px;margin:10px 6px 0}
+  /* the library with its folders in a column, on a computer */
+  .dlib.withf{display:grid;grid-template-columns:250px 1fr;gap:34px;align-items:start}
+  .fside .glabel{margin:12px 10px 8px}
+  .frow{display:flex;align-items:center;gap:12px;padding:8px 10px;border-radius:14px}
+  .frow .fcov{width:40px;height:40px;border-radius:10px}
+  .frow > div{min-width:0}
+  .frow b{display:block;font-size:15px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .frow div span{display:block;font-size:12.5px;color:var(--text-3);margin-top:1px}
+  .frow.on{background:var(--accent-soft)} .frow.on b{color:var(--accent-text)}
+  .fmain{min-width:0}
+  .dopt .fcov{width:40px;height:40px;border-radius:10px}
+  .dopt{align-items:center}
+  .dopt .radio{top:50%;margin-top:-10px}
+  .dopt.dis{opacity:.5}
+  .ddlg .lead.sm{margin:-6px 0 6px}
+  .dsplit .fsel{margin-top:2px}
+  /* a guest's look into a folder, with a PIN that shows it */
+  .gtitle{margin-top:22px}
+  .lead.sm.gmeta{margin:6px 0 0}
+  .gfiles{flex:1;min-height:0;overflow:hidden;margin:2px -10px 14px}
+  .gfiles .day{padding:16px 4px 9px}
 </style>
 </head>
 <body>
@@ -1587,6 +1651,85 @@
 
     </div>
   </section>
+  <!-- ================================================================= FOLDERS -->
+  <section class="sec">
+    <div class="sec-head">
+      <div class="sec-tag">Proposal · folders</div>
+      <h2>Folders, each with its own people</h2>
+      <p>Every file lies in exactly one folder, and every folder has its own people. Admins see every folder. Members see the folders they were given, and nothing tells them about the others. A PIN sends into one folder and, as today, sees nothing. A server with one folder looks exactly as it does now: the folder's name, the choices and the folder column only appear with the second folder. On the drive each folder is a real one with the day folders inside, e.g. <code>/mnt/usb/share/Wedding Anna &amp; Marco/2026-09-26/IMG_0001.jpg</code>; what is there today becomes the first folder. Shown as Maria, a member with three folders, and Stefan, the admin.</p>
+    </div>
+    <p class="sub-h">In the app</p>
+    <div class="board">
+
+      <div class="slot">
+        <h3><span class="n">38</span>Library, in a folder <span class="badge proposal">proposal</span></h3>
+        <p class="cap">From the second folder on, the library's title says which folder is shown; tapping it switches, and the choice stays. Maria was given three folders and sees only those; the others don't show up anywhere.</p>
+        <div class="phone" data-shot="38-library-folder"><div class="sb" data-time="9:41"></div><div class="ab"><h2 class="fpick"><span class="t">Family</span><span data-i="chev" class="down"></span></h2><span class="ib"><span data-i="search"></span></span><span class="av sm tan">M</span></div><div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div><div class="scroll"><div class="day"><div><h4>Today</h4><div class="meta">6 files · 74 MB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p3/h p8/h v2@0:18/h p6 p1 p4"></div><div class="day"><div><h4>Yesterday</h4><div class="meta">45 files · 620 MB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p4 p7 p9 v5@1:15 p2 p10 p6 p3 p5 p1 p8 p2"></div><div class="day"><div><h4>Sunday, 27 Sep</h4><div class="meta">48 files · 1.1 GB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p1/h p2/h p5/h v4@0:42/h p3/h p8/h p9 p10"></div></div><nav class="nav" data-on="library"></nav><div class="gest"></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">39</span>Choosing a folder <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Each folder with its newest picture, how many files it holds and how big they are. All folders shows everything Maria may see together, by day, as the library does today.</p>
+        <div class="phone" data-shot="39-choose-folder"><div class="sb" data-time="9:42"></div><div class="ab"><h2 class="fpick"><span class="t">Family</span><span data-i="chev" class="down"></span></h2><span class="ib"><span data-i="search"></span></span><span class="av sm tan">M</span></div><div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div><div class="scroll"><div class="day"><div><h4>Today</h4><div class="meta">6 files · 74 MB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p3/h p8/h v2@0:18/h p6 p1 p4"></div><div class="day"><div><h4>Yesterday</h4><div class="meta">45 files · 620 MB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p4 p7 p9 v5@1:15 p2 p10 p6 p3 p5 p1 p8 p2"></div><div class="day"><div><h4>Sunday, 27 Sep</h4><div class="meta">48 files · 1.1 GB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p1/h p2/h p5/h v4@0:42/h p3/h p8/h p9 p10"></div></div><nav class="nav" data-on="library"></nav><div class="gest"></div><div class="scrim"></div><div class="sheet"><div class="grip"></div><h3>Folders</h3><div class="group"><div class="row"><span class="fcov all"><span data-i="images"></span></span><div class="rt"><b>All folders</b><span>2,838 files · 51 GB</span></div></div><div class="row on"><span class="fcov ph t3"><span data-i="image"></span></span><div class="rt"><b>Family</b><span>2,340 files · 41 GB</span></div><span class="tick" data-i="check"></span></div><div class="row"><span class="fcov ph t6"><span data-i="image"></span></span><div class="rt"><b>Wedding Anna &amp; Marco</b><span>412 files · 9.8 GB</span></div></div><div class="row"><span class="fcov doc"><span data-i="file"></span></span><div class="rt"><b>Kindergarten</b><span>86 files · 340 MB</span></div></div></div></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">40</span>Folders, as admin <span class="badge proposal">proposal</span></h3>
+        <p class="cap">A new row in the admin's settings, beside Upload PINs and People. Each folder shows how much is in it, who sees it and whether a PIN sends into it. Only admins see Taxes 2026.</p>
+        <div class="phone" data-shot="40-folders"><div class="sb" data-time="10:02"></div><div class="ab back"><span class="ib"><span data-i="back"></span></span><h2>Folders</h2></div><div class="scroll pad"><p class="lead sm">Everyone sees only the folders they were given; admins see all of them.</p><div class="group mt"><div class="row"><span class="fcov ph t3"><span data-i="image"></span></span><div class="rt"><b>Family</b><span>2,340 files · 1 PIN</span></div><span class="avs"><span class="av acc">S</span><span class="av tan">M</span><span class="av sage">P</span><span class="av pend">O</span></span><span class="chev" data-i="chev"></span></div><div class="row"><span class="fcov ph t6"><span data-i="image"></span></span><div class="rt"><b>Wedding Anna &amp; Marco</b><span>412 files · 1 PIN</span></div><span class="avs"><span class="av acc">S</span><span class="av tan">M</span></span><span class="chev" data-i="chev"></span></div><div class="row"><span class="fcov doc"><span data-i="file"></span></span><div class="rt"><b>Kindergarten</b><span>86 files</span></div><span class="avs"><span class="av acc">S</span><span class="av tan">M</span></span><span class="chev" data-i="chev"></span></div><div class="row"><span class="fcov doc"><span data-i="file"></span></span><div class="rt"><b>Taxes 2026</b><span>37 files · only admins</span></div><span class="avs"><span class="av acc">S</span></span><span class="chev" data-i="chev"></span></div></div></div><div class="fab"><span data-i="plus"></span>New folder</div><div class="gest"></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">41</span>A folder <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Who sees it: everyone with a switch; admins always do. Below, the PINs that send into it, and a new one right here. The menu renames the folder or deletes it; its files then wait in Recently deleted like any deleted file.</p>
+        <div class="phone" data-shot="41-folder"><div class="sb" data-time="10:03"></div><div class="ab back"><span class="ib"><span data-i="back"></span></span><h2>Wedding Anna &amp; Marco</h2><span class="ib"><span data-i="more"></span></span></div><div class="scroll pad"><div class="fhead"><span class="fcov ph t6 lg"><span data-i="image"></span></span><div><b>412 files · 9.8 GB</b><span>Since 26 Sep</span></div></div><div class="glabel">Who sees it</div><div class="group"><div class="row"><span class="av acc">S</span><div class="rt"><b>Stefan</b><span>Admin · sees all folders</span></div><span class="sw on lock"></span></div><div class="row"><span class="av tan">M</span><div class="rt"><b>Maria</b><span>Member</span></div><span class="sw on"></span></div><div class="row"><span class="av sage">P</span><div class="rt"><b>Peter</b><span>Member</span></div><span class="sw"></span></div><div class="row"><span class="av pend">O</span><div class="rt"><b>Oma Rosa</b><span>Invite open until 21:00</span></div><span class="sw"></span></div></div><div class="glabel">PINs that send into it</div><div class="group"><div class="row"><span class="ri"><span data-i="key"></span></span><div class="rt"><b translate="no">4HX9T</b><span>For 24 hours · ends today 18:30</span></div><span class="chev" data-i="chev"></span></div><div class="row acc"><span class="ri acc"><span data-i="plus"></span></span><div class="rt"><b>New PIN for this folder</b></div></div></div></div><div class="gest"></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">42</span>A person's folders <span class="badge proposal">proposal</span></h3>
+        <p class="cap">The same switches from the person's side, at the top of the person's sheet. Making Maria an admin would show Maria every folder.</p>
+        <div class="phone" data-shot="42-person-folders"><div class="sb" data-time="10:03"></div><div class="ab"><h2>Settings</h2></div><div class="scroll pad"><div class="profile"><span class="av lg acc">S</span><div><b>Stefan <span class="role admin"><span data-i="crown"></span>Admin</span></b><span class="sub">Signed in in this browser</span></div></div><div class="group"><div class="row"><span class="ri acc"><span data-i="key"></span></span><div class="rt"><b>Upload PINs</b><span>1 permanent · 1 for 24 hours</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="globe"></span></span><div class="rt"><b>Language</b><span>Automatic · English</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="palette"></span></span><div class="rt"><b>Theme</b><span>Ember</span></div><span class="chev" data-i="chev"></span></div></div><div class="glabel">People<span class="gact"><span data-i="user-plus"></span>Invite</span></div><div class="group"><div class="row"><span class="av acc">S</span><div class="rt"><b>Stefan</b><span>You · 1 phone, 1 browser</span></div><span class="role admin">Admin</span></div><div class="row"><span class="av tan">M</span><div class="rt"><b>Maria</b><span>1 phone, 1 browser · active today</span></div><span class="role">Member</span></div><div class="row"><span class="av sage">P</span><div class="rt"><b>Peter</b><span>1 phone · active today</span></div><span class="role">Member</span></div><div class="row"><span class="av pend">O</span><div class="rt"><b>Oma Rosa</b><span>Invite open until 21:00</span></div><span class="role pend">Invited</span></div></div><div class="glabel">Storage</div><div class="group"><div class="row"><span class="ri"><span data-i="trash"></span></span><div class="rt"><b>Recently deleted</b><span>3 files · 9.3 MB</span></div><span class="chev" data-i="chev"></span></div></div></div><nav class="nav" data-on="settings"></nav><div class="scrim"></div><div class="sheet"><div class="grip"></div><div class="pdh"><span class="av lg tan">M</span><div><b>Maria</b><span>@maria</span></div><span class="role">Member</span></div><div class="glabel">Folders</div><div class="group"><div class="row"><span class="fcov ph t3"><span data-i="image"></span></span><div class="rt"><b>Family</b><span>2,340 files · 41 GB</span></div><span class="sw on"></span></div><div class="row"><span class="fcov ph t6"><span data-i="image"></span></span><div class="rt"><b>Wedding Anna &amp; Marco</b><span>412 files · 9.8 GB</span></div><span class="sw on"></span></div><div class="row"><span class="fcov doc"><span data-i="file"></span></span><div class="rt"><b>Kindergarten</b><span>86 files · 340 MB</span></div><span class="sw on"></span></div><div class="row"><span class="fcov doc"><span data-i="file"></span></span><div class="rt"><b>Taxes 2026</b><span>37 files · only admins</span></div><span class="sw"></span></div></div><p class="help sm">Maria sees only the folders switched on. Admins see every folder.</p><div class="group mt12"><div class="row"><span class="ri"><span data-i="smartphone"></span></span><div class="rt"><b>Phones and browsers</b><span>Pixel 8 · Chrome · Windows</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="crown"></span></span><div class="rt"><b>Make admin</b><span>Admin: also delete files, and manage PINs and people</span></div></div></div></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">43</span>New PIN, into a folder <span class="badge proposal">proposal</span></h3>
+        <p class="cap">A PIN sends into the folder picked here, and its card says which. The switch is a proposal of its own: a PIN for an event that also shows guests what everyone sent (46).</p>
+        <div class="phone" data-shot="43-new-pin-folder"><div class="sb" data-time="10:04"></div><div class="ab back"><span class="ib"><span data-i="back"></span></span><h2>Upload PINs</h2></div><div class="scroll pad"><p class="lead sm" data-tr>A PIN only lets people <b>send</b>. Nobody can see or download anything with it.</p><div class="glabel">Permanent</div><div class="pincard"><div class="pc-top"><div class="code"><b>K</b><b>7</b><b>M</b><b>2</b><b>Q</b></div><span class="pcico" data-i="infinity"></span></div><div class="pc-meta"><span class="ftag"><span data-i="folder"></span>Family</span>Since 12 Sep · used on 6 phones</div></div></div><div class="gest"></div><div class="scrim"></div><div class="sheet"><div class="grip"></div><h3>New upload PIN</h3><div class="label t0">Sends into</div><div class="fsel"><span class="fcov ph t6"><span data-i="image"></span></span><div class="rt"><b>Wedding Anna &amp; Marco</b><span>412 files · 2 people</span></div><span data-i="chev" class="down"></span></div><div class="label">How long should it work?</div><div class="opts"><div class="opt"><span data-i="infinity"></span><i class="radio"></i><b>Permanent</b><span class="sub">Until you delete it</span></div><div class="opt on"><span data-i="clock"></span><i class="radio"></i><b>24 hours</b><span class="sub">Until tomorrow, 10:04</span></div></div><div class="swrow"><div class="rt"><b>Guests also see this folder</b><span>Everyone with the PIN then sees and downloads what is in it, as at a wedding.</span></div><span class="sw"></span></div><div class="btn primary mt20"><span data-i="share"></span>Create &amp; share</div></div></div>
+      </div>
+
+    </div>
+    <p class="sub-h">On the website</p>
+    <div class="board">
+
+      <div class="slot wide">
+        <h3><span class="n">44</span>Library with folders, on a computer <span class="badge proposal">proposal</span></h3>
+        <p class="cap">On a computer the folders stay in view, in a column beside the library. Files dropped on the library go into the folder shown.</p>
+        <div class="desktop" data-shot="44-library-folders-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>Library · Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com/library</span></div></div><div class="dview"><div class="ahd"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div><nav class="dtabs"><a class="on"><span data-i="images"></span>Library</a><a><span data-i="upload"></span>Send</a><a><span data-i="settings"></span>Settings</a></nav><span class="dsearch"><span data-i="search"></span>Search file names</span><span class="av tan">M</span></div><div class="dlib withf"><div class="fside"><div class="glabel">Folders</div><div class="frow"><span class="fcov all"><span data-i="images"></span></span><div><b>All folders</b><span>2,838 files</span></div></div><div class="frow on"><span class="fcov ph t3"><span data-i="image"></span></span><div><b>Family</b><span>2,340 files</span></div></div><div class="frow"><span class="fcov ph t6"><span data-i="image"></span></span><div><b>Wedding Anna &amp; Marco</b><span>412 files</span></div></div><div class="frow"><span class="fcov doc"><span data-i="file"></span></span><div><b>Kindergarten</b><span>86 files</span></div></div></div><div class="fmain"><div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div><div class="day"><div><h4>Today</h4><div class="meta">6 files · 74 MB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p3 p8 v2@0:18 p6 p1 p4"></div><div class="day"><div><h4>Yesterday</h4><div class="meta">45 files · 620 MB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p4 p7 p9 v5@1:15 p2 p10 p6 p3 p5 d#DOCX=Recipes_Oma.docx p8 p1 v3@0:42 p2 p9 p7"></div><div class="day"><div><h4>Sunday, 27 Sep</h4><div class="meta">48 files · 1.1 GB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p1 p2 d#PDF=Invitation.pdf p5 v4@0:42 p3 p8 p6"></div></div></div></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">45</span>Sending into a folder, with a PIN <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Guests see where their files go, and nothing else. A PIN of a server with one folder shows no folder at all.</p>
+        <div class="phone" data-shot="45-pin-into-folder"><div class="sb" data-time="21:14"></div><div class="wb"><div class="brand"><span data-i="images"></span><span translate="no">Share</span><span class="langpill"><span data-i="globe"></span>EN</span></div><div class="stack"><div class="pc pa ph t6"><span data-i="image"></span></div><div class="pc pb ph t5"><span data-i="image"></span></div><div class="pc pcen"><span data-i="file"></span><span class="ext">PDF</span></div></div><h1 class="hero">Send your files</h1><p class="lead">Photos, videos, documents, anything. No app, no account.</p><div class="pills"><span class="fpill"><span data-i="folder"></span>Wedding Anna &amp; Marco</span><span class="timepill"><span data-i="clock"></span>This PIN works until tomorrow, 18:30</span></div><div class="grow"></div><div class="btn primary"><span data-i="plus"></span>Choose files</div><p class="small">Others with this PIN can't see what you send.</p></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">46</span>A PIN that also shows the folder <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Only for a PIN made with the switch in 43. Guests see what everyone sent into the folder, open and download it, but delete nothing.</p>
+        <div class="phone" data-shot="46-pin-sees-folder"><div class="sb" data-time="21:20"></div><div class="wb"><div class="brand"><span data-i="images"></span><span translate="no">Share</span><span class="langpill"><span data-i="globe"></span>EN</span></div><div class="seg"><span><span data-i="upload"></span>Send</span><span class="on"><span data-i="images"></span>See</span></div><h1 class="hero sm gtitle">Wedding Anna &amp; Marco</h1><p class="lead sm gmeta">412 files from 23 people</p><div class="gfiles"><div class="day"><div><h4>Today</h4><div class="meta">38 files · 410 MB</div></div></div><div class="grid g4" data-tiles="p6 p2 v3@0:24 p9 p4 p1 p7 p10"></div><div class="day"><div><h4>Saturday, 26 Sep</h4><div class="meta">374 files · 9.4 GB</div></div></div><div class="grid g4" data-tiles="p5 p8 p3 v6@2:05 p1 p9 p2 p4 p6 p10 p7 p3"></div></div><div class="btn primary"><span data-i="download"></span>Download all <small>· 9.8 GB</small></div><p class="small">Everyone with this PIN sees these files.</p></div></div>
+      </div>
+      <div class="slot wide">
+        <h3><span class="n">47</span>Invite someone, with folders <span class="badge proposal">proposal</span></h3>
+        <p class="cap">An invite says which folders the new person gets; with only one folder there is nothing to choose. Changing them later works from the person (42) or the folder (41).</p>
+        <div class="desktop" data-shot="47-invite-folders-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>Settings · Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com/settings/people</span></div></div><div class="dview"><div class="ahd"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div><nav class="dtabs"><a><span data-i="images"></span>Library</a><a><span data-i="upload"></span>Send</a><a class="on"><span data-i="settings"></span>Settings</a></nav><span class="av acc">S</span></div><div class="dset"><div class="pane"><div class="profile"><span class="av lg acc">S</span><div><b>Stefan <span class="role admin"><span data-i="crown"></span>Admin</span></b><span class="sub">Signed in in this browser</span></div><span class="chev" data-i="chev"></span></div><div class="group"><div class="row"><span class="ri acc"><span data-i="key"></span></span><div class="rt"><b>Upload PINs</b><span>1 permanent · 1 for 24 hours</span></div><span class="chev" data-i="chev"></span></div><div class="row on"><span class="ri"><span data-i="users"></span></span><div class="rt"><b>People</b><span>3 people · 1 invite open</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="trash"></span></span><div class="rt"><b>Recently deleted</b><span>3 files · 9.3 MB</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="hdd"></span></span><div class="rt"><b>Storage</b><span>789 GB free of 931 GB</span></div></div></div><div class="group"><div class="row"><span class="ri"><span data-i="globe"></span></span><div class="rt"><b>Language</b><span>Automatic · English</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="palette"></span></span><div class="rt"><b>Theme</b><span>Ember</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="lock"></span></span><div class="rt"><b>Password</b><span>Set · username stefan</span></div><span class="chev" data-i="chev"></span></div></div><div class="group"><div class="row"><span class="ri"><span data-i="log-out"></span></span><div class="rt"><b>Sign out</b></div></div><div class="row dang"><span class="ri dang"><span data-i="user-x"></span></span><div class="rt"><b>Delete my account</b></div></div></div></div><div class="pane pane2"><div class="phead"><h2>People</h2><span class="btn tonal xs"><span data-i="user-plus"></span>Invite</span></div><div class="group"><div class="row"><span class="av acc">S</span><div class="rt"><b>Stefan</b><span>You · 1 phone, 1 browser</span></div><span class="role admin">Admin</span><span class="chev" data-i="chev"></span></div><div class="row"><span class="av tan">M</span><div class="rt"><b>Maria</b><span>1 phone, 1 browser · active today</span></div><span class="role">Member</span><span class="chev" data-i="chev"></span></div><div class="row"><span class="av sage">P</span><div class="rt"><b>Peter</b><span>1 phone · active today</span></div><span class="role">Member</span><span class="chev" data-i="chev"></span></div><div class="row"><span class="av pend">O</span><div class="rt"><b>Oma Rosa</b><span>Invite open until 21:00</span></div><span class="role pend">Invited</span><span class="chev" data-i="chev"></span></div></div></div></div><div class="scrim"></div><div class="ddlg wide"><div class="dlgh"><h3>Invite someone</h3><span class="ib"><span data-i="x"></span></span></div><div class="label t0">Name</div><div class="input">Oma Rosa</div><div class="label">Role</div><div class="seg"><span class="on"><span data-i="check"></span>Member</span><span>Admin</span></div><div class="label">Folders</div><div class="group"><div class="row"><span class="fcov ph t3"><span data-i="image"></span></span><div class="rt"><b>Family</b><span>2,340 files · 4 people</span></div><span class="cbx on"><span data-i="check"></span></span></div><div class="row"><span class="fcov ph t6"><span data-i="image"></span></span><div class="rt"><b>Wedding Anna &amp; Marco</b><span>412 files · 2 people</span></div><span class="cbx"></span></div><div class="row"><span class="fcov doc"><span data-i="file"></span></span><div class="rt"><b>Kindergarten</b><span>86 files · 2 people</span></div><span class="cbx"></span></div><div class="row"><span class="fcov doc"><span data-i="file"></span></span><div class="rt"><b>Taxes 2026</b><span>37 files · only admins</span></div><span class="cbx"></span></div></div><p class="help">Admins see every folder.</p><div class="dbtns"><span class="tbtn">Cancel</span><div class="btn primary sm"><span data-i="qr"></span>Show the QR code</div></div></div></div></div>
+      </div>
+      <div class="slot wide">
+        <h3><span class="n">48</span>Sending into a folder, signed in <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Sending without a PIN asks which folder, among the ones Maria sees; the folder open in the library is picked already.</p>
+        <div class="desktop" data-shot="48-send-folder-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>Send · Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com/send</span></div></div><div class="dview"><div class="ahd"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div><nav class="dtabs"><a><span data-i="images"></span>Library</a><a class="on"><span data-i="upload"></span>Send</a><a><span data-i="settings"></span>Settings</a></nav><span class="av tan">M</span></div><div class="dsplit"><div class="pane"><div class="stack"><div class="pc pa ph t4"><span data-i="image"></span></div><div class="pc pb ph t3"><span data-i="image"></span></div><div class="pc pcen"><span data-i="file"></span><span class="ext">PDF</span></div></div><h1 class="hero">Send your files</h1><p class="lead">No PIN needed while you're signed in. Everything arrives unchanged, in full quality.</p><div class="label">Into the folder</div><div class="fsel"><span class="fcov ph t3"><span data-i="image"></span></span><div class="rt"><b>Family</b><span>2,340 files · 4 people</span></div><span data-i="chev" class="down"></span></div></div><div class="pane"><div class="drop"><div class="roundico"><span data-i="upload"></span></div><p class="drop-t">Drop files or folders here</p><p class="drop-or">or</p><div class="btn primary"><span data-i="plus"></span>Choose files</div><div class="btn link"><span data-i="folder"></span>Choose a folder</div></div><p class="small">Tip: use Wi-Fi for big batches. If the page closes, open it again and it carries on.</p></div></div></div></div>
+      </div>
+      <div class="slot wide">
+        <h3><span class="n">49</span>Moving files to another folder <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Admins move files that went into the wrong folder, such as tax papers sent with the family PIN. On the drive they move into the other folder's day folders; who sees them changes with the folder.</p>
+        <div class="desktop" data-shot="49-move-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>Library · Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com/library</span></div></div><div class="dview"><div class="ahd"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div><nav class="dtabs"><a class="on"><span data-i="images"></span>Library</a><a><span data-i="upload"></span>Send</a><a><span data-i="settings"></span>Settings</a></nav><span class="dsearch"><span data-i="search"></span>Search file names</span><span class="av acc">S</span></div><div class="dlib withf"><div class="fside"><div class="glabel">Folders</div><div class="frow"><span class="fcov all"><span data-i="images"></span></span><div><b>All folders</b><span>2,875 files</span></div></div><div class="frow on"><span class="fcov ph t3"><span data-i="image"></span></span><div><b>Family</b><span>2,340 files</span></div></div><div class="frow"><span class="fcov ph t6"><span data-i="image"></span></span><div><b>Wedding Anna &amp; Marco</b><span>412 files</span></div></div><div class="frow"><span class="fcov doc"><span data-i="file"></span></span><div><b>Kindergarten</b><span>86 files</span></div></div><div class="frow"><span class="fcov doc"><span data-i="file"></span></span><div><b>Taxes 2026</b><span>37 files</span></div></div></div><div class="fmain"><div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div><div class="day"><div><h4>Today</h4><div class="meta">5 of 6 selected</div></div><span class="dsel part"><span data-i="minus"></span></span></div><div class="grid g8" data-tiles="p3/o d#PDF=Tax_return_2025.pdf/s d#PDF=Payslip_09.pdf/s d#XLSX=Receipts.xlsx/s d#PDF=Insurance.pdf/s d#PDF=Hotel_invoice.pdf/s"></div><div class="day"><div><h4>Yesterday</h4><div class="meta">45 files · 620 MB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p4/o p7/o p9/o v5@1:15/o p2/o p10/o p6/o p3/o p5/o d#DOCX=Recipes_Oma.docx/o p8/o p1/o v3@0:42/o p2/o p9/o p7/o"></div></div></div><div class="selbar"><span class="ib"><span data-i="x"></span></span><b>5 selected</b><span class="sz">3.8 MB</span><span class="gap"></span><div class="btn outline sm"><span data-i="folder"></span>Move</div><div class="btn dout sm"><span data-i="trash"></span>Delete</div><div class="btn primary sm"><span data-i="download"></span>Download 5</div></div><div class="scrim"></div><div class="ddlg"><div class="dlgh"><h3>Move 5 files</h3><span class="ib"><span data-i="x"></span></span></div><p class="lead sm">Who sees them changes with the folder.</p><div class="dopt dis"><span class="fcov ph t3"><span data-i="image"></span></span><div class="dt"><b>Family</b><span>Here now · 4 people</span></div><i class="radio"></i></div><div class="dopt"><span class="fcov ph t6"><span data-i="image"></span></span><div class="dt"><b>Wedding Anna &amp; Marco</b><span>2 people</span></div><i class="radio"></i></div><div class="dopt"><span class="fcov doc"><span data-i="file"></span></span><div class="dt"><b>Kindergarten</b><span>2 people</span></div><i class="radio"></i></div><div class="dopt on"><span class="fcov doc"><span data-i="file"></span></span><div class="dt"><b>Taxes 2026</b><span>Only admins</span></div><i class="radio"></i></div><div class="dbtns"><span class="tbtn">Cancel</span><div class="btn primary sm"><span data-i="folder"></span>Move 5 files</div></div></div></div></div>
+      </div>
+
+    </div>
+  </section>
+
 </div>
 
 <script>
@@ -2766,6 +2909,242 @@
       "Frost": [
           "Frost",
           "Brina"
+      ],
+      "Family": [
+          "Familie",
+          "Famiglia"
+      ],
+      "Folders": [
+          "Ordner",
+          "Cartelle"
+      ],
+      "All folders": [
+          "Alle Ordner",
+          "Tutte le cartelle"
+      ],
+      "2,838 files · 51 GB": [
+          "2.838 Dateien · 51 GB",
+          "2.838 file · 51 GB"
+      ],
+      "2,340 files · 41 GB": [
+          "2.340 Dateien · 41 GB",
+          "2.340 file · 41 GB"
+      ],
+      "Wedding Anna & Marco": [
+          "Hochzeit Anna & Marco",
+          "Matrimonio Anna & Marco"
+      ],
+      "412 files · 9.8 GB": [
+          "412 Dateien · 9,8 GB",
+          "412 file · 9,8 GB"
+      ],
+      "Kindergarten": [
+          "Kindergarten",
+          "Asilo"
+      ],
+      "86 files · 340 MB": [
+          "86 Dateien · 340 MB",
+          "86 file · 340 MB"
+      ],
+      "Everyone sees only the folders they were given; admins see all of them.": [
+          "Alle sehen nur die Ordner, die sie bekommen haben; Admins sehen alle.",
+          "Ognuno vede solo le cartelle che ha ricevuto; gli admin le vedono tutte."
+      ],
+      "2,340 files · 1 PIN": [
+          "2.340 Dateien · 1 PIN",
+          "2.340 file · 1 PIN"
+      ],
+      "412 files · 1 PIN": [
+          "412 Dateien · 1 PIN",
+          "412 file · 1 PIN"
+      ],
+      "86 files": [
+          "86 Dateien",
+          "86 file"
+      ],
+      "Taxes 2026": [
+          "Steuern 2026",
+          "Tasse 2026"
+      ],
+      "37 files · only admins": [
+          "37 Dateien · nur Admins",
+          "37 file · solo admin"
+      ],
+      "New folder": [
+          "Neuer Ordner",
+          "Nuova cartella"
+      ],
+      "Since 26 Sep": [
+          "Seit 26. September",
+          "Dal 26 settembre"
+      ],
+      "Who sees it": [
+          "Wer ihn sieht",
+          "Chi la vede"
+      ],
+      "Admin · sees all folders": [
+          "Admin · sieht alle Ordner",
+          "Admin · vede tutte le cartelle"
+      ],
+      "PINs that send into it": [
+          "PINs, die hineinsenden",
+          "PIN che inviano qui"
+      ],
+      "For 24 hours · ends today 18:30": [
+          "24 Stunden · endet heute um 18:30",
+          "24 ore · scade oggi alle 18:30"
+      ],
+      "New PIN for this folder": [
+          "Neue PIN für diesen Ordner",
+          "Nuovo PIN per questa cartella"
+      ],
+      "Maria sees only the folders switched on. Admins see every folder.": [
+          "Maria sieht nur die eingeschalteten Ordner. Admins sehen alle.",
+          "Maria vede solo le cartelle attivate. Gli admin le vedono tutte."
+      ],
+      "Pixel 8 · Chrome · Windows": [
+          "Pixel 8 · Chrome · Windows",
+          "Pixel 8 · Chrome · Windows"
+      ],
+      "Sends into": [
+          "Sendet in",
+          "Invia in"
+      ],
+      "412 files · 2 people": [
+          "412 Dateien · 2 Personen",
+          "412 file · 2 persone"
+      ],
+      "Guests also see this folder": [
+          "Gäste sehen auch diesen Ordner",
+          "Gli ospiti vedono anche questa cartella"
+      ],
+      "Everyone with the PIN then sees and downloads what is in it, as at a wedding.": [
+          "Alle mit der PIN sehen dann, was darin ist, und laden es herunter, wie bei einer Hochzeit.",
+          "Chi ha il PIN vede e scarica ciò che contiene, come a un matrimonio."
+      ],
+      "2,838 files": [
+          "2.838 Dateien",
+          "2.838 file"
+      ],
+      "2,340 files": [
+          "2.340 Dateien",
+          "2.340 file"
+      ],
+      "412 files": [
+          "412 Dateien",
+          "412 file"
+      ],
+      "See": [
+          "Ansehen",
+          "Guarda"
+      ],
+      "412 files from 23 people": [
+          "412 Dateien von 23 Personen",
+          "412 file da 23 persone"
+      ],
+      "38 files · 410 MB": [
+          "38 Dateien · 410 MB",
+          "38 file · 410 MB"
+      ],
+      "374 files · 9.4 GB": [
+          "374 Dateien · 9,4 GB",
+          "374 file · 9,4 GB"
+      ],
+      "Download all": [
+          "Alle herunterladen",
+          "Scarica tutto"
+      ],
+      "· 9.8 GB": [
+          "· 9,8 GB",
+          "· 9,8 GB"
+      ],
+      "Everyone with this PIN sees these files.": [
+          "Alle mit dieser PIN sehen diese Dateien.",
+          "Chi ha questo PIN vede questi file."
+      ],
+      "2,340 files · 4 people": [
+          "2.340 Dateien · 4 Personen",
+          "2.340 file · 4 persone"
+      ],
+      "86 files · 2 people": [
+          "86 Dateien · 2 Personen",
+          "86 file · 2 persone"
+      ],
+      "Admins see every folder.": [
+          "Admins sehen alle Ordner.",
+          "Gli admin vedono tutte le cartelle."
+      ],
+      "Show the QR code": [
+          "QR-Code zeigen",
+          "Mostra il codice QR"
+      ],
+      "Into the folder": [
+          "In den Ordner",
+          "Nella cartella"
+      ],
+      "2,875 files": [
+          "2.875 Dateien",
+          "2.875 file"
+      ],
+      "37 files": [
+          "37 Dateien",
+          "37 file"
+      ],
+      "5 of 6 selected": [
+          "5 von 6 ausgewählt",
+          "5 di 6 selezionati"
+      ],
+      "Tax_return_2025.pdf": [
+          "Steuererklaerung_2025.pdf",
+          "Dichiarazione_2025.pdf"
+      ],
+      "Payslip_09.pdf": [
+          "Lohnzettel_09.pdf",
+          "Busta_paga_09.pdf"
+      ],
+      "Receipts.xlsx": [
+          "Belege.xlsx",
+          "Ricevute.xlsx"
+      ],
+      "Insurance.pdf": [
+          "Versicherung.pdf",
+          "Assicurazione.pdf"
+      ],
+      "Hotel_invoice.pdf": [
+          "Hotelrechnung.pdf",
+          "Fattura_hotel.pdf"
+      ],
+      "3.8 MB": [
+          "3,8 MB",
+          "3,8 MB"
+      ],
+      "Move": [
+          "Verschieben",
+          "Sposta"
+      ],
+      "Delete": [
+          "Löschen",
+          "Elimina"
+      ],
+      "Move 5 files": [
+          "5 Dateien verschieben",
+          "Sposta 5 file"
+      ],
+      "Who sees them changes with the folder.": [
+          "Wer sie sieht, ändert sich mit dem Ordner.",
+          "Chi li vede cambia con la cartella."
+      ],
+      "Here now · 4 people": [
+          "Jetzt hier · 4 Personen",
+          "Ora qui · 4 persone"
+      ],
+      "2 people": [
+          "2 Personen",
+          "2 persone"
+      ],
+      "Only admins": [
+          "Nur Admins",
+          "Solo admin"
       ]
   };
   // Names, codes, numbers and file names that stay the same in every language.
