@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
@@ -119,29 +120,44 @@ func TestGenerateCode(t *testing.T) {
 }
 
 func TestClientIP(t *testing.T) {
-	proxies := []netip.Prefix{netip.MustParsePrefix("127.0.0.1/32")}
-	req := func(remote, header string) *http.Request {
-		r := httptest.NewRequest("GET", "/", nil)
-		r.RemoteAddr = remote
-		if header != "" {
-			r.Header.Set("CF-Connecting-IP", header)
-		}
-		return r
+	r := httptest.NewRequest("GET", "/", nil)
+	r.RemoteAddr = "[fe80::1%eth0]:5000"
+	if got := ClientIP(r).String(); got != "fe80::1" {
+		t.Errorf("the peer: ClientIP = %s", got)
 	}
-	for _, tc := range []struct {
-		name, remote, header, want string
-	}{
-		{"trusted proxy passes the header", "127.0.0.1:5000", "203.0.113.7", "203.0.113.7"},
-		{"untrusted peer can't claim an address", "198.51.100.2:5000", "203.0.113.7", "198.51.100.2"},
-		{"trusted proxy without header", "127.0.0.1:5000", "", "127.0.0.1"},
-		{"garbage header falls back to the peer", "127.0.0.1:5000", "not-an-ip", "127.0.0.1"},
-	} {
-		if got := ClientIP(req(tc.remote, tc.header), proxies, "CF-Connecting-IP").String(); got != tc.want {
-			t.Errorf("%s: ClientIP = %s, want %s", tc.name, got, tc.want)
-		}
+	if got := ClientIP(WithClientIP(r, netip.MustParseAddr("203.0.113.7"))).String(); got != "203.0.113.7" {
+		t.Errorf("named by a proxy: ClientIP = %s", got)
 	}
 	if got := IPKey(netip.MustParseAddr("2001:db8:1:2:3:4:5:6")); got != "2001:db8:1:2::/64" {
 		t.Errorf("IPKey(v6) = %s", got)
+	}
+}
+
+func TestForwardedFor(t *testing.T) {
+	proxies := []netip.Prefix{netip.MustParsePrefix("127.0.0.1/32"), netip.MustParsePrefix("172.30.0.0/24")}
+	for _, tc := range []struct {
+		name  string
+		lines []string
+		want  string // "" when the header doesn't name the visitor
+	}{
+		{"one entry", []string{"203.0.113.9"}, "203.0.113.9"},
+		{"the visitor's own entry before it", []string{"6.6.6.6, 203.0.113.9"}, "203.0.113.9"},
+		{"the proxy's own line after the visitor's", []string{"6.6.6.6", "203.0.113.9"}, "203.0.113.9"},
+		{"a trusted hop in between", []string{"6.6.6.6, 203.0.113.9, 172.30.0.5"}, "203.0.113.9"},
+		{"only trusted hops", []string{"172.30.0.7, 127.0.0.1"}, "172.30.0.7"},
+		{"made up further left", []string{"not-an-ip, 172.30.0.7"}, "172.30.0.7"},
+		{"made up on the right", []string{"203.0.113.9, garbage"}, ""},
+		{"empty", []string{""}, ""},
+		{"none", nil, ""},
+		{"v6 with brackets and port", []string{"[2001:db8::1]:443"}, "2001:db8::1"},
+		{"v4 with port", []string{"192.0.2.1:5678"}, "192.0.2.1"},
+		{"v4 in v6", []string{"::ffff:192.0.2.1"}, "192.0.2.1"},
+		{"v6 in brackets", []string{"[2001:db8::2]"}, "2001:db8::2"},
+	} {
+		got, ok := ForwardedFor(tc.lines, proxies)
+		if s := got.String(); ok != (tc.want != "") || ok && s != tc.want {
+			t.Errorf("%s: ForwardedFor = %s, %v; want %q", tc.name, s, ok, tc.want)
+		}
 	}
 }
 
@@ -164,7 +180,7 @@ func newTestService(t *testing.T) (*Service, *fakeClock) {
 	if _, _, err := d.EnsureFirstFolder(context.Background(), db.Folder{ID: ids.New(), Name: "Share", CreatedBy: "first-start"}, clock.t); err != nil {
 		t.Fatal(err)
 	}
-	return NewService(d, clock.Now, []netip.Prefix{netip.MustParsePrefix("127.0.0.1/32")}, "CF-Connecting-IP"), clock
+	return NewService(d, clock.Now), clock
 }
 
 // spec is a PIN of the given kind into the first folder.
@@ -180,8 +196,7 @@ func spec(t *testing.T, s *Service, kind string) PinSpec {
 // unlockReq is a request from one browser (client id) at one address.
 func unlockReq(client, ip string) *http.Request {
 	r := httptest.NewRequest("POST", "/api/pin/unlock", nil)
-	r.RemoteAddr = "127.0.0.1:4000"
-	r.Header.Set("CF-Connecting-IP", ip)
+	r.RemoteAddr = net.JoinHostPort(ip, "4000")
 	if client != "" {
 		r.Header.Set(HeaderClient, client)
 	}

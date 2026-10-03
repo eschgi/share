@@ -276,7 +276,7 @@ func TestSigningInAgainEndsTheEarlierSession(t *testing.T) {
 }
 
 func TestHomeOnlySessions(t *testing.T) {
-	e := newEnv(t)
+	e := newEnvWith(t, `"proxy": {"headers": "cloudflare", "trusted_proxies": ["192.168.8.20"]}`)
 	admin := e.admin()
 	e.setPassword(admin.token, "stefan", "correct horse")
 	tunnel := map[string]string{"CF-Connecting-IP": "203.0.113.9", "Cf-Visitor": `{"scheme":"https"}`}
@@ -299,9 +299,9 @@ func TestHomeOnlySessions(t *testing.T) {
 		e.app.Handler.ServeHTTP(rec, req)
 		return rec
 	}
-	login := func(target, remote string) (*http.Cookie, bool) {
+	login := func(target, remote string, headers map[string]string) (*http.Cookie, bool) {
 		t.Helper()
-		rec := send("POST", target, remote, `{"username": "stefan", "password": "correct horse", "client": "web"}`, nil, nil)
+		rec := send("POST", target, remote, `{"username": "stefan", "password": "correct horse", "client": "web"}`, nil, headers)
 		cookies := rec.Result().Cookies()
 		if rec.Code != http.StatusOK || len(cookies) == 0 {
 			t.Fatalf("sign in at %s from %s: %d %s", target, remote, rec.Code, rec.Body)
@@ -322,7 +322,7 @@ func TestHomeOnlySessions(t *testing.T) {
 	}
 
 	// Plain http at home: a cookie without Secure, for a session that works only at home.
-	c, homeOnly := login("http://192.168.8.1:8080/api/auth/login", "192.168.8.30:50000")
+	c, homeOnly := login("http://192.168.8.1:8080/api/auth/login", "192.168.8.30:50000", nil)
 	if c.Name != "share_session" || c.Secure || !homeOnly {
 		t.Fatalf("at home over http: %+v, home only %v", c, homeOnly)
 	}
@@ -331,7 +331,7 @@ func TestHomeOnlySessions(t *testing.T) {
 	}
 	// The same key through the tunnel was taken elsewhere: refused, and the session is over.
 	stolen := &http.Cookie{Name: "__Host-share_session", Value: c.Value}
-	if rec := send("GET", "http://share.example.test/api/me", "127.0.0.1:50000", "", stolen, tunnel); rec.Code != http.StatusUnauthorized {
+	if rec := send("GET", "http://share.example.test/api/me", "192.168.8.20:50000", "", stolen, tunnel); rec.Code != http.StatusUnauthorized {
 		t.Errorf("through the tunnel: %d %s", rec.Code, rec.Body)
 	}
 	if rec := send("GET", "http://192.168.8.1:8080/api/me", "192.168.8.30:50000", "", c, nil); rec.Code != http.StatusUnauthorized {
@@ -340,7 +340,7 @@ func TestHomeOnlySessions(t *testing.T) {
 
 	// https from the home network to an address at home works only at home too, also as a
 	// bearer token over the public address.
-	c, homeOnly = login("https://192.168.8.1:8443/api/auth/login", "192.168.8.30:50000")
+	c, homeOnly = login("https://192.168.8.1:8443/api/auth/login", "192.168.8.30:50000", nil)
 	if c.Name != "__Host-share_session" || !c.Secure || !homeOnly {
 		t.Fatalf("at home over https: %+v, home only %v", c, homeOnly)
 	}
@@ -349,21 +349,32 @@ func TestHomeOnlySessions(t *testing.T) {
 	}
 
 	// Signed in at the public address, a browser's session works everywhere.
-	c, homeOnly = login("https://share.example.test/api/auth/login", "")
+	c, homeOnly = login("https://share.example.test/api/auth/login", "", nil)
 	if homeOnly {
 		t.Fatal("a sign-in at the public address is home-only")
 	}
-	if rec := send("GET", "http://share.example.test/api/me", "127.0.0.1:50000", "", c, tunnel); rec.Code != http.StatusOK {
+	if rec := send("GET", "http://share.example.test/api/me", "192.168.8.20:50000", "", c, tunnel); rec.Code != http.StatusOK {
 		t.Errorf("through the tunnel: %d %s", rec.Code, rec.Body)
 	}
 
 	// The server itself counts as home.
-	c, homeOnly = login("http://localhost:8080/api/auth/login", "127.0.0.1:50000")
+	c, homeOnly = login("http://localhost:8080/api/auth/login", "127.0.0.1:50000", nil)
 	if !homeOnly {
 		t.Error("a sign-in on this machine isn't home-only")
 	}
 	if rec := send("GET", "http://localhost:8080/api/me", "127.0.0.1:50000", "", c, nil); rec.Code != http.StatusOK {
 		t.Errorf("on this machine: %d %s", rec.Code, rec.Body)
+	}
+
+	// Through a proxy at home, from the home network to an address at home (e.g. Caddy for
+	// share.home.arpa): Secure, and home-only like Share's own https port at home.
+	atHome := map[string]string{"CF-Connecting-IP": "192.168.8.30", "Cf-Visitor": `{"scheme":"https"}`}
+	c, homeOnly = login("http://share.home.arpa/api/auth/login", "192.168.8.20:50000", atHome)
+	if c.Name != "__Host-share_session" || !c.Secure || !homeOnly {
+		t.Fatalf("through a proxy at home: %+v, home only %v", c, homeOnly)
+	}
+	if rec := send("GET", "http://share.home.arpa/api/me", "192.168.8.20:50000", "", c, tunnel); rec.Code != http.StatusUnauthorized {
+		t.Errorf("the same key through the proxy from the internet: %d %s", rec.Code, rec.Body)
 	}
 }
 

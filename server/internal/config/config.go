@@ -16,7 +16,7 @@ import (
 	"slices"
 	"strings"
 	"time"
-	_ "time/tzdata" // routers often ship without zoneinfo; without this every time zone would be UTC
+	_ "time/tzdata" // small systems and containers often ship without zoneinfo; without it every time zone would be UTC
 
 	"github.com/eschgi/share/server/internal/homenet"
 )
@@ -26,20 +26,20 @@ var SupportedLanguages = []string{"en", "de", "it"}
 
 // Config is config.json. Field names follow the snake_case of the API.
 type Config struct {
-	Name            string     `json:"name"`
-	PublicURL       string     `json:"public_url"`
-	HomeURL         string     `json:"home_url"`
-	HTTP            *HTTP      `json:"http"`
-	HTTPS           *HTTPS     `json:"https"`
-	Cloudflare      Cloudflare `json:"cloudflare"`
-	StorageDir      string     `json:"storage_dir"`
-	DataDir         string     `json:"data_dir"`
-	TimeZone        string     `json:"time_zone"`
-	Languages       []string   `json:"languages"`
-	DefaultLanguage string     `json:"default_language"`
-	Upload          Upload     `json:"upload"`
-	TrashDays       int        `json:"trash_days"`
-	App             App        `json:"app"`
+	Name            string   `json:"name"`
+	PublicURL       string   `json:"public_url"`
+	HomeURL         string   `json:"home_url"`
+	HTTP            *HTTP    `json:"http"`
+	HTTPS           *HTTPS   `json:"https"`
+	Proxy           *Proxy   `json:"proxy"`
+	StorageDir      string   `json:"storage_dir"`
+	DataDir         string   `json:"data_dir"`
+	TimeZone        string   `json:"time_zone"`
+	Languages       []string `json:"languages"`
+	DefaultLanguage string   `json:"default_language"`
+	Upload          Upload   `json:"upload"`
+	TrashDays       int      `json:"trash_days"`
+	App             App      `json:"app"`
 
 	// Filled in by Load from the fields above.
 	Location *time.Location `json:"-"`
@@ -48,9 +48,9 @@ type Config struct {
 	Home     *url.URL       `json:"-"` // nil without home_url
 }
 
-// HTTP is the plain-http port: the website, the API and uploads. Cloudflare's tunnel comes in
-// here; browsers and the app may use it directly only from a home network or this machine.
-// "http": null switches it off.
+// HTTP is the plain-http port: the website, the API and uploads. A tunnel or a reverse proxy
+// passes requests on here; browsers and the app may use it directly only from a home network
+// or this machine. "http": null switches it off.
 type HTTP struct {
 	Listen string `json:"listen"`
 }
@@ -94,48 +94,51 @@ func (c *Certificate) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// Cloudflare says whether requests come through a Cloudflare Tunnel: true when cloudflared
-// runs on this machine, {"trusted_proxies": […]} when it runs elsewhere, false without one.
-// Requests from those addresses carry the visitor's address in CF-Connecting-IP.
-type Cloudflare struct {
-	Enabled        bool
-	TrustedProxies []string
+// Proxy is what passes requests on to Share: Cloudflare's tunnel, or a reverse proxy such as
+// Caddy, nginx or Traefik. It names the visitor in headers, which Share believes only from the
+// proxy's own addresses. "cloudflare" or "x-forwarded" when the proxy runs on this machine,
+// {"headers": …, "trusted_proxies": […]} when it runs elsewhere; left out without a proxy.
+type Proxy struct {
+	Headers        string   `json:"headers"`
+	TrustedProxies []string `json:"trusted_proxies"`
 }
 
-func (c *Cloudflare) UnmarshalJSON(b []byte) error {
-	var on bool
-	if json.Unmarshal(b, &on) == nil {
-		*c = Cloudflare{Enabled: on}
-		if on {
-			c.TrustedProxies = slices.Clone(thisMachine)
+// The headers a proxy names the visitor and the visitor's scheme in.
+const (
+	ProxyCloudflare = "cloudflare"  // CF-Connecting-IP and Cf-Visitor, from cloudflared
+	ProxyXForwarded = "x-forwarded" // X-Forwarded-For and X-Forwarded-Proto, from Caddy, nginx, Traefik…
+)
+
+const proxyForms = `"cloudflare" or "x-forwarded" for a proxy on this machine, or {"headers": "cloudflare" or "x-forwarded", "trusted_proxies": ["192.168.1.30"]} for one elsewhere`
+
+func (p *Proxy) UnmarshalJSON(b []byte) error {
+	var name string
+	if json.Unmarshal(b, &name) == nil {
+		if name != ProxyCloudflare && name != ProxyXForwarded {
+			return fmt.Errorf("proxy: %q is not known; use %s", name, proxyForms)
 		}
+		*p = Proxy{Headers: name, TrustedProxies: slices.Clone(thisMachine)}
 		return nil
 	}
-	var v struct {
-		TrustedProxies []string `json:"trusted_proxies"`
-	}
+	type fields Proxy // without this method
+	var f fields
 	dec := json.NewDecoder(bytes.NewReader(b))
 	dec.DisallowUnknownFields()
-	if err := dec.Decode(&v); err != nil {
-		return fmt.Errorf(`cloudflare: %w; use true, false or {"trusted_proxies": […]}`, err)
+	if err := dec.Decode(&f); err != nil {
+		return fmt.Errorf("proxy: %w; use %s", err, proxyForms)
 	}
-	*c = Cloudflare{Enabled: true, TrustedProxies: v.TrustedProxies}
+	if f.Headers != ProxyCloudflare && f.Headers != ProxyXForwarded {
+		return fmt.Errorf(`proxy.headers: must be "cloudflare" or "x-forwarded", not %q`, f.Headers)
+	}
+	if len(f.TrustedProxies) == 0 {
+		return fmt.Errorf(`proxy.trusted_proxies: needs the address the proxy connects from, e.g. 192.168.1.30; for a proxy on this machine write "proxy": %q`, f.Headers)
+	}
+	*p = Proxy(f)
 	return nil
 }
 
-// thisMachine is where cloudflared connects from when it runs next to Share.
+// thisMachine is where a proxy connects from when it runs next to Share.
 var thisMachine = []string{"127.0.0.1/32", "::1/128"}
-
-// CloudflareHeader carries the visitor's address in requests from Cloudflare's tunnel.
-const CloudflareHeader = "CF-Connecting-IP"
-
-// ClientIPHeader is the header with the visitor's address from trusted proxies, or "" without.
-func (c *Config) ClientIPHeader() string {
-	if c.Cloudflare.Enabled {
-		return CloudflareHeader
-	}
-	return ""
-}
 
 // CertificateHost is the name or address Share's own certificate is made for.
 func (c *Config) CertificateHost() string {
@@ -172,7 +175,6 @@ func Default() Config {
 		// On every interface, so phones at home reach it; plain http from outside a home
 		// network is refused there anyway.
 		HTTP:            &HTTP{Listen: ":8080"},
-		Cloudflare:      Cloudflare{Enabled: true, TrustedProxies: slices.Clone(thisMachine)},
 		Languages:       slices.Clone(SupportedLanguages),
 		DefaultLanguage: "en",
 		Upload: Upload{
@@ -243,8 +245,9 @@ func movedSettings(data []byte) []string {
 		{"tls_cert_file", `moved: "https": {"listen": ":443", "certificate": {"cert_file": "…", "key_file": "…"}}`},
 		{"tls_key_file", `moved: "https": {"listen": ":443", "certificate": {"cert_file": "…", "key_file": "…"}}`},
 		{"local", `replaced: "https": {"listen": "…"} for the port, and "home_url" for the address the app uses at home`},
-		{"trusted_proxies", `moved: "cloudflare": {"trusted_proxies": […]}`},
-		{"client_ip_header", `is gone: behind Cloudflare the visitor's address is in CF-Connecting-IP`},
+		{"cloudflare", `replaced by "proxy": "cloudflare" when cloudflared runs on this machine, or "proxy": {"headers": "cloudflare", "trusted_proxies": […]} when it runs elsewhere; leave it out without a tunnel`},
+		{"trusted_proxies", `moved: "proxy": {"headers": "cloudflare" or "x-forwarded", "trusted_proxies": […]}`},
+		{"client_ip_header", `is gone: "proxy" says which headers the proxy sends, "cloudflare" or "x-forwarded"`},
 	}
 	var moved []string
 	for _, h := range hints {
@@ -317,20 +320,24 @@ func (c *Config) complete() error {
 	}
 
 	c.Proxies = nil
-	if c.Cloudflare.Enabled && len(c.Cloudflare.TrustedProxies) == 0 {
-		bad("cloudflare.trusted_proxies", "needs the address cloudflared connects from, e.g. 192.168.8.20")
-	}
-	for _, p := range c.Cloudflare.TrustedProxies {
-		prefix, err := netip.ParsePrefix(p)
-		if err != nil {
-			addr, err2 := netip.ParseAddr(p)
-			if err2 != nil {
-				bad("cloudflare.trusted_proxies", "%q is neither an address nor a CIDR range", p)
+	if c.Proxy != nil {
+		for _, p := range c.Proxy.TrustedProxies {
+			prefix, err := netip.ParsePrefix(p)
+			if err != nil {
+				addr, err2 := netip.ParseAddr(p)
+				if err2 != nil {
+					bad("proxy.trusted_proxies", "%q is neither an address nor a CIDR range", p)
+					continue
+				}
+				prefix = netip.PrefixFrom(addr, addr.BitLen())
+			}
+			prefix = prefix.Masked()
+			if !homenet.Addr(prefix.Addr()) || !homenet.Addr(lastAddr(prefix)) {
+				bad("proxy.trusted_proxies", "%q isn't on a home network or this machine: a proxy passes requests on over plain http, which mustn't cross the internet", p)
 				continue
 			}
-			prefix = netip.PrefixFrom(addr, addr.BitLen())
+			c.Proxies = append(c.Proxies, prefix)
 		}
-		c.Proxies = append(c.Proxies, prefix.Masked())
 	}
 
 	if c.StorageDir == "" {
@@ -428,6 +435,21 @@ func parseOrigin(raw string) (*url.URL, error) {
 		return nil, fmt.Errorf("%q must use https://", raw)
 	}
 	return &url.URL{Scheme: u.Scheme, Host: strings.ToLower(u.Host)}, nil
+}
+
+// lastAddr is the last address in a range, e.g. 10.255.255.255 for 10.0.0.0/8.
+func lastAddr(p netip.Prefix) netip.Addr {
+	b := p.Masked().Addr().AsSlice()
+	for i := range b {
+		switch covered := p.Bits() - i*8; {
+		case covered <= 0:
+			b[i] = 0xff
+		case covered < 8:
+			b[i] |= 0xff >> covered
+		}
+	}
+	a, _ := netip.AddrFromSlice(b)
+	return a
 }
 
 // samePort reports whether two listen addresses use the same port. Port 0, any free one,

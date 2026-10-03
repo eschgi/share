@@ -33,7 +33,7 @@ func openDB(ctx context.Context, cfg *config.Config) (*db.DB, *auth.Service, err
 		d.Close()
 		return nil, nil, err
 	}
-	return d, auth.NewService(d, time.Now, cfg.Proxies, cfg.ClientIPHeader()), nil
+	return d, auth.NewService(d, time.Now), nil
 }
 
 func invite(args []string) error {

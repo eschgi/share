@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -13,7 +14,7 @@ func TestDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Name != "Share" || cfg.HTTP == nil || cfg.HTTP.Listen != ":8080" || cfg.HTTPS != nil || cfg.ClientIPHeader() != "CF-Connecting-IP" {
+	if cfg.Name != "Share" || cfg.HTTP == nil || cfg.HTTP.Listen != ":8080" || cfg.HTTPS != nil || cfg.Proxy != nil {
 		t.Errorf("unexpected defaults: %+v", cfg)
 	}
 	if cfg.Home != nil || cfg.SelfSigned() {
@@ -25,7 +26,7 @@ func TestDefaults(t *testing.T) {
 	if cfg.ChunkSize() != 20<<20 || cfg.MaxFileSize() != 0 || cfg.MinFreeSpace() != 2048<<20 {
 		t.Errorf("upload limits: chunk %d, max %d, free %d", cfg.ChunkSize(), cfg.MaxFileSize(), cfg.MinFreeSpace())
 	}
-	if len(cfg.Proxies) != 2 || cfg.Location == nil || cfg.Public.String() != "https://share.example.com" {
+	if len(cfg.Proxies) != 0 || cfg.Location == nil || cfg.Public.String() != "https://share.example.com" {
 		t.Errorf("derived values: proxies %v, location %v, public %v", cfg.Proxies, cfg.Location, cfg.Public)
 	}
 }
@@ -83,13 +84,22 @@ func TestErrors(t *testing.T) {
 		{"http home_url on the internet", `{"public_url": "https://a.example", "storage_dir": "/s", "home_url": "http://share.example.com:8080"}`, "home_url"},
 		{"unknown certificate", `{"public_url": "https://a.example", "storage_dir": "/s", "https": {"certificate": "letsencrypt"}}`, "https.certificate"},
 		{"half a certificate", `{"public_url": "https://a.example", "storage_dir": "/s", "https": {"certificate": {"cert_file": "/c.pem"}}}`, "both cert_file and key_file"},
-		{"bad proxy", `{"public_url": "https://a.example", "storage_dir": "/s", "cloudflare": {"trusted_proxies": ["cloudflare"]}}`, "trusted_proxies"},
-		{"no proxies", `{"public_url": "https://a.example", "storage_dir": "/s", "cloudflare": {"trusted_proxies": []}}`, "cloudflared connects from"},
+		{"unknown proxy", `{"public_url": "https://a.example", "storage_dir": "/s", "proxy": "nginx"}`, `proxy: "nginx" is not known`},
+		{"proxy true", `{"public_url": "https://a.example", "storage_dir": "/s", "proxy": true}`, `"x-forwarded"`},
+		{"proxy list", `{"public_url": "https://a.example", "storage_dir": "/s", "proxy": ["cloudflare"]}`, `"x-forwarded"`},
+		{"proxy without headers", `{"public_url": "https://a.example", "storage_dir": "/s", "proxy": {"trusted_proxies": ["192.168.1.30"]}}`, "proxy.headers"},
+		{"unknown proxy field", `{"public_url": "https://a.example", "storage_dir": "/s", "proxy": {"headers": "x-forwarded", "trusted_proxies": ["192.168.1.30"], "header": "X-Real-IP"}}`, "unknown field"},
+		{"no proxies", `{"public_url": "https://a.example", "storage_dir": "/s", "proxy": {"headers": "cloudflare", "trusted_proxies": []}}`, "the address the proxy connects from"},
+		{"bad proxy", `{"public_url": "https://a.example", "storage_dir": "/s", "proxy": {"headers": "x-forwarded", "trusted_proxies": ["caddy"]}}`, "neither an address nor a CIDR range"},
+		{"public proxy", `{"public_url": "https://a.example", "storage_dir": "/s", "proxy": {"headers": "x-forwarded", "trusted_proxies": ["203.0.113.5"]}}`, "isn't on a home network"},
+		{"everyone a proxy", `{"public_url": "https://a.example", "storage_dir": "/s", "proxy": {"headers": "x-forwarded", "trusted_proxies": ["0.0.0.0/0"]}}`, "isn't on a home network"},
+		{"half a home range", `{"public_url": "https://a.example", "storage_dir": "/s", "proxy": {"headers": "x-forwarded", "trusted_proxies": ["172.0.0.0/8"]}}`, "isn't on a home network"},
 		{"old listen", `{"public_url": "https://a.example", "storage_dir": "/s", "listen": "127.0.0.1:8080"}`, `listen: moved into "http"`},
 		{"old local", `{"public_url": "https://a.example", "storage_dir": "/s", "local": {"listen": ":8443", "url": "https://192.168.8.1:8443"}}`, `"home_url"`},
 		{"old tls", `{"public_url": "https://a.example", "storage_dir": "/s", "tls_cert_file": "/c.pem", "tls_key_file": "/k.pem"}`, "cert_file"},
-		{"old proxies", `{"public_url": "https://a.example", "storage_dir": "/s", "trusted_proxies": ["10.0.0.2"]}`, `"cloudflare": {"trusted_proxies"`},
-		{"old header", `{"public_url": "https://a.example", "storage_dir": "/s", "client_ip_header": "X-Real-IP"}`, "CF-Connecting-IP"},
+		{"old cloudflare", `{"public_url": "https://a.example", "storage_dir": "/s", "cloudflare": true}`, `"proxy": "cloudflare"`},
+		{"old proxies", `{"public_url": "https://a.example", "storage_dir": "/s", "trusted_proxies": ["10.0.0.2"]}`, `"proxy": {"headers"`},
+		{"old header", `{"public_url": "https://a.example", "storage_dir": "/s", "client_ip_header": "X-Real-IP"}`, `"proxy" says which headers`},
 		{"bad zone", `{"public_url": "https://a.example", "storage_dir": "/s", "time_zone": "Mars/Base"}`, "time_zone"},
 		{"bad language", `{"public_url": "https://a.example", "storage_dir": "/s", "languages": ["en", "fr"]}`, `"fr" is not available`},
 		{"default not in languages", `{"public_url": "https://a.example", "storage_dir": "/s", "languages": ["de"]}`, "default_language"},
@@ -155,22 +165,33 @@ func TestHTTPSPort(t *testing.T) {
 	}
 }
 
-func TestCloudflare(t *testing.T) {
+func TestProxy(t *testing.T) {
+	thisMachine := []string{"127.0.0.1/32", "::1/128"}
 	for _, tc := range []struct {
-		json    string
-		header  string
-		proxies int
+		json, headers string
+		proxies       []string
 	}{
-		{`true`, "CF-Connecting-IP", 2},
-		{`false`, "", 0},
-		{`{"trusted_proxies": ["192.168.8.20", "10.0.0.0/8"]}`, "CF-Connecting-IP", 2},
+		{`"cloudflare"`, "cloudflare", thisMachine},
+		{`"x-forwarded"`, "x-forwarded", thisMachine},
+		{`{"headers": "x-forwarded", "trusted_proxies": ["172.30.0.2", "192.168.1.0/24", "fd00::1:2/112", "::1"]}`, "x-forwarded",
+			[]string{"172.30.0.2/32", "192.168.1.0/24", "fd00::1:0/112", "::1/128"}},
+		{`{"headers": "cloudflare", "trusted_proxies": ["10.0.0.0/8"]}`, "cloudflare", []string{"10.0.0.0/8"}},
+		{`null`, "", nil},
 	} {
-		cfg, err := Parse([]byte(`{"public_url": "https://a.example", "storage_dir": "/s", "cloudflare": ` + tc.json + `}`))
+		cfg, err := Parse([]byte(`{"public_url": "https://a.example", "storage_dir": "/s", "proxy": ` + tc.json + `}`))
 		if err != nil {
 			t.Fatalf("%s: %v", tc.json, err)
 		}
-		if cfg.ClientIPHeader() != tc.header || len(cfg.Proxies) != tc.proxies {
-			t.Errorf("%s: header %q, proxies %v", tc.json, cfg.ClientIPHeader(), cfg.Proxies)
+		headers := ""
+		if cfg.Proxy != nil {
+			headers = cfg.Proxy.Headers
+		}
+		var proxies []string
+		for _, p := range cfg.Proxies {
+			proxies = append(proxies, p.String())
+		}
+		if headers != tc.headers || !slices.Equal(proxies, tc.proxies) {
+			t.Errorf("%s: headers %q, proxies %v", tc.json, headers, proxies)
 		}
 	}
 }

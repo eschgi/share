@@ -30,6 +30,7 @@ Usage:
   share serve                 run the server
   share init                  create the storage folder layout (once, with the drive mounted)
   share check                 check config, folders and drives
+  share health                check that the running server answers, e.g. for a container
   share folders               list the folders, with what they hold and who sees them
   share pin create --permanent|--day [--folder NAME] [--show]
                               make an upload PIN into a folder and print its link;
@@ -73,6 +74,8 @@ func run(args []string) error {
 		return initStorage(rest)
 	case "check":
 		return check(rest)
+	case "health":
+		return health(rest)
 	case "folders":
 		return folders(rest)
 	case "pin":
@@ -175,6 +178,7 @@ func check(args []string) error {
 		return err
 	}
 	fmt.Printf("Config %s is valid. Public address: %s\n", *f.config, cfg.PublicURL)
+	fmt.Println(proxyLine(cfg))
 	return printReport(storage.Check(storage.Layout{StorageDir: cfg.StorageDir, DataDir: cfg.DataDir}, cfg.MinFreeSpace()))
 }
 

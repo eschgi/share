@@ -54,6 +54,9 @@ type App struct {
 
 	now   func() time.Time
 	sched *jobs.Scheduler
+
+	hintsMu sync.Mutex
+	hints   map[string]time.Time // when each hint about the proxy was last logged
 }
 
 // New opens the storage and database and builds the handlers.
@@ -105,7 +108,7 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 		return nil, err
 	}
 
-	authSvc := auth.NewService(d, now, cfg.Proxies, cfg.ClientIPHeader())
+	authSvc := auth.NewService(d, now)
 	maxFile := cfg.MaxFileSize()
 	if report.MaxFileSize > 0 && (maxFile == 0 || report.MaxFileSize < maxFile) {
 		maxFile = report.MaxFileSize
@@ -159,8 +162,16 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 	mux.Handle("/", ui)
 
 	a := &App{Cfg: cfg, DB: d, Lib: lib, Auth: authSvc, Upload: up, Thumbs: th, CRCs: crcs, UI: ui, Local: local, now: now}
-	// Browsers may only change state from this site itself; the app sends no Origin.
-	a.Handler = a.guard(sameOrigin(mux))
+	// Health checks get their answer however they arrive, also from a proxy that names no
+	// visitor. Everything else goes through the guard. Browsers may only change state from
+	// this site itself; the app sends no Origin.
+	outer := http.NewServeMux()
+	outer.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		w.Write([]byte("ok\n"))
+	})
+	outer.Handle("/", a.guard(sameOrigin(mux)))
+	a.Handler = outer
 	a.sched = &jobs.Scheduler{Now: now, Logf: log.Printf, Tasks: []jobs.Task{
 		{Name: "reconcile uploads", Every: 5 * time.Minute, Run: func(ctx context.Context) error {
 			authSvc.PruneLimits()
@@ -234,7 +245,7 @@ func (a *App) Serve(ctx context.Context) error {
 	if a.Cfg.Home != nil {
 		log.Printf("share: the app at home uses %s", a.Cfg.HomeURL)
 	}
-	if c := a.Cfg.HTTP; c != nil {
+	if c := a.Cfg.HTTP; c != nil && !inContainer() {
 		for _, u := range homeURLs(c.Listen) {
 			log.Printf("share: on this network, also %s", u)
 		}

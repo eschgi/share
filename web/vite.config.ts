@@ -5,6 +5,8 @@ import { defineConfig } from 'vitest/config';
 //
 // `npm run dev` serves the pages with hot reload and forwards the API to a server running on
 // 127.0.0.1:8080 (`share serve` with listen 127.0.0.1:8080 and public_url http://localhost:8080).
+// That server must have no "proxy" in config.json: this forwarding names no visitor, so Share
+// takes it as a request from its own machine.
 const server = 'http://127.0.0.1:8080';
 
 export default defineConfig({

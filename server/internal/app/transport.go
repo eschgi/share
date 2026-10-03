@@ -1,69 +1,45 @@
 package app
 
 import (
-	"encoding/json"
 	"net"
 	"net/http"
 	"net/netip"
+	"os"
 	"strings"
 
 	"github.com/eschgi/share/server/internal/auth"
-	"github.com/eschgi/share/server/internal/config"
 	"github.com/eschgi/share/server/internal/homenet"
 	"github.com/eschgi/share/server/internal/httpx"
 	"github.com/eschgi/share/server/internal/upload"
 )
 
-// guard lets a request in by how it reached Share: over https, through Cloudflare's tunnel
-// (https from the visitor to Cloudflare), or over plain http from a home network or this
-// machine, whose cookies then can't be Secure. Plain http from anywhere else is refused, so
-// that no PIN, password, key or file crosses the internet unencrypted.
+// guard lets a request in by how it reached Share: through the proxy config.json names, over
+// https, or over plain http from a home network or this machine, whose cookies then can't be
+// Secure. Plain http from anywhere else is refused, so that no PIN, password, key or file
+// crosses the internet unencrypted. The proxy is checked first, on both ports: what it passes
+// on must never count as coming from the home network.
 func (a *App) guard(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		p := peer(r)
 		switch {
+		case a.trusted(p):
+			a.throughProxy(w, r, next)
+		case homenet.Addr(p) && forwarded(r):
+			// A proxy config.json doesn't name, e.g. one set up without "proxy".
+			a.untrustedProxy(w, r)
 		case r.TLS != nil:
 			// https straight from the home network to an address at home, such as the https
 			// port at home: like plain http there, a browser's sign-in works only at home.
-			if homenet.Addr(peer(r)) && homenet.Host(hostOf(r.Host)) {
+			if homenet.Addr(p) && homenet.Host(hostOf(r.Host)) {
 				r = auth.WithHome(r)
 			}
 			next.ServeHTTP(w, r)
-		case a.fromTunnel(r):
-			if visitorScheme(r) == "http" {
-				a.refusePlainHTTP(w, r)
-				return
-			}
-			next.ServeHTTP(w, r)
-		case homenet.Addr(peer(r)):
+		case homenet.Addr(p):
 			next.ServeHTTP(w, auth.WithPlainHTTP(r))
 		default:
 			a.refusePlainHTTP(w, r)
 		}
 	})
-}
-
-// fromTunnel reports whether cloudflared passed the request on: it comes from a trusted proxy
-// and names the visitor.
-func (a *App) fromTunnel(r *http.Request) bool {
-	if !a.Cfg.Cloudflare.Enabled || r.Header.Get(config.CloudflareHeader) == "" {
-		return false
-	}
-	p := peer(r)
-	for _, prefix := range a.Cfg.Proxies {
-		if prefix.Contains(p) {
-			return true
-		}
-	}
-	return false
-}
-
-// visitorScheme is how the visitor reached Cloudflare, from its Cf-Visitor header.
-func visitorScheme(r *http.Request) string {
-	var v struct {
-		Scheme string `json:"scheme"`
-	}
-	json.Unmarshal([]byte(r.Header.Get("Cf-Visitor")), &v)
-	return v.Scheme
 }
 
 // hostOf is the host of a Host header, without the port.
@@ -79,7 +55,7 @@ func peer(r *http.Request) netip.Addr {
 	if err != nil {
 		return netip.Addr{}
 	}
-	return ap.Addr().Unmap()
+	return ap.Addr().Unmap().WithZone("")
 }
 
 // refusePlainHTTP answers plain http from outside a home network. A page goes on to the public
@@ -93,6 +69,17 @@ func (a *App) refusePlainHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	httpx.WriteError(w, http.StatusForbidden, "https_required",
 		"Plain http only works on a home network. Open "+a.Cfg.PublicURL+" instead.")
+}
+
+// inContainer reports whether Share runs in a Docker or Podman container, whose own addresses
+// mean nothing to phones in the network.
+func inContainer() bool {
+	for _, f := range []string{"/.dockerenv", "/run/.containerenv"} {
+		if _, err := os.Stat(f); err == nil {
+			return true
+		}
+	}
+	return false
 }
 
 // homeURLs are the addresses at home of an http port that listens on every interface: what

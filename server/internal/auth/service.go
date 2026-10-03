@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/netip"
 	"strings"
 	"time"
 
@@ -54,7 +53,7 @@ func PlainHTTP(r *http.Request) bool {
 type homeKey struct{}
 
 // WithHome marks a request that came over https from the home network to an address at home,
-// such as https://192.168.8.1:8443.
+// such as https://192.168.1.20:8443.
 func WithHome(r *http.Request) *http.Request {
 	return r.WithContext(context.WithValue(r.Context(), homeKey{}, true))
 }
@@ -110,10 +109,8 @@ func (e *LockedError) Error() string {
 
 // Service implements authentication against the database.
 type Service struct {
-	DB             *db.DB
-	Now            func() time.Time
-	Proxies        []netip.Prefix
-	ClientIPHeader string
+	DB  *db.DB
+	Now func() time.Time
 
 	// Wrong-PIN limits: per browser or app, per IP address (one guest can't lock out a whole
 	// party behind the same router), and overall against distributed guessing.
@@ -131,9 +128,9 @@ type Service struct {
 }
 
 // NewService returns a Service with the standard limits.
-func NewService(d *db.DB, now func() time.Time, proxies []netip.Prefix, clientIPHeader string) *Service {
+func NewService(d *db.DB, now func() time.Time) *Service {
 	return &Service{
-		DB: d, Now: now, Proxies: proxies, ClientIPHeader: clientIPHeader,
+		DB: d, Now: now,
 		perClient: ratelimit.New(5, 10*time.Minute, 10*time.Minute),
 		perIP:     ratelimit.New(30, 10*time.Minute, 10*time.Minute),
 		global:    ratelimit.New(300, time.Hour, 10*time.Minute),
@@ -179,7 +176,7 @@ func (s *Service) Unlock(ctx context.Context, r *http.Request, input, client str
 	}
 	now := s.Now()
 	clientKey := s.clientKey(r)
-	ipKey := "ip:" + IPKey(ClientIP(r, s.Proxies, s.ClientIPHeader))
+	ipKey := "ip:" + IPKey(ClientIP(r))
 
 	for _, c := range []struct {
 		l   *ratelimit.Limiter

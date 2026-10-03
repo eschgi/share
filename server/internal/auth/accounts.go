@@ -84,7 +84,7 @@ func (s *Service) Login(ctx context.Context, r *http.Request, username, password
 	username = strings.TrimSpace(username)
 	now := s.Now()
 	userKey := "user:" + strings.ToLower(username)
-	ipKey := "ip:" + IPKey(ClientIP(r, s.Proxies, s.ClientIPHeader))
+	ipKey := "ip:" + IPKey(ClientIP(r))
 	for _, c := range []struct {
 		check func(string, time.Time) (bool, time.Duration)
 		key   string
@@ -295,7 +295,7 @@ func (s *Service) AcceptInvite(ctx context.Context, r *http.Request, token, devi
 // nobody can try tokens at scale (they're unguessable anyway).
 func (s *Service) findInvite(ctx context.Context, r *http.Request, token string) (db.Invite, error) {
 	now := s.Now()
-	ipKey := "ip:" + IPKey(ClientIP(r, s.Proxies, s.ClientIPHeader))
+	ipKey := "ip:" + IPKey(ClientIP(r))
 	if blocked, retry := s.invitePerIP.Check(ipKey, now); blocked {
 		return db.Invite{}, &LockedError{RetryAfter: retry}
 	}
