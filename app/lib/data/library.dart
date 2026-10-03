@@ -42,7 +42,8 @@ class LibraryRepository {
   final Platform platform;
 
   /// The folders the person sees, the oldest first.
-  Future<List<FolderInfo>> folders() async => FolderInfo.listFromJson(await api.get('/api/folders'));
+  /// GET /api/folders as the server sent it, which the folder store keeps on the phone.
+  Future<Json> folders() => api.get('/api/folders');
 
   Future<LibraryOverview> overview(LibraryFilter filter) async =>
       LibraryOverview.fromJson(await api.get('/api/library', query: filter.toQuery()));

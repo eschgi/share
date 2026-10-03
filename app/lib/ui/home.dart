@@ -33,12 +33,6 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   @override
-  void dispose() {
-    unawaited(_folders.clear()); // signed out: the next person starts with all folders
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final nav = NavigationBar(

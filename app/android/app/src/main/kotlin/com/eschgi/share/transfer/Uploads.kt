@@ -30,10 +30,11 @@ object Uploads {
     private fun emit(event: Map<String, Any?>) = listeners.forEach { it(event) }
 
     /**
-     * Queues [files] for sending with a phone's key ([auth] device) or a PIN, and returns the
-     * batch. A file that was lost and is picked again goes on in its old batch instead.
+     * Queues [files] for sending with a phone's key ([auth] device) into [folder], or with a PIN,
+     * and returns the batch. A file that was lost and is picked again goes on in its old batch
+     * instead.
      */
-    fun enqueue(context: Context, auth: String, files: List<Picked>): String? {
+    fun enqueue(context: Context, auth: String, files: List<Picked>, folder: String? = null): String? {
         val app = context.applicationContext
         val queue = UploadQueue(app)
         var batch: String? = null
@@ -42,7 +43,7 @@ object Uploads {
             val fresh = files.filter { f -> queue.relink(auth, f)?.also { batch = it } == null }
             if (fresh.isNotEmpty()) {
                 batch = UUID.randomUUID().toString()
-                queue.addBatch(batch, auth, fresh, System.currentTimeMillis())
+                queue.addBatch(batch, auth, fresh, System.currentTimeMillis(), folder)
             }
             if (batch != null && !UploadEngine.isRunning()) startHost(app)
         }
@@ -79,11 +80,11 @@ object Uploads {
         }
     }
 
-    /** After a new PIN or a sign-in: what waited for it goes on. */
-    fun resume(context: Context, auth: String?) {
+    /** After a new PIN or a sign-in: what waited for it goes on; what lost its folder, into [folder]. */
+    fun resume(context: Context, auth: String?, folder: String? = null) {
         val app = context.applicationContext
         UploadEngine.locked {
-            if (UploadQueue(app).resume(auth) && !UploadEngine.isRunning()) startHost(app)
+            if (UploadQueue(app).resume(auth, folder) && !UploadEngine.isRunning()) startHost(app)
         }
         publish(app, HashMap(), null, false)
     }

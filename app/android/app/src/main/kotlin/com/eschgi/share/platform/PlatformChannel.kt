@@ -59,7 +59,8 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
 
     private var sink: EventChannel.EventSink? = null
     private var initialLink: String? = null
-    private var picking: Pair<MethodChannel.Result, String>? = null
+    /** The pick under way: who hears of it, how its files are sent and, signed in, into which folder. */
+    private var picking: Triple<MethodChannel.Result, String, String?>? = null
 
     private val routeListener: (RouteStatus) -> Unit = { send(it.toMap() + ("type" to "route")) }
     private val transferListener: (Map<String, Any?>) -> Unit = { send(it) }
@@ -176,11 +177,11 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
                     }
                 }
             }
-            "upload.pick" -> pick(call.argument<String>("what"), call.argument<String>("auth") ?: UploadBatch.DEVICE, result)
+            "upload.pick" -> pick(call.argument<String>("what"), call.argument<String>("auth") ?: UploadBatch.DEVICE, call.argument<String>("folder"), result)
             "shared.count" -> background(result) { Outbox.pending(app).size }
             "shared.send" -> background(result) {
                 val auth = call.argument<String>("auth") ?: UploadBatch.DEVICE
-                Outbox.sendWith(app) { files -> Uploads.enqueue(app, auth, files) }
+                Outbox.sendWith(app) { files -> Uploads.enqueue(app, auth, files, call.argument<String>("folder")) }
             }
             "shared.drop" -> background(result) {
                 Outbox.drop(app)
@@ -191,7 +192,7 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
                 null
             }
             "upload.resume" -> background(result) {
-                Uploads.resume(app, call.argument<String>("auth"))
+                Uploads.resume(app, call.argument<String>("auth"), call.argument<String>("folder"))
                 null
             }
             "transfer.saved" -> background(result) { Downloads.saved(app, call.argument<List<String>>("ids") ?: emptyList()) }
@@ -265,7 +266,7 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
     }
 
     /** What to send: from the photo picker, or any files from the document picker. */
-    private fun pick(what: String?, auth: String, result: MethodChannel.Result) {
+    private fun pick(what: String?, auth: String, folder: String?, result: MethodChannel.Result) {
         val intent = if (what == "documents") {
             ActivityResultContracts.OpenMultipleDocuments().createIntent(activity, arrayOf("*/*"))
         } else {
@@ -273,7 +274,7 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
                 .createIntent(activity, PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
         }
         picking?.first?.success(null) // an earlier pick that never came back
-        picking = result to auth
+        picking = Triple(result, auth, folder)
         try {
             activity.startActivityForResult(intent, REQUEST_PICK)
         } catch (e: ActivityNotFoundException) {
@@ -285,7 +286,7 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
     /** The picker's answer; true if it was ours. */
     fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
         if (requestCode != REQUEST_PICK) return false
-        val (result, auth) = picking ?: return true
+        val (result, auth, folder) = picking ?: return true
         picking = null
         val uris = LinkedHashSet<Uri>()
         if (resultCode == Activity.RESULT_OK && data != null) {
@@ -299,7 +300,7 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
         io.execute {
             try {
                 val picked = uris.mapNotNull { describe(it) }
-                val batch = if (picked.isEmpty()) null else Uploads.enqueue(app, auth, picked)
+                val batch = if (picked.isEmpty()) null else Uploads.enqueue(app, auth, picked, folder)
                 main.post { result.success(batch) }
             } catch (e: Exception) {
                 Log.w(TAG, "sending picked files", e)

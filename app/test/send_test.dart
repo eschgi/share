@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -6,14 +7,16 @@ import 'package:share_app/data/models.dart';
 import 'package:share_app/data/platform.dart';
 
 import 'app_test.dart' show signedInPhone, startApp;
+import 'folders_test.dart' show family, kindergarten, threeFolders, wedding;
 import 'support/contract.dart';
 import 'support/fake_platform.dart';
 import 'support/fake_server.dart';
 import 'support/fonts.dart';
 
-UploadState sample({bool running = true, int lost = 0, String? paused, SendAuth auth = SendAuth.device}) => UploadState(
+UploadState sample({bool running = true, int lost = 0, String? paused, SendAuth auth = SendAuth.device, String? folder}) => UploadState(
       batch: 'up-1',
       auth: auth,
+      folder: folder,
       running: running,
       paused: paused,
       total: 5,
@@ -57,6 +60,99 @@ void main() {
     await tester.tap(find.text('Stop sending').last);
     await tester.pumpAndSettle();
     expect(platform.cancelledUploads, ['up-1']);
+  });
+
+  testWidgets('with a second folder, sending says which folder, and goes into the one chosen', (tester) async {
+    final platform = signedInPhone()..secrets['folder'] = wedding;
+    await startApp(tester, platform, threeFolders());
+    await tester.tap(find.text('Send').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Into the folder'), findsOneWidget);
+    expect(find.text('Wedding Anna & Marco'), findsOneWidget, reason: 'the folder open in the library');
+
+    await tester.tap(find.text('Wedding Anna & Marco'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Kindergarten'));
+    await tester.pumpAndSettle();
+    expect(find.text('Kindergarten'), findsOneWidget);
+    await tester.tap(find.text('Photos & videos'));
+    await tester.pumpAndSettle();
+    expect(platform.picks.single, (PickWhat.media, SendAuth.device));
+    expect(platform.pickFolders.single, kindergarten);
+  });
+
+  testWidgets('with one folder there is nothing to choose, and the files go into it', (tester) async {
+    final platform = signedInPhone();
+    await startApp(tester, platform, FakeServer());
+    await tester.tap(find.text('Send').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Into the folder'), findsNothing);
+    await tester.tap(find.text('Other files'));
+    await tester.pumpAndSettle();
+    expect(platform.pickFolders.single, family);
+  });
+
+  testWidgets('without a folder there is nowhere to send to', (tester) async {
+    final platform = signedInPhone();
+    await startApp(tester, platform, FakeServer()..folders = []);
+    await tester.tap(find.text('Send').last);
+    await tester.pumpAndSettle();
+    const nowhere = "You don't see any folder yet, so there's nowhere to send to. An admin gives you folders.";
+    expect(find.text(nowhere), findsOneWidget);
+    await tester.tap(find.text('Photos & videos'));
+    await tester.pumpAndSettle();
+    expect(platform.picks, isEmpty);
+    expect(find.text(nowhere), findsNWidgets(2), reason: 'and a snack bar says so');
+  });
+
+  testWidgets('sending waits for the folders, and says when they can\'t be had', (tester) async {
+    final platform = signedInPhone();
+    final server = FakeServer();
+    server.routes['GET /api/folders'] = (_) => throw const SocketException('offline');
+    await startApp(tester, platform, server);
+    await tester.tap(find.text('Send').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Photos & videos'));
+    await tester.pumpAndSettle();
+    expect(platform.picks, isEmpty);
+    expect(find.text('No connection to the server. Check your internet and try again.'), findsOneWidget);
+  });
+
+  testWidgets('the folders known last time are enough to send without the server', (tester) async {
+    final platform = signedInPhone();
+    await startApp(tester, platform, threeFolders());
+    expect(platform.secrets['folders'], contains('Kindergarten'));
+    await tester.pumpWidget(const SizedBox());
+
+    final offline = FakeServer();
+    offline.routes['GET /api/folders'] = (_) => throw const SocketException('offline');
+    await startApp(tester, platform, offline);
+    await tester.tap(find.text('Send').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Family'), findsOneWidget, reason: 'the oldest folder');
+    await tester.tap(find.text('Photos & videos'));
+    await tester.pumpAndSettle();
+    expect(platform.pickFolders.single, family);
+  });
+
+  testWidgets('a batch whose folder is gone goes on into another one', (tester) async {
+    final platform = signedInPhone();
+    final server = threeFolders();
+    await startApp(tester, platform, server);
+    await tester.tap(find.text('Send').last);
+    await tester.pumpAndSettle();
+    server.folders.removeWhere((f) => f['id'] == wedding);
+    platform.uploadEvents.add(sample(running: false, paused: 'folder_gone', folder: wedding));
+    await tester.pumpAndSettle();
+    expect(find.text('The folder these files were going into is gone. Choose another one and sending goes on.'), findsOneWidget);
+
+    await tester.tap(find.text('Choose a folder'));
+    await tester.pumpAndSettle();
+    expect(find.text('Wedding Anna & Marco'), findsNothing, reason: 'the folders are fetched again');
+    await tester.tap(find.text('Kindergarten').last);
+    await tester.pumpAndSettle();
+    expect(platform.resumed, [SendAuth.device]);
+    expect(platform.resumedFolders, [kindergarten]);
   });
 
   testWidgets('files the phone didn\'t keep are picked again', (tester) async {

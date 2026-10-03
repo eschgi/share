@@ -24,6 +24,9 @@ object UploadEngine {
     private const val TAG = "UploadEngine"
     private const val MAX_ATTEMPTS = 8
 
+    /** The server's answers when a batch's folder is gone, or the person sees no folder any more. */
+    private val FOLDER_GONE = setOf("folder_gone", "no_folder")
+
     /** Over the local address nothing limits a request; over Cloudflare 100 MB does. */
     private const val LOCAL_CHUNK = 64L * 1024 * 1024
     private const val PUBLIC_CHUNK = 20L * 1024 * 1024
@@ -87,6 +90,11 @@ object UploadEngine {
                     lastKey = key
                 }
                 val batch = queue.batch(item.batch) ?: continue
+                if (batch.auth == UploadBatch.DEVICE && batch.folder == null) {
+                    // Queued before there were folders: the person says which one.
+                    queue.pauseBatch(batch.id, UploadBatch.FOLDER_GONE)
+                    continue
+                }
                 val credentials = credentials(app, batch.auth)
                 if (credentials == null) {
                     queue.pause(batch.auth, if (batch.auth == UploadBatch.PIN) "pin_ended" else "signed_out")
@@ -109,6 +117,7 @@ object UploadEngine {
                             live[key] = it
                             progress.publish()
                         },
+                        folder = batch.folder,
                     )
                 } finally {
                     current = null
@@ -134,8 +143,13 @@ object UploadEngine {
                         // Cancelled: the batch is gone from the queue already.
                     }
                     is Uploader.Outcome.Failed -> {
-                        queue.finish(item, UploadRow.FAILED, "HTTP ${outcome.status} ${outcome.code ?: ""}".trim())
-                        release(app, item)
+                        if (outcome.code in FOLDER_GONE) {
+                            // The file stays queued until the person chooses another folder.
+                            queue.pauseBatch(batch.id, UploadBatch.FOLDER_GONE)
+                        } else {
+                            queue.finish(item, UploadRow.FAILED, "HTTP ${outcome.status} ${outcome.code ?: ""}".trim())
+                            release(app, item)
+                        }
                     }
                     is Uploader.Outcome.Retry -> {
                         if (!ServerConnection.online(app)) {

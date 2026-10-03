@@ -56,9 +56,10 @@ class Uploader(private val bufferSize: Int = 256 * 1024) {
     }
 
     /**
-     * Uploads [size] bytes of [source] as [name]. [open] makes a request with the given method
-     * and path, on the current route and with the right key. [onCreated] hears the id of a new
-     * upload (keep it: it's what a later try continues), [onBytes] how far it is.
+     * Uploads [size] bytes of [source] as [name], signed in into [folder]. [open] makes a request
+     * with the given method and path, on the current route and with the right key. [onCreated]
+     * hears the id of a new upload (keep it: it's what a later try continues), [onBytes] how far
+     * it is.
      */
     fun upload(
         name: String,
@@ -71,6 +72,7 @@ class Uploader(private val bufferSize: Int = 256 * 1024) {
         abort: Abort = Abort(),
         onCreated: (String) -> Unit = {},
         onBytes: (Long) -> Unit = {},
+        folder: String? = null,
     ): Outcome {
         var id = uploadId
         var offset: Long
@@ -79,7 +81,7 @@ class Uploader(private val bufferSize: Int = 256 * 1024) {
         while (true) {
             if (abort.stopped) return Outcome.Stopped
             if (id == null) {
-                when (val created = create(name, mime, size, open, abort)) {
+                when (val created = create(name, mime, size, folder, open, abort)) {
                     is Step.Ok -> {
                         id = created.value
                         onCreated(id)
@@ -127,10 +129,10 @@ class Uploader(private val bufferSize: Int = 256 * 1024) {
         data class End(val outcome: Outcome) : Step<Nothing>
     }
 
-    private fun create(name: String, mime: String, size: Long, open: (String, String) -> HttpURLConnection, abort: Abort): Step<String> =
+    private fun create(name: String, mime: String, size: Long, folder: String?, open: (String, String) -> HttpURLConnection, abort: Abort): Step<String> =
         request(open, "POST", "/tus/", abort) { conn ->
             conn.setRequestProperty("Upload-Length", size.toString())
-            conn.setRequestProperty("Upload-Metadata", "filename ${b64(name)},filetype ${b64(mime)}")
+            conn.setRequestProperty("Upload-Metadata", "filename ${b64(name)},filetype ${b64(mime)}" + (folder?.let { ",folder ${b64(it)}" } ?: ""))
             // No body, so no streaming mode: in it the JDK hides the body of a 401.
             conn.doOutput = true
             conn.outputStream.close()

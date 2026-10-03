@@ -234,6 +234,12 @@ void main() {
     await shot(tester, 'en/15-send');
   }));
 
+  testWidgets('sending into a folder', (tester) => atTen(() async {
+    await startApp(tester, signedInPhone()..secrets['folder'] = 'f4mily5x2k7mbqz4bwdbyj6qsq', folders());
+    await tester.tap(find.text('Send').last);
+    await shot(tester, 'en/48-send-folder');
+  }));
+
   testWidgets('a PIN, without an account', (tester) => atTen(() async {
     await startApp(tester, FakePlatform(), FakeServer());
     await tester.tap(find.text('Send files'));

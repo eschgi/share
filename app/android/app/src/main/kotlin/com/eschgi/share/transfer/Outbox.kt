@@ -135,8 +135,9 @@ object Outbox {
 
     /**
      * Hands the files waiting to [send], which queues them; they leave the outbox only once it
-     * has. What [send] returns, or null without files.
+     * has. What [send] returns, or null without files. One at a time, so no file goes twice.
      */
+    @Synchronized
     fun <T> sendWith(context: Context, send: (List<Picked>) -> T): T? {
         val rows = rows(context)
         if (rows.isEmpty()) return null

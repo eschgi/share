@@ -58,6 +58,10 @@ class AppServices {
     theme.value = await platform.readSecret('theme');
     language.value = await platform.readSecret('language');
     await folders.start();
+    // Signed out: the next person starts with their own folders.
+    session.states.listen((s) {
+      if (s is SignedOutState) unawaited(folders.clear());
+    });
     await session.restore();
     await pin.restore();
   }

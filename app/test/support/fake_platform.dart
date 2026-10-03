@@ -140,16 +140,19 @@ class FakePlatform implements Platform {
   @override
   Future<String> cacheDir() async => '';
 
-  /// What pickAndSend gives back, and what was asked.
+  /// What pickAndSend gives back, and what was asked: what, how, and into which folder.
   String? nextPick = 'up-1';
   final picks = <(PickWhat, SendAuth)>[];
+  final pickFolders = <String?>[];
   final cancelledUploads = <String>[];
   final resumed = <SendAuth>[];
+  final resumedFolders = <String?>[];
   final uploadEvents = StreamController<UploadState>.broadcast();
 
   @override
-  Future<String?> pickAndSend(PickWhat what, {SendAuth auth = SendAuth.device}) async {
+  Future<String?> pickAndSend(PickWhat what, {SendAuth auth = SendAuth.device, String? folder}) async {
     picks.add((what, auth));
+    pickFolders.add(folder);
     return nextPick;
   }
 
@@ -157,14 +160,18 @@ class FakePlatform implements Platform {
   Future<void> cancelUpload(String batch) async => cancelledUploads.add(batch);
 
   @override
-  Future<void> resumeUploads(SendAuth auth) async => resumed.add(auth);
+  Future<void> resumeUploads(SendAuth auth, {String? folder}) async {
+    resumed.add(auth);
+    resumedFolders.add(folder);
+  }
 
   @override
   Stream<UploadState> get uploads => uploadEvents.stream;
 
-  /// Files shared into the app, waiting; what was done with them.
+  /// Files shared into the app, waiting; what was done with them, and into which folder.
   int sharedWaiting = 0;
   final sharedSent = <SendAuth>[];
+  final sharedFolders = <String?>[];
   int sharedDropped = 0;
   final sharedEvents = StreamController<SharedFiles>.broadcast();
 
@@ -181,10 +188,11 @@ class FakePlatform implements Platform {
   Stream<SharedFiles> get sharedChanges => sharedEvents.stream;
 
   @override
-  Future<String?> sendShared(SendAuth auth) async {
+  Future<String?> sendShared(SendAuth auth, {String? folder}) async {
     if (sharedWaiting == 0) return null;
     sharedWaiting = 0;
     sharedSent.add(auth);
+    sharedFolders.add(folder);
     return 'up-shared';
   }
 

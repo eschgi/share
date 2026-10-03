@@ -44,6 +44,7 @@ void main() {
   test('upload events', () {
     final u = UploadState.fromMap(fixture['upload_event'] as Map);
     expect(u.auth, SendAuth.device);
+    expect(u.folder, 'f4mily5x2k7mbqz4bwdbyj6qsq');
     expect([u.total, u.done, u.failed, u.lost], [5, 1, 1, 1]);
     expect([u.bytesTotal, u.bytesDone, u.etaSeconds], [61280000, 36380000, 120]);
     expect(u.current, 4, reason: 'three are behind it');
@@ -51,7 +52,7 @@ void main() {
     expect(u.items.map((i) => i.state), ['done', 'queued', 'queued', 'lost']);
     expect(u.items[1].kind, FileKind.video);
     expect(u.items[1].bytes, 33280000);
-    expect(fixture['upload_paused'], ['pin_ended', 'signed_out', 'user']);
+    expect(fixture['upload_paused'], ['pin_ended', 'signed_out', 'folder_gone', 'user']); // the send panel tells each
   });
 
   test('where the player plays from', () {

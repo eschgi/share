@@ -98,7 +98,7 @@ class PlatformContractTest {
     fun uploadEventIsWhatDartReads() {
         val rows = fixture.getJSONArray("upload_rows")
         val expected = fixture.getJSONObject("upload_event")
-        val batch = UploadBatch(expected.getString("batch"), UploadBatch.DEVICE, "active", null, 0)
+        val batch = UploadBatch(expected.getString("batch"), UploadBatch.DEVICE, "active", null, 0, expected.getString("folder"))
         val items = List(rows.length()) { i ->
             val r = rows.getJSONObject(i)
             val file = Picked("content://picked/$i", r.getString("name"), r.getLong("size"), r.getString("mime"))
@@ -107,7 +107,7 @@ class PlatformContractTest {
         val snapshot = UploadSnapshot.of(batch, items, etaSeconds = 120, local = true)
         assertEquals(expected.toMap(), snapshot.toMap().numbersAsLong())
         val paused = fixture.getJSONArray("upload_paused")
-        assertEquals(listOf("pin_ended", "signed_out", "user"), List(paused.length()) { paused.getString(it) })
+        assertEquals(listOf("pin_ended", "signed_out", UploadBatch.FOLDER_GONE, "user"), List(paused.length()) { paused.getString(it) })
     }
 
     @Test

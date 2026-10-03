@@ -34,10 +34,14 @@ data class UploadRow(
     }
 }
 
-data class UploadBatch(val id: String, val auth: String, val state: String, val paused: String?, val createdAt: Long) {
+/** A batch of files sent together; signed in, into [folder] (a PIN sends into its own). */
+data class UploadBatch(val id: String, val auth: String, val state: String, val paused: String?, val createdAt: Long, val folder: String? = null) {
     companion object {
         const val DEVICE = "device" // signed in
         const val PIN = "pin"
+
+        /** Why a batch is paused: its folder is gone, or no longer the person's. */
+        const val FOLDER_GONE = "folder_gone"
     }
 }
 
@@ -48,6 +52,7 @@ data class UploadBatch(val id: String, val auth: String, val state: String, val 
 data class UploadSnapshot(
     val batch: String,
     val auth: String,
+    val folder: String?,
     val running: Boolean,
     val paused: String?,
     val total: Int,
@@ -64,6 +69,7 @@ data class UploadSnapshot(
         "type" to "upload",
         "batch" to batch,
         "auth" to auth,
+        "folder" to folder,
         "running" to running,
         "paused" to paused,
         "total" to total,
@@ -89,6 +95,7 @@ data class UploadSnapshot(
             return UploadSnapshot(
                 batch = batch.id,
                 auth = batch.auth,
+                folder = batch.folder,
                 running = batch.state == "active" && counted.any { it.state == UploadRow.QUEUED },
                 paused = if (batch.state == "paused") batch.paused ?: "user" else null,
                 total = counted.size,
@@ -120,12 +127,13 @@ data class UploadSnapshot(
 class UploadQueue(context: Context) {
     private val db = TransferDb.get(context)
 
-    fun addBatch(id: String, auth: String, files: List<Picked>, now: Long) {
+    fun addBatch(id: String, auth: String, files: List<Picked>, now: Long, folder: String? = null) {
         db.writableDatabase.transaction {
             insertOrThrow("upload_batches", null, ContentValues().apply {
                 put("id", id)
                 put("created_at", now)
                 put("auth", auth)
+                put("folder", folder)
             })
             files.forEachIndexed { i, f ->
                 insertOrThrow("uploads", null, ContentValues().apply {
@@ -187,13 +195,13 @@ class UploadQueue(context: Context) {
         }
 
     fun batch(id: String): UploadBatch? = db.readableDatabase.rawQuery(
-        "SELECT id, auth, state, paused, created_at FROM upload_batches WHERE id = ?",
+        "SELECT $BATCH_COLUMNS FROM upload_batches WHERE id = ?",
         arrayOf(id),
     ).use { if (it.moveToFirst()) batch(it) else null }
 
     /** Batches worth showing: not finished, or started in the last [since]. */
     fun recentBatches(since: Long): List<UploadBatch> = db.readableDatabase.rawQuery(
-        "SELECT id, auth, state, paused, created_at FROM upload_batches WHERE state IN ('active', 'paused') OR created_at >= ? ORDER BY created_at",
+        "SELECT $BATCH_COLUMNS FROM upload_batches WHERE state IN ('active', 'paused') OR created_at >= ? ORDER BY created_at",
         arrayOf(since.toString()),
     ).use { c -> buildList { while (c.moveToNext()) add(batch(c)) } }
 
@@ -216,6 +224,14 @@ class UploadQueue(context: Context) {
         }, "auth = ? AND state = 'active'", arrayOf(auth))
     }
 
+    /** Stops one batch until it's resumed, e.g. when its folder is gone. */
+    fun pauseBatch(id: String, why: String) {
+        db.writableDatabase.update("upload_batches", ContentValues().apply {
+            put("state", "paused")
+            put("paused", why)
+        }, "id = ? AND state = 'active'", arrayOf(id))
+    }
+
     fun pauseActive(why: String) {
         db.writableDatabase.update("upload_batches", ContentValues().apply {
             put("state", "paused")
@@ -223,13 +239,23 @@ class UploadQueue(context: Context) {
         }, "state = 'active'", null)
     }
 
-    /** Paused batches of [auth] go on; returns whether there are any. */
-    fun resume(auth: String?): Boolean {
-        val n = db.writableDatabase.update("upload_batches", ContentValues().apply {
+    /**
+     * Paused batches of [auth] go on; those whose folder is gone go into [folder], or stay
+     * paused without one. Returns whether any go on.
+     */
+    fun resume(auth: String?, folder: String? = null): Boolean = db.writableDatabase.transaction {
+        if (folder != null) {
+            update("upload_batches", ContentValues().apply { put("folder", folder) }, "state = 'paused' AND paused = ? AND auth = ?", arrayOf(UploadBatch.FOLDER_GONE, UploadBatch.DEVICE))
+        }
+        val where = buildList {
+            add("state = 'paused'")
+            if (auth != null) add("auth = ?")
+            if (folder == null) add("IFNULL(paused, '') != '${UploadBatch.FOLDER_GONE}'")
+        }.joinToString(" AND ")
+        update("upload_batches", ContentValues().apply {
             put("state", "active")
             putNull("paused")
-        }, if (auth == null) "state = 'paused'" else "state = 'paused' AND auth = ?", auth?.let { arrayOf(it) })
-        return n > 0
+        }, where, auth?.let { arrayOf(it) }) > 0
     }
 
     /** Failed files go again. */
@@ -289,10 +315,17 @@ class UploadQueue(context: Context) {
         bytes = c.getLong(8),
     )
 
-    private fun batch(c: Cursor) =
-        UploadBatch(id = c.getString(0), auth = c.getString(1), state = c.getString(2), paused = if (c.isNull(3)) null else c.getString(3), createdAt = c.getLong(4))
+    private fun batch(c: Cursor) = UploadBatch(
+        id = c.getString(0),
+        auth = c.getString(1),
+        state = c.getString(2),
+        paused = if (c.isNull(3)) null else c.getString(3),
+        createdAt = c.getLong(4),
+        folder = if (c.isNull(5)) null else c.getString(5),
+    )
 
     private companion object {
         const val COLUMNS = "u.batch, u.seq, u.uri, u.name, u.size, u.mime, u.state, u.upload_id, u.bytes"
+        const val BATCH_COLUMNS = "id, auth, state, paused, created_at, folder"
     }
 }

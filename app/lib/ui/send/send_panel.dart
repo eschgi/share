@@ -7,6 +7,7 @@ import '../../app.dart';
 import '../../data/models.dart';
 import '../../data/platform.dart';
 import '../../l10n/app_localizations.dart';
+import '../folders.dart';
 import '../format.dart';
 import '../icons.dart';
 import '../theme.dart';
@@ -46,16 +47,42 @@ class _SendPanelState extends State<SendPanel> {
     super.dispose();
   }
 
+  void _say(String text) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+
   Future<void> _pick(PickWhat what) async {
     if (_picking) return;
+    final t = AppLocalizations.of(context);
+    final services = Services.read(context);
     setState(() => _picking = true);
     try {
-      await Services.read(context).platform.pickAndSend(what, auth: widget.auth);
+      // Signed in, the files go into the folder chosen; a PIN sends into its own.
+      String? folder;
+      if (widget.auth == SendAuth.device) {
+        final folders = services.folders;
+        if (folders.list == null) await folders.load();
+        folder = folders.sendTo?.id;
+        if (folder == null) return _say(folders.list == null ? t.commonOffline : t.sendNoFolder);
+      }
+      await services.platform.pickAndSend(what, auth: widget.auth, folder: folder);
     } on PlatformException {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).commonFailed)));
+      if (mounted) _say(t.commonFailed);
     } finally {
       if (mounted) setState(() => _picking = false);
     }
+  }
+
+  /// The folder a batch was going into is gone: it goes on into another one.
+  Future<void> _otherFolder(UploadState s) async {
+    final t = AppLocalizations.of(context);
+    final folders = Services.read(context).folders;
+    await (s.folder != null ? folders.gone(s.folder!) : folders.load());
+    if (!mounted) return;
+    final list = folders.list;
+    if (list == null || list.isEmpty) return _say(list == null ? t.commonOffline : t.sendNoFolder);
+    final id = await showFolderChoice(context, title: t.sendInto, list: list, value: folders.sendTo?.id);
+    if (id == null || !mounted) return;
+    folders.chooseSendTo(id);
+    await Services.read(context).platform.resumeUploads(widget.auth, folder: id);
   }
 
   Future<void> _stop(UploadState s) async {
@@ -97,6 +124,7 @@ class _SendPanelState extends State<SendPanel> {
           onPickAgain: () => _pick(s.items.any((i) => i.state == 'lost' && i.kind == FileKind.document) ? PickWhat.documents : PickWhat.media),
           onNewPin: widget.onNewPin,
           onGoOn: () => Services.read(context).platform.resumeUploads(widget.auth),
+          onOtherFolder: () => _otherFolder(s),
         ),
       ],
       if (s == null || s.running) ...[
@@ -136,9 +164,16 @@ class _PickCard extends StatelessWidget {
 }
 
 class _Progress extends StatelessWidget {
-  const _Progress({required this.state, required this.onStop, required this.onPickAgain, required this.onGoOn, this.onNewPin});
+  const _Progress({
+    required this.state,
+    required this.onStop,
+    required this.onPickAgain,
+    required this.onGoOn,
+    required this.onOtherFolder,
+    this.onNewPin,
+  });
   final UploadState state;
-  final VoidCallback onStop, onPickAgain, onGoOn;
+  final VoidCallback onStop, onPickAgain, onGoOn, onOtherFolder;
   final VoidCallback? onNewPin;
 
   @override
@@ -179,6 +214,8 @@ class _Progress extends StatelessWidget {
           _Notice(icon: AppIcons.lock, text: t.sendPinEnded, action: onNewPin == null ? null : (t.sendNewPin, onNewPin!))
         else if (s.paused == 'signed_out')
           _Notice(icon: AppIcons.logOut, text: t.sendSignedOut)
+        else if (s.paused == 'folder_gone')
+          _Notice(icon: AppIcons.folder, text: t.sendFolderGone, action: (t.sendChooseFolder, onOtherFolder))
         else if (s.paused != null)
           _Notice(icon: AppIcons.clock, text: t.sendPaused, action: (t.sendGoOn, onGoOn)),
         if (s.lost > 0) _Notice(icon: AppIcons.alert, text: t.sendLostCount(s.lost), action: (t.sendPickAgain, onPickAgain)),

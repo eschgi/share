@@ -3,6 +3,8 @@
 /// folders.
 library;
 
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 
 import 'library.dart';
@@ -28,8 +30,9 @@ String? sendTarget(List<FolderInfo> list, String? shown, String? chosen) {
 ({int files, int bytes}) allTotals(List<FolderInfo> list) =>
     (files: list.fold(0, (s, f) => s + f.files), bytes: list.fold(0, (s, f) => s + f.bytes));
 
-/// The folders this person sees, for all the app's screens. The folder the library shows stays
-/// on the phone; the one chosen for sending lasts while the app runs.
+/// The folders this person sees, for all the app's screens. They stay on the phone, so sending
+/// knows where to go before the server answers, or without it; so does the folder the library
+/// shows. The one chosen for sending lasts while the app runs.
 class FolderStore extends ChangeNotifier {
   FolderStore({required this.library, required this.platform});
 
@@ -41,9 +44,14 @@ class FolderStore extends ChangeNotifier {
   bool failed = false;
   String? _stored;
   String? _sendChoice;
+  String? _kept; // the folders as the phone keeps them
   Future<void>? _loading;
 
   bool get choices => hasChoices(list);
+
+  /// Files shared into the app wait for the person to say where they go: there's a folder to
+  /// choose, or none known.
+  bool get asksForFolder => choices || sendTo == null;
 
   /// The folder the library shows; null for all.
   FolderInfo? get shown => byId(validShown(list, _stored));
@@ -53,14 +61,25 @@ class FolderStore extends ChangeNotifier {
 
   FolderInfo? byId(String? id) => id == null ? null : list?.where((f) => f.id == id).firstOrNull;
 
-  /// Reads the folder the library showed last time.
-  Future<void> start() async => _stored = await platform.readSecret('folder');
+  /// Reads the folders and the one the library showed, as they were last time.
+  Future<void> start() async {
+    _stored = await platform.readSecret('folder');
+    _kept = await platform.readSecret('folders');
+    try {
+      if (_kept != null) list = FolderInfo.listFromJson(jsonDecode(_kept!) as Json);
+    } catch (_) {
+      // fetched again soon anyway
+    }
+  }
 
   /// Fetches the folders again; a fetch already under way is reused.
   Future<void> load() => _loading ??= () async {
         try {
-          list = await library.folders();
+          final json = await library.folders();
+          list = FolderInfo.listFromJson(json);
           failed = false;
+          final kept = jsonEncode(json);
+          if (kept != _kept) await platform.writeSecret('folders', _kept = kept);
         } catch (_) {
           failed = true;
         } finally {
@@ -93,6 +112,8 @@ class FolderStore extends ChangeNotifier {
   Future<void> clear() async {
     list = null;
     _sendChoice = null;
+    _kept = null;
+    await platform.writeSecret('folders', null);
     await show(null);
   }
 }

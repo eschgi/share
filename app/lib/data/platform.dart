@@ -121,6 +121,7 @@ class UploadState {
   const UploadState({
     required this.batch,
     required this.auth,
+    this.folder,
     required this.running,
     this.paused,
     required this.total,
@@ -139,6 +140,7 @@ class UploadState {
     return UploadState(
       batch: m['batch'] as String? ?? '',
       auth: m['auth'] == 'pin' ? SendAuth.pin : SendAuth.device,
+      folder: m['folder'] as String?,
       running: m['running'] == true,
       paused: m['paused'] as String?,
       total: n('total'),
@@ -155,8 +157,9 @@ class UploadState {
 
   final String batch;
   final SendAuth auth;
+  final String? folder; // signed in: the folder it goes into; a PIN sends into its own
   final bool running;
-  final String? paused; // pin_ended, signed_out or user
+  final String? paused; // pin_ended, signed_out, folder_gone or user
   final int total, done, failed, lost;
   final int bytesTotal, bytesDone;
   final int? etaSeconds;
@@ -266,21 +269,24 @@ abstract class Platform {
 
   Future<String> cacheDir();
 
-  /// Opens the picker and sends what was picked in the background; the batch, or null if
-  /// nothing was picked. Files that had to be picked again go on in their old batch.
-  Future<String?> pickAndSend(PickWhat what, {SendAuth auth = SendAuth.device});
+  /// Opens the picker and sends what was picked in the background, signed in into [folder]; the
+  /// batch, or null if nothing was picked. Files that had to be picked again go on in their old
+  /// batch.
+  Future<String?> pickAndSend(PickWhat what, {SendAuth auth = SendAuth.device, String? folder});
   Future<void> cancelUpload(String batch);
 
-  /// What waited for a new PIN or a sign-in goes on.
-  Future<void> resumeUploads(SendAuth auth);
+  /// What waited for a new PIN or a sign-in goes on; batches whose folder is gone go into
+  /// [folder].
+  Future<void> resumeUploads(SendAuth auth, {String? folder});
   Stream<UploadState> get uploads;
 
   /// Files shared into the app wait until they are sent, or dropped ("Send with Share").
   Future<int> sharedCount();
   Stream<SharedFiles> get sharedChanges;
 
-  /// Sends the files waiting, with the phone's key or the PIN; the upload batch, or null.
-  Future<String?> sendShared(SendAuth auth);
+  /// Sends the files waiting, with the phone's key into [folder] or with the PIN; the upload
+  /// batch, or null.
+  Future<String?> sendShared(SendAuth auth, {String? folder});
   Future<void> dropShared();
 }
 
@@ -457,14 +463,14 @@ class ChannelPlatform implements Platform {
   Future<String> cacheDir() async => await _soft<String>('cache.dir') ?? '';
 
   @override
-  Future<String?> pickAndSend(PickWhat what, {SendAuth auth = SendAuth.device}) =>
-      _invoke<String>('upload.pick', {'what': what.name, 'auth': auth.name});
+  Future<String?> pickAndSend(PickWhat what, {SendAuth auth = SendAuth.device, String? folder}) =>
+      _invoke<String>('upload.pick', {'what': what.name, 'auth': auth.name, 'folder': ?folder});
 
   @override
   Future<void> cancelUpload(String batch) => _soft('upload.cancel', {'batch': batch});
 
   @override
-  Future<void> resumeUploads(SendAuth auth) => _soft('upload.resume', {'auth': auth.name});
+  Future<void> resumeUploads(SendAuth auth, {String? folder}) => _soft('upload.resume', {'auth': auth.name, 'folder': ?folder});
 
   @override
   Future<int> sharedCount() async => await _soft<int>('shared.count') ?? 0;
@@ -473,7 +479,7 @@ class ChannelPlatform implements Platform {
   Stream<SharedFiles> get sharedChanges => _shared.stream;
 
   @override
-  Future<String?> sendShared(SendAuth auth) => _invoke<String>('shared.send', {'auth': auth.name});
+  Future<String?> sendShared(SendAuth auth, {String? folder}) => _invoke<String>('shared.send', {'auth': auth.name, 'folder': ?folder});
 
   @override
   Future<void> dropShared() => _soft('shared.drop');

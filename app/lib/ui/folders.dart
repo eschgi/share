@@ -144,3 +144,99 @@ class _FolderSheet extends StatelessWidget {
     );
   }
 }
+
+/// A folder picked for something, such as sending (screen 48): its picture, what it holds and
+/// who sees it; tapping it chooses another one.
+class FolderField extends StatelessWidget {
+  const FolderField({super.key, required this.label, required this.value, required this.onTap});
+  final String label;
+  final FolderInfo? value;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final c = context.colors;
+    final f = value;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+        child: Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+      ),
+      Material(
+        color: c.s1,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: c.line, width: 1.5)),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(10, 10, 14, 10),
+            child: Row(children: [
+              if (f != null) ...[FolderCover(folder: f), const SizedBox(width: 12)],
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(f?.name ?? t.sendChooseFolder,
+                      maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  if (f != null) ...[
+                    const SizedBox(height: 2),
+                    Text(FolderLines(context).about(f), style: TextStyle(fontSize: 13.5, color: c.text2)),
+                  ],
+                ]),
+              ),
+              const SizedBox(width: 8),
+              RotatedBox(quarterTurns: 1, child: Icon(AppIcons.chevronRight, size: 20, color: c.text3)),
+            ]),
+          ),
+        ),
+      ),
+    ]);
+  }
+}
+
+/// Choosing one folder, such as the one sending goes into: each with its picture, what it holds
+/// and who sees it. A folder with a [note] can't be chosen. The folder chosen, or null.
+Future<String?> showFolderChoice(
+  BuildContext context, {
+  required String title,
+  required List<FolderInfo> list,
+  String? value,
+  String? Function(FolderInfo f)? note,
+}) =>
+    showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        final c = context.colors;
+        final lines = FolderLines(context);
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 4, 8, 14),
+                child: Text(title, style: Theme.of(context).textTheme.headlineSmall),
+              ),
+              SettingsGroup(children: [
+                for (final f in list)
+                  if (note?.call(f) case final why?)
+                    Opacity(
+                      opacity: 0.55,
+                      child: SettingsRow(leading: FolderCover(folder: f), title: f.name, subtitle: '$why · ${lines.seen(f)}', trailing: const SizedBox.shrink()),
+                    )
+                  else
+                    Semantics(
+                      selected: f.id == value,
+                      child: SettingsRow(
+                        leading: FolderCover(folder: f),
+                        title: f.name,
+                        subtitle: lines.about(f),
+                        trailing: f.id == value ? Icon(AppIcons.check, size: 22, color: c.accentText) : const SizedBox.shrink(),
+                        onTap: () => Navigator.pop(context, f.id),
+                      ),
+                    ),
+              ]),
+            ]),
+          ),
+        );
+      },
+    );

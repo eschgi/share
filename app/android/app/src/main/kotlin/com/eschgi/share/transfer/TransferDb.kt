@@ -46,11 +46,18 @@ class TransferDb private constructor(context: Context) : SQLiteOpenHelper(contex
         db.execSQL("CREATE TABLE saved (file_id TEXT PRIMARY KEY, uri TEXT NOT NULL, saved_at INTEGER NOT NULL)")
         createUploads(db)
         createShared(db)
+        version4(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         if (oldVersion < 2) createUploads(db)
         if (oldVersion < 3) createShared(db)
+        if (oldVersion < 4) version4(db)
+    }
+
+    /** Version 4: the folder signed-in sending goes into; null for a PIN, which sends into its own. */
+    private fun version4(db: SQLiteDatabase) {
+        db.execSQL("ALTER TABLE upload_batches ADD COLUMN folder TEXT")
     }
 
     /** Version 3: files shared into the app, waiting to be sent (Outbox). */
@@ -284,7 +291,7 @@ class TransferDb private constructor(context: Context) : SQLiteOpenHelper(contex
     )
 
     companion object {
-        private const val VERSION = 3
+        private const val VERSION = 4
         private const val ITEM_COLUMNS = "i.batch, i.file_id, i.name, i.size, i.mime, i.kind, i.state, i.bytes, i.target"
 
         @Volatile private var instance: TransferDb? = null

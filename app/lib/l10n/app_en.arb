@@ -937,6 +937,26 @@
   "sendSignedOut": "This phone was signed out. Sign in again and sending goes on.",
   "sendPaused": "Sending was stopped. It goes on where it stopped.",
   "sendGoOn": "Go on",
+  "sendInto": "Into the folder",
+  "sendChooseFolder": "Choose a folder",
+  "sendWaitingCount": "{count, plural, =1{1 file waits to be sent.} other{{count} files wait to be sent.}}",
+  "@sendWaitingCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sendWaitingSend": "{count, plural, =1{Send 1 file} other{Send {count} files}}",
+  "@sendWaitingSend": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sendNoFolder": "You don't see any folder yet, so there's nowhere to send to. An admin gives you folders.",
+  "sendFolderGone": "The folder these files were going into is gone. Choose another one and sending goes on.",
   "pinEnterTitle": "Enter your PIN",
   "pinEnterLead": "The 5-character code you were given. You only need it once on this phone.",
   "pinEnterHelp": "Letters or numbers. Capital or small doesn't matter.",

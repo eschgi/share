@@ -25,8 +25,8 @@ class UploaderTest {
 
     private val data = Random(3).nextBytes(3 * 1024 * 1024 + 5)
 
-    /** The uploads the server has: their length and the bytes so far. */
-    private class Upload(val length: Long, val name: String) {
+    /** The uploads the server has: their length, the folder they go into and the bytes so far. */
+    private class Upload(val length: Long, val name: String, val folder: String? = null) {
         val bytes = ByteArrayOutputStream()
     }
 
@@ -47,7 +47,8 @@ class UploaderTest {
             method == "POST" && req.path == "/tus/" -> {
                 val new = "u${next++}"
                 val meta = req.header("Upload-Metadata")!!.split(',').associate { it.substringBefore(' ') to it.substringAfter(' ') }
-                uploads[new] = Upload(req.header("Upload-Length")!!.toLong(), String(Base64.getDecoder().decode(meta.getValue("filename"))))
+                fun text(key: String) = meta[key]?.let { String(Base64.getDecoder().decode(it)) }
+                uploads[new] = Upload(req.header("Upload-Length")!!.toLong(), text("filename")!!, text("folder"))
                 res.send(201, headers = mapOf("Location" to "/tus/$new"))
             }
             method == "HEAD" -> {
@@ -99,9 +100,10 @@ class UploaderTest {
         source: UploadSource = FileSource(file(bytes)),
         abort: Abort = Abort(),
         created: MutableList<String> = mutableListOf(),
+        folder: String? = null,
         onBytes: (Long) -> Unit = {},
     ) = Uploader(bufferSize = 64 * 1024).upload(
-        "IMG_1.jpg", "image/jpeg", bytes.size.toLong(), source, uploadId, 1024 * 1024, ::open, abort, { created += it }, onBytes,
+        "IMG_1.jpg", "image/jpeg", bytes.size.toLong(), source, uploadId, 1024 * 1024, ::open, abort, { created += it }, onBytes, folder,
     )
 
     @Test
@@ -113,8 +115,21 @@ class UploaderTest {
         assertEquals(listOf("u0"), created)
         assertArrayEquals(data, uploads.getValue("u0").bytes.toByteArray())
         assertEquals("IMG_1.jpg", uploads.getValue("u0").name)
+        assertEquals(null, uploads.getValue("u0").folder) // a PIN sends into its own
         assertEquals(listOf("POST /tus/", "PATCH /tus/u0", "PATCH /tus/u0", "PATCH /tus/u0", "PATCH /tus/u0"), requests)
         assertEquals(data.size.toLong(), seen.last())
+    }
+
+    @Test
+    fun intoAFolder() {
+        assertEquals(Uploader.Outcome.Done("u0"), upload(folder = "f4mily5x2k7mbqz4bwdbyj6qsq"))
+        assertEquals("f4mily5x2k7mbqz4bwdbyj6qsq", uploads.getValue("u0").folder)
+    }
+
+    @Test
+    fun anUploadTheServerForgotStartsOverInItsFolder() {
+        assertEquals(Uploader.Outcome.Done("u0"), upload(uploadId = "gone", folder = "w3dd1ng5x2k7mbqz4bwdbyj6qs"))
+        assertEquals("w3dd1ng5x2k7mbqz4bwdbyj6qs", uploads.getValue("u0").folder)
     }
 
     @Test
@@ -195,6 +210,8 @@ class UploaderTest {
         assertEquals(Uploader.Outcome.PinEnded, answer(401, "session_ended"))
         assertEquals(Uploader.Outcome.SignedOut, answer(401, "signed_out"))
         assertEquals(Uploader.Outcome.Failed(413, "too_large"), answer(413, "too_large"))
+        assertEquals(Uploader.Outcome.Failed(404, "folder_gone"), answer(404, "folder_gone"))
+        assertEquals(Uploader.Outcome.Failed(403, "no_folder"), answer(403, "no_folder"))
         assertEquals(Uploader.Outcome.Retry(null, 503, 4000), answer(503))
     }
 
