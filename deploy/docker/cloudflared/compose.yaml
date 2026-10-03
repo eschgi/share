@@ -1,0 +1,29 @@
+# Share behind a Cloudflare Tunnel: nothing to open in the firewall, no public address needed.
+# How to start: ../README.md. The tunnel's token goes into a file .env next to this one:
+# TUNNEL_TOKEN=…
+services:
+  share:
+    image: ghcr.io/eschgi/share:latest
+    restart: unless-stopped
+    # Share gives running requests 20 seconds when it stops.
+    stop_grace_period: 30s
+    volumes:
+      - ./config.json:/config/config.json:ro
+      - share:/data
+    # For the app at home ("home_url"): the http port on this machine's address in the home
+    # network only, never on every address.
+    # ports:
+    #   - "192.168.1.20:8080:8080"
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+    # In Share's own network: the tunnel reaches Share at http://127.0.0.1:8080, from this
+    # machine as far as Share can tell, so "proxy": "cloudflare" trusts it.
+    network_mode: service:share
+
+volumes:
+  share:

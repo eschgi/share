@@ -13,8 +13,8 @@ import (
 )
 
 // MarkerName is the file `share init` puts into the storage folder. The server waits for it
-// instead of creating the folder itself: if the USB drive isn't mounted yet, creating the
-// folder would quietly put every upload on the router's flash.
+// instead of creating the folder itself: if the drive or volume isn't mounted yet, creating the
+// folder would quietly put every upload on the system's own disk, or inside a container.
 const MarkerName = ".share-storage"
 
 // Layout names the folders.
@@ -73,7 +73,7 @@ func WaitForMarker(ctx context.Context, storageDir string, logf func(string, ...
 			return nil
 		}
 		if time.Since(lastLog) >= time.Minute {
-			logf("storage: waiting for %s (is the drive mounted? run `share init` once)", marker)
+			logf("storage: waiting for %s (is the drive or volume mounted? run `share init` once)", marker)
 			lastLog = time.Now()
 		}
 		select {
@@ -115,7 +115,7 @@ func Check(l Layout, minFree int64) Report {
 	}
 
 	if _, err := os.Stat(filepath.Join(l.StorageDir, MarkerName)); err != nil {
-		problem("marker_missing", "%s has no %s marker; mount the drive and run `share init`", l.StorageDir, MarkerName)
+		problem("marker_missing", "%s has no %s marker; mount the drive or volume and run `share init`", l.StorageDir, MarkerName)
 		return r
 	}
 	var err error
@@ -139,7 +139,7 @@ func Check(l Layout, minFree int64) Report {
 	case "exfat", "ntfs", "ntfs3", "fuseblk":
 		warn("ignores_case", "the storage drive is %s: it ignores case in names and is slower than ext4", r.Storage.Type)
 	case "tmpfs", "squashfs", "overlay", "ubifs", "jffs2":
-		problem("not_a_drive", "the storage folder is on %s, which is the router's memory or flash, not a drive", r.Storage.Type)
+		problem("not_a_drive", "the storage folder is on %s: memory, flash or a container's own layer, not a drive or a volume", r.Storage.Type)
 	}
 
 	if err := os.MkdirAll(l.DataDir, 0o700); err != nil {
@@ -155,6 +155,8 @@ func Check(l Layout, minFree int64) Report {
 		problem("data_unsafe", "the data folder is on %s; SQLite isn't safe there — set data_dir to a local disk", r.Data.Type)
 	case "tmpfs":
 		problem("data_in_memory", "the data folder is in memory (tmpfs) and would be lost on restart")
+	case "overlay":
+		problem("data_in_memory", "the data folder is inside the container (overlay) and would be lost when the container is made anew; put it on a volume")
 	}
 	// Uploads stop where they would leave less than minFree; say so a while before.
 	switch free := r.Storage.Free; {

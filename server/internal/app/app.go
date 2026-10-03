@@ -31,7 +31,7 @@ import (
 // Options changes how New builds the app; the zero value is what `share serve` uses.
 type Options struct {
 	Now            func() time.Time
-	WaitForStorage bool // wait for the storage marker instead of failing (the drive may mount late)
+	WaitForStorage bool // wait for the storage marker instead of failing (a drive may mount late)
 	Upload         *upload.Config
 	Version        string // the program's version, for the About screens; "dev" when empty
 	// CheckStorage looks at the drives for the admins' storage page; storage.Check when nil.
@@ -71,7 +71,7 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 			return nil, err
 		}
 	} else if _, err := os.Stat(filepath.Join(cfg.StorageDir, storage.MarkerName)); err != nil {
-		return nil, fmt.Errorf("%s isn't a Share storage folder (no %s); mount the drive and run `share init`", cfg.StorageDir, storage.MarkerName)
+		return nil, fmt.Errorf("%s isn't a Share storage folder (no %s); mount the drive or volume and run `share init`", cfg.StorageDir, storage.MarkerName)
 	}
 	report := storage.Check(layout, cfg.MinFreeSpace())
 	for _, p := range report.Problems {

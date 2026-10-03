@@ -1,0 +1,42 @@
+# Share behind Caddy, which gets and renews the certificates. How to start: ../README.md.
+services:
+  share:
+    image: ghcr.io/eschgi/share:latest
+    restart: unless-stopped
+    # Share gives running requests 20 seconds when it stops.
+    stop_grace_period: 30s
+    volumes:
+      - ./config.json:/config/config.json:ro
+      - share:/data
+    networks:
+      - web
+    # No ports: only Caddy reaches Share.
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      web:
+        # Share trusts this address as its proxy ("trusted_proxies" in config.json).
+        ipv4_address: 172.30.0.2
+
+networks:
+  web:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+          # Other containers get addresses from here, so none of them takes Caddy's.
+          ip_range: 172.30.0.128/25
+
+volumes:
+  share:
+  caddy_data:
+  caddy_config:

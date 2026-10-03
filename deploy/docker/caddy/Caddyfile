@@ -1,0 +1,12 @@
+# Share, with a certificate Caddy gets and renews itself. Put your own name here, and point its
+# DNS record at this server.
+share.example.com {
+	reverse_proxy share:8080
+}
+
+# Another app on the same server, under its own name, as another service in compose.yaml on
+# the same network:
+#
+# other.example.com {
+# 	reverse_proxy other-app:3000
+# }

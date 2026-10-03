@@ -1,7 +1,9 @@
 package config
 
 import (
+	"io/fs"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -207,5 +209,27 @@ func TestExampleIsValid(t *testing.T) {
 	}
 	if cfg.HomeURL != "http://192.168.8.1:8080" || cfg.App.LinkScheme != "com.eschgi.share" {
 		t.Errorf("home = %q, app = %+v", cfg.HomeURL, cfg.App)
+	}
+}
+
+// The setups in deploy/ come with examples of config.json, which must work as they are.
+func TestDeployExamplesAreValid(t *testing.T) {
+	var found int
+	err := filepath.WalkDir("../../../deploy", func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.Name() != "config.example.json" {
+			return err
+		}
+		found++
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if _, err := Parse(data); err != nil {
+			t.Errorf("%s: %v", path, err)
+		}
+		return nil
+	})
+	if err != nil || found == 0 {
+		t.Fatalf("looking for examples in deploy/: %d found, %v", found, err)
 	}
 }

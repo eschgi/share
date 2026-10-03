@@ -1,0 +1,14 @@
+# Only the website and the server go into an image's build. The app, the docs and anything
+# local (configs, databases, keys, builds) stay out.
+*
+!web/
+!server/
+!LICENSE
+!NOTICE
+web/node_modules/
+server/internal/webui/dist/
+server/share
+server/share.exe
+**/config.json
+**/*.db
+**/*.db-*
