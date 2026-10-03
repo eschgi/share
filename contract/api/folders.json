@@ -33,5 +33,5 @@
       }
     ]
   },
-  "notes": "The folders the caller sees, the oldest first: admins every folder, members the ones they were given. files, bytes: what is in the library (not the trash); senders: how many people and PIN sessions sent them. people: who sees the folder: the admins, the members given it and open invites that give it. admins_only: no member sees it. cover: the newest photo or video with a thumbnail, as in /api/files, or null. The list changes with the library's version."
+  "notes": "The folders the caller sees, the oldest first: admins every folder, members the ones they were given. files, bytes: what is in the library (not the trash); senders: how many people and PIN sessions sent them. people: who sees the folder: the admins, the members given it and open invites that give it. admins_only: no member sees it. cover: the newest photo or video with a thumbnail, as in /api/files, or null. The list changes with the library's version. A PIN session whose PIN shows its folder gets that folder; other PIN sessions 403 forbidden."
 }

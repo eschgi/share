@@ -121,6 +121,8 @@ type Session struct {
 	// FolderName is the folder the PIN sends into; null while the server has only one, where
 	// nothing tells of folders.
 	FolderName *string `json:"folder_name"`
+	// ShowsFolder: the PIN also shows what is in its folder (/api/folders, /api/library, ...).
+	ShowsFolder bool `json:"shows_folder"`
 }
 
 // folderName is the name of a PIN's folder for its session, nil on a server with one folder.
@@ -199,7 +201,8 @@ func (a *API) unlock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	resp := UnlockResponse{
-		Session:      Session{Kind: auth.KindPin, PinKind: res.Session.Pin.Kind, ExpiresAt: res.ExpiresAt, FolderName: folder},
+		Session: Session{Kind: auth.KindPin, PinKind: res.Session.Pin.Kind, ExpiresAt: res.ExpiresAt, FolderName: folder,
+			ShowsFolder: res.Session.Pin.ShowsFolder},
 		MovedUploads: res.Moved,
 	}
 	if req.Client == "app" {
@@ -222,7 +225,8 @@ func (a *API) session(w http.ResponseWriter, r *http.Request) {
 		internal(w, "session", err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, Session{Kind: p.Kind, PinKind: p.PinKind, ExpiresAt: p.PinExpiresAt, FolderName: folder})
+	httpx.WriteJSON(w, http.StatusOK, Session{Kind: p.Kind, PinKind: p.PinKind, ExpiresAt: p.PinExpiresAt, FolderName: folder,
+		ShowsFolder: p.PinShowsFolder})
 }
 
 func (a *API) endSession(w http.ResponseWriter, r *http.Request) {

@@ -23,6 +23,8 @@ type Principal struct {
 	PinKind      string
 	PinExpiresAt *time.Time
 	PinFolderID  string // the folder the PIN sends into
+	// PinShowsFolder: guests with the PIN also see and download what is in its folder.
+	PinShowsFolder bool
 
 	// Signed-in phones and browsers.
 	UserID   string

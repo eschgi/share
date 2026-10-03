@@ -350,12 +350,13 @@ func (s *Service) authenticatePin(ctx context.Context, token string) (*Principal
 		}
 	}
 	return &Principal{
-		Kind:         KindPin,
-		PinSessionID: sess.ID,
-		PinID:        sess.PinID,
-		PinKind:      sess.Pin.Kind,
-		PinExpiresAt: sess.Pin.ExpiresAt,
-		PinFolderID:  sess.Pin.FolderID,
+		Kind:           KindPin,
+		PinSessionID:   sess.ID,
+		PinID:          sess.PinID,
+		PinKind:        sess.Pin.Kind,
+		PinExpiresAt:   sess.Pin.ExpiresAt,
+		PinFolderID:    sess.Pin.FolderID,
+		PinShowsFolder: sess.Pin.ShowsFolder,
 	}, nil
 }
 

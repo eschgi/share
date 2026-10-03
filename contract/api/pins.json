@@ -14,7 +14,8 @@
         "link": "https://share.example.com/#K7M2Q",
         "files": 128,
         "phones": 6,
-        "folder": "f4mily5x2k7mbqz4bwdbyj6qsq"
+        "folder": "f4mily5x2k7mbqz4bwdbyj6qsq",
+        "shows_folder": false
       },
       {
         "id": "p4ld5x2k7mbqz4bwdbyj6qsqxa",
@@ -25,7 +26,8 @@
         "link": "https://share.example.com/#4HX9T",
         "files": 45,
         "phones": 7,
-        "folder": "f4mily5x2k7mbqz4bwdbyj6qsq"
+        "folder": "f4mily5x2k7mbqz4bwdbyj6qsq",
+        "shows_folder": false
       }
     ]
   },

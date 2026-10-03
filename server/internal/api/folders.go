@@ -40,11 +40,20 @@ type folderCache struct {
 }
 
 // viewer authenticates someone who may look at the library and returns the folders they see:
-// admins every folder, members the ones they were given.
+// admins every folder, members the ones they were given, guests with a PIN that shows its
+// folder that folder.
 func (a *API) viewer(w http.ResponseWriter, r *http.Request) (*auth.Principal, []db.Folder, bool) {
-	p, ok := a.device(w, r)
-	if !ok {
+	p, err := a.Auth.Authenticate(r.Context(), r)
+	if err != nil {
+		httpx.WriteAuthError(w, r, err)
 		return nil, nil, false
+	}
+	if p.Kind == auth.KindPin && !p.PinShowsFolder {
+		httpx.WriteError(w, http.StatusForbidden, "forbidden", "Sign in to do this; a PIN can only send files.")
+		return nil, nil, false
+	}
+	if p.RenewCookie {
+		auth.RenewAccountCookie(w, r)
 	}
 	folders, err := a.visibleFolders(r.Context(), p)
 	if err != nil {
@@ -56,10 +65,26 @@ func (a *API) viewer(w http.ResponseWriter, r *http.Request) (*auth.Principal, [
 
 // visibleFolders are the folders p sees, the oldest first.
 func (a *API) visibleFolders(ctx context.Context, p *auth.Principal) ([]db.Folder, error) {
-	if p.Role == db.RoleAdmin {
+	switch {
+	case p.Kind == auth.KindPin:
+		f, err := a.Auth.DB.FolderByID(ctx, p.PinFolderID)
+		if errors.Is(err, db.ErrNotFound) || (err == nil && f.DeletedAt != nil) {
+			return nil, nil
+		}
+		return []db.Folder{f}, err
+	case p.Role == db.RoleAdmin:
 		return a.Auth.DB.LiveFolders(ctx)
 	}
 	return a.Auth.DB.FoldersOf(ctx, p.UserID)
+}
+
+// senderNames maps user ids to names, for the "from" of files: none for guests, who don't
+// learn who sent what.
+func (a *API) senderNames(r *http.Request, p *auth.Principal) (map[string]string, error) {
+	if p.Kind == auth.KindPin {
+		return nil, nil
+	}
+	return a.userNames(r)
 }
 
 func folderIDs(folders []db.Folder) []string {
@@ -83,11 +108,11 @@ func (a *API) oldestFolder(ctx context.Context) (db.Folder, error) {
 }
 
 func (a *API) folders(w http.ResponseWriter, r *http.Request) {
-	_, folders, ok := a.viewer(w, r)
+	p, folders, ok := a.viewer(w, r)
 	if !ok {
 		return
 	}
-	list, err := a.folderInfos(r, folders)
+	list, err := a.folderInfos(r, p, folders)
 	if err != nil {
 		internal(w, "folders", err)
 		return
@@ -95,9 +120,9 @@ func (a *API) folders(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, Folders{Folders: list})
 }
 
-// folderInfos describes folders: what they hold comes from the cache while the library is
-// unchanged; who sees them is counted each time.
-func (a *API) folderInfos(r *http.Request, folders []db.Folder) ([]FolderInfo, error) {
+// folderInfos describes folders to p: what they hold comes from the cache while the library
+// is unchanged; who sees them is counted each time.
+func (a *API) folderInfos(r *http.Request, p *auth.Principal, folders []db.Folder) ([]FolderInfo, error) {
 	ctx := r.Context()
 	stats, covers, err := a.folderContents(ctx, folders)
 	if err != nil {
@@ -107,7 +132,7 @@ func (a *API) folderInfos(r *http.Request, folders []db.Folder) ([]FolderInfo, e
 	if err != nil {
 		return nil, err
 	}
-	names, err := a.userNames(r)
+	names, err := a.senderNames(r, p)
 	if err != nil {
 		return nil, err
 	}
@@ -164,9 +189,9 @@ type folderRequest struct {
 	Name string `json:"name"`
 }
 
-// folderInfo describes one folder, as GET /api/folders would.
-func (a *API) folderInfo(r *http.Request, f db.Folder) (FolderInfo, error) {
-	list, err := a.folderInfos(r, []db.Folder{f})
+// folderInfo describes one folder to an admin, as GET /api/folders would.
+func (a *API) folderInfo(r *http.Request, p *auth.Principal, f db.Folder) (FolderInfo, error) {
+	list, err := a.folderInfos(r, p, []db.Folder{f})
 	if err != nil {
 		return FolderInfo{}, err
 	}
@@ -186,11 +211,12 @@ func (a *API) createFolder(w http.ResponseWriter, r *http.Request) {
 	if !a.folderError(w, "create folder", err) {
 		return
 	}
-	a.writeFolder(w, r, http.StatusCreated, f)
+	a.writeFolder(w, r, p, http.StatusCreated, f)
 }
 
 func (a *API) renameFolder(w http.ResponseWriter, r *http.Request) {
-	if _, ok := a.admin(w, r); !ok {
+	p, ok := a.admin(w, r)
+	if !ok {
 		return
 	}
 	var req folderRequest
@@ -201,7 +227,7 @@ func (a *API) renameFolder(w http.ResponseWriter, r *http.Request) {
 	if !a.folderError(w, "rename folder", err) {
 		return
 	}
-	a.writeFolder(w, r, http.StatusOK, f)
+	a.writeFolder(w, r, p, http.StatusOK, f)
 }
 
 func (a *API) deleteFolder(w http.ResponseWriter, r *http.Request) {
@@ -216,8 +242,8 @@ func (a *API) deleteFolder(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, Changed{Changed: len(files)})
 }
 
-func (a *API) writeFolder(w http.ResponseWriter, r *http.Request, status int, f db.Folder) {
-	info, err := a.folderInfo(r, f)
+func (a *API) writeFolder(w http.ResponseWriter, r *http.Request, p *auth.Principal, status int, f db.Folder) {
+	info, err := a.folderInfo(r, p, f)
 	if err != nil {
 		internal(w, "folder", err)
 		return

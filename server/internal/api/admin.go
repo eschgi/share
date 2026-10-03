@@ -75,12 +75,14 @@ type PinInfo struct {
 	Files     int        `json:"files"`      // sent with it and still in the library
 	Phones    int        `json:"phones"`     // browsers and phones that unlocked it
 	Folder    string     `json:"folder"`     // the id of the folder it sends into
+	// ShowsFolder: guests with it also see and download what is in the folder.
+	ShowsFolder bool `json:"shows_folder"`
 }
 
 func (a *API) pinInfo(p db.Pin, s db.PinStat) PinInfo {
 	return PinInfo{
 		ID: p.ID, Code: p.Code, Kind: p.Kind, CreatedAt: p.CreatedAt, ExpiresAt: p.ExpiresAt,
-		Link: a.Cfg.PublicURL + "/#" + p.Code, Files: s.Files, Phones: s.Phones, Folder: p.FolderID,
+		Link: a.Cfg.PublicURL + "/#" + p.Code, Files: s.Files, Phones: s.Phones, Folder: p.FolderID, ShowsFolder: p.ShowsFolder,
 	}
 }
 
@@ -137,6 +139,8 @@ type createPinRequest struct {
 	Kind   string `json:"kind"`
 	Code   string `json:"code,omitempty"`   // empty: a random one
 	Folder string `json:"folder,omitempty"` // the folder it sends into; left out: the oldest one
+	// ShowsFolder: guests with it also see and download what is in the folder.
+	ShowsFolder bool `json:"shows_folder,omitempty"`
 }
 
 func (a *API) createPin(w http.ResponseWriter, r *http.Request) {
@@ -160,7 +164,8 @@ func (a *API) createPin(w http.ResponseWriter, r *http.Request) {
 		}
 		req.Folder = folder.ID
 	}
-	pin, err := a.Auth.CreatePin(r.Context(), auth.PinSpec{Kind: req.Kind, Code: req.Code, FolderID: req.Folder}, p.UserID)
+	spec := auth.PinSpec{Kind: req.Kind, Code: req.Code, FolderID: req.Folder, ShowsFolder: req.ShowsFolder}
+	pin, err := a.Auth.CreatePin(r.Context(), spec, p.UserID)
 	switch {
 	case err == nil:
 		httpx.WriteJSON(w, http.StatusCreated, a.pinInfo(pin, db.PinStat{}))

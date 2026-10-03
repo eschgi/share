@@ -5,7 +5,7 @@
   "cases": [
     {
       "status": 200,
-      "response": {"kind": "pin", "pin_kind": "day", "expires_at": "2026-09-28T10:00:00Z", "folder_name": "Wedding Anna & Marco"}
+      "response": {"kind": "pin", "pin_kind": "day", "expires_at": "2026-09-28T10:00:00Z", "folder_name": "Wedding Anna & Marco", "shows_folder": true}
     },
     {
       "status": 401,
@@ -16,5 +16,5 @@
       "response": {"error": {"code": "unauthorized", "message": "Enter a PIN or sign in first."}}
     }
   ],
-  "notes": "folder_name is the folder the PIN sends into, null while the server has only one folder."
+  "notes": "folder_name is the folder the PIN sends into, null while the server has only one folder. shows_folder: the PIN also shows what is in its folder, so the session may use GET /api/folders, /api/library, /api/files, /api/files/ids, /api/files/{id} with its content and thumbnail, and ZIPs (/api/downloads), all for that folder only; without it they answer 403 forbidden."
 }

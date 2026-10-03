@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/eschgi/share/server/internal/auth"
 	"github.com/eschgi/share/server/internal/db"
 	"github.com/eschgi/share/server/internal/httpx"
 	"github.com/eschgi/share/server/internal/ids"
@@ -142,7 +143,7 @@ type FilePage struct {
 }
 
 func (a *API) files(w http.ResponseWriter, r *http.Request) {
-	_, folders, ok := a.viewer(w, r)
+	p, folders, ok := a.viewer(w, r)
 	if !ok {
 		return
 	}
@@ -173,7 +174,7 @@ func (a *API) files(w http.ResponseWriter, r *http.Request) {
 		internal(w, "files", err)
 		return
 	}
-	names, err := a.userNames(r)
+	names, err := a.senderNames(r, p)
 	if err != nil {
 		internal(w, "files", err)
 		return
@@ -234,44 +235,44 @@ func (a *API) fileIDs(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, FileIDs{IDs: list, Bytes: total})
 }
 
-// readyFile finds a file in the library for a signed-in phone, answering the request if it
-// can't.
-func (a *API) readyFile(w http.ResponseWriter, r *http.Request) (db.File, bool) {
+// readyFile finds a file in the library for someone who may see it, answering the request if
+// it can't.
+func (a *API) readyFile(w http.ResponseWriter, r *http.Request) (*auth.Principal, db.File, bool) {
 	return a.libraryFile(w, r, false)
 }
 
 // libraryFile loads the file a request is about, if it is in a folder the caller sees. With
 // trash, admins also get deleted files: Recently deleted shows their thumbnails.
-func (a *API) libraryFile(w http.ResponseWriter, r *http.Request, trash bool) (db.File, bool) {
+func (a *API) libraryFile(w http.ResponseWriter, r *http.Request, trash bool) (*auth.Principal, db.File, bool) {
 	p, folders, ok := a.viewer(w, r)
 	if !ok {
-		return db.File{}, false
+		return nil, db.File{}, false
 	}
 	id := r.PathValue("id")
 	if !ids.Valid(id) {
 		httpx.WriteError(w, http.StatusNotFound, "not_found", "No such file.")
-		return db.File{}, false
+		return nil, db.File{}, false
 	}
 	f, err := a.Auth.DB.FileByID(r.Context(), id)
 	seen := slices.ContainsFunc(folders, func(x db.Folder) bool { return x.ID == f.FolderID })
 	visible := (f.State == db.StateReady && seen) || (trash && f.State == db.StateTrashed && p.Role == db.RoleAdmin)
 	if errors.Is(err, db.ErrNotFound) || (err == nil && !visible) {
 		httpx.WriteError(w, http.StatusNotFound, "not_found", "No such file.")
-		return f, false
+		return nil, f, false
 	}
 	if err != nil {
 		internal(w, "file", err)
-		return f, false
+		return nil, f, false
 	}
-	return f, true
+	return p, f, true
 }
 
 func (a *API) file(w http.ResponseWriter, r *http.Request) {
-	f, ok := a.readyFile(w, r)
+	p, f, ok := a.readyFile(w, r)
 	if !ok {
 		return
 	}
-	names, err := a.userNames(r)
+	names, err := a.senderNames(r, p)
 	if err != nil {
 		internal(w, "file", err)
 		return
@@ -282,7 +283,7 @@ func (a *API) file(w http.ResponseWriter, r *http.Request) {
 // content sends a file as it was uploaded. Downloads resume with Range (and If-Range, the ETag
 // being the file id), and nothing along the way may cache or change them.
 func (a *API) content(w http.ResponseWriter, r *http.Request) {
-	f, ok := a.readyFile(w, r)
+	_, f, ok := a.readyFile(w, r)
 	if !ok {
 		return
 	}
@@ -315,7 +316,7 @@ func (a *API) content(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) thumb(w http.ResponseWriter, r *http.Request) {
-	f, ok := a.libraryFile(w, r, true)
+	_, f, ok := a.libraryFile(w, r, true)
 	if !ok {
 		return
 	}

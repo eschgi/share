@@ -552,3 +552,66 @@ func TestUnlockAgainMovesUploadsToTheNewPinsFolder(t *testing.T) {
 		t.Fatalf("the upload went into %q (%s)", f.FolderID, f.State)
 	}
 }
+
+func TestPinsThatShowTheirFolder(t *testing.T) {
+	e := newEnv(t)
+	admin := e.admin()
+	family := e.firstFolder()
+	wedding := e.newFolder("Wedding")
+	photo := (tus{e, admin.token}).sendInto(wedding.ID, "IMG_1.png", pngBytes(t, 64, 48))
+	private := e.put(family, "Family.jpg", []byte("private"))
+	e.clock.Add(3 * time.Minute)
+	if _, err := e.app.Thumbs.MakePending(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	pin := e.sendJSON("POST", "/api/pins", admin.token, map[string]any{"kind": "day", "folder": wedding.ID, "shows_folder": true}).json(t)
+	if pin["shows_folder"] != true {
+		t.Fatalf("the PIN: %v", pin)
+	}
+	guest, unlocked := e.unlockApp(pin["code"].(string), "")
+	if s := unlocked["session"].(map[string]any); s["shows_folder"] != true || s["folder_name"] != "Wedding" {
+		t.Fatalf("the session: %v", s)
+	}
+
+	// The guest sees Wedding, and nothing tells of Family or who sent what.
+	r := e.get("/api/folders", guest)
+	assertShape(t, "folders", readFixture(t, "api/folders.json")["response"], r.json(t))
+	if list := r.json(t)["folders"].([]any); len(list) != 1 || list[0].(map[string]any)["id"] != wedding.ID {
+		t.Fatalf("the guest's folders: %v", list)
+	}
+	files := e.get("/api/files", guest).json(t)["files"].([]any)
+	if len(files) != 1 || files[0].(map[string]any)["id"] != photo.ID || files[0].(map[string]any)["from"] != nil {
+		t.Fatalf("the guest's files: %v", files)
+	}
+	if days := e.get("/api/library", guest).json(t)["days"].([]any); len(days) != 1 {
+		t.Fatalf("the guest's days: %v", days)
+	}
+	for _, path := range []string{"/api/files/" + photo.ID, "/api/files/" + photo.ID + "/content", "/api/files/" + photo.ID + "/thumb", "/api/files/ids"} {
+		wantStatus(t, "the guest: "+path, e.get(path, guest), http.StatusOK, "")
+	}
+	for _, path := range []string{"/api/files/" + private.ID, "/api/files/" + private.ID + "/content", "/api/library?folder=" + family.ID} {
+		wantStatus(t, "the guest: "+path, e.get(path, guest), http.StatusNotFound, "not_found")
+	}
+
+	// ZIPs are the guest's own.
+	z := e.askZip(guest, photo.ID, private.ID).json(t)
+	if z["count"] != 1.0 {
+		t.Fatalf("the guest's ZIP: %v", z)
+	}
+	wantStatus(t, "the guest's ZIP", e.get("/api/downloads/"+z["id"].(string), guest), http.StatusOK, "")
+	other, _ := e.unlockApp(pin["code"].(string), "")
+	wantStatus(t, "another guest's ZIP", e.get("/api/downloads/"+z["id"].(string), other), http.StatusNotFound, "not_found")
+
+	// Guests delete nothing, and still send into the folder.
+	wantStatus(t, "the guest deleting", e.sendJSON("POST", "/api/files/delete", guest, map[string][]string{"ids": {photo.ID}}), http.StatusForbidden, "forbidden")
+	wantStatus(t, "the guest's trash", e.get("/api/trash", guest), http.StatusForbidden, "forbidden")
+	if f := e.file((tus{e, guest}).sendFile("IMG_2.jpg", []byte("more"))); f.FolderID != wedding.ID {
+		t.Fatalf("the guest's file went into %q", f.FolderID)
+	}
+
+	// A PIN that only sends still sees nothing.
+	plain, _ := e.unlockApp(e.newPin(db.PinDay).Code, "")
+	wantStatus(t, "a plain PIN", e.get("/api/library", plain), http.StatusForbidden, "forbidden")
+	wantStatus(t, "a plain PIN's folders", e.get("/api/folders", plain), http.StatusForbidden, "forbidden")
+}

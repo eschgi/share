@@ -20,6 +20,8 @@ type PinSpec struct {
 	Kind     string // db.PinPermanent or db.PinDay
 	Code     string // as typed (spaces, dashes and small letters are fine); "" for a random one
 	FolderID string // the folder it sends into
+	// ShowsFolder: guests with the PIN also see and download what is in the folder.
+	ShowsFolder bool
 }
 
 // CreatePin makes a PIN that sends into a folder, with the code asked for or a fresh random
@@ -38,7 +40,7 @@ func (s *Service) CreatePin(ctx context.Context, spec PinSpec, createdBy string)
 		return db.Pin{}, err
 	}
 	now := s.Now()
-	p := db.Pin{ID: ids.New(), Kind: spec.Kind, CreatedBy: createdBy, CreatedAt: now, FolderID: folder.ID}
+	p := db.Pin{ID: ids.New(), Kind: spec.Kind, CreatedBy: createdBy, CreatedAt: now, FolderID: folder.ID, ShowsFolder: spec.ShowsFolder}
 	if spec.Kind == db.PinDay {
 		exp := now.Add(DayPinLifetime)
 		p.ExpiresAt = &exp
@@ -84,8 +86,7 @@ func (s *Service) SuggestCode(ctx context.Context) (string, error) {
 }
 
 // NewCode replaces a PIN's code. The old PIN ends (so its sessions and links stop working)
-// and a new PIN of the same kind, into the same folder, takes its place; codes are never
-// reused.
+// and a new PIN like it, into the same folder, takes its place; codes are never reused.
 func (s *Service) NewCode(ctx context.Context, id, createdBy string) (db.Pin, error) {
 	old, err := s.DB.PinByID(ctx, id)
 	if err != nil {
@@ -94,7 +95,7 @@ func (s *Service) NewCode(ctx context.Context, id, createdBy string) (db.Pin, er
 	if !old.LiveAt(s.Now()) {
 		return db.Pin{}, errors.New("that PIN has already ended")
 	}
-	p, err := s.CreatePin(ctx, PinSpec{Kind: old.Kind, FolderID: old.FolderID}, createdBy)
+	p, err := s.CreatePin(ctx, PinSpec{Kind: old.Kind, FolderID: old.FolderID, ShowsFolder: old.ShowsFolder}, createdBy)
 	if err != nil {
 		return db.Pin{}, err
 	}

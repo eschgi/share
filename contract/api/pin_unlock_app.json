@@ -13,7 +13,8 @@
       "kind": "pin",
       "pin_kind": "day",
       "expires_at": "2026-09-28T10:00:00Z",
-      "folder_name": "Wedding Anna & Marco"
+      "folder_name": "Wedding Anna & Marco",
+      "shows_folder": true
     },
     "moved_uploads": 0,
     "server": {

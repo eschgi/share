@@ -12,7 +12,8 @@
     "link": "https://share.example.com/#M9CQ3",
     "files": 0,
     "phones": 0,
-    "folder": "f4mily5x2k7mbqz4bwdbyj6qsq"
+    "folder": "f4mily5x2k7mbqz4bwdbyj6qsq",
+    "shows_folder": false
   },
   "notes": "Replaces a PIN's code: the old PIN ends (its links and sessions stop working) and a new one of the same kind takes its place. Also: POST /api/pins/{id}/end (204) ends a PIN now. Both: not_found (404) for a PIN that has ended."
 }
