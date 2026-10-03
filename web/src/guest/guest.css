@@ -29,8 +29,10 @@
   width: 19px;
   height: 19px;
 }
+/* The days' titles line up with the folder's name; the tiles reach a little further out, as in
+   the app. */
 .gfiles {
-  margin: 4px -10px 14px;
+  margin: 4px -4px 14px;
 }
 .gfiles .selm {
   display: none !important;
@@ -45,6 +47,6 @@
     white-space: normal;
   }
   .gfiles {
-    margin: 4px 0 14px;
+    margin: 4px -2px 14px;
   }
 }
