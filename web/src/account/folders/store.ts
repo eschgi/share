@@ -3,7 +3,7 @@
 // library changes and after an admin changes them.
 import { useEffect, useState } from 'preact/hooks';
 import { getFolders, type FolderInfo } from '../../api';
-import { sendTarget, validShown } from './folders';
+import { sendTarget, validShown } from './model';
 
 const storedKey = 'share.folder';
 

@@ -3,7 +3,7 @@ import type { FolderInfo } from '../../api';
 import { Icon } from '../../components/Icon';
 import { useI18n } from '../../i18n';
 import { Modal } from '../components/Modal';
-import { moveDefault } from './folders';
+import { moveDefault } from './model';
 import { FolderChoices } from './Folders';
 
 /** Screen 49: the folder selected files go into. here is the folder they are all in already,

@@ -7,7 +7,7 @@ import { claimShared, dropShared, sharedGone, type Shared } from '../../incoming
 import { notify } from '../../notify';
 import { initialState, reduce, type Action, type State } from '../../state';
 import { holdQueueLock, Uploader, type Snapshot } from '../../uploader';
-import { hasChoices } from '../folders/folders';
+import { hasChoices } from '../folders/model';
 import { foldersNow, refreshFolders } from '../folders/store';
 
 let state: State = initialState;

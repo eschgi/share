@@ -7,7 +7,7 @@ import { ReadyScreen } from '../../screens/ReadyScreen';
 import { SendingScreen } from '../../screens/SendingScreen';
 import { WelcomeScreen } from '../../screens/WelcomeScreen';
 import { useAccount } from '../context';
-import { hasChoices } from '../folders/folders';
+import { hasChoices } from '../folders/model';
 import { useFolders } from '../folders/store';
 import { Shell, TitleBar } from '../Shell';
 import { continueRestored, retryFailed, sendFiles, sendMore, skipGhosts, startOver, useSender } from './sender';

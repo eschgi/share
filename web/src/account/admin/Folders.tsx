@@ -7,7 +7,7 @@ import { navigate } from '../../router';
 import { Avatar, AvatarStack, Link, Row, Switch } from '../components/Bits';
 import { Confirm, Modal } from '../components/Modal';
 import { useAccount } from '../context';
-import { whoSees } from '../folders/folders';
+import { whoSees } from '../folders/model';
 import { FolderCover, useFolderLines } from '../folders/Folders';
 import { refreshFolders } from '../folders/store';
 import { NewPinDialog, PinsList } from './Pins';

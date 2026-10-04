@@ -22,7 +22,7 @@ import { useOverlay } from '../../router';
 import { Avatar, Link } from '../components/Bits';
 import { Confirm } from '../components/Modal';
 import { useAccount } from '../context';
-import { hasChoices } from '../folders/folders';
+import { hasChoices } from '../folders/model';
 import { FolderColumn, FolderSheet, FolderTitle } from '../folders/Folders';
 import { MoveDialog } from '../folders/MoveDialog';
 import { folderGone, refreshFolders, useFolders } from '../folders/store';

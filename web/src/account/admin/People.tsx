@@ -22,7 +22,7 @@ import { useI18n, type Lang } from '../../i18n';
 import { Avatar, RoleBadge, Switch } from '../components/Bits';
 import { Confirm, Modal } from '../components/Modal';
 import { useAccount } from '../context';
-import { inviteDefault } from '../folders/folders';
+import { inviteDefault } from '../folders/model';
 import { FolderCover, useFolderLines } from '../folders/Folders';
 import { refreshFolders, useFolders } from '../folders/store';
 import { lastUsed } from '../settings/dialogs';

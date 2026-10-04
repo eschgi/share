@@ -8,7 +8,7 @@ import { formatBytes, formatCount } from '../../format';
 import { useI18n } from '../../i18n';
 import { toneClass } from '../colors';
 import { Modal } from '../components/Modal';
-import { allTotals } from './folders';
+import { allTotals } from './model';
 import { showFolder } from './store';
 
 /** A folder's picture: its newest photo or video, a document for one without pictures, and the

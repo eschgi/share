@@ -5,7 +5,7 @@ import { formatBytes } from '../../format';
 import { useI18n } from '../../i18n';
 import { Confirm } from '../components/Modal';
 import { useAccount } from '../context';
-import { hasChoices } from '../folders/folders';
+import { hasChoices } from '../folders/model';
 import { refreshFolders, useFolders } from '../folders/store';
 import { inParts } from '../library/actions';
 import { Thumb } from '../library/Tile';

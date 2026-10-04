@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FolderInfo, OpenInvite, People, Person } from '../src/api';
-import { allTotals, dropTarget, hasChoices, inviteDefault, moveDefault, sendTarget, validShown, whoSees } from '../src/account/folders/folders';
+import { allTotals, dropTarget, hasChoices, inviteDefault, moveDefault, sendTarget, validShown, whoSees } from '../src/account/folders/model';
 import { uploadMeta } from '../src/uploader';
 
 function folder(id: string, files = 1, bytes = 100): FolderInfo {

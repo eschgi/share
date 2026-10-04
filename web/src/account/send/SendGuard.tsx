@@ -4,7 +4,7 @@ import { useLeaveWarning, useWakeLock } from '../../device';
 import { useI18n } from '../../i18n';
 import { navigate } from '../../router';
 import { useAccount } from '../context';
-import { dropTarget } from '../folders/folders';
+import { dropTarget } from '../folders/model';
 import { foldersNow, useFolders } from '../folders/store';
 import { hold, sendFiles, sendMore, unfinished, useSender } from './sender';
 

@@ -9,7 +9,7 @@ import { cleanPinInput, pinLength } from '../../pin';
 import { Switch } from '../components/Bits';
 import { Confirm, Modal } from '../components/Modal';
 import { useAccount } from '../context';
-import { hasChoices } from '../folders/folders';
+import { hasChoices } from '../folders/model';
 import { FolderField, FolderPicker } from '../folders/Folders';
 import { useFolders } from '../folders/store';
 import { copyText, sharesLinks, shareText } from './share';
