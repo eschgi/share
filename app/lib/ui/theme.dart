@@ -227,6 +227,13 @@ abstract final class ThemeChoice {
     final c = (AppTheme.parse(setting) ?? AppTheme.ember).colors;
     return (c, c, c.isDark ? ThemeMode.dark : ThemeMode.light);
   }
+
+  /// The viewer's colours: dark in every theme. A light one lends it its dark sibling.
+  static ShareColors viewer(String? setting) {
+    final (_, dark, _) = resolve(setting);
+    if (dark.isDark) return dark;
+    return (setting == AppTheme.frost.name ? AppTheme.midnight : AppTheme.ember).colors;
+  }
 }
 
 extension ShareTheme on BuildContext {

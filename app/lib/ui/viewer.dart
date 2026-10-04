@@ -20,8 +20,8 @@ import 'widgets.dart';
 
 /// Screen 14: one file at a time, at original size; swipe to the next. Admins can delete the file
 /// shown. Under a PIN's LibraryScope (screen 46) it fetches with the PIN, and says nothing of who
-/// sent what.
-class ViewerScreen extends StatefulWidget {
+/// sent what. Dark in every theme, sheets and dialogs too, so the pictures stand out.
+class ViewerScreen extends StatelessWidget {
   const ViewerScreen({super.key, required this.files, required this.initial, this.onDeleted, this.onRestored, this.folderOf});
   final List<FileInfo> files;
   final int initial;
@@ -36,15 +36,25 @@ class ViewerScreen extends StatefulWidget {
   final VoidCallback? onRestored;
 
   @override
-  State<ViewerScreen> createState() => _ViewerScreenState();
+  Widget build(BuildContext context) =>
+      Theme(data: shareTheme(ThemeChoice.viewer(Services.read(context).theme.value)), child: _Viewer(screen: this));
 }
 
-class _ViewerScreenState extends State<ViewerScreen> {
-  late final PageController _pages = PageController(initialPage: widget.initial);
-  late int _index = widget.initial;
+// Under the dark theme, so what it opens from its own context is dark too.
+class _Viewer extends StatefulWidget {
+  const _Viewer({required this.screen});
+  final ViewerScreen screen;
+
+  @override
+  State<_Viewer> createState() => _ViewerState();
+}
+
+class _ViewerState extends State<_Viewer> {
+  late final PageController _pages = PageController(initialPage: widget.screen.initial);
+  late int _index = widget.screen.initial;
   // The viewer's own list: a deleted file leaves it. Pages are keyed by file, so the page of the
   // next one isn't the deleted one's.
-  late final List<FileInfo> _files = List.of(widget.files);
+  late final List<FileInfo> _files = List.of(widget.screen.files);
 
   FileInfo get _file => _files[_index];
 
@@ -80,8 +90,8 @@ class _ViewerScreenState extends State<ViewerScreen> {
       messenger.showSnackBar(SnackBar(content: Text(t.commonFailed)));
       return;
     }
-    widget.onDeleted?.call(f.id);
-    final restored = widget.onRestored;
+    widget.screen.onDeleted?.call(f.id);
+    final restored = widget.screen.onRestored;
     // It goes by itself: staying, it would cover the viewer's buttons.
     messenger.showSnackBar(SnackBar(
       content: Text(t.deletedSnack(1)),
@@ -113,7 +123,7 @@ class _ViewerScreenState extends State<ViewerScreen> {
     final locale = Localizations.localeOf(context).languageCode;
     final f = _file;
     final c = context.colors;
-    final folder = widget.folderOf?.call(f);
+    final folder = widget.screen.folderOf?.call(f);
     final senders = LibraryScope.read(context).pin == null; // a PIN's guests don't see who sent what
     showModalBottomSheet<void>(
       context: context,
@@ -208,7 +218,7 @@ class _ViewerScreenState extends State<ViewerScreen> {
               onTap: () => withFetch(context, 1, () => Services.read(context).platform.shareFiles([f], auth: LibraryScope.read(context).auth)),
             ),
             _Action(icon: AppIcons.info, label: t.viewerDetails, onTap: _details),
-            if (widget.onDeleted != null) _Action(icon: AppIcons.trash, label: t.deleteSelected, onTap: _delete),
+            if (widget.screen.onDeleted != null) _Action(icon: AppIcons.trash, label: t.deleteSelected, onTap: _delete),
           ]),
         ),
       ]),

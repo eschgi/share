@@ -6,13 +6,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:share_app/data/models.dart';
 import 'package:share_app/data/platform.dart';
+import 'package:share_app/ui/library/tiles.dart';
 import 'package:share_app/ui/theme.dart';
+import 'package:share_app/ui/viewer.dart';
 
 import 'app_test.dart' show daysAgo, signedInPhone, startApp, today;
 import 'support/fake_server.dart';
 import 'support/fonts.dart';
 
-/// Each theme on three screens, to compare them side by side:
+/// Each theme on four screens, to compare them side by side:
 ///   flutter test --run-skipped --tags golden --update-goldens test/themes_golden_test.dart
 void main() {
   setUpAll(loadFonts);
@@ -29,12 +31,17 @@ void main() {
     ..addDay(daysAgo(1), 11, startId: 100);
 
   for (final theme in AppTheme.values) {
-    testWidgets('${theme.name}: library, settings, sending', (tester) => at(() async {
+    testWidgets('${theme.name}: library, viewer, settings, sending', (tester) => at(() async {
           final platform = signedInPhone()
             ..secrets['theme'] = theme.name
             ..current = const RouteStatus(ServerRoute.local, millis: 12);
           await startApp(tester, platform, server());
           await shot(tester, '${theme.name}-library');
+
+          await tester.tap(find.byType(LibraryTile).at(3)); // a PDF: the viewer's own text, and the filmstrip
+          await shot(tester, '${theme.name}-viewer');
+          Navigator.of(tester.element(find.byType(ViewerScreen))).pop();
+          await tester.pumpAndSettle();
 
           await tester.tap(find.text('Send').last);
           await tester.pumpAndSettle();

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:share_app/ui/icons.dart';
+import 'package:share_app/ui/library/tiles.dart';
 import 'package:share_app/ui/settings_screen.dart';
 import 'package:share_app/ui/theme.dart';
 
-import 'app_test.dart' show signedInPhone, startApp;
+import 'app_test.dart' show signedInPhone, startApp, today;
 import 'support/fake_server.dart';
 import 'support/fonts.dart';
 
@@ -65,4 +67,18 @@ void main() {
     expect(background(tester), AppTheme.frost.colors.bg);
     expect(Theme.of(tester.element(find.byType(SettingsScreen))).brightness, Brightness.light);
   });
+
+  for (final (setting, dark) in [('linen', AppTheme.ember), ('frost', AppTheme.midnight), ('plum', AppTheme.plum)]) {
+    testWidgets('the viewer is dark in $setting too, its menu and sheets with it', (tester) async {
+      await startApp(tester, signedInPhone()..secrets['theme'] = setting, FakeServer()..addDay(today(), 6));
+      await tester.tap(find.byType(LibraryTile).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(AppIcons.more));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Details').last);
+      await tester.pumpAndSettle();
+      expect(Theme.of(tester.element(find.text('Details').first)).extension<ShareColors>(), same(dark.colors), reason: 'the viewer');
+      expect(Theme.of(tester.element(find.textContaining(' · image/').last)).extension<ShareColors>(), same(dark.colors), reason: 'the details');
+    });
+  }
 }
