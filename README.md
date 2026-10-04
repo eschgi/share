@@ -109,37 +109,6 @@ VPS, or in Docker. [Hosting](#hosting) shows the ways to reach it.
 
 Both speak English, German and Italian.
 
-## Status
-
-| Part | State |
-|------|-------|
-| Server: PINs, uploads, storage, thumbnails | works |
-| Server: accounts and invites, library and downloads, an address at home for the app | works |
-| Plain http at home for the website and the app, https everywhere else | works |
-| Server: managing PINs and people, deleting and restoring files | works |
-| Website: sending with a PIN, the invite page (English, German, Italian) | works |
-| Website: continuing after the page was closed, install as an app | works |
-| Website: layouts for tablets and computers, dropping files and folders, invites as a QR code | works |
-| Website for people with an account: signing in with a password or an invite, the library, the viewer | works |
-| Website: downloads of one file, of many as a ZIP that resumes, or into a folder (Chrome, Edge) | works |
-| Website: selecting, sharing from phones, deleting with Undo, sending without a PIN | works |
-| Website: upload PINs, people and invites, Recently deleted, storage | works |
-| Server: the version for people with an account, new passwords from admins, the drive's warnings | works |
-| Website: zooming into photos, marks for files saved into a folder, notifications when a transfer ends | works |
-| Website: Use another PIN, About, new passwords and the drive's warnings for admins | works |
-| Server and website: folders with their own people, PINs into a folder and PINs that show it, moving files | works |
-| Website: Share into Share, installed on Android | built and tested in Chrome, not yet tried on a phone |
-| Android app: see and download | built and tested, not yet tried on a phone |
-| Android app: send, manage PINs and people, Recently deleted | built and tested, not yet tried on a phone |
-| Android app: videos and sound in the viewer, deleting there, one's own phones and browsers | built and tested, not yet tried on a phone |
-| Android app: Share into Share, new passwords, the drive's warnings, About | built and tested, not yet tried on a phone |
-| Android app: folders, sending into one, a PIN's folder to see, moving files | built and tested, not yet tried on a phone |
-| Server: behind Cloudflare's tunnel or a reverse proxy (Caddy, nginx, Traefik), next to other apps | built and tested, not yet tried behind a reverse proxy |
-| Docker image for amd64 and arm64, with setups for Caddy and a Cloudflare Tunnel | built, not yet tried |
-| Self-updating app, Google Play | planned |
-
-The plan and the screens are in [`docs/`](docs/).
-
 ## How it works
 
 - An admin makes a PIN, in the app, on the website or with `share pin create`: a permanent one, for
