@@ -169,7 +169,7 @@ func (k *keyring) work(a keysAnswer) {
 	}
 	for _, p := range a.Todo.Pins {
 		holder := k.folders[fmt.Sprintf("%s:%d", p.Folder, p.SecretVersion)]
-		secret, err := e2ee.Open(holder, e2ee.PurposeFolder, e2ee.FolderContext(p.Folder, p.SecretVersion), k.unb64(p.SecretSealed))
+		secret, err := e2ee.Open(holder, e2ee.PurposePin, e2ee.FolderContext(p.Folder, p.SecretVersion), k.unb64(p.SecretSealed))
 		if err != nil {
 			k.e.t.Fatalf("opening a PIN's secret: %v", err)
 		}
@@ -620,7 +620,7 @@ func TestInvitesAndPinsWithSecrets(t *testing.T) {
 
 	// A PIN that shows the folder: its secret sealed for the folder key, the key locked with it.
 	pinSecret := randomBytes(t, 32)
-	secretSealed, _ := e2ee.Seal(ak.folderPubs[family.ID+":1"], e2ee.PurposeFolder, e2ee.FolderContext(family.ID, 1), pinSecret)
+	secretSealed, _ := e2ee.Seal(ak.folderPubs[family.ID+":1"], e2ee.PurposePin, e2ee.FolderContext(family.ID, 1), pinSecret)
 	pinLocked := e2ee.Lock(e2ee.SecretKey(pinSecret, e2ee.PurposePin), e2ee.FolderContext(family.ID, 1), ak.folders[family.ID+":1"])
 	pinReq := map[string]any{"kind": "day", "folder": family.ID, "shows_folder": true, "secret": map[string]any{
 		"sealed": b64u.EncodeToString(secretSealed), "version": 1, "keys": []map[string]any{{"version": 1, "locked": b64u.EncodeToString(pinLocked)}}}}

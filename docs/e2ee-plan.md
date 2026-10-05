@@ -77,6 +77,7 @@ scalar, everything binary in JSON as base64url without padding.
   | a file key, for a folder key | `share-e2ee-v1/file` | `folder:<folder id>:<version>` |
   | a folder key, for a person or the recovery key | `share-e2ee-v1/folder` | `folder:<folder id>:<version>` |
   | a person key, for a device | `share-e2ee-v1/person` | `person:<user id>` |
+  | a PIN link's secret, for a folder key | `share-e2ee-v1/pin` | `folder:<folder id>:<version>` |
 
   The context keeps a server from passing one folder's key off as another's, which would make a
   member encrypt into a folder that others see.

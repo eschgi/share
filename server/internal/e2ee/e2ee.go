@@ -42,7 +42,7 @@ const (
 	PurposeContent  = "share-e2ee-v1/content"  // a file's contents
 	PurposeThumb    = "share-e2ee-v1/thumb"    // a file's thumbnail
 	PurposeInvite   = "share-e2ee-v1/invite"   // keys locked with an invite link's secret
-	PurposePin      = "share-e2ee-v1/pin"      // folder keys locked with a PIN link's secret
+	PurposePin      = "share-e2ee-v1/pin"      // folder keys locked with a PIN link's secret, and that secret sealed for a folder key
 	PurposeRecovery = "share-e2ee-v1/recovery" // the recovery key, locked with the recovery code
 )
 

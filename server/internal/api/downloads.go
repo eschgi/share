@@ -36,9 +36,10 @@ type downloadRequest struct {
 
 // DownloadFile is one file of a download, with its path inside the ZIP or the folder.
 type DownloadFile struct {
-	ID   string `json:"id"`
-	Path string `json:"path"`
-	Size int64  `json:"size"`
+	ID   string   `json:"id"`
+	Path string   `json:"path"`
+	Size int64    `json:"size"` // the plain size of an encrypted file
+	Enc  *EncInfo `json:"enc"`  // an encrypted file, which the ZIP leaves out; null for a plain one
 }
 
 // DownloadInfo is a ZIP ready to be fetched from GET /api/downloads/{id}.
@@ -97,11 +98,10 @@ func (a *API) createDownload(w http.ResponseWriter, r *http.Request) {
 	sel := a.Downloads.Add(p.Key(), z.ids(), a.zipName(files, folders), dirs != nil)
 	info := DownloadInfo{ID: sel.ID, Name: sel.Name, Size: z.archive.Size(), Count: len(plain), Files: make([]DownloadFile, len(files))}
 	for i, f := range files {
-		size := f.Size
-		if f.Enc != nil {
-			size = f.Enc.PlainSize
+		info.Files[i] = DownloadFile{ID: f.ID, Path: all.paths[i], Size: f.Size}
+		if e := f.Enc; e != nil {
+			info.Files[i].Size, info.Files[i].Enc = e.PlainSize, &EncInfo{Version: e.Version, Key: e.Key, Header: e.Header}
 		}
-		info.Files[i] = DownloadFile{ID: f.ID, Path: all.paths[i], Size: size}
 	}
 	httpx.WriteJSON(w, http.StatusCreated, info)
 }
