@@ -19,6 +19,7 @@ import (
 
 	"github.com/eschgi/share/server/internal/config"
 	"github.com/eschgi/share/server/internal/db"
+	"github.com/eschgi/share/server/internal/db/pgtest"
 	"github.com/eschgi/share/server/internal/ids"
 	"github.com/eschgi/share/server/internal/s3"
 	"github.com/eschgi/share/server/internal/s3/s3test"
@@ -68,7 +69,10 @@ func startS3Env(t *testing.T, dataDir string, setting []byte, fake *s3test.Serve
 	}
 	database, ok := databases.Load(dataDir)
 	if !ok {
-		database, _ = databases.LoadOrStore(dataDir, testDatabase(t))
+		database = testDatabase(t)
+		if dataDir != "" {
+			database, _ = databases.LoadOrStore(dataDir, database)
+		}
 	}
 	cfg, err := config.Parse([]byte(fmt.Sprintf(
 		`{"public_url": "https://share.example.test", "data_dir": %q, "s3": %s, "time_zone": "Europe/Rome", "http": {"listen": "127.0.0.1:0"}%s%s}`,
@@ -155,6 +159,36 @@ func TestS3ModeStarts(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("Serve didn't stop")
+	}
+}
+
+// With PostgreSQL and a bucket, the server keeps nothing on its own disk: no data folder.
+func TestNothingIsKeptOnThisMachine(t *testing.T) {
+	if !pgtest.Enabled() {
+		t.Skip("needs PostgreSQL (SHARE_TEST_POSTGRES)")
+	}
+	fake := s3test.New(t)
+	fake.SetMinPartSize(s3TestPart)
+	setting, _ := json.Marshal(fake.Config("share/"))
+	cwd, _ := os.Getwd()
+	before, _ := os.ReadDir(cwd)
+	e := startS3Env(t, "", setting, fake, "")
+	if e.cfg.DataDir != "" {
+		t.Fatalf("data_dir %q", e.cfg.DataDir)
+	}
+	admin := e.admin()
+	id := s3Client{e: e, token: admin.token}.send("IMG_1.jpg", jpegBytes(t, 64, 48, 1), e.firstFolder().ID)
+	if r := e.putThumb(admin.token, id, "", "image/jpeg", jpegBytes(t, 32, 24, 2)); r.status != http.StatusNoContent {
+		t.Fatalf("PUT thumb: %d %s", r.status, r.body)
+	}
+	if r := e.get("/api/files/"+id+"/thumb", admin.token); r.status != http.StatusOK {
+		t.Errorf("GET thumb: %d %s", r.status, r.body)
+	}
+	if r := storage.CheckS3(context.Background(), e.cfg.DataDir, e.app.S3, e.cfg.Origins()); len(r.Problems) != 0 || r.Data.Type != "" {
+		t.Errorf("the checks: %+v", r)
+	}
+	if after, _ := os.ReadDir(cwd); len(after) != len(before) {
+		t.Errorf("something was written into %s: %d entries, before %d", cwd, len(after), len(before))
 	}
 }
 

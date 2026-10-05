@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/eschgi/share/server/internal/config"
+	"github.com/eschgi/share/server/internal/db/pgtest"
 	"github.com/eschgi/share/server/internal/s3"
 	"github.com/eschgi/share/server/internal/s3/s3test"
 )
@@ -61,5 +62,35 @@ func TestInitAndCheckABucket(t *testing.T) {
 	t.Logf("share check:\n%s", out)
 	if strings.Contains(out, s3test.Secret) {
 		t.Errorf("check printed the secret:\n%s", out)
+	}
+}
+
+// With PostgreSQL and a bucket, init has nothing to make on this machine.
+func TestInitWithPostgresAndABucket(t *testing.T) {
+	url := pgtest.URL(t)
+	if url == "" {
+		t.Skip("needs PostgreSQL (SHARE_TEST_POSTGRES)")
+	}
+	fake := s3test.New(t)
+	saved := openBucket
+	openBucket = func(c *config.S3) (*s3.Bucket, error) {
+		return s3.Open(c, s3.Options{Transport: fake.Client().Transport, MaxRetries: 1})
+	}
+	t.Cleanup(func() { openBucket = saved })
+	dir := t.TempDir()
+	setting, _ := json.Marshal(fake.Config("share/"))
+	database, _ := json.Marshal(url)
+	path := filepath.Join(dir, "config.json")
+	cfg := fmt.Sprintf(`{"public_url": "https://share.example.com", "s3": %s, "database": {"postgres": %s}}`, setting, database)
+	if err := os.WriteFile(path, []byte(cfg), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out, err := output(t, "init", "--config", path)
+	if err != nil || !strings.Contains(out, "Nothing to keep on this machine") || strings.Contains(out, "Data folder") {
+		t.Errorf("init: %v\n%s", err, out)
+	}
+	out, err = output(t, "check", "--config", path)
+	if err != nil || !strings.Contains(out, "Database:      PostgreSQL at ") || !strings.Contains(out, "All good.") {
+		t.Errorf("check: %v\n%s", err, out)
 	}
 }

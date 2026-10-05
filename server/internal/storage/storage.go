@@ -187,7 +187,9 @@ func CheckS3(ctx context.Context, dataDir string, b *s3.Bucket, origins []string
 			r.problem("s3_cors", "the bucket's CORS rules don't let Share's pages on %s send and fetch files; `share check` prints the rules to set", strings.Join(refused, " and "))
 		}
 	}
-	r.checkData(dataDir)
+	if dataDir != "" { // with PostgreSQL and a bucket nothing is kept on this machine
+		r.checkData(dataDir)
+	}
 	return r
 }
 

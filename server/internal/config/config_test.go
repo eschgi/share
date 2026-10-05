@@ -362,3 +362,21 @@ func TestPostgres(t *testing.T) {
 		}
 	}
 }
+
+// With PostgreSQL and a bucket nothing needs to be kept on this machine.
+func TestDataDirIsOptionalWithPostgresAndABucket(t *testing.T) {
+	s3 := `"s3": {"endpoint": "https://s3.eu-central-1.amazonaws.com", "region": "eu-central-1", "bucket": "family-share", "access_key_id": "AKID", "secret_access_key": "SECRET"}`
+	database := `"database": {"postgres": "postgres://share:pw@db.example.com/share?sslmode=require"}`
+	cfg, err := Parse([]byte(`{"public_url": "https://a.example", ` + s3 + `, ` + database + `}`))
+	if err != nil || cfg.DataDir != "" {
+		t.Fatalf("a bucket and PostgreSQL: %q, %v", cfg.DataDir, err)
+	}
+	for _, tc := range []struct{ json, want string }{
+		{`{"public_url": "https://a.example", ` + s3 + `}`, `unless "database" names PostgreSQL`},
+		{`{"public_url": "https://a.example", ` + s3 + `, ` + database + `, "https": {"listen": ":8443"}}`, "own certificate"},
+	} {
+		if _, err := Parse([]byte(tc.json)); err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("%s: %v, want %q", tc.json, err, tc.want)
+		}
+	}
+}

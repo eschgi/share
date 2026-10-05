@@ -14,8 +14,13 @@ import (
 var openBucket = func(c *config.S3) (*s3.Bucket, error) { return s3.Open(c, s3.Options{}) }
 
 // initS3 is `share init` with the files in a bucket, which needs nothing made: only the data
-// folder, for the database. Then it checks as `share check` does.
+// folder, for the database, and not even that with PostgreSQL. Then it checks as `share
+// check` does.
 func initS3(cfg *config.Config) error {
+	if cfg.DataDir == "" {
+		fmt.Println("Nothing to keep on this machine: the files are in the bucket, the records in PostgreSQL.")
+		return checkS3(cfg)
+	}
 	if err := os.MkdirAll(cfg.DataDir, 0o700); err != nil {
 		return err
 	}

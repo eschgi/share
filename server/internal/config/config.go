@@ -382,12 +382,15 @@ func (c *Config) complete() error {
 		c.StorageDir = filepath.Clean(c.StorageDir)
 	}
 	switch {
-	case c.DataDir == "" && c.S3 != nil:
-		bad("data_dir", `is required with "s3": the database stays on this machine`)
+	case c.DataDir == "" && c.S3 != nil && c.Database == nil:
+		bad("data_dir", `is required with "s3": the database stays on this machine, unless "database" names PostgreSQL`)
+	case c.DataDir == "" && c.S3 != nil && c.SelfSigned():
+		bad("data_dir", "is required for the https port's own certificate")
 	case c.DataDir == "" && c.StorageDir != "":
 		c.DataDir = filepath.Join(c.StorageDir, ".share")
 	case c.DataDir == "":
-		// Without storage_dir there is nothing to put it into; that is reported above.
+		// With PostgreSQL and a bucket nothing is kept on this machine. Without storage_dir
+		// or "s3" there is nothing to put it into; that is reported above.
 	case !filepath.IsAbs(c.DataDir):
 		bad("data_dir", "must be an absolute path")
 	default:
