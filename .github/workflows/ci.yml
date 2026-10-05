@@ -78,6 +78,44 @@ jobs:
       - name: Known vulnerabilities
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
+  server-postgres:
+    # The same tests against PostgreSQL, which Share can use instead of SQLite. The race
+    # detector and the 120 MiB upload run in the job above.
+    name: Server on PostgreSQL
+    needs: web
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: share
+          POSTGRES_PASSWORD: share
+          POSTGRES_DB: share
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U share"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: webui-dist
+          path: server/internal/webui/dist/
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.27.x'
+          cache-dependency-path: server/go.sum
+      - name: Test against PostgreSQL 17
+        run: go test -short ./...
+        env:
+          SHARE_TEST_POSTGRES: postgres://share:share@127.0.0.1:5432/share?sslmode=disable
+
   docker:
     # Every push checks that the image builds; a version tag also publishes it as
     # ghcr.io/<owner>/share with the version, the minor version and latest (not for a tag
@@ -198,7 +236,7 @@ jobs:
   release:
     name: Release
     if: github.ref_type == 'tag'
-    needs: [server, app]
+    needs: [server, server-postgres, app]
     runs-on: ubuntu-latest
     permissions:
       contents: write
