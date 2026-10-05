@@ -116,6 +116,7 @@ object UploadEngine {
                                 progress.publish()
                             },
                             folder = batch.folder,
+                            lastModified = Outbox.lastModified(app, item.file.uri.toUri()),
                         )
                     } finally {
                         current = null

@@ -26,7 +26,7 @@ class TusUploaderTest {
     private val data = Random(3).nextBytes(3 * 1024 * 1024 + 5)
 
     /** The uploads the server has: their length, the folder they go into and the bytes so far. */
-    private class Upload(val length: Long, val name: String, val folder: String? = null) {
+    private class Upload(val length: Long, val name: String, val folder: String? = null, val lastModified: String? = null) {
         val bytes = ByteArrayOutputStream()
     }
 
@@ -48,7 +48,7 @@ class TusUploaderTest {
                 val new = "u${next++}"
                 val meta = req.header("Upload-Metadata")!!.split(',').associate { it.substringBefore(' ') to it.substringAfter(' ') }
                 fun text(key: String) = meta[key]?.let { String(Base64.getDecoder().decode(it)) }
-                uploads[new] = Upload(req.header("Upload-Length")!!.toLong(), text("filename")!!, text("folder"))
+                uploads[new] = Upload(req.header("Upload-Length")!!.toLong(), text("filename")!!, text("folder"), text("lastModified"))
                 res.send(201, headers = mapOf("Location" to "/tus/$new"))
             }
             method == "HEAD" -> {
@@ -101,9 +101,10 @@ class TusUploaderTest {
         abort: Abort = Abort(),
         created: MutableList<String> = mutableListOf(),
         folder: String? = null,
+        lastModified: Long? = null,
         onBytes: (Long) -> Unit = {},
     ) = TusUploader(bufferSize = 64 * 1024).upload(
-        "IMG_1.jpg", "image/jpeg", bytes.size.toLong(), source, uploadId, 1024 * 1024, ::open, abort, { created += it }, onBytes, folder,
+        "IMG_1.jpg", "image/jpeg", bytes.size.toLong(), source, uploadId, 1024 * 1024, ::open, abort, { created += it }, onBytes, folder, lastModified,
     )
 
     @Test
@@ -124,6 +125,13 @@ class TusUploaderTest {
     fun intoAFolder() {
         assertEquals(UploadOutcome.Done("u0"), upload(folder = "f4mily5x2k7mbqz4bwdbyj6qsq"))
         assertEquals("f4mily5x2k7mbqz4bwdbyj6qsq", uploads.getValue("u0").folder)
+        assertEquals(null, uploads.getValue("u0").lastModified) // not known: not sent
+    }
+
+    @Test
+    fun withTheFilesTime() {
+        assertEquals(UploadOutcome.Done("u0"), upload(lastModified = 1758960000000))
+        assertEquals("1758960000000", uploads.getValue("u0").lastModified)
     }
 
     @Test
