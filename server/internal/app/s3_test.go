@@ -131,6 +131,9 @@ func TestS3ModeStarts(t *testing.T) {
 	if v, _ := e.app.DB.Meta(context.Background(), "storage"); v != e.cfg.StorageKey() || !strings.HasPrefix(v, "s3:") {
 		t.Errorf("storage noted as %q", v)
 	}
+	if csp := e.do(nil, "GET", "/", "", nil, nil).header.Get("Content-Security-Policy"); !strings.Contains(csp, "connect-src 'self' "+e.app.S3.Origin()+";") {
+		t.Errorf("pages can't reach the bucket: %q", csp)
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() { done <- e.app.Serve(ctx) }()

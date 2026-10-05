@@ -171,7 +171,11 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 		lib.OnReady = crcs.Wake
 	}
 	dl := &downloads.Store{Now: now}
-	ui := webui.New(cfg)
+	bucketOrigin := ""
+	if bucket != nil {
+		bucketOrigin = bucket.Origin()
+	}
+	ui := webui.New(cfg, bucketOrigin)
 	if !ui.Built() {
 		log.Printf("webui: the website isn't built into this binary; serving a placeholder")
 	}
