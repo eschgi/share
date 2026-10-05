@@ -65,12 +65,12 @@ func (d *DB) UserByID(ctx context.Context, id string) (User, error) {
 
 // UserByUsername finds a person by username, ignoring case.
 func (d *DB) UserByUsername(ctx context.Context, username string) (User, error) {
-	return scanUser(d.QueryRowContext(ctx, "SELECT "+userColumns+" FROM users WHERE username = ?", username))
+	return scanUser(d.QueryRowContext(ctx, "SELECT "+userColumns+" FROM users WHERE "+d.dialect.noCase("username"), username))
 }
 
 // Users lists everyone, admins first, then by name.
 func (d *DB) Users(ctx context.Context) ([]User, error) {
-	rows, err := d.QueryContext(ctx, "SELECT "+userColumns+" FROM users ORDER BY role = 'member', name COLLATE NOCASE, id")
+	rows, err := d.QueryContext(ctx, "SELECT "+userColumns+" FROM users ORDER BY role = 'member', "+d.dialect.orderNoCase("name")+", id")
 	if err != nil {
 		return nil, err
 	}
@@ -311,7 +311,7 @@ func (d *DB) InsertInvite(ctx context.Context, in Invite, tokenHash []byte) erro
 			return err
 		}
 		for _, f := range in.Folders {
-			if _, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO invite_folders (invite_id, folder_id) VALUES (?, ?)", in.ID, f); err != nil {
+			if _, err := tx.ExecContext(ctx, "INSERT INTO invite_folders (invite_id, folder_id) VALUES (?, ?) ON CONFLICT DO NOTHING", in.ID, f); err != nil {
 				return err
 			}
 		}
@@ -375,9 +375,9 @@ func (d *DB) UseInvite(ctx context.Context, inviteID string, u User, dv Device, 
 			if err := insertUser(ctx, tx, u); err != nil {
 				return err
 			}
-			if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO folder_people (folder_id, user_id)
+			if _, err := tx.ExecContext(ctx, `INSERT INTO folder_people (folder_id, user_id)
 				SELECT i.folder_id, ? FROM invite_folders i JOIN folders f ON f.id = i.folder_id
-				WHERE i.invite_id = ? AND f.deleted_at IS NULL`, u.ID, inviteID); err != nil {
+				WHERE i.invite_id = ? AND f.deleted_at IS NULL ON CONFLICT DO NOTHING`, u.ID, inviteID); err != nil {
 				return err
 			}
 		}

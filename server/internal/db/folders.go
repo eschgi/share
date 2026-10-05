@@ -163,7 +163,7 @@ func (d *DB) FoldersOf(ctx context.Context, userID string) ([]Folder, error) {
 
 // SetFolderPerson gives a person a folder, or takes it away. Doing it twice changes nothing.
 func (d *DB) SetFolderPerson(ctx context.Context, folderID, userID string, sees bool) error {
-	q := "INSERT OR IGNORE INTO folder_people (folder_id, user_id) VALUES (?, ?)"
+	q := "INSERT INTO folder_people (folder_id, user_id) VALUES (?, ?) ON CONFLICT DO NOTHING"
 	if !sees {
 		q = "DELETE FROM folder_people WHERE folder_id = ? AND user_id = ?"
 	}
@@ -190,7 +190,7 @@ func (d *DB) SetFolderInvite(ctx context.Context, folderID, inviteID string, get
 	if n == 0 {
 		return ErrNotFound
 	}
-	q := "INSERT OR IGNORE INTO invite_folders (folder_id, invite_id) VALUES (?, ?)"
+	q := "INSERT INTO invite_folders (folder_id, invite_id) VALUES (?, ?) ON CONFLICT DO NOTHING"
 	if !gets {
 		q = "DELETE FROM invite_folders WHERE folder_id = ? AND invite_id = ?"
 	}
@@ -230,7 +230,7 @@ func (d *DB) folderLists(ctx context.Context, query string) (map[string][]string
 // DirTaken reports whether a folder, deleted or not, has a directory, ignoring case.
 func (d *DB) DirTaken(ctx context.Context, dir string) (bool, error) {
 	var n int
-	err := d.QueryRowContext(ctx, "SELECT COUNT(*) FROM folders WHERE dir = ? COLLATE NOCASE", dir).Scan(&n)
+	err := d.QueryRowContext(ctx, "SELECT COUNT(*) FROM folders WHERE "+d.dialect.noCase("dir"), dir).Scan(&n)
 	return n > 0, err
 }
 
@@ -421,11 +421,22 @@ func (d *DB) ReviveFolder(ctx context.Context, id string) (Folder, error) {
 			if n > 1 {
 				name = numberedName(f.Name, n)
 			}
+			// A taken name fails only this statement: the savepoint keeps the transaction going,
+			// which PostgreSQL needs.
+			if _, err := tx.ExecContext(ctx, "SAVEPOINT revive"); err != nil {
+				return err
+			}
 			_, err := tx.ExecContext(ctx, "UPDATE folders SET name = ?, deleted_at = NULL, deleted_by = NULL WHERE id = ?", name, id)
 			if isUniqueViolation(err) {
+				if _, err := tx.ExecContext(ctx, "ROLLBACK TO SAVEPOINT revive"); err != nil {
+					return err
+				}
 				continue
 			}
 			if err != nil {
+				return err
+			}
+			if _, err := tx.ExecContext(ctx, "RELEASE SAVEPOINT revive"); err != nil {
 				return err
 			}
 			f.Name, f.DeletedAt, f.DeletedBy = name, nil, ""

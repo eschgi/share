@@ -9,32 +9,19 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/eschgi/share/server/internal/app"
 	"github.com/eschgi/share/server/internal/auth"
 	"github.com/eschgi/share/server/internal/config"
 	"github.com/eschgi/share/server/internal/db"
 	"github.com/eschgi/share/server/internal/ids"
 	"github.com/eschgi/share/server/internal/localtls"
-	"github.com/eschgi/share/server/internal/storage"
 )
 
 // openDB opens and migrates the database of cfg, for the commands that work on it directly.
 // Like the server, it makes the first folder if there is none yet.
 func openDB(ctx context.Context, cfg *config.Config) (*db.DB, *auth.Service, error) {
-	layout := storage.Layout{StorageDir: cfg.StorageDir, DataDir: cfg.DataDir}
-	d, err := db.Open(layout.DBPath())
+	d, err := app.OpenDatabase(ctx, cfg, time.Now())
 	if err != nil {
-		return nil, nil, err
-	}
-	if err := d.Migrate(ctx, layout.BackupDir()); err != nil {
-		d.Close()
-		return nil, nil, err
-	}
-	if err := storage.ClaimStorage(ctx, d, cfg.StorageKey()); err != nil {
-		d.Close()
-		return nil, nil, err
-	}
-	if _, err := storage.EnsureFirstFolder(ctx, d, cfg.StorageDir, cfg.Name, time.Now()); err != nil {
-		d.Close()
 		return nil, nil, err
 	}
 	return d, auth.NewService(d, time.Now), nil

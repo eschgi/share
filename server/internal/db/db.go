@@ -1,5 +1,6 @@
-// Package db is the SQLite persistence layer: opening, migrations and every query. Rules
-// about who may do what live in the packages that call it.
+// Package db is the persistence layer: opening, migrations and every query. Rules about who
+// may do what live in the packages that call it. The queries are written in SQL that SQLite
+// and PostgreSQL both accept; the few places where they differ ask the DB's dialect.
 package db
 
 import (
@@ -16,10 +17,10 @@ import (
 	"strings"
 	"time"
 
-	_ "modernc.org/sqlite" // registers the pure-Go "sqlite" driver
+	"modernc.org/sqlite" // registers the pure-Go "sqlite" driver
 )
 
-//go:embed migrations/*.sql
+//go:embed migrations/sqlite/*.sql
 var migrationFiles embed.FS
 
 // ErrNotFound is returned when a looked-up row doesn't exist.
@@ -28,6 +29,37 @@ var ErrNotFound = errors.New("not found")
 // DB wraps the connection pool.
 type DB struct {
 	*sql.DB
+	dialect dialect
+}
+
+// dialect is what differs between the databases Share runs on.
+type dialect struct{}
+
+// noCase compares col with the next argument, ignoring the case of ASCII letters, as the
+// indexes of such columns do.
+func (dialect) noCase(col string) string { return col + " = ? COLLATE NOCASE" }
+
+// orderNoCase sorts by col, ignoring case.
+func (dialect) orderNoCase(col string) string { return col + " COLLATE NOCASE" }
+
+// like is a LIKE that ignores the case of ASCII letters.
+func (dialect) like() string { return "LIKE" }
+
+// unindexed keeps the planner from using an index on col: SQLite's unary plus.
+func (dialect) unindexed(col string) string { return "+" + col }
+
+// migrations is the folder of this database's migrations.
+func (dialect) migrations() string { return "migrations/sqlite" }
+
+// retry reports whether a transaction failed only because another one was in the way, so
+// that running it again may work: SQLite's busy and locked.
+func (dialect) retry(err error) bool {
+	var e *sqlite.Error
+	if !errors.As(err, &e) {
+		return false
+	}
+	code := e.Code() & 0xff
+	return code == 5 || code == 6 // SQLITE_BUSY, SQLITE_LOCKED
 }
 
 // Open opens (or creates) the database at path. WAL keeps readers and the writer out of each
@@ -54,7 +86,7 @@ func Open(path string) (*DB, error) {
 		sqldb.Close()
 		return nil, fmt.Errorf("open %s: %w", path, err)
 	}
-	return &DB{sqldb}, nil
+	return &DB{DB: sqldb}, nil
 }
 
 // escapePath keeps characters that mean something in a URI from being read as such.
@@ -62,15 +94,17 @@ func escapePath(p string) string {
 	return strings.NewReplacer("%", "%25", "?", "%3f", "#", "%23").Replace(p)
 }
 
-// migration is one numbered file in migrations/.
+// migration is one numbered file in a dialect's migrations folder.
 type migration struct {
 	version int
 	name    string
 	sql     string
 }
 
-func loadMigrations() ([]migration, error) {
-	entries, err := fs.ReadDir(migrationFiles, "migrations")
+// loadMigrations reads a folder of migrations. Their numbers follow each other; the first
+// one may be higher than 1 when it makes the whole schema of that version at once.
+func loadMigrations(dir string) ([]migration, error) {
+	entries, err := fs.ReadDir(migrationFiles, dir)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +115,7 @@ func loadMigrations() ([]migration, error) {
 		if !ok || err != nil {
 			return nil, fmt.Errorf("migration %s: name must start with a number and an underscore", e.Name())
 		}
-		body, err := fs.ReadFile(migrationFiles, "migrations/"+e.Name())
+		body, err := fs.ReadFile(migrationFiles, dir+"/"+e.Name())
 		if err != nil {
 			return nil, err
 		}
@@ -89,9 +123,12 @@ func loadMigrations() ([]migration, error) {
 	}
 	slices.SortFunc(out, func(a, b migration) int { return a.version - b.version })
 	for i, m := range out {
-		if m.version != i+1 {
-			return nil, fmt.Errorf("migration %s: expected number %d", m.name, i+1)
+		if i > 0 && m.version != out[0].version+i {
+			return nil, fmt.Errorf("migration %s: expected number %d", m.name, out[0].version+i)
 		}
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("no migrations in %s", dir)
 	}
 	return out, nil
 }
@@ -99,20 +136,23 @@ func loadMigrations() ([]migration, error) {
 // Migrate brings the schema up to date. Before changing a database that already has data,
 // it saves a copy in backupDir, so a bad migration never costs anything.
 func (d *DB) Migrate(ctx context.Context, backupDir string) error {
-	migrations, err := loadMigrations()
+	migrations, err := loadMigrations(d.dialect.migrations())
 	if err != nil {
 		return err
 	}
-	var current int
-	if err := d.QueryRowContext(ctx, "PRAGMA user_version").Scan(&current); err != nil {
+	current, err := d.SchemaVersion(ctx)
+	if err != nil {
 		return err
 	}
-	latest := len(migrations)
+	first, latest := migrations[0].version, migrations[len(migrations)-1].version
 	if current > latest {
 		return fmt.Errorf("the database is at version %d but this program only knows %d; use a newer program", current, latest)
 	}
 	if current == latest {
 		return nil
+	}
+	if current > 0 && current < first-1 {
+		return fmt.Errorf("the database is at version %d, too old for this program", current)
 	}
 	if current > 0 {
 		if err := os.MkdirAll(backupDir, 0o700); err != nil {
@@ -123,28 +163,66 @@ func (d *DB) Migrate(ctx context.Context, backupDir string) error {
 			return fmt.Errorf("backup before migrating: %w", err)
 		}
 	}
-	for _, m := range migrations[current:] {
-		tx, err := d.BeginTx(ctx, nil)
+	for _, m := range migrations {
+		if m.version <= current {
+			continue
+		}
+		err := d.Tx(ctx, func(tx *sql.Tx) error {
+			if _, err := tx.ExecContext(ctx, m.sql); err != nil {
+				return err
+			}
+			_, err := tx.ExecContext(ctx, `INSERT INTO meta (key, value) VALUES ('schema_version', ?)
+				ON CONFLICT (key) DO UPDATE SET value = excluded.value`, strconv.Itoa(m.version))
+			return err
+		})
 		if err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, m.sql); err != nil {
-			tx.Rollback()
-			return fmt.Errorf("migration %s: %w", m.name, err)
-		}
-		if _, err := tx.ExecContext(ctx, fmt.Sprintf("PRAGMA user_version = %d", m.version)); err != nil {
-			tx.Rollback()
-			return err
-		}
-		if err := tx.Commit(); err != nil {
 			return fmt.Errorf("migration %s: %w", m.name, err)
 		}
 	}
 	return nil
 }
 
-// Tx runs fn in one transaction and commits it if fn returns nil.
+// SchemaVersion is the number of the last migration the database went through, 0 for a new
+// one. It is kept in the meta table; databases from before that keep it in SQLite's
+// user_version.
+func (d *DB) SchemaVersion(ctx context.Context) (int, error) {
+	var tables int
+	if err := d.QueryRowContext(ctx, "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'meta'").Scan(&tables); err != nil {
+		return 0, err
+	}
+	if tables == 0 {
+		return 0, nil
+	}
+	v, err := d.Meta(ctx, "schema_version")
+	if errors.Is(err, ErrNotFound) {
+		var old int
+		err := d.QueryRowContext(ctx, "PRAGMA user_version").Scan(&old)
+		return old, err
+	}
+	if err != nil {
+		return 0, err
+	}
+	return strconv.Atoi(v)
+}
+
+// Tx runs fn in one transaction and commits it if fn returns nil. When another transaction
+// was in the way, fn runs again, a few times, so it must change nothing outside the
+// transaction.
 func (d *DB) Tx(ctx context.Context, fn func(*sql.Tx) error) error {
+	for attempt := 1; ; attempt++ {
+		err := d.tx(ctx, fn)
+		if err == nil || attempt == 5 || !d.dialect.retry(err) {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return err
+		case <-time.After(time.Duration(attempt*attempt) * 10 * time.Millisecond):
+		}
+	}
+}
+
+func (d *DB) tx(ctx context.Context, fn func(*sql.Tx) error) error {
 	tx, err := d.BeginTx(ctx, nil)
 	if err != nil {
 		return err

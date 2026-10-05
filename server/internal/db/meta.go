@@ -63,7 +63,7 @@ func (d *DB) SetJobRun(ctx context.Context, name string, at time.Time) error {
 // ServerID returns this server's permanent random id, creating it on first use. Apps compare
 // it to make sure the local address reaches the same server as the public one.
 func (d *DB) ServerID(ctx context.Context) (string, error) {
-	if _, err := d.ExecContext(ctx, "INSERT OR IGNORE INTO meta (key, value) VALUES ('server_id', ?)", ids.New()); err != nil {
+	if _, err := d.ExecContext(ctx, "INSERT INTO meta (key, value) VALUES ('server_id', ?) ON CONFLICT DO NOTHING", ids.New()); err != nil {
 		return "", err
 	}
 	return d.Meta(ctx, "server_id")

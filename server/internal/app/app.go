@@ -112,20 +112,8 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 		checkStorage = opts.CheckStorage
 	}
 
-	d, err := db.Open(layout.DBPath())
+	d, err := OpenDatabase(ctx, cfg, now())
 	if err != nil {
-		return nil, err
-	}
-	if err := d.Migrate(ctx, layout.BackupDir()); err != nil {
-		d.Close()
-		return nil, err
-	}
-	if err := storage.ClaimStorage(ctx, d, cfg.StorageKey()); err != nil {
-		d.Close()
-		return nil, err
-	}
-	if _, err := storage.EnsureFirstFolder(ctx, d, cfg.StorageDir, cfg.Name, now()); err != nil {
-		d.Close()
 		return nil, err
 	}
 	serverID, err := d.ServerID(ctx)

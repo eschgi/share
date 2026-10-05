@@ -38,8 +38,8 @@ func (d *DB) SetRole(ctx context.Context, id, role string) error {
 		if role != RoleMember {
 			return nil
 		}
-		_, err = tx.ExecContext(ctx, `INSERT OR IGNORE INTO folder_people (folder_id, user_id)
-			SELECT id, ? FROM folders WHERE deleted_at IS NULL`, id)
+		_, err = tx.ExecContext(ctx, `INSERT INTO folder_people (folder_id, user_id)
+			SELECT id, ? FROM folders WHERE deleted_at IS NULL ON CONFLICT DO NOTHING`, id)
 		return err
 	})
 }

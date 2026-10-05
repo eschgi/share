@@ -56,11 +56,39 @@ func TestMigrateIsIdempotentAndRefusesNewerDatabases(t *testing.T) {
 	if entries, _ := os.ReadDir(filepath.Join(dir, "backups")); len(entries) != 0 {
 		t.Errorf("a no-op migration made %d backups", len(entries))
 	}
-	if _, err := d.ExecContext(ctx, "PRAGMA user_version = 99"); err != nil {
+	if v, err := d.SchemaVersion(ctx); err != nil || v != 7 {
+		t.Errorf("schema version %d, %v", v, err)
+	}
+	if err := d.SetMeta(ctx, "schema_version", "99"); err != nil {
 		t.Fatal(err)
 	}
 	if err := d.Migrate(ctx, filepath.Join(dir, "backups")); err == nil {
 		t.Fatal("Migrate accepted a database newer than the program")
+	}
+}
+
+// A database from before the schema version moved into the meta table still has it in
+// SQLite's user_version, and goes on from there.
+func TestMigrateGoesOnFromUserVersion(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	d, err := Open(filepath.Join(dir, "share.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	migrateTo(t, d, 6)
+	if v, err := d.SchemaVersion(ctx); err != nil || v != 6 {
+		t.Fatalf("an old database's version: %d, %v", v, err)
+	}
+	if err := d.Migrate(ctx, filepath.Join(dir, "backups")); err != nil {
+		t.Fatal(err)
+	}
+	if v, err := d.Meta(ctx, "schema_version"); err != nil || v != "7" {
+		t.Errorf("after migrating: %q, %v", v, err)
+	}
+	if entries, _ := os.ReadDir(filepath.Join(dir, "backups")); len(entries) != 1 {
+		t.Errorf("%d backups before migrating, want 1", len(entries))
 	}
 }
 

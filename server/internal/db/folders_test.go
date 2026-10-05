@@ -15,7 +15,7 @@ import (
 // migrateTo brings a new database to version n only, as an older program would have.
 func migrateTo(t *testing.T, d *DB, n int) {
 	t.Helper()
-	migrations, err := loadMigrations()
+	migrations, err := loadMigrations(dialect{}.migrations())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,7 +188,7 @@ func TestLibraryPagesUseTheirIndexes(t *testing.T) {
 		{[]string{"a"}, "files_by_folder"},
 		{[]string{"a", "b", "c"}, "files_ready_by_time"},
 	} {
-		w, args := LibraryFilter{Folders: tc.folders}.where()
+		w, args := LibraryFilter{Folders: tc.folders}.where(dialect{})
 		rows, err := d.Query("EXPLAIN QUERY PLAN SELECT id FROM files WHERE "+w+" ORDER BY uploaded_at DESC, id LIMIT 10", args...)
 		if err != nil {
 			t.Fatal(err)

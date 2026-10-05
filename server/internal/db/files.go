@@ -167,7 +167,7 @@ func (d *DB) OutstandingBytes(ctx context.Context) (int64, error) {
 func (d *DB) RelPathTaken(ctx context.Context, folderID, relPath string) (bool, error) {
 	var n int
 	err := d.QueryRowContext(ctx, `SELECT COUNT(*) FROM files
-		WHERE folder_id = ? AND rel_path = ? COLLATE NOCASE AND state IN ('finalizing', 'ready')`, folderID, relPath).Scan(&n)
+		WHERE folder_id = ? AND `+d.dialect.noCase("rel_path")+` AND state IN ('finalizing', 'ready')`, folderID, relPath).Scan(&n)
 	return n > 0, err
 }
 
