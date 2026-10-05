@@ -1,0 +1,22 @@
+{
+  "description": "The recovery code: 20 random bytes (secret), written as 32 characters of Crockford's base32 (0-9 and A-Z without I, L, O, U), most significant bits first, in groups of four joined by dashes. Reading one back takes small letters, O for 0, I and L for 1, and ignores dashes and spaces; it refuses anything else and other lengths. key is HKDF-SHA256 of the secret (no salt, share-e2ee-v1/recovery as info); it locks the recovery key's private key with the aad \"recovery\" (contract/crypto/lock.json has the format). Binary values are base64url without padding.",
+  "secret": "nHjt_J9IN7IUaHUA9Yj8FP1m6Ts",
+  "code": "KHWE-VZ4Z-90VV-4538-EM0F-B27W-2KYP-DT9V",
+  "also_reads": [
+    "khwe-vz4z-90vv-4538-em0f-b27w-2kyp-dt9v",
+    "KHWE VZ4Z 90VV 4538 EM0F B27W 2KYP DT9V",
+    "KHWEVZ4Z9OVV4538EMOFB27W2KYPDT9V"
+  ],
+  "refuses": [
+    "KHWE-VZ4Z-90VV-4538-EM0F-B27W-2KYP-DT",
+    "KHWE-VZ4Z-90VV-4538-EM0F-B27W-2KYP-DT9V-0000",
+    "UHWE-VZ4Z-90VV-4538-EM0F-B27W-2KYP-DT9V",
+    "KHWE-*Z4Z-90VV-4538-EM0F-B27W-2KYP-DT9V"
+  ],
+  "key": "STvZTy26PG8ZOIs5nIHiOFPktoXZsQzI5GmkuQzNInE",
+  "lock": {
+    "locked": "c0wDVp3tUrdAUXc_bmenxfUUOflcEep07M9amS6tgcVoLcHUG6YEAjRVe6Tx-i390DiRH4gNzhT83JX8",
+    "private_key": "r7uwsModWbCEH7z_1TB6YjIQy_WskCS0MbSuaFFsr-w",
+    "public_key": "BNrT9mbGLhraoEPPN-dx--Y0FBklr9jIyboftCKjiB_IUUy6KChnIRcQ-d29Pf-1lqntJzqdeVM2FSKZHI0DE3c"
+  }
+}

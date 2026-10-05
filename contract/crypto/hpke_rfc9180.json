@@ -1,0 +1,19 @@
+{
+  "description": "RFC 9180's test vector for the suite Share seals keys with: base mode (0), DHKEM(P-256, HKDF-SHA256) (KEM 0x0010), HKDF-SHA256 (KDF 0x0001), AES-256-GCM (AEAD 0x0002), with its first encryption. From the vectors published with RFC 9180, https://github.com/cfrg/draft-irtf-cfrg-hpke (test-vectors.json). Sealing with skEm as the ephemeral key gives enc and ct; opening enc and ct with skRm gives pt. shared_secret, key and base_nonce are the steps in between. All values are hex.",
+  "mode": 0,
+  "kem_id": 16,
+  "kdf_id": 1,
+  "aead_id": 2,
+  "info": "4f6465206f6e2061204772656369616e2055726e",
+  "skRm": "317f915db7bc629c48fe765587897e01e282d3e8445f79f27f65d031a88082b2",
+  "pkRm": "04abc7e49a4c6b3566d77d0304addc6ed0e98512ffccf505e6a8e3eb25c685136f853148544876de76c0f2ef99cdc3a05ccf5ded7860c7c021238f9e2073d2356c",
+  "skEm": "90345e3a1d116c1dd39ae76d95ab858c142223a63e44f8f85318cfa91a84858e",
+  "pkEm": "04c06b4f6bebc7bb495cb797ab753f911aff80aefb86fd8b6fcc35525f3ab5f03e0b21bd31a86c6048af3cb2d98e0d3bf01da5cc4c39ff5370d331a4f1f7d5a4e0",
+  "enc": "04c06b4f6bebc7bb495cb797ab753f911aff80aefb86fd8b6fcc35525f3ab5f03e0b21bd31a86c6048af3cb2d98e0d3bf01da5cc4c39ff5370d331a4f1f7d5a4e0",
+  "shared_secret": "48893fecd82f7c3456af6a42d8f56325d21e08c10fa81299986aaff54cde7b49",
+  "key": "ee16802a936d5f544771131900ee6973d0551de9e852ece2ef34bf0d5f9e1d1d",
+  "base_nonce": "9bc50980832a7b4b58c40161",
+  "aad": "436f756e742d30",
+  "pt": "4265617574792069732074727574682c20747275746820626561757479",
+  "ct": "58c61a45059d0c5704560e9d88b564a8b63f1364b8d1fcb3c4c6ddc1d291742465e902cd216f8908da49f8f96f"
+}

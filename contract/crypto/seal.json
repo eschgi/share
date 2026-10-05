@@ -1,0 +1,61 @@
+{
+  "description": "Keys Share seals with HPKE (contract/crypto/hpke_rfc9180.json has the suite): sealed is the encapsulated key (65 bytes), then the ciphertext; purpose is HPKE's info, aad its associated data, both as UTF-8. Every case in open opens with private_key to plaintext, whose public key is public_key; none in refuse opens. Binary values are base64url without padding.",
+  "open": [
+    {
+      "name": "a file key for version 1 of a folder's key",
+      "purpose": "share-e2ee-v1/file",
+      "aad": "folder:w3dding5x2k7mbqz4bwdbyj6qs:1",
+      "private_key": "ZGxTAFnoldzoaRPb8WZ-li4wIYHc-VV77jOBf3Q7cm8",
+      "public_key": "BBsur1lQkLWmRYn2s8ifgGXNwtnXlGoqSNFKYm7bPQ4huSZpvHWbJ7BXfDws0UkX9Vm1tvEkN29hmwmcQtik8aU",
+      "plaintext": "JvdvL0iFwW_8P_OIkpn-9OI5NfK20iN_Orr52Sc_WWo",
+      "sealed": "BNpjSyqfXxOAIH11bO2U0j8otTkt9pdrGtgbqTuOF__mMxONlrnZE5w4h31QhMhlXJf0_-wYz2cTsjgSwa2DwuYcDFt2GWhsQ-EiIjENY1Uw6k9IYMNTnWWgI0B0h2zfC3J2xKeZN4k1OcUaf3XJfRo"
+    },
+    {
+      "name": "a folder's private key for a person",
+      "purpose": "share-e2ee-v1/folder",
+      "aad": "folder:w3dding5x2k7mbqz4bwdbyj6qs:1",
+      "private_key": "50PXsUM3jZQ_Sp9s6Ukpj06wSobNtQYPq0kB2J6fFBo",
+      "public_key": "BB9QH0j7ZM_ms93OtdPq8DfCQ2_1pkAKI7w8DJZTnWM33Qdj2ChJ-NPZD4HPQ_YK26RxSN_9ISEx4nZlsHhIEqg",
+      "plaintext": "ZGxTAFnoldzoaRPb8WZ-li4wIYHc-VV77jOBf3Q7cm8",
+      "sealed": "BLZ2XSAYMtiX7txjj8bpB8-EdmwdTfmiwvjY8zrdoyeG3rzW04eP6S6oPn2uDk9KadAsZBlBlc-09TibzGozHb76IzC2teSLWIsadVvXC1C8tpdKZXdTD-hwTW7o0o94nZ5ACTTrlNDT_SmHlu8UCm0"
+    },
+    {
+      "name": "a person's private key for one of their browsers",
+      "purpose": "share-e2ee-v1/person",
+      "aad": "person:u7ld5x2k7mbqz4bwdbyj6qsqxa",
+      "private_key": "F4IVHCv377xBzjNpGmIw35BG4s7ovwDpd1PoDJSwVKg",
+      "public_key": "BA2K2mkI_aZHZ7aCIJaoOs-lMupgR4zECFeW-dszPkKe96NAYS0PIyDWOvScJQ8SsGb9YiQZUsz7r7vxNq-WxMk",
+      "plaintext": "50PXsUM3jZQ_Sp9s6Ukpj06wSobNtQYPq0kB2J6fFBo",
+      "sealed": "BFk4FNq4BSkStD0SzSG4t-X49l_2jCTIVaW_TOtn3-U6DigGoJx_gx4_eWMFEdT4KU-_TGJAPEbX_BjIw9ODTf6a0AzaN5haRk8zE4NjpncWkUsZGTVYUqwMxQ2opZ_evmmIBs9HVxmojIK5CPGrzBI"
+    }
+  ],
+  "refuse": [
+    {
+      "name": "the file key, opened as if for version 2",
+      "purpose": "share-e2ee-v1/file",
+      "aad": "folder:w3dding5x2k7mbqz4bwdbyj6qs:2",
+      "private_key": "ZGxTAFnoldzoaRPb8WZ-li4wIYHc-VV77jOBf3Q7cm8",
+      "public_key": "BBsur1lQkLWmRYn2s8ifgGXNwtnXlGoqSNFKYm7bPQ4huSZpvHWbJ7BXfDws0UkX9Vm1tvEkN29hmwmcQtik8aU",
+      "plaintext": "JvdvL0iFwW_8P_OIkpn-9OI5NfK20iN_Orr52Sc_WWo",
+      "sealed": "BNpjSyqfXxOAIH11bO2U0j8otTkt9pdrGtgbqTuOF__mMxONlrnZE5w4h31QhMhlXJf0_-wYz2cTsjgSwa2DwuYcDFt2GWhsQ-EiIjENY1Uw6k9IYMNTnWWgI0B0h2zfC3J2xKeZN4k1OcUaf3XJfRo"
+    },
+    {
+      "name": "the file key, opened as a folder key",
+      "purpose": "share-e2ee-v1/folder",
+      "aad": "folder:w3dding5x2k7mbqz4bwdbyj6qs:1",
+      "private_key": "ZGxTAFnoldzoaRPb8WZ-li4wIYHc-VV77jOBf3Q7cm8",
+      "public_key": "BBsur1lQkLWmRYn2s8ifgGXNwtnXlGoqSNFKYm7bPQ4huSZpvHWbJ7BXfDws0UkX9Vm1tvEkN29hmwmcQtik8aU",
+      "plaintext": "JvdvL0iFwW_8P_OIkpn-9OI5NfK20iN_Orr52Sc_WWo",
+      "sealed": "BNpjSyqfXxOAIH11bO2U0j8otTkt9pdrGtgbqTuOF__mMxONlrnZE5w4h31QhMhlXJf0_-wYz2cTsjgSwa2DwuYcDFt2GWhsQ-EiIjENY1Uw6k9IYMNTnWWgI0B0h2zfC3J2xKeZN4k1OcUaf3XJfRo"
+    },
+    {
+      "name": "the file key with its last bit flipped",
+      "purpose": "share-e2ee-v1/file",
+      "aad": "folder:w3dding5x2k7mbqz4bwdbyj6qs:1",
+      "private_key": "ZGxTAFnoldzoaRPb8WZ-li4wIYHc-VV77jOBf3Q7cm8",
+      "public_key": "BBsur1lQkLWmRYn2s8ifgGXNwtnXlGoqSNFKYm7bPQ4huSZpvHWbJ7BXfDws0UkX9Vm1tvEkN29hmwmcQtik8aU",
+      "plaintext": "JvdvL0iFwW_8P_OIkpn-9OI5NfK20iN_Orr52Sc_WWo",
+      "sealed": "BNpjSyqfXxOAIH11bO2U0j8otTkt9pdrGtgbqTuOF__mMxONlrnZE5w4h31QhMhlXJf0_-wYz2cTsjgSwa2DwuYcDFt2GWhsQ-EiIjENY1Uw6k9IYMNTnWWgI0B0h2zfC3J2xKeZN4k1OcUaf3XJfRs"
+    }
+  ]
+}
