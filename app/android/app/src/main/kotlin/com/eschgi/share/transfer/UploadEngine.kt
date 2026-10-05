@@ -33,6 +33,7 @@ object UploadEngine {
     private val live = ConcurrentHashMap<String, Long>()
 
     private val tus = TusUploader()
+    private val s3 = S3Uploader()
 
     fun <T> locked(block: () -> T): T = synchronized(lock) { block() }
 
@@ -99,28 +100,38 @@ object UploadEngine {
                 val info = ServerInfo.of(config) { server.open(it, local, readTimeoutMs = 15_000) }
                 val abort = Abort()
                 current = key to abort
-                progress.local = local
-                val outcome = if (info == null) {
-                    current = null
-                    UploadOutcome.Retry(IOException("the server didn't say how it takes files"))
-                } else {
-                    try {
-                        tus.upload(
-                            item.file.name, item.file.mime, item.file.size, ContentSource(app.contentResolver, item.file.uri.toUri()), item.uploadId,
+                // Into a bucket the bytes go over the internet, wherever the phone is.
+                progress.local = local && info?.storage == ServerInfo.Storage.DISK
+                val source = ContentSource(app.contentResolver, item.file.uri.toUri())
+                val onBytes = { bytes: Long ->
+                    live[key] = bytes
+                    progress.publish()
+                }
+                val outcome = try {
+                    when (info?.storage) {
+                        null -> UploadOutcome.Retry(IOException("the server didn't say how it takes files"))
+                        ServerInfo.Storage.DISK -> tus.upload(
+                            item.file.name, item.file.mime, item.file.size, source, item.uploadId,
                             if (local) LOCAL_CHUNK else info.chunkSize,
                             open = { method, path -> server.open(path, local, method = method) },
                             abort = abort,
                             onCreated = { queue.setUploadId(item, it) },
-                            onBytes = {
-                                live[key] = it
-                                progress.publish()
-                            },
+                            onBytes = onBytes,
                             folder = batch.folder,
                             lastModified = Outbox.lastModified(app, item.file.uri.toUri()),
                         )
-                    } finally {
-                        current = null
+                        ServerInfo.Storage.S3 -> s3.upload(
+                            item.file.name, item.file.size, source, item.uploadId,
+                            open = { method, path -> server.open(path, local, method = method) },
+                            abort = abort,
+                            onCreated = { queue.setUploadId(item, it) },
+                            onBytes = onBytes,
+                            folder = batch.folder,
+                            lastModified = Outbox.lastModified(app, item.file.uri.toUri()),
+                        )
                     }
+                } finally {
+                    current = null
                 }
                 live[key]?.let { queue.setBytes(item, it) }
                 when (outcome) {
