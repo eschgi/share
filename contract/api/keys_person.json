@@ -1,0 +1,12 @@
+{
+  "method": "PUT",
+  "path": "/api/keys/person",
+  "auth": "device",
+  "status": 204,
+  "request": {
+    "public_key": "BKF_KtHU0EU0B33uNlDtr_D7fqqyVDNbu9vIAnImbiymOr6zTjVVcSGyzYQUhipq_tvZzinJvuh8cSNvWTZieVA",
+    "sealed": "23h7OZ2ufJAfpmn_e7t-9oRBrCsjJuxs4Dw6CWlyTjpsh1J6y9tI3UPe7uBm3K8LY0yd9pC5wmqdZE4t6dBiFXJ9Sf5qxDqB33rtiO7u7VjboRskDwHvLo07JadvHBFpb8QVQZBjKNHpdoOIUysFTr8",
+    "start_over": false
+  },
+  "notes": "The person's key, made on this device, its private key sealed for this device (share-e2ee-v1/person, person:<user id>). Once per person: 409 key_exists when they have one, unless start_over: then everything sealed for the old one goes (their folder keys, their other devices' copies, the password lock), and they wait for others to seal again. 409 no_key without this device's key (PUT /api/keys/device first)."
+}

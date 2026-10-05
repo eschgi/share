@@ -154,6 +154,9 @@ func (d *DB) DeleteUser(ctx context.Context, id string) error {
 				return ErrLastAdmin
 			}
 		}
+		if err := loseFolders(ctx, tx, id, "TRUE"); err != nil {
+			return err
+		}
 		_, err = tx.ExecContext(ctx, "DELETE FROM users WHERE id = ?", id)
 		return err
 	})
@@ -272,8 +275,13 @@ func (d *DB) TouchDevice(ctx context.Context, id string, at time.Time) error {
 
 // RevokeDevice signs a phone or browser out; its token stops working.
 func (d *DB) RevokeDevice(ctx context.Context, id string, at time.Time) error {
-	_, err := d.ExecContext(ctx, "UPDATE devices SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL", ms(at), id)
-	return err
+	return d.Tx(ctx, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, "UPDATE devices SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL", ms(at), id); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx, "DELETE FROM person_keys WHERE device_id = ?", id)
+		return err
+	})
 }
 
 // DeleteEndedDevices forgets phones and browsers that were signed out before revokedBefore,
@@ -300,7 +308,16 @@ type Invite struct {
 	UsedAt    *time.Time
 	DeviceID  string
 	RevokedAt *time.Time
-	Folders   []string // the folders a new member gets; only InsertInvite reads it
+	Folders   []string    // the folders a new member gets; only InsertInvite reads it
+	Keys      []InviteKey // keys locked with the link's secret; only InsertInvite reads it
+}
+
+// InviteKey is a key locked with the secret of an invite's link: a version of a folder's key,
+// or the person's own key ("" and 0) for a new phone or browser.
+type InviteKey struct {
+	FolderID string
+	Version  int
+	Locked   []byte
 }
 
 const inviteColumns = "id, name, role, user_id, created_by, created_at, expires_at, used_at, device_id, revoked_at"
@@ -336,6 +353,12 @@ func (d *DB) InsertInvite(ctx context.Context, in Invite, tokenHash []byte) erro
 				return err
 			}
 		}
+		for _, k := range in.Keys {
+			if _, err := tx.ExecContext(ctx, "INSERT INTO invite_keys (invite_id, folder_id, version, locked) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING",
+				in.ID, k.FolderID, k.Version, k.Locked); err != nil {
+				return err
+			}
+		}
 		return nil
 	})
 }
@@ -368,8 +391,10 @@ func (d *DB) OpenInvites(ctx context.Context, now time.Time) ([]Invite, error) {
 // adds a phone for someone) with the invite's folders, signs the phone in and marks the
 // invite used. It returns ErrConflict if the invite was used, revoked or expired in the
 // meantime.
-func (d *DB) UseInvite(ctx context.Context, inviteID string, u User, dv Device, tokenHash []byte, now time.Time) error {
-	return d.Tx(ctx, func(tx *sql.Tx) error {
+func (d *DB) UseInvite(ctx context.Context, inviteID string, u User, dv Device, tokenHash []byte, now time.Time) ([]InviteKey, error) {
+	var keys []InviteKey
+	err := d.Tx(ctx, func(tx *sql.Tx) error {
+		keys = nil
 		res, err := tx.ExecContext(ctx, `UPDATE invites SET used_at = ?, device_id = ?
 			WHERE id = ? AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ?`, ms(now), dv.ID, inviteID, ms(now))
 		if err != nil {
@@ -395,8 +420,29 @@ func (d *DB) UseInvite(ctx context.Context, inviteID string, u User, dv Device, 
 				return err
 			}
 		}
+		// The keys locked with the link's secret go to the new device, once.
+		rows, err := tx.QueryContext(ctx, "SELECT folder_id, version, locked FROM invite_keys WHERE invite_id = ? ORDER BY folder_id, version", inviteID)
+		if err != nil {
+			return err
+		}
+		for rows.Next() {
+			var k InviteKey
+			if err := rows.Scan(&k.FolderID, &k.Version, &k.Locked); err != nil {
+				rows.Close()
+				return err
+			}
+			keys = append(keys, k)
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, "DELETE FROM invite_keys WHERE invite_id = ?", inviteID); err != nil {
+			return err
+		}
 		return insertDevice(ctx, tx, dv, tokenHash)
 	})
+	return keys, err
 }
 
 // DeleteOldInvites drops invites that ended before before.

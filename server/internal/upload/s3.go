@@ -105,6 +105,7 @@ func (h *S3Handler) create(w http.ResponseWriter, r *http.Request, p *auth.Princ
 		Size           *int64 `json:"size"`
 		LastModifiedMS int64  `json:"last_modified_ms"`
 		Folder         string `json:"folder"`
+		Enc            *Enc   `json:"enc"`
 	}
 	if !httpx.DecodeJSON(w, r, &req) {
 		return
@@ -116,6 +117,10 @@ func (h *S3Handler) create(w http.ResponseWriter, r *http.Request, p *auth.Princ
 	ctx := r.Context()
 	size := *req.Size
 	folderID, err := h.admit(ctx, p, size, req.Folder, "folder")
+	var enc *db.Enc
+	if err == nil {
+		enc, err = h.encryption(ctx, folderID, size, req.Enc)
+	}
 	var refusal *Refusal
 	if errors.As(err, &refusal) {
 		httpx.WriteError(w, refusal.Status, refusal.Code, refusal.Message)
@@ -131,12 +136,12 @@ func (h *S3Handler) create(w http.ResponseWriter, r *http.Request, p *auth.Princ
 		ID: ids.New(), Name: name, Size: size, Kind: storage.GuessKind(name), FolderID: folderID,
 		CreatedAt: now, UpdatedAt: now, ClientModifiedAt: millis(req.LastModifiedMS),
 		PinID: p.PinID, PinSessionID: p.PinSessionID, UserID: p.UserID, DeviceID: p.DeviceID,
-		S3PartSize: storage.S3PartSize(size, h.cfg.ChunkSize),
+		S3PartSize: storage.S3PartSize(size, h.cfg.ChunkSize), Enc: enc,
 	}
 	// The bucket's upload comes first, so a row never waits without one; an empty file needs
 	// none and is finished by complete.
 	if size > 0 {
-		if f.S3UploadID, err = h.lib.StartS3Upload(ctx, f.ID, name); err != nil {
+		if f.S3UploadID, err = h.lib.StartS3Upload(ctx, f.ID, name, enc != nil); err != nil {
 			unavailable(w, f.ID, err)
 			return
 		}

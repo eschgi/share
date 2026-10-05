@@ -1,0 +1,10 @@
+{
+  "method": "PUT",
+  "path": "/api/keys/device",
+  "auth": "device",
+  "status": 204,
+  "request": {
+    "public_key": "BDk8AamfofvNqUAbNCpgtxXIZb3cTjBgrBIPLPf4lnDC2kW9L5YaeqdisAwi9WNqAOVqDq5gxLxgGBquGaoeV9k"
+  },
+  "notes": "This phone's or browser's public key; its private key never leaves it. A new one (a browser whose storage was cleared) drops the person's key sealed for the old one: another device of the person seals it again, or the password opens it. 400 bad_request for anything but a P-256 point."
+}

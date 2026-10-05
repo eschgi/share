@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"path"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -80,15 +81,27 @@ func (a *API) createDownload(w http.ResponseWriter, r *http.Request) {
 	}
 	dirs := zipDirs(files, folders)
 	zipOrder(files, dirs)
-	z, err := a.zipOf(files, dirs)
+	all, err := a.zipOf(files, dirs) // the paths of every file, for saving them into a folder
+	if err != nil {
+		internal(w, "download", err)
+		return
+	}
+	// The ZIP leaves encrypted files out: the server can't read them, the devices fetch them
+	// one by one and decrypt them.
+	plain := slices.DeleteFunc(slices.Clone(files), func(f db.File) bool { return f.Enc != nil })
+	z, err := a.zipOf(plain, dirs)
 	if err != nil {
 		internal(w, "download", err)
 		return
 	}
 	sel := a.Downloads.Add(p.Key(), z.ids(), a.zipName(files, folders), dirs != nil)
-	info := DownloadInfo{ID: sel.ID, Name: sel.Name, Size: z.archive.Size(), Count: len(files), Files: make([]DownloadFile, len(files))}
+	info := DownloadInfo{ID: sel.ID, Name: sel.Name, Size: z.archive.Size(), Count: len(plain), Files: make([]DownloadFile, len(files))}
 	for i, f := range files {
-		info.Files[i] = DownloadFile{ID: f.ID, Path: z.paths[i], Size: f.Size}
+		size := f.Size
+		if f.Enc != nil {
+			size = f.Enc.PlainSize
+		}
+		info.Files[i] = DownloadFile{ID: f.ID, Path: all.paths[i], Size: size}
 	}
 	httpx.WriteJSON(w, http.StatusCreated, info)
 }

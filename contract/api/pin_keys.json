@@ -1,0 +1,17 @@
+{
+  "method": "GET",
+  "path": "/api/pin/keys",
+  "auth": "pin",
+  "status": 200,
+  "response": {
+    "folder": "f4mily5x2k7mbqz4bwdbyj6qsq",
+    "keys": [
+      {
+        "version": 1,
+        "public_key": "BLDvYr-vYFrWsSev_q3kIjbrq_1XjrmObxvdlPPR6vZcgWPk4Y1CV6rUcPpMngDoj-UM9vYfljfZCFmOiJh-BNY",
+        "locked": "C5ZKPJyTbkE1atKCEo6rZ7N9wG8UuZW9lMjJh5XHv6VpClZT6Q_4fAnh87spGG7HEGYLVDIepsDNvFSd"
+      }
+    ]
+  },
+  "notes": "For a PIN session whose PIN shows its folder: every version of the folder's key locked with the secret that only the PIN's link carries (/#<code>.<secret>; share-e2ee-v1/pin, folder:<id>:<version>). Without the secret the guest still sends, and sees encrypted files as locked. 403 forbidden for a PIN that doesn't show its folder, or a device."
+}

@@ -44,6 +44,13 @@ func (d *DB) SetMeta(ctx context.Context, key, value string) error {
 	return err
 }
 
+func setMeta(ctx context.Context, tx *sql.Tx, key, value string) error {
+	_, err := tx.ExecContext(ctx,
+		"INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+		key, value)
+	return err
+}
+
 // JobRun is when the periodic job of that name last ran without an error; the zero time if
 // it never did.
 func (d *DB) JobRun(ctx context.Context, name string) (time.Time, error) {

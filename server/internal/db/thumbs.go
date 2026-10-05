@@ -16,11 +16,11 @@ const (
 	ThumbFailed = "failed"
 )
 
-// ThumbCandidates lists photos in the library without a thumbnail that arrived before
-// before, oldest first.
+// ThumbCandidates lists plain photos in the library without a thumbnail that arrived before
+// before, oldest first: the server can't read encrypted ones.
 func (d *DB) ThumbCandidates(ctx context.Context, before time.Time, limit int) ([]File, error) {
 	return queryFiles(ctx, d, "SELECT "+fileColumns+` FROM files
-		WHERE state = 'ready' AND thumb = 'none' AND kind = 'photo' AND uploaded_at <= ?
+		WHERE state = 'ready' AND thumb = 'none' AND kind = 'photo' AND enc_version IS NULL AND uploaded_at <= ?
 		ORDER BY uploaded_at, id LIMIT ?`, ms(before), limit)
 }
 

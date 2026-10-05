@@ -1,0 +1,32 @@
+{
+  "method": "POST",
+  "path": "/api/s3/uploads",
+  "auth": "pin",
+  "request": {
+    "name": "VID_0412.mp4",
+    "size": 52441616,
+    "last_modified_ms": 1758960000000,
+    "folder": "f4mily5x2k7mbqz4bwdbyj6qsq",
+    "enc": {
+      "version": 1,
+      "key": "qxJuq98kaSY0zUgmZsONrFvuCearm1viz1SS9BKjvRRDXtgTO6lSt_VKNmTYSZiBhKEiMIp9Qt47mr3Vk1bo6YCLF4XMO07noALk4oF0rErxsurgjgGEKE5BPwWqehoqtm9h3TU66YGwPWOvvI4CmK0",
+      "header": "U0hFMQABAAA9p6lLxQCBAA",
+      "plain_size": 52428800
+    }
+  },
+  "status": 201,
+  "response": {
+    "id": "q3ld5x2k7mbqz4bwdbyj6qsqxa",
+    "part_size": 20971520,
+    "parts": 3,
+    "urls": [
+      {
+        "number": 1,
+        "url": "https://share-files.s3.eu-central-1.amazonaws.com/share/files/q3ld5x2k7mbqz4bwdbyj6qsqxa?partNumber=1&…",
+        "size": 20971520
+      }
+    ],
+    "expires_at": "2026-09-27T11:00:00Z"
+  },
+  "notes": "An upload into an encrypted folder, as s3_upload_create.json: size is the encrypted size (16 + plain_size + 16 per 64 KiB), and the parts are the encrypted stream's. enc: the version of the folder's key that the file key is sealed for (the newest: GET /api/keys, or a PIN session's encrypt), the sealed file key and the header. tus takes the same enc as JSON in the Upload-Metadata key enc. Errors besides the usual: 409 encryption_required (a plain upload into an encrypted folder), 409 key_outdated (not the newest version), 409 not_encrypted (a folder that was never encrypted), 400 bad_request (sizes that don't match)."
+}

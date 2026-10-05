@@ -48,7 +48,7 @@ func (a *API) redirectToBucket(w http.ResponseWriter, r *http.Request, f db.File
 // bucketLink is a link that fetches the file under its own name and type.
 func (a *API) bucketLink(ctx context.Context, f db.File) (string, time.Time, error) {
 	mime := f.Mime
-	if mime == "" {
+	if mime == "" || f.Enc != nil { // encrypted bytes are of no type
 		mime = "application/octet-stream"
 	}
 	return a.S3.GetURL(ctx, a.S3.Key(f.ID), storage.ContentDisposition(f.Name), mime)

@@ -27,9 +27,12 @@
           "height": 3024,
           "duration_ms": null,
           "has_thumb": true,
-          "from": "Maria"
+          "from": "Maria",
+          "enc": null
         },
-        "created_at": "2026-09-12T08:00:00Z"
+        "created_at": "2026-09-12T08:00:00Z",
+        "encrypted": false,
+        "key_version": null
       }
     ]
   },

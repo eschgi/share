@@ -64,6 +64,7 @@ type SignedIn struct {
 	Token  string
 	User   db.User
 	Device db.Device
+	Keys   []db.InviteKey // from an invite: keys locked with its link's secret
 }
 
 // checkClient accepts the two kinds of devices: the app, and a browser.
@@ -185,9 +186,12 @@ func (s *Service) EndBrowserSession(ctx context.Context, r *http.Request) error 
 // give their name, role and, for a member, the folders they get (possibly none, but not nil);
 // to add a phone for someone with an account, give their user id. It returns ErrFolderGone
 // if one of the folders doesn't exist or is deleted.
-func (s *Service) CreateInvite(ctx context.Context, name, role, forUserID, createdBy string, folders []string, lifetime time.Duration) (string, db.Invite, error) {
+//
+// keys are locked with the secret of the invite's link: versions of the folders' keys for a new
+// person, or the person's own key for a new phone or browser.
+func (s *Service) CreateInvite(ctx context.Context, name, role, forUserID, createdBy string, folders []string, lifetime time.Duration, keys ...db.InviteKey) (string, db.Invite, error) {
 	now := s.Now()
-	in := db.Invite{ID: ids.New(), UserID: forUserID, CreatedBy: createdBy, CreatedAt: now, ExpiresAt: now.Add(lifetime)}
+	in := db.Invite{ID: ids.New(), UserID: forUserID, CreatedBy: createdBy, CreatedAt: now, ExpiresAt: now.Add(lifetime), Keys: keys}
 	if forUserID != "" {
 		u, err := s.DB.UserByID(ctx, forUserID)
 		if err != nil {
@@ -280,14 +284,15 @@ func (s *Service) AcceptInvite(ctx context.Context, r *http.Request, token, devi
 	}
 	deviceToken, hash := ids.NewToken(ids.PrefixDevice)
 	dv := newDevice(r, u.ID, deviceName, client, now)
-	if err := s.DB.UseInvite(ctx, in.ID, u, dv, hash, now); err != nil {
+	keys, err := s.DB.UseInvite(ctx, in.ID, u, dv, hash, now)
+	if err != nil {
 		if errors.Is(err, db.ErrConflict) {
 			return nil, ErrInviteUsed // someone was quicker, a moment ago
 		}
 		return nil, err
 	}
 	s.browserSignedIn(ctx, r, dv, now)
-	return &SignedIn{Token: deviceToken, User: u, Device: dv}, nil
+	return &SignedIn{Token: deviceToken, User: u, Device: dv, Keys: keys}, nil
 }
 
 // findInvite checks an invite token. Unknown tokens count against the caller's address, so
@@ -408,8 +413,9 @@ func checkPassword(password string) error {
 }
 
 // SetPassword gives the caller a username and password, for signing in on other phones and in
-// browsers. With a password already set, the current one is needed.
-func (s *Service) SetPassword(ctx context.Context, p *Principal, username, current, password string) error {
+// browsers. With a password already set, the current one is needed. lock is the person's key
+// locked with the new password; without one, a lock with the old password goes.
+func (s *Service) SetPassword(ctx context.Context, p *Principal, username, current, password string, lock []byte) error {
 	if p.Kind != KindDevice {
 		return ErrDevicesOnly
 	}
@@ -451,6 +457,9 @@ func (s *Service) SetPassword(ctx context.Context, p *Principal, username, curre
 	} else if err != nil {
 		return err
 	}
+	if err := s.DB.SetPasswordLock(ctx, u.ID, lock); err != nil && !errors.Is(err, db.ErrNoKey) {
+		return err
+	}
 	return nil
 }
 
@@ -480,6 +489,10 @@ func (s *Service) ResetPassword(ctx context.Context, userID, username string) (s
 	if err := s.DB.SetLogin(ctx, u.ID, username, hash); errors.Is(err, db.ErrConflict) {
 		return "", "", ErrUsernameTaken
 	} else if err != nil {
+		return "", "", err
+	}
+	// Their key stays locked with the forgotten password; that lock opens nothing for them now.
+	if err := s.DB.SetPasswordLock(ctx, u.ID, nil); err != nil {
 		return "", "", err
 	}
 	for _, name := range []string{u.Username, username} {

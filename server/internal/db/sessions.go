@@ -66,11 +66,12 @@ func (d *DB) RevokePinSession(ctx context.Context, id string, at time.Time) erro
 
 // MoveReceivingUploads hands the unfinished uploads of an old session to a new one. That
 // happens when a PIN ended mid-upload and the person unlocked again with a new PIN: the
-// uploads continue instead of starting over, into the new PIN's folder.
+// uploads continue instead of starting over, into the new PIN's folder. An encrypted upload
+// continues only into the same folder, whose key its file key is sealed for.
 func (d *DB) MoveReceivingUploads(ctx context.Context, fromSession, toSession, toPin, toFolder string, at time.Time) (int64, error) {
 	res, err := d.ExecContext(ctx, `UPDATE files SET pin_session_id = ?, pin_id = ?, folder_id = ?, updated_at = ?
-		WHERE pin_session_id = ? AND state = 'receiving'`,
-		toSession, toPin, toFolder, ms(at), fromSession)
+		WHERE pin_session_id = ? AND state = 'receiving' AND (enc_version IS NULL OR folder_id = ?)`,
+		toSession, toPin, toFolder, ms(at), fromSession, toFolder)
 	if err != nil {
 		return 0, err
 	}

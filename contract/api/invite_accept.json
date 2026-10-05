@@ -28,7 +28,10 @@
       "local_cert_sha256": [
         "3f1c9e0a5b7d2c4e6f8091a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6"
       ]
-    }
+    },
+    "keys": [
+      {"folder": "f4mily5x2k7mbqz4bwdbyj6qsq", "version": 1, "public_key": "BA7xcg0LvJENgGcBAe6KmLqsTx8ps6QbHLnA3smWI2NGtqauPu-Eq1huFR-CqFjNpbtE5koBwWw8iqYC2MaRom4", "locked": "W3DX2JPdSjU4ZtdzslsPTQ07WMt-LzcATEQ6Ymu5gyDHiCI72rcFAZZGLXoblogsGApvqVzvssKHVyZ4"}
+    ]
   },
-  "notes": "The app's answer (client \"app\", also when client is missing); a browser's is invite_accept_web.json. Uses the invite: it works once. The phone is signed in as a new person with the invite's name and role, or, with adds_phone, as the existing person."
+  "notes": "The app's answer (client \"app\", also when client is missing); a browser's is invite_accept_web.json. Uses the invite: it works once. The phone is signed in as a new person with the invite's name and role, or, with adds_phone, as the existing person. keys are what the inviting device locked with the secret after the dot in the invite's link (docs/e2ee-plan.md): versions of encrypted folders' keys for a new person, or the person's own key (folder null, version 0) for a new phone or browser, each with its public key; they come once, and are empty without them."
 }

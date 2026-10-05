@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/eschgi/share/server/internal/db"
+	"github.com/eschgi/share/server/internal/e2ee"
 	"github.com/eschgi/share/server/internal/s3"
 )
 
@@ -54,9 +55,14 @@ func S3PartLen(n int, size, partSize int64) int64 {
 }
 
 // StartS3Upload starts the multipart upload of a new file. The object gets the type its name
-// suggests and its name for downloads, which the links name again anyway.
-func (lib *Library) StartS3Upload(ctx context.Context, id, name string) (string, error) {
-	return lib.s3.CreateUpload(ctx, lib.s3.Key(id), objectType(name), ContentDisposition(name))
+// suggests, or none for encrypted bytes, and its name for downloads, which the links name
+// again anyway.
+func (lib *Library) StartS3Upload(ctx context.Context, id, name string, encrypted bool) (string, error) {
+	t := objectType(name)
+	if encrypted {
+		t = "application/octet-stream"
+	}
+	return lib.s3.CreateUpload(ctx, lib.s3.Key(id), t, ContentDisposition(name))
 }
 
 func objectType(name string) string {
@@ -171,8 +177,20 @@ func (lib *Library) checkObject(ctx context.Context, f db.File) error {
 }
 
 // classifyS3 is classify for an object: by the name, else by its first bytes. A failed read
-// is an error, never a guess.
+// is an error, never a guess. An encrypted object must start with its header, and its name
+// alone says what it is.
 func (lib *Library) classifyS3(ctx context.Context, f db.File) (mime, kind string, err error) {
+	if f.Enc != nil {
+		head, err := lib.s3.Head(ctx, lib.s3.Key(f.ID), e2ee.HeaderSize)
+		if err != nil {
+			return "", "", err
+		}
+		if err := checkHeader(f, head); err != nil {
+			return "", "", err
+		}
+		mime, kind = ClassifyEncrypted(f.Name)
+		return mime, kind, nil
+	}
 	if mime, kind, ok := TypeByName(f.Name); ok {
 		return mime, kind, nil
 	}

@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"bytes"
+	"fmt"
 	"net/http"
 	"path"
 	"regexp"
@@ -208,6 +210,23 @@ func Classify(name string, head []byte) (mime, kind string) {
 		return mime, db.KindVideo
 	}
 	return mime, db.KindDocument
+}
+
+// ClassifyEncrypted is Classify for an encrypted file, whose bytes say nothing: by the name
+// alone.
+func ClassifyEncrypted(name string) (mime, kind string) {
+	if mime, kind, ok := TypeByName(name); ok {
+		return mime, kind
+	}
+	return "application/octet-stream", db.KindDocument
+}
+
+// checkHeader makes sure an encrypted file's bytes start with the header its uploader said.
+func checkHeader(f db.File, head []byte) error {
+	if !bytes.Equal(head, f.Enc.Header) {
+		return fmt.Errorf("finalize %s: the encrypted bytes don't start with their header", f.ID)
+	}
+	return nil
 }
 
 // Day is the library folder, and the day a file is grouped under: the upload day in the

@@ -79,9 +79,14 @@ func (d *DB) RevokeInvite(ctx context.Context, id string, at time.Time) error {
 	if _, err := d.InviteByID(ctx, id); err != nil {
 		return err
 	}
-	_, err := d.ExecContext(ctx, "UPDATE invites SET revoked_at = ? WHERE id = ? AND used_at IS NULL AND revoked_at IS NULL",
-		ms(at), id)
-	return err
+	return d.Tx(ctx, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, "UPDATE invites SET revoked_at = ? WHERE id = ? AND used_at IS NULL AND revoked_at IS NULL",
+			ms(at), id); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx, "DELETE FROM invite_keys WHERE invite_id = ?", id) // locked for nobody now
+		return err
+	})
 }
 
 // PinStat says how much a PIN was used: the files sent with it that are in the library, and

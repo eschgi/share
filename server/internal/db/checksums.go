@@ -7,10 +7,10 @@ import (
 	"strings"
 )
 
-// CRCCandidates lists files in the library whose CRC-32 isn't known yet, the newest first:
-// those are the likeliest to be downloaded soon.
+// CRCCandidates lists plain files in the library whose CRC-32 isn't known yet, the newest
+// first: those are the likeliest to be downloaded soon. Encrypted files go into no ZIP.
 func (d *DB) CRCCandidates(ctx context.Context, limit int) ([]File, error) {
-	return queryFiles(ctx, d, "SELECT "+fileColumns+` FROM files WHERE state = 'ready' AND crc32 IS NULL
+	return queryFiles(ctx, d, "SELECT "+fileColumns+` FROM files WHERE state = 'ready' AND crc32 IS NULL AND enc_version IS NULL
 		ORDER BY uploaded_at DESC, id LIMIT ?`, limit)
 }
 

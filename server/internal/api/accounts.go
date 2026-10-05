@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"log"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/eschgi/share/server/internal/auth"
 	"github.com/eschgi/share/server/internal/db"
+	"github.com/eschgi/share/server/internal/e2ee"
 	"github.com/eschgi/share/server/internal/httpx"
 )
 
@@ -71,17 +73,67 @@ type SignedInResponse struct {
 
 // signedIn answers a login or an accepted invite. A browser gets its key as an HttpOnly
 // cookie, never in the body, and loses its PIN cookie: what it sent with the PIN is the
-// person's now.
-func (a *API) signedIn(w http.ResponseWriter, r *http.Request, s *auth.SignedIn) {
+// person's now. An accepted invite also brings the keys locked for its link.
+func (a *API) signedIn(w http.ResponseWriter, r *http.Request, s *auth.SignedIn, keys []InviteKeyInfo) {
 	if s.Device.Client == db.ClientWeb {
 		auth.SetAccountCookie(w, r, s.Token)
 		auth.ClearSessionCookie(w, r)
-		httpx.WriteJSON(w, http.StatusOK, Me{User: userInfo(s.User), Device: deviceInfo(s.Device)})
+		me := Me{User: userInfo(s.User), Device: deviceInfo(s.Device)}
+		if keys == nil {
+			httpx.WriteJSON(w, http.StatusOK, me)
+		} else {
+			httpx.WriteJSON(w, http.StatusOK, struct {
+				Me
+				Keys []InviteKeyInfo `json:"keys"`
+			}{me, keys})
+		}
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, SignedInResponse{
-		Token: s.Token, User: userInfo(s.User), Device: deviceInfo(s.Device), Server: a.server(),
-	})
+	res := SignedInResponse{Token: s.Token, User: userInfo(s.User), Device: deviceInfo(s.Device), Server: a.server()}
+	if keys == nil {
+		httpx.WriteJSON(w, http.StatusOK, res)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, struct {
+		SignedInResponse
+		Keys []InviteKeyInfo `json:"keys"`
+	}{res, keys})
+}
+
+// InviteKeyInfo is a key locked with the secret of an invite's link: a version of a folder's
+// key, or the person's own key (folder null) for a new phone or browser, with its public key.
+type InviteKeyInfo struct {
+	Folder    *string `json:"folder"`
+	Version   int     `json:"version"`
+	PublicKey B64     `json:"public_key"`
+	Locked    B64     `json:"locked"`
+}
+
+// inviteKeys describes the keys an accepted invite brought.
+func (a *API) inviteKeys(ctx context.Context, s *auth.SignedIn) ([]InviteKeyInfo, error) {
+	out := []InviteKeyInfo{}
+	for _, k := range s.Keys {
+		info := InviteKeyInfo{Version: k.Version, Locked: k.Locked}
+		if k.FolderID == "" {
+			keys, err := a.Auth.DB.KeysOf(ctx, s.User.ID, s.Device.ID)
+			if err != nil {
+				return nil, err
+			}
+			info.PublicKey = keys.PersonPublic
+		} else {
+			fk, err := a.Auth.DB.FolderKeyOf(ctx, k.FolderID, k.Version)
+			if errors.Is(err, db.ErrNoKey) {
+				continue
+			}
+			if err != nil {
+				return nil, err
+			}
+			folder := k.FolderID
+			info.Folder, info.PublicKey = &folder, fk.PublicKey
+		}
+		out = append(out, info)
+	}
+	return out, nil
 }
 
 // clientOf is the client a sign-in is for: the app, unless it says web.
@@ -110,7 +162,7 @@ func (a *API) login(w http.ResponseWriter, r *http.Request) {
 	var input *auth.InputError
 	switch {
 	case err == nil:
-		a.signedIn(w, r, res)
+		a.signedIn(w, r, res, nil)
 	case errors.As(err, &input):
 		httpx.WriteError(w, http.StatusBadRequest, "bad_request", "The "+input.Field+" "+input.Problem+".")
 	case errors.As(err, &locked):
@@ -172,7 +224,12 @@ func (a *API) acceptInvite(w http.ResponseWriter, r *http.Request) {
 	var input *auth.InputError
 	switch {
 	case err == nil:
-		a.signedIn(w, r, res)
+		keys, err := a.inviteKeys(r.Context(), res)
+		if err != nil {
+			internal(w, "invite keys", err)
+			return
+		}
+		a.signedIn(w, r, res, keys)
 	case errors.As(err, &input):
 		httpx.WriteError(w, http.StatusBadRequest, "bad_request", "The "+input.Field+" "+input.Problem+".")
 	default:
@@ -293,6 +350,9 @@ type passwordRequest struct {
 	Username        string `json:"username"`
 	Password        string `json:"password"`
 	CurrentPassword string `json:"current_password,omitempty"`
+	// PasswordLock: the person's key locked with the new password. Without it, a lock with
+	// the old one goes.
+	PasswordLock B64 `json:"password_lock,omitempty"`
 }
 
 func (a *API) setPassword(w http.ResponseWriter, r *http.Request) {
@@ -304,7 +364,11 @@ func (a *API) setPassword(w http.ResponseWriter, r *http.Request) {
 	if !httpx.DecodeJSON(w, r, &req) {
 		return
 	}
-	err := a.Auth.SetPassword(r.Context(), p, req.Username, req.CurrentPassword, req.Password)
+	if req.PasswordLock != nil && e2ee.CheckPasswordLock(req.PasswordLock) != nil {
+		badKey(w, "password_lock")
+		return
+	}
+	err := a.Auth.SetPassword(r.Context(), p, req.Username, req.CurrentPassword, req.Password, req.PasswordLock)
 	var input *auth.InputError
 	var wrong *auth.WrongPasswordError
 	var locked *auth.LockedError

@@ -13,12 +13,20 @@ import (
 	"time"
 
 	"github.com/eschgi/share/server/internal/db"
+	"github.com/eschgi/share/server/internal/e2ee"
 	"github.com/eschgi/share/server/internal/ids"
 	"github.com/eschgi/share/server/internal/s3"
 )
 
 // ErrIncomplete means an upload hasn't received all its bytes yet.
 var ErrIncomplete = errors.New("upload is not complete yet")
+
+// Moving encrypted files: the target folder never had a key, or a file's key isn't sealed for
+// its newest one.
+var (
+	ErrNotEncrypted = errors.New("the folder has no key for encrypted files")
+	ErrKeysNeeded   = errors.New("encrypted files need their keys sealed for the folder's newest key")
+)
 
 // Library moves finished uploads into the day folders of their folder, and keeps track of
 // where each file's bytes are.
@@ -193,6 +201,21 @@ func (lib *Library) Finalize(ctx context.Context, id string) error {
 		if info.Size() != f.Size {
 			return ErrIncomplete
 		}
+		if f.Enc != nil {
+			head := make([]byte, e2ee.HeaderSize)
+			fh, err := lib.root.Open(uploadPath(id))
+			if err != nil {
+				return err
+			}
+			_, err = io.ReadFull(fh, head)
+			fh.Close()
+			if err != nil {
+				return err
+			}
+			if err := checkHeader(f, head); err != nil {
+				return err
+			}
+		}
 		if f, err = lib.claimPath(ctx, f); err != nil {
 			return err
 		}
@@ -308,6 +331,9 @@ func (lib *Library) moveIntoLibrary(f db.File, dst string) error {
 }
 
 func (lib *Library) classify(f db.File, at string) (mime, kind string) {
+	if f.Enc != nil {
+		return ClassifyEncrypted(f.Name)
+	}
 	head := make([]byte, 512)
 	fh, err := lib.root.Open(at)
 	if err == nil {

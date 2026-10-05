@@ -24,6 +24,16 @@ type Pin struct {
 	EndedAt     *time.Time
 	FolderID    string // the folder it sends into; "" once that folder is gone for good
 	ShowsFolder bool   // guests with it also see and download what is in the folder
+	Secret      *PinSecret
+}
+
+// PinSecret is what the link of a PIN that shows an encrypted folder brings: its secret,
+// sealed for a version of the folder's key, and the folder's keys locked with it. Only
+// InsertPin reads it.
+type PinSecret struct {
+	Sealed  []byte
+	Version int
+	Keys    []PinKey
 }
 
 // LiveAt reports whether the PIN still lets people send at time now.
@@ -57,8 +67,22 @@ func (d *DB) InsertPin(ctx context.Context, p Pin) error {
 	if p.FolderID == "" {
 		return errors.New("db: a PIN needs a folder")
 	}
-	_, err := d.ExecContext(ctx, "INSERT INTO pins ("+pinColumns+") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		p.ID, p.Code, p.Kind, p.CreatedBy, ms(p.CreatedAt), nullMS(p.ExpiresAt), nullMS(p.EndedAt), p.FolderID, p.ShowsFolder)
+	err := d.Tx(ctx, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, "INSERT INTO pins ("+pinColumns+") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+			p.ID, p.Code, p.Kind, p.CreatedBy, ms(p.CreatedAt), nullMS(p.ExpiresAt), nullMS(p.EndedAt), p.FolderID, p.ShowsFolder)
+		if err != nil || p.Secret == nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, "UPDATE pins SET secret_sealed = ?, secret_version = ? WHERE id = ?", p.Secret.Sealed, p.Secret.Version, p.ID); err != nil {
+			return err
+		}
+		for _, k := range p.Secret.Keys {
+			if _, err := tx.ExecContext(ctx, "INSERT INTO pin_keys (pin_id, version, locked) VALUES (?, ?, ?)", p.ID, k.Version, k.Locked); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 	if isUniqueViolation(err) {
 		return ErrConflict
 	}

@@ -90,7 +90,7 @@ func (fx *s3Fixture) upload(t *testing.T, name, content string, partSize int64, 
 	id := ids.New()
 	f := db.File{ID: id, Name: name, Size: int64(len(content)), CreatedAt: fx.now, UpdatedAt: fx.now, FolderID: fx.folder.ID, S3PartSize: partSize}
 	if f.Size > 0 {
-		uploadID, err := fx.lib.StartS3Upload(ctx, id, name)
+		uploadID, err := fx.lib.StartS3Upload(ctx, id, name, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -300,7 +300,7 @@ func TestS3LibraryChangesOnlyRows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if moved, err := fx.lib.MoveFiles(ctx, []string{a.ID}, other.ID); err != nil || len(moved) != 1 {
+	if moved, err := fx.lib.MoveFiles(ctx, []string{a.ID}, other.ID, nil); err != nil || len(moved) != 1 {
 		t.Fatalf("moved %v, %v", moved, err)
 	}
 	if got := fx.file(t, a.ID); got.FolderID != other.ID || got.MovedFrom != "" {

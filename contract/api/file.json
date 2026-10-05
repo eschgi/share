@@ -17,7 +17,8 @@
     "height": 3024,
     "duration_ms": null,
     "has_thumb": true,
-    "from": "Maria"
+    "from": "Maria",
+    "enc": null
   },
   "notes": "404 not_found for a file in a folder the caller doesn't see. GET /api/files/{id}/content sends the file as uploaded, with Content-Disposition attachment and ETag \"<id>\"; it answers Range and If-Range (206), and nothing may cache it. With the files in a bucket (storage \"s3\") it answers a browser with 302 to a link there, which names the file the same way; the app asks GET /api/s3/files/{id}/url instead, and gets 409 s3_use_url here. GET /api/files/{id}/thumb is a JPEG of up to 512 pixels, 404 if there is none; updated_at changes with it."
 }

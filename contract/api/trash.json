@@ -20,6 +20,7 @@
         "duration_ms": null,
         "has_thumb": true,
         "from": null,
+        "enc": null,
         "deleted_at": "2026-09-30T08:10:00Z",
         "deleted_by": "Stefan",
         "purge_at": "2026-10-30T08:10:00Z"

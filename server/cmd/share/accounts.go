@@ -56,6 +56,7 @@ func invite(args []string) error {
 	}
 	userID := ""
 	var into []string
+	var sees []db.Folder // what the invite opens, to refuse it for encrypted folders
 	switch {
 	case *forUser != "":
 		u, err := findUser(ctx, d, *forUser)
@@ -63,12 +64,30 @@ func invite(args []string) error {
 			return err
 		}
 		userID = u.ID
+		if u.Role == db.RoleAdmin {
+			sees, err = d.LiveFolders(ctx)
+		} else {
+			sees, err = d.FoldersOf(ctx, u.ID)
+		}
+		if err != nil {
+			return err
+		}
 	case *admin && len(names) > 0:
 		return errors.New("admins see every folder; leave out --folder")
-	case !*admin:
+	case *admin:
+		if sees, err = d.LiveFolders(ctx); err != nil {
+			return err
+		}
+	default:
 		if into, err = pickFolders(ctx, d, names); err != nil {
 			return err
 		}
+		if sees, err = d.FoldersByID(ctx, into); err != nil {
+			return err
+		}
+	}
+	if err := noEncrypted(sees, "invite"); err != nil {
+		return err
 	}
 	token, in, err := svc.CreateInvite(ctx, *name, role, userID, "cli", into, auth.InviteLifetime)
 	if err != nil {

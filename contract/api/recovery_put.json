@@ -1,0 +1,11 @@
+{
+  "method": "PUT",
+  "path": "/api/recovery",
+  "auth": "admin",
+  "status": 204,
+  "request": {
+    "public_key": "BDFd7tK2QVrRZrz2n06pEn0s4mnWwHMpoCwDQAlpsw3HgIs9goITXuTJqEqXthFqua8KJEYlir4vdPHCNN_EPt8",
+    "locked": "MPydzR58EYjpXELeTEXN1otL4bkMrzrois8hbvIr3jCIApOGUBlA28DvZbbhU-LhpuYNUqkBTZWdHiSF"
+  },
+  "notes": "Makes the recovery key, or a new one (a new code): made on the admin's device, its private key locked with the recovery code that device shows once. A new one drops everything sealed for the old one; the admins' devices seal the folder keys for it again (todo.recovery)."
+}

@@ -64,7 +64,7 @@ func TestMigrateIsIdempotentAndRefusesNewerDatabases(t *testing.T) {
 	if entries, _ := os.ReadDir(filepath.Join(dir, "backups")); len(entries) != 0 {
 		t.Errorf("a no-op migration made %d backups", len(entries))
 	}
-	if v, err := d.SchemaVersion(ctx); err != nil || v != 7 {
+	if v, err := d.SchemaVersion(ctx); err != nil || v != 8 {
 		t.Errorf("schema version %d, %v", v, err)
 	}
 	if err := d.SetMeta(ctx, "schema_version", "99"); err != nil {
@@ -92,7 +92,7 @@ func TestMigrateGoesOnFromUserVersion(t *testing.T) {
 	if err := d.Migrate(ctx, filepath.Join(dir, "backups")); err != nil {
 		t.Fatal(err)
 	}
-	if v, err := d.Meta(ctx, "schema_version"); err != nil || v != "7" {
+	if v, err := d.Meta(ctx, "schema_version"); err != nil || v != "8" {
 		t.Errorf("after migrating: %q, %v", v, err)
 	}
 	if entries, _ := os.ReadDir(filepath.Join(dir, "backups")); len(entries) != 1 {
@@ -203,7 +203,13 @@ func TestSessionsAndMovingUploads(t *testing.T) {
 	if err := d.InsertReceiving(ctx, f); err != nil {
 		t.Fatal(err)
 	}
-	if n, _ := d.UnfinishedCount(ctx, oldS.ID, ""); n != 1 {
+	// An encrypted upload's key is sealed for its folder's key: it stays where it was going.
+	enc := File{ID: ids.New(), Name: "b.jpg", Size: 42, CreatedAt: t0, UpdatedAt: t0, PinID: oldPin.ID, PinSessionID: oldS.ID, FolderID: family,
+		Enc: &Enc{Version: 1, Key: []byte("sealed"), Header: []byte("header"), PlainSize: 10}}
+	if err := d.InsertReceiving(ctx, enc); err != nil {
+		t.Fatal(err)
+	}
+	if n, _ := d.UnfinishedCount(ctx, oldS.ID, ""); n != 2 {
 		t.Fatalf("UnfinishedCount = %d", n)
 	}
 	moved, err := d.MoveReceivingUploads(ctx, oldS.ID, newS.ID, newPin.ID, wedding, t0)
@@ -213,6 +219,12 @@ func TestSessionsAndMovingUploads(t *testing.T) {
 	after, _ := d.FileByID(ctx, f.ID)
 	if after.PinSessionID != newS.ID || after.PinID != newPin.ID || after.FolderID != wedding {
 		t.Fatalf("file after move: %+v", after)
+	}
+	if after, _ := d.FileByID(ctx, enc.ID); after.PinSessionID != oldS.ID || after.FolderID != family || after.Enc == nil || after.Enc.PlainSize != 10 {
+		t.Fatalf("the encrypted upload after the move: %+v", after)
+	}
+	if err := d.DeleteFileRow(ctx, enc.ID); err != nil {
+		t.Fatal(err)
 	}
 
 	// The old session has nothing receiving any more, so once revoked long enough it goes.

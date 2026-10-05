@@ -275,6 +275,15 @@ func pin(args []string) error {
 		if err != nil {
 			return err
 		}
+		if *show {
+			f, err := d.FoldersByID(ctx, into)
+			if err != nil {
+				return err
+			}
+			if err := noEncrypted(f, "PIN that shows its folder"); err != nil {
+				return err
+			}
+		}
 		p, err := svc.CreatePin(ctx, auth.PinSpec{Kind: kind, FolderID: into[0], ShowsFolder: *show}, "cli")
 		if err != nil {
 			return err

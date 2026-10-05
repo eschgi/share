@@ -24,6 +24,7 @@ import (
 
 	"github.com/eschgi/share/server/internal/auth"
 	"github.com/eschgi/share/server/internal/db"
+	"github.com/eschgi/share/server/internal/e2ee"
 	"github.com/eschgi/share/server/internal/ids"
 )
 
@@ -65,6 +66,9 @@ var sentDecodes = make(chan struct{}, 2)
 // Meta is what the uploader measured on the original file. Nil fields are unknown.
 type Meta struct {
 	Width, Height, DurationMS *int64
+	// Sealed: the thumbnail of an encrypted file, sealed on the uploader's device; only its
+	// size can be checked.
+	Sealed bool
 }
 
 // Bucket keeps the thumbnails when the files are in a bucket; *s3.Bucket is one.
@@ -97,7 +101,7 @@ func (s *Store) Path(id string) string { return filepath.Join(s.Dir, id[:2], id+
 // Read returns the thumbnail of file id; fs.ErrNotExist if there is none.
 func (s *Store) Read(ctx context.Context, id string) ([]byte, error) {
 	if s.Bucket != nil {
-		return s.Bucket.ReadAll(ctx, s.Bucket.ThumbKey(id), MaxBytes)
+		return s.Bucket.ReadAll(ctx, s.Bucket.ThumbKey(id), e2ee.MaxThumbSize)
 	}
 	return os.ReadFile(s.Path(id))
 }
@@ -105,47 +109,50 @@ func (s *Store) Read(ctx context.Context, id string) ([]byte, error) {
 // CanSend checks that p may send a thumbnail for file id: its uploader within a day of the
 // upload, or an admin. The API asks before it reads the picture.
 func (s *Store) CanSend(ctx context.Context, p *auth.Principal, id string) error {
+	_, err := s.canSend(ctx, p, id)
+	return err
+}
+
+func (s *Store) canSend(ctx context.Context, p *auth.Principal, id string) (db.File, error) {
 	if !ids.Valid(id) {
-		return ErrNotFound
+		return db.File{}, ErrNotFound
 	}
 	f, err := s.DB.FileByID(ctx, id)
 	if errors.Is(err, db.ErrNotFound) || (err == nil && f.State != db.StateReady) {
-		return ErrNotFound
+		return f, ErrNotFound
 	}
 	if err != nil {
-		return err
+		return f, err
 	}
 	if p.Kind == auth.KindDevice && p.Role == "admin" {
-		return nil
+		return f, nil
 	}
 	if !p.Owns(f) {
-		return ErrNotFound
+		return f, ErrNotFound
 	}
 	if f.UploadedAt == nil || s.Now().Sub(*f.UploadedAt) > uploaderWindow {
-		return ErrTooLate
+		return f, ErrTooLate
 	}
-	return nil
+	return f, nil
 }
 
 // PutSent stores a thumbnail sent by the file's uploader, or by an admin. It replaces any
-// thumbnail the file already has.
+// thumbnail the file already has. An encrypted file's thumbnail comes sealed; a plain file's
+// must be a whole JPEG.
 func (s *Store) PutSent(ctx context.Context, p *auth.Principal, id string, data []byte, m Meta) error {
-	if err := s.CanSend(ctx, p, id); err != nil {
+	f, err := s.canSend(ctx, p, id)
+	if err != nil {
 		return err
 	}
-	cfg, format, err := image.DecodeConfig(bytes.NewReader(data))
-	if err != nil || format != "jpeg" || cfg.Width < 1 || cfg.Height < 1 || cfg.Width > maxSentSide || cfg.Height > maxSentSide {
+	if m.Sealed != (f.Enc != nil) {
 		return ErrInvalid
 	}
-	select {
-	case sentDecodes <- struct{}{}:
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-	_, err = jpeg.Decode(bytes.NewReader(data))
-	<-sentDecodes
-	if err != nil {
-		return ErrInvalid // the app shows these; only whole, valid pictures get through
+	if m.Sealed {
+		if len(data) <= e2ee.LockOverhead || len(data) > e2ee.MaxThumbSize {
+			return ErrInvalid
+		}
+	} else if err := checkJPEG(ctx, data); err != nil {
+		return err
 	}
 
 	s.mu.Lock()
@@ -160,6 +167,25 @@ func (s *Store) PutSent(ctx context.Context, p *auth.Principal, id string, data 
 	if !ok { // it left the library in the meantime
 		s.drop(ctx, id)
 		return ErrNotFound
+	}
+	return nil
+}
+
+// checkJPEG makes sure data is a whole JPEG of at most maxSentSide pixels a side.
+func checkJPEG(ctx context.Context, data []byte) error {
+	cfg, format, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil || format != "jpeg" || cfg.Width < 1 || cfg.Height < 1 || cfg.Width > maxSentSide || cfg.Height > maxSentSide {
+		return ErrInvalid
+	}
+	select {
+	case sentDecodes <- struct{}{}:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	_, err = jpeg.Decode(bytes.NewReader(data))
+	<-sentDecodes
+	if err != nil {
+		return ErrInvalid // the app shows these; only whole, valid pictures get through
 	}
 	return nil
 }

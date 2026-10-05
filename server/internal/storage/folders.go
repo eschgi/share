@@ -371,7 +371,11 @@ func ptrOr(p *string, or string) string {
 // them changes with the folder. The database changes first and the bytes follow; Reconcile
 // finishes what a crash cut short. It returns the files it moved; db.ErrNotFound for no such
 // folder.
-func (lib *Library) MoveFiles(ctx context.Context, fileIDs []string, folderID string) ([]db.File, error) {
+//
+// An encrypted file needs its file key sealed for the target folder's newest key: keys has
+// them by file id. ErrNotEncrypted if the folder never had a key, ErrKeysNeeded if one is
+// missing or sealed for another version.
+func (lib *Library) MoveFiles(ctx context.Context, fileIDs []string, folderID string, keys map[string]db.Enc) ([]db.File, error) {
 	lib.mu.Lock()
 	defer lib.mu.Unlock()
 	to, err := lib.DB.FolderByID(ctx, folderID)
@@ -393,6 +397,17 @@ func (lib *Library) MoveFiles(ctx context.Context, fileIDs []string, folderID st
 		if f.FolderID == to.ID {
 			continue
 		}
+		var enc *db.Enc
+		if f.Enc != nil {
+			k, ok := keys[f.ID]
+			switch {
+			case to.KeyVersion == 0:
+				return nil, ErrNotEncrypted
+			case !ok || k.Version != to.KeyVersion:
+				return nil, ErrKeysNeeded
+			}
+			enc = &k
+		}
 		src, err := lib.locate(ctx, f)
 		if err != nil {
 			return nil, err
@@ -402,7 +417,7 @@ func (lib *Library) MoveFiles(ctx context.Context, fileIDs []string, folderID st
 			return nil, err
 		}
 		claimed[strings.ToLower(rel)] = true
-		moves = append(moves, db.Move{ID: f.ID, FolderID: to.ID, RelPath: rel, From: f.FolderID + "/" + f.RelPath})
+		moves = append(moves, db.Move{ID: f.ID, FolderID: to.ID, RelPath: rel, From: f.FolderID + "/" + f.RelPath, Enc: enc})
 		from = append(from, src)
 		f.FolderID, f.RelPath, f.MovedFrom = to.ID, rel, f.FolderID+"/"+f.RelPath
 		moved = append(moved, f)

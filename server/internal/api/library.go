@@ -36,6 +36,16 @@ type FileInfo struct {
 	DurationMS *int64    `json:"duration_ms"`
 	HasThumb   bool      `json:"has_thumb"`
 	From       *string   `json:"from"` // who sent it, if they have an account; null for a PIN
+	Enc        *EncInfo  `json:"enc"`  // how it is encrypted; null for a plain file
+}
+
+// EncInfo is how a file is encrypted: the version of its folder's key that its file key is
+// sealed for, that sealed key, and the header its contents start with. The file's size is
+// the plain size; what is stored is bigger by the header and 16 bytes per 64 KiB.
+type EncInfo struct {
+	Version int `json:"version"`
+	Key     B64 `json:"key"`
+	Header  B64 `json:"header"`
 }
 
 func fileInfo(f db.File, names map[string]string) FileInfo {
@@ -43,6 +53,9 @@ func fileInfo(f db.File, names map[string]string) FileInfo {
 		ID: f.ID, Folder: f.FolderID, Name: f.Name, Size: f.Size, Mime: f.Mime, Kind: f.Kind, Day: f.UploadDay, UpdatedAt: f.UpdatedAt,
 		Width: f.Width, Height: f.Height, DurationMS: f.DurationMS,
 		HasThumb: f.Thumb == db.ThumbClient || f.Thumb == db.ThumbServer,
+	}
+	if e := f.Enc; e != nil {
+		info.Size, info.Enc = e.PlainSize, &EncInfo{Version: e.Version, Key: e.Key, Header: e.Header}
 	}
 	if f.UploadedAt != nil {
 		info.UploadedAt = *f.UploadedAt
@@ -318,7 +331,7 @@ func (a *API) content(w http.ResponseWriter, r *http.Request) {
 	}
 	h := w.Header()
 	h.Set("Content-Type", f.Mime)
-	if f.Mime == "" {
+	if f.Mime == "" || f.Enc != nil { // encrypted bytes are of no type
 		h.Set("Content-Type", "application/octet-stream")
 	}
 	h.Set("Content-Disposition", storage.ContentDisposition(f.Name))
@@ -361,7 +374,11 @@ func (a *API) thumb(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cached()
-	w.Header().Set("Content-Type", "image/jpeg")
+	if f.Enc != nil {
+		w.Header().Set("Content-Type", "application/octet-stream") // sealed
+	} else {
+		w.Header().Set("Content-Type", "image/jpeg")
+	}
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	http.ServeContent(w, r, "", f.UpdatedAt, bytes.NewReader(data))
 }

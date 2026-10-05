@@ -125,7 +125,7 @@ func TestNewMembersGetTheirFolders(t *testing.T) {
 	}
 	u := User{ID: ids.New(), Name: "Oma Rosa", Role: RoleMember, CreatedAt: t0, CreatedBy: "cli"}
 	dv := Device{ID: ids.New(), UserID: u.ID, Name: "Pixel", CreatedAt: t0, LastSeenAt: t0}
-	if err := d.UseInvite(ctx, in.ID, u, dv, []byte("device"), t0); err != nil {
+	if _, err := d.UseInvite(ctx, in.ID, u, dv, []byte("device"), t0); err != nil {
 		t.Fatal(err)
 	}
 	if folders, _ := d.FoldersOf(ctx, u.ID); len(folders) != 1 || folders[0].ID != kindergarten {

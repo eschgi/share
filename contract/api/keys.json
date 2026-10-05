@@ -1,0 +1,58 @@
+{
+  "method": "GET",
+  "path": "/api/keys",
+  "auth": "device",
+  "status": 200,
+  "response": {
+    "device_key": "BP5Xqgr0LIgKJsxpLCxqCYP0IBXFuhbhlS4whnsboXUZct_cyjLT2j4RuYAd2bTu7wOfI6OFx1f7FSd0kFbx7To",
+    "person": {
+      "public_key": "BOoK7BbB52RAZMcAfKQQLjL8yXeQdFC6SjgFDQuE6_QCLP7iXRaIzQc0VbnOm0RpNONTdswHfJdNix83cVz2SN4",
+      "sealed": "kq-C1mWsV1iFUzNoO9cSR-PVo4fyrs4kg_-Sx19doYBM1BbF76Jm292nN71xpQ64vUWpLWrd1U1c7GQlqQDpR1dU8H3CvISLsMxJdnbPB31kM45-Dlzhz0xEC3r-VBW7K7gT_qtxhJEVsmzhkzcxRE8",
+      "password_lock": "HsK-CjVqsf87rGnQqHVph1WvX7fvZZLvWhKJTLL5NLnIK0M9IejaYbZvBP19cLdAXMuLhuzkCb4nGfrHmzKl57R0nMEJJm6zaWpB8EJIHuw"
+    },
+    "folders": [
+      {
+        "folder": "f4mily5x2k7mbqz4bwdbyj6qsq",
+        "version": 1,
+        "public_key": "BD6DSZYRQziHQxVPHDEuXP2MXE_NYfU4KzqIj3kOYLpMHBJE-WoTxJjmMJnP1rUglfpbFwAY-RtCJNKv0Burx14",
+        "sealed": "214P3l6NWr5tlB8FZrCrFc4sCUghW778MsWZiyWfPuIUdt_xblTn_e-v_ARvl5ZcXDnfJ3BLx4V5WqwHKlXoMeNyUY-Jv88DkASE0xT5RoU7elhye1TvVoEvuzbmqRVBtwfASQUbNo1GR8q9y6GWKP0"
+      }
+    ],
+    "recovery_key": "BDyEopB5K3FQd2qSvFyEPd4O3v2BjLGwYeQO7H1903GGr-FHRNPM7w3dE1QUjLwQRFjSCpH_noivHY0cZqdARH8",
+    "todo": {
+      "devices": [
+        {
+          "id": "d4ld5x2k7mbqz4bwdbyj6qsqxa",
+          "public_key": "BMmYyu1hjVZiPGtw6To8VR7ubX_Uhpt5oHzlpQJ6NKVwvSHzARYhSsXNAOzpVNhD1gUWGMdgfNMNb-29G98okLw"
+        }
+      ],
+      "people": [
+        {
+          "folder": "f4mily5x2k7mbqz4bwdbyj6qsq",
+          "version": 1,
+          "user": "u7ld5x2k7mbqz4bwdbyj6qsqxa",
+          "public_key": "BO_wgxnd_ogCHgijEQLzuGO9oADVgaVEb7b7LTJNaTaicF7BZ3w8Q03QaUui70Y2kmOJrKNBSa2leYx42d7kwi0"
+        }
+      ],
+      "recovery": [
+        {
+          "folder": "f4mily5x2k7mbqz4bwdbyj6qsq",
+          "version": 1
+        }
+      ],
+      "rekey": [
+        "f4mily5x2k7mbqz4bwdbyj6qsq"
+      ],
+      "pins": [
+        {
+          "pin": "p5ld5x2k7mbqz4bwdbyj6qsqxa",
+          "folder": "f4mily5x2k7mbqz4bwdbyj6qsq",
+          "version": 2,
+          "secret_version": 1,
+          "secret_sealed": "iQsHNbK-pPkifhtea0oIKb4tCl-yEo6JaqpP8QsyZvZIUN6RV9LB_YSoScYEmNtRd0DauOYp5e6IPGpPd3hR2dHRWjylJRdrlV3Yb4mLVbvP9h9b_y-hDldi9t3XCzay_TnWlynu9gWKkTkm3ZW1c78"
+        }
+      ]
+    }
+  },
+  "notes": "End-to-end encryption (docs/e2ee-plan.md); binary values are base64url without padding, keys P-256 (65 bytes public, 32 private), sealing and locking as in contract/crypto. What a phone or browser needs at every start: device_key is the public key it sent (null before PUT /api/keys/device; a different one means its own was lost: send a new one). person: the person's public key (null until a device makes it with PUT /api/keys/person), their private key sealed for this device (null while no device sealed it for this one), and locked with their password (null without). folders: every version of the keys of the folders the person sees, sealed for the person, or null while nobody did yet. recovery_key: null until an admin makes it. todo is what this device can do with the keys its person holds, and sends with POST /api/keys/grants: seal the person key for their devices that lack it, seal folder keys for people who see the folder and lack a version, seal folder keys for the recovery key, make the next version of a folder's key (rekey, with POST /api/folders/{id}/keys), and lock versions for PIN links that show a folder (the PIN's secret is sealed for version secret_version). Only devices: a PIN gets 403 forbidden."
+}

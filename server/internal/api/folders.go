@@ -9,6 +9,7 @@ import (
 
 	"github.com/eschgi/share/server/internal/auth"
 	"github.com/eschgi/share/server/internal/db"
+	"github.com/eschgi/share/server/internal/e2ee"
 	"github.com/eschgi/share/server/internal/httpx"
 	"github.com/eschgi/share/server/internal/storage"
 )
@@ -24,6 +25,8 @@ type FolderInfo struct {
 	AdminsOnly bool      `json:"admins_only"` // no member sees it
 	Cover      *FileInfo `json:"cover"`       // its newest photo or video with a thumbnail
 	CreatedAt  time.Time `json:"created_at"`
+	Encrypted  bool      `json:"encrypted"`   // new files must be encrypted
+	KeyVersion *int      `json:"key_version"` // the newest version of its key; null if it was never encrypted
 }
 
 // Folders lists the folders the caller sees, the oldest first.
@@ -129,7 +132,11 @@ func (a *API) folderInfos(r *http.Request, p *auth.Principal, folders []db.Folde
 		s := stats[f.ID]
 		out[i] = FolderInfo{
 			ID: f.ID, Name: f.Name, Files: s.Files, Bytes: s.Bytes, Senders: s.Senders, CreatedAt: f.CreatedAt,
-			People: people.Admins + people.Members[f.ID], AdminsOnly: people.Members[f.ID] == 0,
+			People: people.Admins + people.Members[f.ID], AdminsOnly: people.Members[f.ID] == 0, Encrypted: f.Encrypted,
+		}
+		if f.KeyVersion > 0 {
+			v := f.KeyVersion
+			out[i].KeyVersion = &v
 		}
 		if c := covers[f.ID]; c != nil {
 			info := fileInfo(*c, names)
@@ -326,6 +333,12 @@ func (a *API) liveFolder(w http.ResponseWriter, r *http.Request) (db.Folder, boo
 type moveRequest struct {
 	IDs    []string `json:"ids"`
 	Folder string   `json:"folder"`
+	// Keys: for encrypted files, their file keys sealed for the target folder's newest key.
+	Keys []struct {
+		ID      string `json:"id"`
+		Version int    `json:"version"`
+		Key     B64    `json:"key"`
+	} `json:"keys,omitempty"`
 }
 
 // moveFiles moves files to another folder: who sees them changes with the folder.
@@ -341,9 +354,24 @@ func (a *API) moveFiles(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	moved, err := a.Lib.MoveFiles(r.Context(), fileIDs, req.Folder)
-	if errors.Is(err, db.ErrNotFound) {
+	keys := map[string]db.Enc{}
+	for _, k := range req.Keys {
+		if len(k.Key) != e2ee.FileKeySize+e2ee.SealOverhead {
+			badKey(w, "sealed file key")
+			return
+		}
+		keys[k.ID] = db.Enc{Version: k.Version, Key: k.Key}
+	}
+	moved, err := a.Lib.MoveFiles(r.Context(), fileIDs, req.Folder, keys)
+	switch {
+	case errors.Is(err, db.ErrNotFound):
 		httpx.WriteError(w, http.StatusNotFound, "not_found", "No such folder.")
+		return
+	case errors.Is(err, storage.ErrNotEncrypted):
+		httpx.WriteError(w, http.StatusConflict, "not_encrypted", "Encrypted files can only go into a folder that was encrypted too.")
+		return
+	case errors.Is(err, storage.ErrKeysNeeded):
+		httpx.WriteError(w, http.StatusConflict, "key_outdated", "Seal the encrypted files' keys for the folder's newest key.")
 		return
 	}
 	if err != nil {

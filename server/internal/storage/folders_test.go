@@ -412,7 +412,7 @@ func TestMoveFilesToAnotherFolder(t *testing.T) {
 	c := fx.readyIn(t, family, "Menu.pdf", "c")
 	before, _ := fx.db.LibraryVersion(ctx)
 
-	moved, err := fx.lib.MoveFiles(ctx, []string{a.ID, b.ID, c.ID}, wedding.ID)
+	moved, err := fx.lib.MoveFiles(ctx, []string{a.ID, b.ID, c.ID}, wedding.ID, nil)
 	if err != nil || len(moved) != 3 {
 		t.Fatalf("MoveFiles = %d files, %v", len(moved), err)
 	}
@@ -432,10 +432,10 @@ func TestMoveFilesToAnotherFolder(t *testing.T) {
 	if v, _ := fx.db.LibraryVersion(ctx); v == before {
 		t.Error("the library version didn't change")
 	}
-	if again, err := fx.lib.MoveFiles(ctx, []string{a.ID}, wedding.ID); err != nil || len(again) != 0 {
+	if again, err := fx.lib.MoveFiles(ctx, []string{a.ID}, wedding.ID, nil); err != nil || len(again) != 0 {
 		t.Fatalf("moving into the folder it's in: %d, %v", len(again), err)
 	}
-	if _, err := fx.lib.MoveFiles(ctx, []string{a.ID}, newID()); !errors.Is(err, db.ErrNotFound) {
+	if _, err := fx.lib.MoveFiles(ctx, []string{a.ID}, newID(), nil); !errors.Is(err, db.ErrNotFound) {
 		t.Fatalf("moving into no folder: %v", err)
 	}
 }

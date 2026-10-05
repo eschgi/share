@@ -22,16 +22,22 @@ type Folder struct {
 	CreatedAt    time.Time
 	DeletedAt    *time.Time
 	DeletedBy    string
+	Encrypted    bool // new files must be encrypted
+	Rekey        bool // someone lost the folder: its key needs a new version
+	KeyVersion   int  // the newest version of its key; 0 if it was never encrypted
 }
 
 const folderColumns = "id, name, dir, renaming_from, created_by, created_at, deleted_at, deleted_by"
+
+// folderSelect is what a folder is read with: its columns and its newest key version.
+const folderSelect = folderColumns + ", encrypted, rekey, (SELECT COALESCE(MAX(version), 0) FROM folder_keys WHERE folder_id = id)"
 
 func scanFolder(row interface{ Scan(...any) error }) (Folder, error) {
 	var f Folder
 	var renaming, deletedBy sql.NullString
 	var created int64
 	var deleted sql.NullInt64
-	err := row.Scan(&f.ID, &f.Name, &f.Dir, &renaming, &f.CreatedBy, &created, &deleted, &deletedBy)
+	err := row.Scan(&f.ID, &f.Name, &f.Dir, &renaming, &f.CreatedBy, &created, &deleted, &deletedBy, &f.Encrypted, &f.Rekey, &f.KeyVersion)
 	if errors.Is(err, sql.ErrNoRows) {
 		return f, ErrNotFound
 	}
@@ -145,23 +151,25 @@ func insertFolder(ctx context.Context, tx *sql.Tx, f Folder) error {
 
 // FolderByID returns one folder, deleted or not.
 func (d *DB) FolderByID(ctx context.Context, id string) (Folder, error) {
-	return scanFolder(d.QueryRowContext(ctx, "SELECT "+folderColumns+" FROM folders WHERE id = ?", id))
+	return scanFolder(d.QueryRowContext(ctx, "SELECT "+folderSelect+" FROM folders WHERE id = ?", id))
 }
 
 // LiveFolders lists the folders that aren't deleted, the oldest first: the first one is where
 // things go when nobody says.
 func (d *DB) LiveFolders(ctx context.Context) ([]Folder, error) {
-	return queryFolders(ctx, d, "SELECT "+folderColumns+" FROM folders WHERE deleted_at IS NULL ORDER BY created_at, rowid")
+	return queryFolders(ctx, d, "SELECT "+folderSelect+" FROM folders WHERE deleted_at IS NULL ORDER BY created_at, rowid")
 }
 
 // FoldersOf lists the live folders a member was given, the oldest first. Admins see every
 // folder whatever this says.
 func (d *DB) FoldersOf(ctx context.Context, userID string) ([]Folder, error) {
-	return queryFolders(ctx, d, "SELECT "+folderColumns+` FROM folders
+	return queryFolders(ctx, d, "SELECT "+folderSelect+` FROM folders
 		WHERE deleted_at IS NULL AND id IN (SELECT folder_id FROM folder_people WHERE user_id = ?) ORDER BY created_at, rowid`, userID)
 }
 
 // SetFolderPerson gives a person a folder, or takes it away. Doing it twice changes nothing.
+// Taking an encrypted folder away drops its keys sealed for the person and asks for a new
+// version of the folder's key.
 func (d *DB) SetFolderPerson(ctx context.Context, folderID, userID string, sees bool) error {
 	q := "INSERT INTO folder_people (folder_id, user_id) VALUES (?, ?) ON CONFLICT DO NOTHING"
 	if !sees {
@@ -175,8 +183,24 @@ func (d *DB) SetFolderPerson(ctx context.Context, folderID, userID string, sees 
 		if n, _ := res.RowsAffected(); n == 0 {
 			return nil
 		}
+		if !sees {
+			if err := loseFolders(ctx, tx, userID, "folder_id = ?", folderID); err != nil {
+				return err
+			}
+		}
 		return bumpLibraryVersion(ctx, tx) // what the person's library shows changed
 	})
+}
+
+// loseFolders drops the keys sealed for a person of the folders that match where, and asks
+// for a new version of each one's key.
+func loseFolders(ctx context.Context, tx *sql.Tx, userID, where string, args ...any) error {
+	if _, err := tx.ExecContext(ctx, `UPDATE folders SET rekey = ? WHERE id IN (
+		SELECT folder_id FROM folder_grants WHERE user_id = ? AND `+where+`)`, append([]any{true, userID}, args...)...); err != nil {
+		return err
+	}
+	_, err := tx.ExecContext(ctx, "DELETE FROM folder_grants WHERE user_id = ? AND "+where, append([]any{userID}, args...)...)
+	return err
 }
 
 // SetFolderInvite lets an open invite for a new member give a folder, or not. It returns
@@ -236,7 +260,7 @@ func (d *DB) DirTaken(ctx context.Context, dir string) (bool, error) {
 
 // Relocating lists the folders whose files may still lie under an older directory.
 func (d *DB) Relocating(ctx context.Context) ([]Folder, error) {
-	return queryFolders(ctx, d, "SELECT "+folderColumns+" FROM folders WHERE renaming_from IS NOT NULL ORDER BY created_at, rowid")
+	return queryFolders(ctx, d, "SELECT "+folderSelect+" FROM folders WHERE renaming_from IS NOT NULL ORDER BY created_at, rowid")
 }
 
 // FinishRelocation notes that nothing is left under a folder's older directory from.
@@ -339,7 +363,7 @@ var ErrBusy = errors.New("the folder's files are still being moved")
 func (d *DB) RenameFolder(ctx context.Context, id, name, dir string) (Folder, error) {
 	var out Folder
 	err := d.Tx(ctx, func(tx *sql.Tx) error {
-		f, err := scanFolder(tx.QueryRowContext(ctx, "SELECT "+folderColumns+" FROM folders WHERE id = ? AND deleted_at IS NULL", id))
+		f, err := scanFolder(tx.QueryRowContext(ctx, "SELECT "+folderSelect+" FROM folders WHERE id = ? AND deleted_at IS NULL", id))
 		if err != nil {
 			return err
 		}
@@ -411,7 +435,7 @@ func (d *DB) DeleteFolder(ctx context.Context, id, by string, at time.Time) ([]F
 func (d *DB) ReviveFolder(ctx context.Context, id string) (Folder, error) {
 	var out Folder
 	err := d.Tx(ctx, func(tx *sql.Tx) error {
-		f, err := scanFolder(tx.QueryRowContext(ctx, "SELECT "+folderColumns+" FROM folders WHERE id = ?", id))
+		f, err := scanFolder(tx.QueryRowContext(ctx, "SELECT "+folderSelect+" FROM folders WHERE id = ?", id))
 		if err != nil || f.DeletedAt == nil {
 			out = f
 			return err
@@ -471,7 +495,7 @@ func (d *DB) DropEmptyDeletedFolders(ctx context.Context) ([]Folder, error) {
 	var out []Folder
 	err := d.Tx(ctx, func(tx *sql.Tx) error {
 		var err error
-		out, err = queryFolders(ctx, tx, "SELECT "+folderColumns+` FROM folders f WHERE deleted_at IS NOT NULL
+		out, err = queryFolders(ctx, tx, "SELECT "+folderSelect+` FROM folders f WHERE deleted_at IS NOT NULL
 			AND NOT EXISTS (SELECT 1 FROM files WHERE folder_id = f.id)
 			AND NOT EXISTS (SELECT 1 FROM files WHERE moved_from LIKE f.id || '/%')`)
 		if err != nil {
@@ -496,5 +520,5 @@ func (d *DB) FoldersByID(ctx context.Context, ids []string) ([]Folder, error) {
 	for i, id := range ids {
 		args[i] = id
 	}
-	return queryFolders(ctx, d, "SELECT "+folderColumns+" FROM folders WHERE id IN (?"+strings.Repeat(", ?", len(ids)-1)+") ORDER BY created_at, rowid", args...)
+	return queryFolders(ctx, d, "SELECT "+folderSelect+" FROM folders WHERE id IN (?"+strings.Repeat(", ?", len(ids)-1)+") ORDER BY created_at, rowid", args...)
 }

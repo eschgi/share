@@ -295,6 +295,13 @@ func (h *TusHandler) preCreate(hook handler.HookEvent) (handler.HTTPResponse, ha
 		return handler.HTTPResponse{}, handler.FileInfoChanges{}, tusError(http.StatusBadRequest, "length_required", "The file size must be known when the upload starts.")
 	}
 	folderID, err := h.admit(ctx, p, info.Size, info.MetaData["folder"], "Upload-Metadata folder")
+	var enc *db.Enc
+	if err == nil {
+		var e *Enc
+		if e, err = parseEnc(info.MetaData["enc"]); err == nil {
+			enc, err = h.encryption(ctx, folderID, info.Size, e)
+		}
+	}
 	var refusal *Refusal
 	if errors.As(err, &refusal) {
 		return handler.HTTPResponse{}, handler.FileInfoChanges{}, tusError(refusal.Status, refusal.Code, refusal.Message)
@@ -309,7 +316,7 @@ func (h *TusHandler) preCreate(hook handler.HookEvent) (handler.HTTPResponse, ha
 	f := db.File{
 		ID: ids.New(), Name: name, Size: info.Size, Kind: storage.GuessKind(name), FolderID: folderID,
 		CreatedAt: now, UpdatedAt: now, ClientModifiedAt: parseMillis(info.MetaData["lastModified"]),
-		PinID: p.PinID, PinSessionID: p.PinSessionID, UserID: p.UserID, DeviceID: p.DeviceID,
+		PinID: p.PinID, PinSessionID: p.PinSessionID, UserID: p.UserID, DeviceID: p.DeviceID, Enc: enc,
 	}
 	if err := h.db.InsertReceiving(ctx, f); err != nil {
 		return handler.HTTPResponse{}, handler.FileInfoChanges{}, err

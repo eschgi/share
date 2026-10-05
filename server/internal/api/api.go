@@ -15,7 +15,9 @@ import (
 	"github.com/eschgi/share/server/internal/auth"
 	"github.com/eschgi/share/server/internal/checksum"
 	"github.com/eschgi/share/server/internal/config"
+	"github.com/eschgi/share/server/internal/db"
 	"github.com/eschgi/share/server/internal/downloads"
+	"github.com/eschgi/share/server/internal/e2ee"
 	"github.com/eschgi/share/server/internal/httpx"
 	"github.com/eschgi/share/server/internal/localtls"
 	"github.com/eschgi/share/server/internal/s3"
@@ -85,6 +87,7 @@ func (a *API) Register(mux *http.ServeMux) {
 		mux.HandleFunc("GET /api/s3/files/{id}/url", a.fileURL)
 	}
 	a.registerAdmin(mux)
+	a.registerKeys(mux)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusNotFound, "not_found", "No such API endpoint.")
 	})
@@ -132,6 +135,33 @@ type Session struct {
 	FolderName *string `json:"folder_name"`
 	// ShowsFolder: the PIN also shows what is in its folder (/api/folders, /api/library, ...).
 	ShowsFolder bool `json:"shows_folder"`
+	// Encrypt: the key new files into the folder are encrypted for; null while the folder is
+	// plain.
+	Encrypt *EncryptInfo `json:"encrypt"`
+}
+
+// EncryptInfo is the newest version of an encrypted folder's key, which uploads seal their
+// file keys for.
+type EncryptInfo struct {
+	Folder    string `json:"folder"`
+	Version   int    `json:"version"`
+	PublicKey B64    `json:"public_key"`
+}
+
+// encryptFor is the key that uploads into a folder are encrypted for; nil while it is plain.
+func (a *API) encryptFor(ctx context.Context, folderID string) (*EncryptInfo, error) {
+	f, err := a.Auth.DB.FolderByID(ctx, folderID)
+	if errors.Is(err, db.ErrNotFound) {
+		return nil, nil
+	}
+	if err != nil || !f.Encrypted || f.KeyVersion == 0 {
+		return nil, err
+	}
+	k, err := a.Auth.DB.FolderKeyOf(ctx, f.ID, f.KeyVersion)
+	if err != nil {
+		return nil, err
+	}
+	return &EncryptInfo{Folder: f.ID, Version: k.Version, PublicKey: k.PublicKey}, nil
 }
 
 // folderName is the name of a PIN's folder for its session, nil on a server with one folder.
@@ -209,9 +239,14 @@ func (a *API) unlock(w http.ResponseWriter, r *http.Request) {
 		internal(w, "unlock", err)
 		return
 	}
+	encrypt, err := a.encryptFor(r.Context(), res.Session.Pin.FolderID)
+	if err != nil {
+		internal(w, "unlock", err)
+		return
+	}
 	resp := UnlockResponse{
 		Session: Session{Kind: auth.KindPin, PinKind: res.Session.Pin.Kind, ExpiresAt: res.ExpiresAt, FolderName: folder,
-			ShowsFolder: res.Session.Pin.ShowsFolder},
+			ShowsFolder: res.Session.Pin.ShowsFolder, Encrypt: encrypt},
 		MovedUploads: res.Moved,
 	}
 	if req.Client == "app" {
@@ -234,8 +269,13 @@ func (a *API) session(w http.ResponseWriter, r *http.Request) {
 		internal(w, "session", err)
 		return
 	}
+	encrypt, err := a.encryptFor(r.Context(), p.PinFolderID)
+	if err != nil {
+		internal(w, "session", err)
+		return
+	}
 	httpx.WriteJSON(w, http.StatusOK, Session{Kind: p.Kind, PinKind: p.PinKind, ExpiresAt: p.PinExpiresAt, FolderName: folder,
-		ShowsFolder: p.PinShowsFolder})
+		ShowsFolder: p.PinShowsFolder, Encrypt: encrypt})
 }
 
 func (a *API) endSession(w http.ResponseWriter, r *http.Request) {
@@ -261,11 +301,15 @@ func (a *API) putThumb(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteAuthError(w, r, err)
 		return
 	}
-	if mt, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); mt != "image/jpeg" {
-		httpx.WriteError(w, http.StatusUnsupportedMediaType, "unsupported_media_type", "Send the thumbnail as image/jpeg.")
+	var m thumbs.Meta
+	switch mt, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); mt {
+	case "image/jpeg":
+	case "application/octet-stream": // an encrypted file's, sealed
+		m.Sealed = true
+	default:
+		httpx.WriteError(w, http.StatusUnsupportedMediaType, "unsupported_media_type", "Send the thumbnail as image/jpeg, or sealed as application/octet-stream.")
 		return
 	}
-	var m thumbs.Meta
 	q := r.URL.Query()
 	for _, f := range []struct {
 		name string
@@ -292,7 +336,11 @@ func (a *API) putThumb(w http.ResponseWriter, r *http.Request) {
 	err = a.Thumbs.CanSend(r.Context(), p, id)
 	if err == nil {
 		var data []byte
-		data, err = io.ReadAll(http.MaxBytesReader(w, r.Body, thumbs.MaxBytes))
+		limit := int64(thumbs.MaxBytes)
+		if m.Sealed {
+			limit = e2ee.MaxThumbSize
+		}
+		data, err = io.ReadAll(http.MaxBytesReader(w, r.Body, limit))
 		if tooBig := (*http.MaxBytesError)(nil); errors.As(err, &tooBig) {
 			httpx.WriteError(w, http.StatusRequestEntityTooLarge, "too_large", "A thumbnail can be at most 512 KiB.")
 			return
@@ -311,7 +359,7 @@ func (a *API) putThumb(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, thumbs.ErrTooLate):
 		httpx.WriteError(w, http.StatusForbidden, "forbidden", "Thumbnails can only be sent within a day of the upload.")
 	case errors.Is(err, thumbs.ErrInvalid):
-		httpx.WriteError(w, http.StatusBadRequest, "bad_thumbnail", "The thumbnail must be a JPEG of at most 1024×1024 pixels.")
+		httpx.WriteError(w, http.StatusBadRequest, "bad_thumbnail", "The thumbnail must be a JPEG of at most 1024×1024 pixels, sealed for an encrypted file.")
 	default:
 		log.Printf("api: thumbnail: %v", err)
 		httpx.WriteError(w, http.StatusInternalServerError, "internal", "The thumbnail couldn't be stored.")

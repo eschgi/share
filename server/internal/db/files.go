@@ -52,20 +52,33 @@ type File struct {
 	MovedFrom        string  // a move to another folder in progress: "<folder id>/<rel_path>" of the bytes
 	S3UploadID       string  // in a bucket: the multipart upload of a receiving file
 	S3PartSize       int64   // in a bucket: the size of every part but the last
+	Enc              *Enc    // how it is encrypted; nil for a plain file
+}
+
+// Enc is how an encrypted file is encrypted (docs/e2ee-plan.md). Its Size is that of the stored
+// bytes; the devices show PlainSize.
+type Enc struct {
+	Version   int    // the version of its folder's key that the file key is sealed for
+	Key       []byte // the file key, sealed for that version
+	Header    []byte // the header the stored bytes start with
+	PlainSize int64
 }
 
 const fileColumns = `id, state, name, size, received, mime, kind, rel_path, upload_day, created_at, updated_at,
 	uploaded_at, client_modified_at, width, height, duration_ms, thumb, pin_id, pin_session_id, user_id,
-	device_id, deleted_at, deleted_by, crc32, folder_id, moved_from, s3_upload_id, s3_part_size`
+	device_id, deleted_at, deleted_by, crc32, folder_id, moved_from, s3_upload_id, s3_part_size, enc_version,
+	enc_key, enc_header, plain_size`
 
 func scanFile(row interface{ Scan(...any) error }) (File, error) {
 	var f File
 	var relPath, day, pinID, sessionID, userID, deviceID, deletedBy, folderID, movedFrom, s3Upload sql.NullString
 	var created, updated int64
-	var uploaded, clientModified, deleted, width, height, duration, crc, s3PartSize sql.NullInt64
+	var uploaded, clientModified, deleted, width, height, duration, crc, s3PartSize, encVersion, plainSize sql.NullInt64
+	var encKey, encHeader []byte
 	err := row.Scan(&f.ID, &f.State, &f.Name, &f.Size, &f.Received, &f.Mime, &f.Kind, &relPath, &day,
 		&created, &updated, &uploaded, &clientModified, &width, &height, &duration, &f.Thumb,
-		&pinID, &sessionID, &userID, &deviceID, &deleted, &deletedBy, &crc, &folderID, &movedFrom, &s3Upload, &s3PartSize)
+		&pinID, &sessionID, &userID, &deviceID, &deleted, &deletedBy, &crc, &folderID, &movedFrom, &s3Upload, &s3PartSize,
+		&encVersion, &encKey, &encHeader, &plainSize)
 	if errors.Is(err, sql.ErrNoRows) {
 		return f, ErrNotFound
 	}
@@ -82,6 +95,9 @@ func scanFile(row interface{ Scan(...any) error }) (File, error) {
 	if crc.Valid {
 		v := uint32(crc.Int64)
 		f.CRC32 = &v
+	}
+	if encVersion.Valid {
+		f.Enc = &Enc{Version: int(encVersion.Int64), Key: encKey, Header: encHeader, PlainSize: plainSize.Int64}
 	}
 	return f, nil
 }
@@ -122,16 +138,22 @@ func (d *DB) InsertReceiving(ctx context.Context, f File) error {
 	if f.Kind == "" {
 		f.Kind = KindDocument
 	}
-	var partSize sql.NullInt64
+	var partSize, encVersion, plainSize sql.NullInt64
 	if f.S3PartSize > 0 {
 		partSize = sql.NullInt64{Int64: f.S3PartSize, Valid: true}
 	}
+	var encKey, encHeader []byte
+	if e := f.Enc; e != nil {
+		encVersion, plainSize = sql.NullInt64{Int64: int64(e.Version), Valid: true}, sql.NullInt64{Int64: e.PlainSize, Valid: true}
+		encKey, encHeader = e.Key, e.Header
+	}
 	_, err := d.ExecContext(ctx, `INSERT INTO files (id, state, name, size, received, mime, kind, created_at, updated_at,
-			client_modified_at, pin_id, pin_session_id, user_id, device_id, folder_id, s3_upload_id, s3_part_size)
-		VALUES (?, 'receiving', ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			client_modified_at, pin_id, pin_session_id, user_id, device_id, folder_id, s3_upload_id, s3_part_size,
+			enc_version, enc_key, enc_header, plain_size)
+		VALUES (?, 'receiving', ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		f.ID, f.Name, f.Size, f.Mime, f.Kind, ms(f.CreatedAt), ms(f.UpdatedAt), nullMS(f.ClientModifiedAt),
 		nullString(f.PinID), nullString(f.PinSessionID), nullString(f.UserID), nullString(f.DeviceID), f.FolderID,
-		nullString(f.S3UploadID), partSize)
+		nullString(f.S3UploadID), partSize, encVersion, encKey, encHeader, plainSize)
 	return err
 }
 
@@ -235,6 +257,7 @@ type Move struct {
 	FolderID string
 	RelPath  string
 	From     string
+	Enc      *Enc // an encrypted file's key, sealed for the new folder's key; Header and PlainSize stay
 }
 
 // MoveFiles records moves to other folders in one transaction, before the bytes follow; each
@@ -244,8 +267,11 @@ func (d *DB) MoveFiles(ctx context.Context, moves []Move) error {
 	return d.Tx(ctx, func(tx *sql.Tx) error {
 		changed := false
 		for _, m := range moves {
-			res, err := tx.ExecContext(ctx, "UPDATE files SET folder_id = ?, rel_path = ?, moved_from = ? WHERE id = ? AND state = 'ready'",
-				m.FolderID, m.RelPath, m.From, m.ID)
+			q, args := "UPDATE files SET folder_id = ?, rel_path = ?, moved_from = ?", []any{m.FolderID, m.RelPath, m.From}
+			if m.Enc != nil {
+				q, args = q+", enc_version = ?, enc_key = ?", append(args, m.Enc.Version, m.Enc.Key)
+			}
+			res, err := tx.ExecContext(ctx, q+" WHERE id = ? AND state = 'ready'", append(args, m.ID)...)
 			if isUniqueViolation(err) {
 				return ErrConflict
 			}

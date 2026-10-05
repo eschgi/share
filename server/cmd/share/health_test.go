@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/eschgi/share/server/internal/config"
+	"github.com/eschgi/share/server/internal/db"
 )
 
 func TestHealthURL(t *testing.T) {
@@ -48,5 +49,17 @@ func TestProxyLine(t *testing.T) {
 		if got := proxyLine(cfg); !strings.HasPrefix(got, want) {
 			t.Errorf("%s: %q, want %q", settings, got, want)
 		}
+	}
+}
+
+// The command line has no keys: it refuses what would open folders with encrypted files.
+func TestNoEncrypted(t *testing.T) {
+	plain := db.Folder{Name: "Family"}
+	encrypted := db.Folder{Name: "Taxes", KeyVersion: 1}
+	if err := noEncrypted([]db.Folder{plain}, "invite"); err != nil {
+		t.Errorf("a plain folder: %v", err)
+	}
+	if err := noEncrypted([]db.Folder{plain, encrypted}, "invite"); err == nil || !strings.Contains(err.Error(), `"Taxes"`) {
+		t.Errorf("an encrypted folder: %v", err)
 	}
 }

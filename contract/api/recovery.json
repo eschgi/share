@@ -1,0 +1,19 @@
+{
+  "method": "GET",
+  "path": "/api/recovery",
+  "auth": "admin",
+  "status": 200,
+  "response": {
+    "public_key": "BJicWfAcvj3jxAHtC-Uy58D8xHwHzzag6N4vxtMls9Kgolk5D-7jUUfaZSLcwLTfIA8yrT9MVCc0CMC7O-bRvq4",
+    "locked": "VLG2aTNhyayxLP2zZzzCm2K0XRNSZ9gi73tsgqH_Grs0L0229cflFtmlMIp-vUlknPKZ3USw6BXVxnlh",
+    "folders": [
+      {
+        "folder": "f4mily5x2k7mbqz4bwdbyj6qsq",
+        "version": 1,
+        "public_key": "BD2by89bRJCssD8lt0C3_6ty_5oR7bv8NTJBzR_bExVcLwCpyG-mivDtV7cTpU0f_H-l4CGCrkBCaUfVWDdXH_M",
+        "sealed": "oErgrfectImc-M70fmLovXW60s7t9HSf4JLHRbhQz4-GhFwsaSSSmdv6akXJB0mnXxvkCh9wqFVVeVbRMEX0-MvcHFQXRaCPi2ayADEkcJ_eCTcj8m7ekRkBtWe7l4frUC-DgyLE5hBm25wvcD1nJDs"
+      }
+    ]
+  },
+  "notes": "The recovery key: its public key and its private key locked with the recovery code (contract/crypto/recovery.json), and every version of every folder's key sealed for it. An admin who has the code opens all encrypted folders with it, e.g. on a new device. All null and empty before an admin made the recovery key."
+}

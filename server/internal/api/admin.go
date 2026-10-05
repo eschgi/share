@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"slices"
@@ -137,10 +138,52 @@ func (a *API) suggestPin(w http.ResponseWriter, r *http.Request) {
 
 type createPinRequest struct {
 	Kind   string `json:"kind"`
-	Code   string `json:"code,omitempty"`   // empty: a random one
-	Folder string `json:"folder"` // the folder it sends into
+	Code   string `json:"code,omitempty"` // empty: a random one
+	Folder string `json:"folder"`         // the folder it sends into
 	// ShowsFolder: guests with it also see and download what is in the folder.
 	ShowsFolder bool `json:"shows_folder,omitempty"`
+	// Secret: for a PIN that shows an encrypted folder, what its link's secret brings.
+	Secret *pinSecretRequest `json:"secret,omitempty"`
+}
+
+// pinSecretRequest is the secret of the link of a PIN that shows an encrypted folder, sealed
+// for a version of the folder's key, and the folder's keys locked with it.
+type pinSecretRequest struct {
+	Sealed  B64 `json:"sealed"`
+	Version int `json:"version"`
+	Keys    []struct {
+		Version int `json:"version"`
+		Locked  B64 `json:"locked"`
+	} `json:"keys"`
+}
+
+// pinSecret checks a PIN's secret against its folder's keys.
+func (a *API) pinSecret(w http.ResponseWriter, r *http.Request, folderID string, req *pinSecretRequest) (*db.PinSecret, bool) {
+	ctx := r.Context()
+	versions := []int{req.Version}
+	out := &db.PinSecret{Sealed: req.Sealed, Version: req.Version}
+	for _, k := range req.Keys {
+		if len(k.Locked) != lockedKeySize {
+			badKey(w, "locked key")
+			return nil, false
+		}
+		versions = append(versions, k.Version)
+		out.Keys = append(out.Keys, db.PinKey{Version: k.Version, Locked: k.Locked})
+	}
+	if len(req.Sealed) != sealedKeySize {
+		badKey(w, "sealed secret")
+		return nil, false
+	}
+	for _, v := range versions {
+		if _, err := a.Auth.DB.FolderKeyOf(ctx, folderID, v); errors.Is(err, db.ErrNoKey) {
+			httpx.WriteError(w, http.StatusConflict, "key_outdated", fmt.Sprintf("The folder has no key version %d.", v))
+			return nil, false
+		} else if err != nil {
+			internal(w, "create PIN", err)
+			return nil, false
+		}
+	}
+	return out, true
 }
 
 func (a *API) createPin(w http.ResponseWriter, r *http.Request) {
@@ -161,6 +204,15 @@ func (a *API) createPin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	spec := auth.PinSpec{Kind: req.Kind, Code: req.Code, FolderID: req.Folder, ShowsFolder: req.ShowsFolder}
+	if req.Secret != nil {
+		if !req.ShowsFolder {
+			httpx.WriteError(w, http.StatusBadRequest, "bad_request", "Only a PIN that shows its folder has a secret.")
+			return
+		}
+		if spec.Secret, ok = a.pinSecret(w, r, req.Folder, req.Secret); !ok {
+			return
+		}
+	}
 	pin, err := a.Auth.CreatePin(r.Context(), spec, p.UserID)
 	switch {
 	case err == nil:
@@ -456,6 +508,18 @@ type newInviteRequest struct {
 	Name    string   `json:"name"`
 	Role    string   `json:"role"`
 	Folders []string `json:"folders"` // the folders a member gets, possibly none; needed for a member
+	// Keys: the versions of the keys of the encrypted folders the person gets, locked with the
+	// secret of the invite's link.
+	Keys []struct {
+		Folder  string `json:"folder"`
+		Version int    `json:"version"`
+		Locked  B64    `json:"locked"`
+	} `json:"keys,omitempty"`
+}
+
+// invitePhoneRequest may bring the person's key, locked with the secret of the invite's link.
+type invitePhoneRequest struct {
+	PersonKey B64 `json:"person_key,omitempty"`
 }
 
 // NewInvite is a fresh invite. The token and the link are shown only now; the server keeps
@@ -475,7 +539,26 @@ func (a *API) invite(w http.ResponseWriter, r *http.Request) {
 	if !httpx.DecodeJSON(w, r, &req) {
 		return
 	}
-	a.newInvite(w, r, p, req.Name, req.Role, "", req.Folders)
+	var keys []db.InviteKey
+	for _, k := range req.Keys {
+		if len(k.Locked) != lockedKeySize {
+			badKey(w, "locked key")
+			return
+		}
+		if req.Role == db.RoleMember && !slices.Contains(req.Folders, k.Folder) {
+			httpx.WriteError(w, http.StatusBadRequest, "bad_request", "Keys only for the folders the invite gives.")
+			return
+		}
+		if _, err := a.Auth.DB.FolderKeyOf(r.Context(), k.Folder, k.Version); errors.Is(err, db.ErrNoKey) {
+			httpx.WriteError(w, http.StatusConflict, "key_outdated", "No such version of that folder's key.")
+			return
+		} else if err != nil {
+			internal(w, "invite", err)
+			return
+		}
+		keys = append(keys, db.InviteKey{FolderID: k.Folder, Version: k.Version, Locked: k.Locked})
+	}
+	a.newInvite(w, r, p, req.Name, req.Role, "", req.Folders, keys)
 }
 
 func (a *API) invitePhone(w http.ResponseWriter, r *http.Request) {
@@ -483,11 +566,23 @@ func (a *API) invitePhone(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	a.newInvite(w, r, p, "", "", r.PathValue("id"), nil)
+	var req invitePhoneRequest
+	if r.ContentLength != 0 && !httpx.DecodeJSON(w, r, &req) {
+		return
+	}
+	var keys []db.InviteKey
+	if req.PersonKey != nil {
+		if len(req.PersonKey) != lockedKeySize {
+			badKey(w, "person_key")
+			return
+		}
+		keys = []db.InviteKey{{Locked: req.PersonKey}}
+	}
+	a.newInvite(w, r, p, "", "", r.PathValue("id"), nil, keys)
 }
 
-func (a *API) newInvite(w http.ResponseWriter, r *http.Request, p *auth.Principal, name, role, forUser string, folders []string) {
-	token, in, err := a.Auth.CreateInvite(r.Context(), name, role, forUser, p.UserID, folders, auth.InviteLifetime)
+func (a *API) newInvite(w http.ResponseWriter, r *http.Request, p *auth.Principal, name, role, forUser string, folders []string, keys []db.InviteKey) {
+	token, in, err := a.Auth.CreateInvite(r.Context(), name, role, forUser, p.UserID, folders, auth.InviteLifetime, keys...)
 	var input *auth.InputError
 	switch {
 	case err == nil:
