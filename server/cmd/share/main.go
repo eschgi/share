@@ -183,10 +183,16 @@ func check(args []string) error {
 	}
 	fmt.Printf("Config %s is valid. Public address: %s\n", *f.config, cfg.PublicURL)
 	fmt.Println(proxyLine(cfg))
+	dbErr := checkDatabase(cfg)
 	if cfg.S3 != nil {
-		return checkS3(cfg)
+		err = checkS3(cfg)
+	} else {
+		err = printReport(storage.Check(storage.Layout{StorageDir: cfg.StorageDir, DataDir: cfg.DataDir}, cfg.MinFreeSpace()))
 	}
-	return printReport(storage.Check(storage.Layout{StorageDir: cfg.StorageDir, DataDir: cfg.DataDir}, cfg.MinFreeSpace()))
+	if err == nil {
+		err = dbErr
+	}
+	return err
 }
 
 func printReport(r storage.Report) error {

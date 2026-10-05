@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/eschgi/share/server/internal/db/pgtest"
 	"github.com/eschgi/share/server/internal/ids"
 )
 
@@ -180,6 +181,9 @@ func TestNoFoldersShowNothing(t *testing.T) {
 // The library's pages come newest first without sorting: from files_by_folder for one
 // folder, and from files_ready_by_time for several.
 func TestLibraryPagesUseTheirIndexes(t *testing.T) {
+	if pgtest.Enabled() {
+		t.Skip("SQLite's query plans")
+	}
 	d := openTest(t)
 	for _, tc := range []struct {
 		folders []string

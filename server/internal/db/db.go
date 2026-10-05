@@ -17,10 +17,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"modernc.org/sqlite" // registers the pure-Go "sqlite" driver
 )
 
-//go:embed migrations/sqlite/*.sql
+//go:embed migrations/sqlite/*.sql migrations/postgres/*.sql
 var migrationFiles embed.FS
 
 // ErrNotFound is returned when a looked-up row doesn't exist.
@@ -32,34 +33,81 @@ type DB struct {
 	dialect dialect
 }
 
-// dialect is what differs between the databases Share runs on.
-type dialect struct{}
+// dialect is what differs between the databases Share runs on: SQLite, or PostgreSQL.
+type dialect struct{ postgres bool }
 
 // noCase compares col with the next argument, ignoring the case of ASCII letters, as the
 // indexes of such columns do.
-func (dialect) noCase(col string) string { return col + " = ? COLLATE NOCASE" }
+func (dl dialect) noCase(col string) string {
+	if dl.postgres {
+		return "lower(" + col + ") = lower(?)"
+	}
+	return col + " = ? COLLATE NOCASE"
+}
 
 // orderNoCase sorts by col, ignoring case.
-func (dialect) orderNoCase(col string) string { return col + " COLLATE NOCASE" }
+func (dl dialect) orderNoCase(col string) string {
+	if dl.postgres {
+		return "lower(" + col + ")"
+	}
+	return col + " COLLATE NOCASE"
+}
 
-// like is a LIKE that ignores the case of ASCII letters.
-func (dialect) like() string { return "LIKE" }
+// like is a LIKE that ignores case.
+func (dl dialect) like() string {
+	if dl.postgres {
+		return "ILIKE"
+	}
+	return "LIKE"
+}
 
-// unindexed keeps the planner from using an index on col: SQLite's unary plus.
-func (dialect) unindexed(col string) string { return "+" + col }
+// unindexed keeps SQLite's planner from using an index on col; PostgreSQL's needs no hint.
+func (dl dialect) unindexed(col string) string {
+	if dl.postgres {
+		return col
+	}
+	return "+" + col
+}
 
 // migrations is the folder of this database's migrations.
-func (dialect) migrations() string { return "migrations/sqlite" }
+func (dl dialect) migrations() string {
+	if dl.postgres {
+		return "migrations/postgres"
+	}
+	return "migrations/sqlite"
+}
+
+// txOptions makes PostgreSQL's transactions serializable, which gives the transactions that
+// read and then write the guarantee SQLite's single writer gives.
+func (dl dialect) txOptions() *sql.TxOptions {
+	if dl.postgres {
+		return &sql.TxOptions{Isolation: sql.LevelSerializable}
+	}
+	return nil
+}
 
 // retry reports whether a transaction failed only because another one was in the way, so
-// that running it again may work: SQLite's busy and locked.
-func (dialect) retry(err error) bool {
+// that running it again may work: SQLite's busy and locked, PostgreSQL's serialization
+// failure and deadlock.
+func (dl dialect) retry(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "40001" || pgErr.Code == "40P01"
+	}
 	var e *sqlite.Error
 	if !errors.As(err, &e) {
 		return false
 	}
 	code := e.Code() & 0xff
 	return code == 5 || code == 6 // SQLITE_BUSY, SQLITE_LOCKED
+}
+
+// hasMeta is a query that counts the tables named meta in the database.
+func (dl dialect) hasMeta() string {
+	if dl.postgres {
+		return "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = 'meta'"
+	}
+	return "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'meta'"
 }
 
 // Open opens (or creates) the database at path. WAL keeps readers and the writer out of each
@@ -154,7 +202,7 @@ func (d *DB) Migrate(ctx context.Context, backupDir string) error {
 	if current > 0 && current < first-1 {
 		return fmt.Errorf("the database is at version %d, too old for this program", current)
 	}
-	if current > 0 {
+	if current > 0 && !d.dialect.postgres { // PostgreSQL's host keeps its own backups
 		if err := os.MkdirAll(backupDir, 0o700); err != nil {
 			return err
 		}
@@ -187,14 +235,14 @@ func (d *DB) Migrate(ctx context.Context, backupDir string) error {
 // user_version.
 func (d *DB) SchemaVersion(ctx context.Context) (int, error) {
 	var tables int
-	if err := d.QueryRowContext(ctx, "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'meta'").Scan(&tables); err != nil {
+	if err := d.QueryRowContext(ctx, d.dialect.hasMeta()).Scan(&tables); err != nil {
 		return 0, err
 	}
 	if tables == 0 {
 		return 0, nil
 	}
 	v, err := d.Meta(ctx, "schema_version")
-	if errors.Is(err, ErrNotFound) {
+	if errors.Is(err, ErrNotFound) && !d.dialect.postgres {
 		var old int
 		err := d.QueryRowContext(ctx, "PRAGMA user_version").Scan(&old)
 		return old, err
@@ -223,7 +271,7 @@ func (d *DB) Tx(ctx context.Context, fn func(*sql.Tx) error) error {
 }
 
 func (d *DB) tx(ctx context.Context, fn func(*sql.Tx) error) error {
-	tx, err := d.BeginTx(ctx, nil)
+	tx, err := d.BeginTx(ctx, d.dialect.txOptions())
 	if err != nil {
 		return err
 	}

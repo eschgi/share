@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -56,14 +57,22 @@ func newS3EnvWith(t *testing.T, settings string) *env {
 // s3TestPart is the parts' size in the tests: small, so a file of a few parts stays small.
 const s3TestPart = 64 << 10
 
+// databases remembers the database setting of each data folder, so that a server started
+// again on the same folder finds the same PostgreSQL schema.
+var databases sync.Map
+
 func startS3Env(t *testing.T, dataDir string, setting []byte, fake *s3test.Server, settings string) *env {
 	t.Helper()
 	if settings != "" {
 		settings = ", " + settings
 	}
+	database, ok := databases.Load(dataDir)
+	if !ok {
+		database, _ = databases.LoadOrStore(dataDir, testDatabase(t))
+	}
 	cfg, err := config.Parse([]byte(fmt.Sprintf(
-		`{"public_url": "https://share.example.test", "data_dir": %q, "s3": %s, "time_zone": "Europe/Rome", "http": {"listen": "127.0.0.1:0"}%s}`,
-		dataDir, setting, settings)))
+		`{"public_url": "https://share.example.test", "data_dir": %q, "s3": %s, "time_zone": "Europe/Rome", "http": {"listen": "127.0.0.1:0"}%s%s}`,
+		dataDir, setting, database, settings)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,8 +170,9 @@ func TestS3ModeKeepsItsBucket(t *testing.T) {
 	e.srv.Close()
 	e.app.Close()
 
+	database, _ := databases.Load(dir) // the same database, also on PostgreSQL
 	other, _ := json.Marshal(fake.Config("other/"))
-	cfg, err := config.Parse([]byte(fmt.Sprintf(`{"public_url": "https://share.example.test", "data_dir": %q, "s3": %s, "http": {"listen": "127.0.0.1:0"}}`, dir, other)))
+	cfg, err := config.Parse([]byte(fmt.Sprintf(`{"public_url": "https://share.example.test", "data_dir": %q, "s3": %s, "http": {"listen": "127.0.0.1:0"}%s}`, dir, other, database)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +180,7 @@ func TestS3ModeKeepsItsBucket(t *testing.T) {
 	if _, err := New(context.Background(), cfg, Options{S3: bucket}); err == nil || !strings.Contains(err.Error(), "new data_dir") {
 		t.Errorf("another prefix for the same database: %v", err)
 	}
-	disk, err := config.Parse([]byte(fmt.Sprintf(`{"public_url": "https://share.example.test", "storage_dir": %q, "data_dir": %q, "http": {"listen": "127.0.0.1:0"}}`, filepath.Join(dir, "files"), dir)))
+	disk, err := config.Parse([]byte(fmt.Sprintf(`{"public_url": "https://share.example.test", "storage_dir": %q, "data_dir": %q, "http": {"listen": "127.0.0.1:0"}%s}`, filepath.Join(dir, "files"), dir, database)))
 	if err != nil {
 		t.Fatal(err)
 	}

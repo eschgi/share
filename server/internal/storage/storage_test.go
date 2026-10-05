@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/eschgi/share/server/internal/db"
+	"github.com/eschgi/share/server/internal/db/dbtest"
 	"github.com/eschgi/share/server/internal/ids"
 )
 
@@ -110,14 +111,7 @@ func newFixtureWith(t *testing.T, before func(d *db.DB, l Layout)) *fixture {
 	if err := Init(l); err != nil {
 		t.Fatal(err)
 	}
-	d, err := db.Open(l.DBPath())
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { d.Close() })
-	if err := d.Migrate(context.Background(), l.BackupDir()); err != nil {
-		t.Fatal(err)
-	}
+	d := dbtest.Open(t, l.DataDir)
 	if before != nil {
 		before(d, l)
 	}

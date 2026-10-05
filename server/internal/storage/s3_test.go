@@ -6,7 +6,6 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/eschgi/share/server/internal/config"
 	"github.com/eschgi/share/server/internal/db"
+	"github.com/eschgi/share/server/internal/db/dbtest"
 	"github.com/eschgi/share/server/internal/ids"
 	"github.com/eschgi/share/server/internal/s3"
 	"github.com/eschgi/share/server/internal/s3/s3test"
@@ -67,14 +67,7 @@ func newS3Fixture(t *testing.T) *s3Fixture {
 		t.Fatal(err)
 	}
 	dir := t.TempDir()
-	d, err := db.Open(filepath.Join(dir, "share.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { d.Close() })
-	if err := d.Migrate(ctx, filepath.Join(dir, "backups")); err != nil {
-		t.Fatal(err)
-	}
+	d := dbtest.Open(t, dir)
 	folder, err := EnsureFirstFolder(ctx, d, "", "Share", t0)
 	if err != nil {
 		t.Fatal(err)

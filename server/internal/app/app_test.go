@@ -25,6 +25,7 @@ import (
 	"github.com/eschgi/share/server/internal/auth"
 	"github.com/eschgi/share/server/internal/config"
 	"github.com/eschgi/share/server/internal/db"
+	"github.com/eschgi/share/server/internal/db/pgtest"
 	"github.com/eschgi/share/server/internal/ids"
 	"github.com/eschgi/share/server/internal/s3/s3test"
 	"github.com/eschgi/share/server/internal/storage"
@@ -63,8 +64,8 @@ func newEnvWith(t *testing.T, settings string) *env {
 		settings = ", " + settings
 	}
 	cfg, err := config.Parse([]byte(fmt.Sprintf(
-		`{"public_url": "https://share.example.test", "storage_dir": %q, "time_zone": "Europe/Rome", "http": {"listen": "127.0.0.1:0"}%s}`,
-		storageDir, settings)))
+		`{"public_url": "https://share.example.test", "storage_dir": %q, "time_zone": "Europe/Rome", "http": {"listen": "127.0.0.1:0"}%s%s}`,
+		storageDir, testDatabase(t), settings)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,6 +93,17 @@ func newEnvWith(t *testing.T, settings string) *env {
 		a.Close()
 	})
 	return e
+}
+
+// testDatabase is the "database" setting of a test's configuration: none for SQLite, or a
+// schema of its own on the PostgreSQL server in SHARE_TEST_POSTGRES.
+func testDatabase(t *testing.T) string {
+	url := pgtest.URL(t)
+	if url == "" {
+		return ""
+	}
+	quoted, _ := json.Marshal(url)
+	return `, "database": {"postgres": ` + string(quoted) + `}`
 }
 
 // newPin makes a PIN of the given kind through the auth service, like `share pin create`.

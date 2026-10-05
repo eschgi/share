@@ -112,7 +112,7 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 		checkStorage = opts.CheckStorage
 	}
 
-	d, err := OpenDatabase(ctx, cfg, now())
+	d, err := OpenDatabase(ctx, cfg, now(), opts.WaitForStorage)
 	if err != nil {
 		return nil, err
 	}

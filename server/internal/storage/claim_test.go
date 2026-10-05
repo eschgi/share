@@ -2,28 +2,17 @@ package storage
 
 import (
 	"context"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/eschgi/share/server/internal/db"
+	"github.com/eschgi/share/server/internal/db/dbtest"
 	"github.com/eschgi/share/server/internal/ids"
 )
 
 func TestClaimStorage(t *testing.T) {
 	ctx := context.Background()
-	open := func(t *testing.T) *db.DB {
-		dir := t.TempDir()
-		d, err := db.Open(filepath.Join(dir, "share.db"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(func() { d.Close() })
-		if err := d.Migrate(ctx, filepath.Join(dir, "backups")); err != nil {
-			t.Fatal(err)
-		}
-		return d
-	}
+	open := func(t *testing.T) *db.DB { return dbtest.Open(t, t.TempDir()) }
 	addFile := func(t *testing.T, d *db.DB) {
 		folder, err := EnsureFirstFolder(ctx, d, t.TempDir(), "Share", t0)
 		if err != nil {

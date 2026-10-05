@@ -20,7 +20,7 @@ import (
 // openDB opens and migrates the database of cfg, for the commands that work on it directly.
 // Like the server, it makes the first folder if there is none yet.
 func openDB(ctx context.Context, cfg *config.Config) (*db.DB, *auth.Service, error) {
-	d, err := app.OpenDatabase(ctx, cfg, time.Now())
+	d, err := app.OpenDatabase(ctx, cfg, time.Now(), false)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -10,13 +10,19 @@ import (
 	"time"
 
 	"github.com/eschgi/share/server/internal/ids"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // ErrConflict is returned when a unique value (a PIN code, a library path) is already taken.
 var ErrConflict = errors.New("already exists")
 
-// isUniqueViolation reports whether err comes from a UNIQUE constraint.
+// isUniqueViolation reports whether err comes from a UNIQUE constraint, in SQLite or in
+// PostgreSQL (23505).
 func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "23505"
+	}
 	return err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed")
 }
 
@@ -84,6 +90,6 @@ func (d *DB) LibraryVersion(ctx context.Context) (int64, error) {
 
 func bumpLibraryVersion(ctx context.Context, tx *sql.Tx) error {
 	_, err := tx.ExecContext(ctx, `INSERT INTO meta (key, value) VALUES ('library_version', '1')
-		ON CONFLICT (key) DO UPDATE SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT)`)
+		ON CONFLICT (key) DO UPDATE SET value = CAST(CAST(meta.value AS INTEGER) + 1 AS TEXT)`)
 	return err
 }

@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"fmt"
+	"log"
 	"time"
 
 	"github.com/eschgi/share/server/internal/config"
@@ -9,12 +11,19 @@ import (
 	"github.com/eschgi/share/server/internal/storage"
 )
 
-// OpenDatabase opens the database of cfg, brings its schema up to date, checks that it
-// belongs to this storage and makes the first folder if there is none yet. The server and the
-// commands that work on the database directly use it alike.
-func OpenDatabase(ctx context.Context, cfg *config.Config, now time.Time) (*db.DB, error) {
+// OpenDatabase opens the database of cfg, SQLite in data_dir or PostgreSQL, brings its schema
+// up to date, checks that it belongs to this storage and makes the first folder if there is
+// none yet. The server and the commands that work on the database directly use it alike; the
+// server waits while PostgreSQL doesn't answer.
+func OpenDatabase(ctx context.Context, cfg *config.Config, now time.Time, wait bool) (*db.DB, error) {
 	layout := storage.Layout{StorageDir: cfg.StorageDir, DataDir: cfg.DataDir}
-	d, err := db.Open(layout.DBPath())
+	var d *db.DB
+	var err error
+	if cfg.Database != nil {
+		d, err = openPostgres(ctx, cfg.Database, wait)
+	} else {
+		d, err = db.Open(layout.DBPath())
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -34,4 +43,29 @@ func setUpDatabase(ctx context.Context, d *db.DB, cfg *config.Config, layout sto
 	}
 	_, err := storage.EnsureFirstFolder(ctx, d, cfg.StorageDir, cfg.Name, now)
 	return err
+}
+
+// postgresRetry is how often the server asks again while PostgreSQL doesn't answer.
+var postgresRetry = 5 * time.Second
+
+// openPostgres opens the PostgreSQL database. When waiting, it asks again while nothing
+// answers, as when a free database host wakes a paused one; a refused login or database ends
+// it at once, since waiting won't change that.
+func openPostgres(ctx context.Context, c *config.Database, wait bool) (*db.DB, error) {
+	start, lastLog := time.Now(), time.Time{}
+	for {
+		d, err := db.OpenPostgres(ctx, c.Postgres)
+		if err == nil || !wait || !db.Unreachable(err) {
+			return d, err
+		}
+		if time.Since(lastLog) >= time.Minute {
+			log.Printf("database: waiting for %s: %v", c, err)
+			lastLog = time.Now()
+		}
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("gave up waiting for %s after %v: %w", c, time.Since(start).Round(time.Second), err)
+		case <-time.After(postgresRetry):
+		}
+	}
 }

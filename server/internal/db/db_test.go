@@ -9,15 +9,23 @@ import (
 	"testing"
 	"time"
 
+	"github.com/eschgi/share/server/internal/db/pgtest"
 	"github.com/eschgi/share/server/internal/ids"
 )
 
 var t0 = time.Date(2026, 9, 27, 10, 0, 0, 0, time.UTC)
 
+// openTest opens a fresh, migrated database: SQLite, or PostgreSQL with SHARE_TEST_POSTGRES.
 func openTest(t *testing.T) *DB {
 	t.Helper()
 	dir := t.TempDir()
-	d, err := Open(filepath.Join(dir, "share.db"))
+	var d *DB
+	var err error
+	if url := pgtest.URL(t); url != "" {
+		d, err = OpenPostgres(context.Background(), url)
+	} else {
+		d, err = Open(filepath.Join(dir, "share.db"))
+	}
 	if err != nil {
 		t.Fatal(err)
 	}

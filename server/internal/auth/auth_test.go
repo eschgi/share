@@ -9,12 +9,12 @@ import (
 	"net/http/httptest"
 	"net/netip"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/eschgi/share/server/internal/db"
+	"github.com/eschgi/share/server/internal/db/dbtest"
 	"github.com/eschgi/share/server/internal/ids"
 )
 
@@ -167,15 +167,7 @@ func (c *fakeClock) Now() time.Time      { return c.t }
 func (c *fakeClock) Add(d time.Duration) { c.t = c.t.Add(d) }
 func newTestService(t *testing.T) (*Service, *fakeClock) {
 	t.Helper()
-	dir := t.TempDir()
-	d, err := db.Open(filepath.Join(dir, "share.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { d.Close() })
-	if err := d.Migrate(context.Background(), filepath.Join(dir, "b")); err != nil {
-		t.Fatal(err)
-	}
+	d := dbtest.Open(t, t.TempDir())
 	clock := &fakeClock{time.Date(2026, 9, 27, 10, 0, 0, 0, time.UTC)}
 	if _, _, err := d.EnsureFirstFolder(context.Background(), db.Folder{ID: ids.New(), Name: "Share", CreatedBy: "first-start"}, clock.t); err != nil {
 		t.Fatal(err)

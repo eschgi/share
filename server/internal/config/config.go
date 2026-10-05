@@ -26,21 +26,22 @@ var SupportedLanguages = []string{"en", "de", "it"}
 
 // Config is config.json. Field names follow the snake_case of the API.
 type Config struct {
-	Name            string   `json:"name"`
-	PublicURL       string   `json:"public_url"`
-	HomeURL         string   `json:"home_url"`
-	HTTP            *HTTP    `json:"http"`
-	HTTPS           *HTTPS   `json:"https"`
-	Proxy           *Proxy   `json:"proxy"`
-	StorageDir      string   `json:"storage_dir"`
-	S3              *S3      `json:"s3"` // instead of storage_dir: the files in a bucket
-	DataDir         string   `json:"data_dir"`
-	TimeZone        string   `json:"time_zone"`
-	Languages       []string `json:"languages"`
-	DefaultLanguage string   `json:"default_language"`
-	Upload          Upload   `json:"upload"`
-	TrashDays       int      `json:"trash_days"`
-	App             App      `json:"app"`
+	Name            string    `json:"name"`
+	PublicURL       string    `json:"public_url"`
+	HomeURL         string    `json:"home_url"`
+	HTTP            *HTTP     `json:"http"`
+	HTTPS           *HTTPS    `json:"https"`
+	Proxy           *Proxy    `json:"proxy"`
+	StorageDir      string    `json:"storage_dir"`
+	S3              *S3       `json:"s3"` // instead of storage_dir: the files in a bucket
+	DataDir         string    `json:"data_dir"`
+	Database        *Database `json:"database"` // instead of SQLite in data_dir: PostgreSQL
+	TimeZone        string    `json:"time_zone"`
+	Languages       []string  `json:"languages"`
+	DefaultLanguage string    `json:"default_language"`
+	Upload          Upload    `json:"upload"`
+	TrashDays       int       `json:"trash_days"`
+	App             App       `json:"app"`
 
 	// Filled in by Load from the fields above.
 	Location *time.Location `json:"-"`
@@ -365,6 +366,9 @@ func (c *Config) complete() error {
 		}
 	}
 
+	if c.Database != nil {
+		c.Database.complete(bad)
+	}
 	switch {
 	case c.S3 != nil && c.StorageDir != "":
 		bad("storage_dir", `and "s3" can't both be set: the files are either on a drive or in a bucket`)

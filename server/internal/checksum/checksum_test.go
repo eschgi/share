@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/eschgi/share/server/internal/db"
+	"github.com/eschgi/share/server/internal/db/dbtest"
 	"github.com/eschgi/share/server/internal/ids"
 )
 
@@ -25,14 +26,7 @@ type fixture struct {
 func newFixture(t *testing.T, pace int64) *fixture {
 	t.Helper()
 	dir := t.TempDir()
-	d, err := db.Open(filepath.Join(dir, "share.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { d.Close() })
-	if err := d.Migrate(context.Background(), filepath.Join(dir, "backups")); err != nil {
-		t.Fatal(err)
-	}
+	d := dbtest.Open(t, dir)
 	folder, _, err := d.EnsureFirstFolder(context.Background(), db.Folder{ID: ids.New(), Name: "Share", CreatedBy: "first-start"}, time.Now())
 	if err != nil {
 		t.Fatal(err)

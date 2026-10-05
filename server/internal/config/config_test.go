@@ -320,3 +320,45 @@ func TestS3(t *testing.T) {
 		}
 	}
 }
+
+func TestPostgres(t *testing.T) {
+	const secret = "s3cr3t-pass"
+	parse := func(url string) (*Config, error) {
+		quoted, _ := json.Marshal(url)
+		return Parse([]byte(`{"public_url": "https://a.example", "storage_dir": "/s", "database": {"postgres": ` + string(quoted) + `}}`))
+	}
+	for _, ok := range []string{
+		"postgres://share:" + secret + "@ep-x.eu-central-1.aws.neon.tech/share?sslmode=require&channel_binding=require",
+		"postgresql://share:" + secret + "@db.example.com:5432/share?sslmode=verify-full",
+		"postgres://share@127.0.0.1:5433/share",                // on this machine, no TLS needed
+		"postgres://share@nas.home.arpa/share?sslmode=disable", // at home
+	} {
+		if _, err := parse(ok); err != nil {
+			t.Errorf("%s: %v", ok, err)
+		}
+	}
+	for _, tc := range []struct{ url, want string }{
+		{"", "database.postgres: is required"},
+		{"mysql://share:" + secret + "@db.example.com/share", "must be an address like"},
+		{"postgres://share:" + secret + "@db.example.com", "names no database"},
+		{"postgres://share:" + secret + "@db.example.com/share", "needs sslmode=require"},
+		{"postgres://share:" + secret + "@db.example.com/share?sslmode=prefer", "needs sslmode=require"},
+	} {
+		_, err := parse(tc.url)
+		if err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("%q: %v, want %q", tc.url, err, tc.want)
+		}
+		if err != nil && strings.Contains(err.Error(), secret) {
+			t.Errorf("%q: the error shows the password: %v", tc.url, err)
+		}
+	}
+	cfg, err := parse("postgres://share:" + secret + "@ep-x.eu-central-1.aws.neon.tech/share?sslmode=require")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, shown := range []string{cfg.Database.String(), fmt.Sprintf("%v %+v %#v", *cfg.Database, *cfg.Database, *cfg.Database)} {
+		if strings.Contains(shown, secret) || !strings.Contains(shown, "ep-x.eu-central-1.aws.neon.tech/share") {
+			t.Errorf("printed as %q", shown)
+		}
+	}
+}
