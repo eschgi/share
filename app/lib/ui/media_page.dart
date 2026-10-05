@@ -33,6 +33,10 @@ class _MediaPageState extends State<MediaPage> {
   bool _failed = false;
   bool _awake = false;
 
+  /// Where it was when it last played, for Retry to go on from there: a link to a bucket ends
+  /// after a while, and a network can fail halfway.
+  Duration _resumeAt = Duration.zero;
+
   Future<void> _start() async {
     if (_starting) return;
     setState(() {
@@ -57,19 +61,23 @@ class _MediaPageState extends State<MediaPage> {
       });
       return;
     }
+    final resumeAt = _resumeAt; // before the new player says it is at the start
     final player = _services.player(from);
     _player = player;
     player.value.addListener(_changed);
     await player.initialize();
     if (!mounted || _player != player) return;
     setState(() => _starting = false);
-    if (!player.value.value.failed && widget.active) await player.play();
+    if (player.value.value.failed) return;
+    if (resumeAt > Duration.zero) await player.seekTo(resumeAt);
+    if (mounted && _player == player && widget.active) await player.play();
   }
 
   /// The screen stays on while it plays; a failure shows what else to do.
   void _changed() {
     final v = _player?.value.value;
     if (v == null) return;
+    if (v.ready && !v.failed) _resumeAt = v.ended ? Duration.zero : v.position;
     if (v.playing != _awake) {
       _awake = v.playing;
       _services.platform.keepScreenOn(_awake);
