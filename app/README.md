@@ -6,8 +6,9 @@ app sends with a PIN, like the website. Admins manage PINs, people and Recently 
 
 Flutter draws the screens. Kotlin (`android/app/src/main/kotlin`) does what has to work without
 them: the phone's key in the Android KeyStore, the choice between the local and the public
-address, and the transfers. Downloads and uploads (tus, in pieces) keep going when the app is
-closed and continue where they stopped.
+address, and the transfers. Downloads and uploads (in pieces, by tus or straight into the server's
+S3 bucket) keep going when the app is closed and continue where they stopped. Links to a bucket
+are fetched without the phone's key, which goes only to Share.
 
 ## Running it
 
@@ -72,9 +73,10 @@ flutter analyze && flutter test
 flutter test --run-skipped --tags golden     # screenshots, compared with docs/share-mockup
 ```
 
-The Dart tests run the screens against a fake server made from `contract/api`. The Kotlin unit
-tests download from a small local server and check the pinned TLS against real self-signed
-certificates. Both sides read `contract/app/platform.json`, which is what they hand each other.
+The Dart tests run the screens against a fake server made from `contract/api`, with a bucket of
+its own. The Kotlin unit tests send to and download from a small local server, which also plays
+the bucket, and check the pinned TLS against real self-signed certificates. Both sides read
+`contract/app/platform.json`, which is what they hand each other.
 
 The golden screenshots depend on the machine's font rendering, so they are skipped by default
 and not run in CI. After changing a screen, `--update-goldens` writes them again.

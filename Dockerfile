@@ -24,10 +24,11 @@ RUN test -f internal/webui/dist/index.html
 ARG TARGETOS TARGETARCH VERSION=dev
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
     go build -trimpath -ldflags "-s -w -X main.version=$VERSION" -o /out/share ./cmd/share
-# Where the files and the database go. A new volume mounted there takes its owner.
+# Where the files and the database go, with a bucket only the database. A new volume mounted
+# there takes its owner.
 RUN mkdir -p /out/data
 
-# No CA certificates needed: Share makes no connections of its own. /tmp is there for SQLite.
+# The image has the CA certificates, for a bucket over https, and /tmp for SQLite.
 FROM gcr.io/distroless/static-debian13:nonroot
 COPY --from=server /out/share /usr/local/bin/share
 COPY --from=server --chown=65532:65532 /out/data /data

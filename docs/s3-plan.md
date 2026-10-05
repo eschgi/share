@@ -1,7 +1,9 @@
 # S3 storage plan
 
 Keeping Share's files in an S3-compatible bucket (AWS S3, Backblaze B2, Cloudflare R2, MinIO), with
-uploads and downloads going straight to and from the bucket. Planned on 2026-10-03; not built yet.
+uploads and downloads going straight to and from the bucket. Planned on 2026-10-03 and built on
+2026-10-05; the README's [Files in an S3 bucket](../README.md#files-in-an-s3-bucket) has the setup.
+Where the build went another way than first planned, this plan now says what was built.
 
 ## Context
 
@@ -50,8 +52,8 @@ Also decided:
 
 | Where | S3 names | Disk/tus names |
 |---|---|---|
-| Go | package `internal/s3` (`s3.Bucket`, `s3.Open`: the package name is the prefix, not `s3.S3Bucket`), fake `internal/s3/s3test`; files `config/s3.go`, `storage/s3.go`, `upload/s3.go`, `api/s3.go`, `app/s3_test.go`, `cmd/share/s3.go`; `NewS3Library`, `Library.s3`, `finalizeS3`, `terminateS3`, `reconcileS3`, `CheckS3`, `S3PartSize`/`S3PartCount`/`S3PartLen`, `upload.S3Handler`, `API.S3`, `Options.S3`, `newS3Env`, `e.s3Object` | `upload/upload.go` → `upload/tus.go`, `Handler`/`New` → `TusHandler`/`NewTusHandler` (tests follow); a disk-only `Library.OpenFile`; shared admission in `upload/admit.go` |
-| Database | `0007_s3.sql`: `files.s3_upload_id`, `files.s3_part_size`, table `s3_garbage`; `SetS3UploadID`, `PurgeToS3Garbage`, `S3Garbage`, `ForgetS3Garbage` | meta key `storage` = `disk` or `s3:<bucket>/<prefix>` |
+| Go | package `internal/s3` (`s3.Bucket`, `s3.Open`: the package name is the prefix, not `s3.S3Bucket`), fake `internal/s3/s3test`; files `config/s3.go`, `storage/s3.go`, `upload/s3.go`, `api/s3.go`, `app/s3_test.go`, `cmd/share/s3.go`; `OpenS3Library`, `Library.s3`, `finalizeS3`, `terminateS3`, `reconcileS3`, `CheckS3`, `S3PartSize`/`S3PartCount`/`S3PartLen`, `upload.S3Handler`, `API.S3`, `Options.S3`, `newS3Env`, `e.s3Object` | `upload/upload.go` → `upload/tus.go`, `Handler`/`New` → `TusHandler`/`NewTusHandler` (tests follow); a disk-only `Library.OpenFile`; shared admission in `upload/admit.go` |
+| Database | `0007_s3.sql`: `files.s3_upload_id`, `files.s3_part_size`, table `s3_garbage`; `PurgeToS3Garbage`, `S3Garbage`, `ForgetS3Garbage`, `DropS3Garbage`, `HasFiles`; `storage.ClaimStorage` | meta key `storage` = `disk` or `s3:<bucket>/<prefix>` |
 | API | `/api/s3/uploads…`, `/api/s3/files/{id}/url`; codes `s3_unavailable`, `s3_upload_finished`, `s3_parts_missing`, `s3_use_url`, `s3_no_zip`; findings `s3_unreachable`, `s3_denied`, `s3_cors`, `s3_clock_skew`; fixtures `contract/api/s3_*.json`, `play_s3` | `/api/info` `storage: "disk"\|"s3"`; `/tus/` unchanged |
 | Website | `src/s3parts.ts`, `src/s3upload.ts` (class `S3Upload`), types `S3NewUpload`/`S3PartUrls`/`S3UploadStatus`, file state `s3`, `test/s3upload.test.ts` | the tus setup stays in `uploader.ts` |
 | App | Kotlin `net/S3Connection.kt`, `transfer/S3Uploader.kt`, `transfer/S3Links.kt`, tests `S3UploaderTest`, `S3ConnectionTest`, `S3LinksTest`; Dart `Api.s3Bytes`, `LibraryRepository._onS3`, `test/s3_library_test.dart` | `transfer/Uploader.kt` → `transfer/TusUploader.kt` (`TusUploader`), `UploaderTest` → `TusUploaderTest`; `Uploader.Outcome`, `outcomeOf`, `copy` and `SourceError` move to a shared `transfer/UploadOutcome.kt`; `ServerInfo.Storage {DISK, S3}`, Dart `enum Storage {disk, s3}` |
@@ -64,9 +66,11 @@ Pieces used by both modes keep neutral names: `upload/admit.go`, `UploadEngine.k
 **Sending**, the same for the website and the app:
 1. `POST /api/s3/uploads`. The server:
    - runs the same admission as tus;
-   - inserts the `receiving` row;
    - calls `CreateMultipartUpload` with a Content-Type guessed from the name and an attachment
      Content-Disposition;
+   - inserts the `receiving` row with the upload id, and aborts the upload if that fails, so no row
+     lacks an upload id;
+   - finishes an empty file at once, as tusd does;
    - answers the plan and the first part URLs.
 2. The client PUTs the parts straight to the bucket. Each presigned URL is valid for about 1 h and has
    the part's exact `Content-Length` signed in, so a part of any other size gets a 403.
@@ -93,15 +97,15 @@ Cloudflare does today:
 | Connection drops during a part | the PUT fails | The part is retried with today's backoff (website `retryDelays`, app 8 attempts). Progress falls back to the finished parts. |
 | A part URL expired (after 1 h) | 403; on R2 a browser sees status 0, since the 403 has no CORS headers | New URLs are fetched and the part is retried. |
 | Tab closed, app killed, phone off | – | On return, `GET /api/s3/uploads/{id}` lists the parts already in the bucket and only the missing ones are sent. On the website, a file too big for IndexedDB has to be picked again (a "ghost"), as with tus today. |
-| Session ended (PIN expired, signed out) | 401 | Uploads pause as today. After a new unlock the server moves the rows to the new session and they continue. |
+| Session ended (PIN expired, signed out) | 401 | As with tus: the file that got the 401 fails, and the others pause. After a new unlock the server moves the rows to the new session and they continue. |
 | Server down or busy | 5xx, 429 or a network error | Retry with backoff. The parts already sent stay in the bucket. |
 | A part has the wrong size | the bucket answers 403, because Content-Length is signed | Complete checks every size with ListParts and answers 409 `s3_parts_missing`. The client asks for the status and re-sends those parts. |
 | A part is re-sent while Complete runs | `CompleteMultipartUpload` answers InvalidPart | The server answers 409 `s3_parts_missing`; the client asks for the status and completes again. |
 | Complete's answer gets lost (e.g. Cloudflare's 524 after 100 s) | a timeout | The client retries Complete. It is idempotent: the object is there with the right size, so the server finalizes and answers the same `{id}`. The 5-minute reconcile also finishes rows stuck in `finishing`. |
-| The server crashed between steps | – | Reconcile drops rows without an S3 upload id after 1 h, aborts multipart uploads without a row after 1 h, and finalizes rows stuck in `finishing`. |
+| The server crashed between steps | – | Reconcile aborts multipart uploads without a row after 1 h and finalizes rows stuck in `finishing`. An empty file whose row a crash left `receiving` (the only rows without an upload id) is finished after 1 h. |
 | The upload is abandoned | – | After `incomplete_ttl_hours` (7 days) idle, the server aborts it in the bucket, which frees the parts, and drops the row. The bucket's lifecycle rule is the safety net. |
 | The bucket lost the upload (e.g. its own 7-day abort) | 404 on status or parts | The client starts a new upload. |
-| The folder was deleted meanwhile | 404 `folder_gone` | As today the upload pauses. Deleting the folder also aborts its unfinished uploads. |
+| The folder was deleted meanwhile | 404 `folder_gone` | As with tus, the file fails. On the website it waits among the files without a folder, and sending it into another one makes a new upload there. Deleting the folder also aborts its unfinished uploads. |
 | Cancelled by the user | – | `DELETE` aborts the upload and removes the row. |
 | Bucket misconfigured (CORS, keys, clock) | every PUT fails (status 0 or 403) | Retries, then the file fails. `share check` and the admin's storage warnings name the cause: `s3_cors`, `s3_denied` or `s3_clock_skew`. |
 
@@ -193,8 +197,11 @@ Contract changes:
    - `Head(n)`, `Remove`.
    - `GetURL`: `PresignedGetObject` with `response-content-disposition`, from the existing
      `contentDisposition()` at `api/library.go:347`, and `response-content-type`.
-   - `Reach` / `WaitReachable`, which tell denied apart from clock skew and network errors.
-   - `CORS(origin)`: OPTIONS preflights for PUT and for GET with Range.
+   - `Reach` / `WaitReachable`, which tell denied apart from clock skew and network errors. `Reach`
+     asks for the parts of an upload that can't exist, which needs no more rights than sending, and
+     reads the bucket's clock from the answer's Date. `WaitReachable` gives up at once on denied.
+   - `CORS(origin)`: OPTIONS preflights for PUT and for GET with Range and If-Range (a resumed save
+     sends If-Range).
    - `CORSRules(origins)`: the JSON for `share check` to print.
 
    `internal/s3/s3test` holds the fake S3 for tests (see Verification).
@@ -203,13 +210,14 @@ Contract changes:
      - `files.s3_upload_id`;
      - `files.s3_part_size`;
      - table `s3_garbage(key, created_at)`, so a purge that hits a network outage is retried.
-   - `files.go`: the struct, `fileColumns`, `scanFile` and `InsertReceiving` get the new fields. New
-     functions: `SetS3UploadID`, `PurgeToS3Garbage` (in one transaction), `S3Garbage`, `ForgetS3Garbage`,
-     `HasFiles`.
+   - `files.go`: the struct, `fileColumns`, `scanFile` and `InsertReceiving` get the new fields, so
+     the upload id goes in with the row. New functions in `db/s3.go`: `PurgeToS3Garbage` (in one
+     transaction), `S3Garbage`, `ForgetS3Garbage`, `DropS3Garbage`, `HasFiles`.
    - A meta key `storage` (`disk` or `s3:<bucket>/<prefix>`) for the mode lock.
 4. **Storage, S3 mode** (`internal/storage`): a nil-able `Library.s3 *s3.Bucket`, not an interface. The
    database steps stay shared; only the byte moves differ.
-   - **Constructor:** `NewS3Library(d, b, loc, now, logf)`, without an `os.Root`.
+   - **Constructor:** `OpenS3Library(d, b, layout, loc, now, logf)`, without an `os.Root`; the
+     layout has only the data folder.
    - **New `storage/s3.go`** holds:
      - part planning: `S3PartSize` = max(chunk, ceil(size/10000) rounded up to a MiB), `S3PartCount`,
        `S3PartLen`;
@@ -217,20 +225,26 @@ Contract changes:
        `PutEmpty`. When Complete answers NoSuchUpload, a `Stat` with the right size counts as done.
        InvalidPart or InvalidPartOrder (a part re-sent meanwhile) becomes `ErrIncomplete`, which the
        API answers with 409 `s3_parts_missing`;
-     - classify by name first (split a `byName` out of `Classify` in `names.go`), and otherwise read
-       `Head(512)`, skipping that for size 0;
+     - classify by name first (`TypeByName`, split out of `Classify` in `names.go`), and otherwise
+       read `Head(512)`, skipping that for size 0; a failed read is an error, never a guess;
      - `terminateS3`;
-     - `reconcileS3`:
+     - `reconcileS3`, with 2 minutes for the bucket; its errors are only logged, so the database
+       steps always run:
+       - note renames and moves that a crash cut short as done;
        - Finalize the finalizing rows;
-       - drop receiving rows that have no S3 upload id and are older than 1 h;
        - after the TTL, Finalize or Terminate;
+       - finish empty files whose row a crash left receiving, after 1 h;
        - abort multipart uploads that have no row and are older than 1 h;
-       - empty `s3_garbage`.
+       - empty `s3_garbage`;
+       - send files that reached a deleted folder to the trash, and forget empty deleted folders.
    - **One-line guards in the disk code:**
      - `exists` returns false without a root. This covers `freePath`, `freeDir` and `locate`.
      - `restorePath` (`trash.go:106`) uses `lib.exists`.
-     - These are skipped: `relocateFolder`, the `MkdirAll`/rename loops in CreateFolder and MoveFiles,
-       `moveToTrash` and `moveFromTrash`, and `removeEmptyDirs`.
+     - `relocateFolder` reports done without a root, so a rename still finishes; otherwise the next
+       one would get 409 `folder_busy`. `MoveFiles` marks every moved file done.
+     - These are skipped: the `MkdirAll` in CreateFolder and EnsureFirstFolder, `moveToTrash` and
+       `moveFromTrash`, and `removeEmptyDirs`.
+     - `reconcileTrash` never runs in S3 mode: it would purge every trashed row.
      - `Purge` calls `PurgeToS3Garbage`, then removes the object.
      - `Close` handles a nil root.
      - `EnsureFirstFolder` (`folders.go:28`) handles an empty `storageDir`.
@@ -239,8 +253,9 @@ Contract changes:
    - **`storage.go`**:
      - `CheckS3(ctx, dataDir, b, origins)` uses the four new codes as literals, because
        `TestFindingsMatchContract` scans `storage.go`. It shares the data-dir checks.
-     - `ClaimStorage` refuses to start when the mode, bucket or prefix changed, or when switching to S3
-       on a database that already has files.
+     - `ClaimStorage` (`storage/claim.go`, run after `Migrate` by `app.New` and by the commands that
+       open the database) refuses to start when the mode, bucket or prefix changed while the
+       database has files, or when S3 mode meets a database that already has files.
 5. **Uploads** (`internal/upload`):
    - First, a pure rename: `upload.go` → `tus.go`, `Handler`/`New` → `TusHandler`/`NewTusHandler`, the
      tests to match.
@@ -251,7 +266,8 @@ Contract changes:
      - ownership through `p.Owns`, with 404 for others;
      - complete runs Finalize under `context.WithoutCancel` with a 2 min timeout;
      - a receiving upload the provider lost is Terminated and answers 404, so the client starts over;
-     - when CreateUpload fails, delete the row and answer 503 `s3_unavailable`.
+     - CreateUpload runs before the row is inserted; when the bucket can't be reached, the answer is
+       503 `s3_unavailable` with `Retry-After: 30`.
 6. **API** (`internal/api`):
    - `Version` 3 and `Info.Storage` (`api.go:26, 94-100`).
    - `content` (`library.go:285-316`): 409 `s3_use_url` when an `Authorization` header is sent, else a
@@ -267,7 +283,7 @@ Contract changes:
    `setPageHeaders` becomes a method.
 8. **Wiring** (`internal/app/app.go:60-200`). S3 mode:
    - skips the marker; `WaitReachable` replaces it when `WaitForStorage` is set;
-   - runs `ClaimStorage` and `NewS3Library`;
+   - runs `ClaimStorage` and `OpenS3Library`;
    - registers `S3Handler` instead of `TusHandler` and answers JSON 404 at `/tus/`;
    - has no checksum store or `CRCs.Run`, and `OnReady` stays nil;
    - gives thumbs `Open` through a closure, with no `Root`;
@@ -351,14 +367,16 @@ Contract changes:
    - `Outcome`, `outcomeOf`, `copy` and `SourceError` move to `transfer/UploadOutcome.kt`, shared by both
      uploaders.
 2. **Kotlin network pieces**:
-   - `net/HomeHosts.kt`: `isHomeHost`, matching IP literals only, tested on `contract/home_hosts.json`.
+   - `net/HomeHosts.kt`: `isHomeHost`, following `contract/home_hosts.json`, host names included, as
+     Dart and Go do. IP literals are parsed by hand: `InetAddress` may look names up.
    - `net/S3Connection.kt`: `S3Connection.open(url, method)`, the counterpart of `ServerConnection`,
      with **no token parameter**:
      - https, or http only for a home host;
      - system trust, no Authorization, redirects and caches off;
      - the query is stripped from errors and logs.
-   - `net/ServerInfo.kt`: `Storage {DISK, S3}` and the chunk size from `/api/info`, cached per server.
-     It replaces `UploadEngine.chunkSize()` (173-190).
+   - `net/ServerInfo.kt`: `Storage {DISK, S3}` and the chunk size from `/api/info`, cached per public
+     address (PIN configs have no server id). Failures aren't cached, and saving the server forgets
+     it. It replaces `UploadEngine.chunkSize()` (173-190).
 3. **Uploads**:
    - New `transfer/S3Uploader.kt`, returning `UploadOutcome`:
      - create, or resume from the status answer;
@@ -394,8 +412,10 @@ Contract changes:
    - `ui/settings_screen.dart:27-39, 209` shows the bucket, plus the four new warnings in
      `l10n/app_{en,de,it}.arb` (`storageWarnS3Unreachable` and so on); `test/storage_warnings_test.dart`
      enforces them.
-   - `ui/admin/folders_screen.dart:402`: hide `folderRenameHelp` in S3 mode.
-   - The "At home" labels follow `local=false` without other changes.
+   - `ui/admin/folders_screen.dart:402`: hide `folderRenameHelp` in S3 mode, as
+     `AdminRepository.storageMode` says.
+   - The "At home" labels follow `local = false`; `Uploads.kt`, `Downloads.kt` and `Fetcher.kt` also
+     check `!ServerInfo.knownS3(…)`.
 7. **Tests**:
    - Kotlin:
      - `S3UploaderTest`, where `TestServer` plays both the API and the bucket: the reassembled bytes,
@@ -416,16 +436,19 @@ Contract changes:
 ## Docs
 
 - `README.md`:
-  - "How it works", "Security" and "Status";
+  - "How it works", "Security" and "Hosting";
   - "Configuration": disk or S3, and the `s3` object with one example each for R2, B2, AWS and MinIO.
   - Bucket setup:
-    - CORS: origins `public_url`, the `home_url` origin and `http://localhost:5173`; methods GET and
-      PUT; headers `*`; expose ETag, Content-Length and Content-Range;
+    - CORS: origins `public_url` and the `home_url` origin, which `share check` prints, and
+      `http://localhost:5173` by hand for `npm run dev`; methods GET and PUT; headers `*`; expose
+      ETag, Content-Length and Content-Range;
     - a lifecycle rule that aborts incomplete multipart uploads after 7 days;
     - a key limited to the bucket.
   - The limits in S3 mode: no ZIP; bytes skip the home address; a presigned link is a bearer token for
     one file for 12 h, even after trash.
-- `docs/share-plan.md`: Parts, Library (70-73) and Network (90-91).
+- `docs/share-plan.md`: Parts, Folders, Library and Network.
+- `deploy/docker/README.md`: an S3 variant with `"data_dir": "/data"`; the Dockerfile's comment
+  about CA certificates.
 - `config.example.json` stays disk-based.
 
 ## Order of work (on branch `feature/s3_support`, plain-sentence commits, not pushed)
@@ -463,7 +486,7 @@ Contract changes:
     - the CSP;
     - the mode lock;
     - the contract shapes.
-  - Opt-in: `SHARE_TEST_S3='{…config.S3…}'` runs the flow against MinIO in Docker and a real R2 or B2
+  - Opt-in: `SHARE_TEST_S3='{…config.S3…}'` runs the flow against MinIO or AIStor and a real R2 or B2
     bucket, on a random prefix. This is where minio-go details and provider support for
     `response-content-disposition` and the signed Content-Length get confirmed.
 - Website: `cd web && npm run typecheck && npm test && npm run build`.

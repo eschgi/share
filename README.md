@@ -15,7 +15,8 @@ A self-hosted place where family and friends drop photos, videos and documents.
   they were given. A PIN sends into one folder, and one made to show it lets guests see and download
   it too, as at a wedding. With one folder, the library and sending look as they always did.
 - Files are stored unchanged, in a directory per folder with one folder per upload day inside:
-  `<storage_dir>/Family/2026-09-30/IMG_0001.jpg`.
+  `<storage_dir>/Family/2026-09-30/IMG_0001.jpg`. Or in an S3 bucket, such as Cloudflare R2,
+  Backblaze B2, Amazon S3 or MinIO, which browsers and the app send to and fetch from directly.
 
 The server is one Go program without dependencies at runtime, with the website embedded in it.
 It runs on Linux and Windows: on a small computer at home such as a Raspberry Pi or a NAS, on a
@@ -117,6 +118,11 @@ Both speak English, German and Italian.
 - The website sends with [tus](https://tus.io), in pieces of 20 MiB that the server confirms one by
   one, so a dropped connection costs at most one piece. If the page is closed in the middle, it
   offers to continue when it's opened again. It can be installed as an app.
+- **Files in a bucket.** With an S3 bucket instead of a drive, the website and the app send the
+  pieces straight to the bucket and fetch the files from there, with links the server signs for
+  each piece and each file. The bytes skip the server, and a tunnel in front of it with its limits;
+  the server keeps the database and the thumbnails. [Files in an S3 bucket](#files-in-an-s3-bucket)
+  has the setup.
 - On a computer, files and whole folders can be dropped on the page, the tab shows how far sending is,
   and closing it in the middle asks first. An invite opened there shows a QR code for the phone.
 - A finished file moves into the day's folder. The sender's browser or phone makes its thumbnail; for
@@ -130,14 +136,15 @@ Both speak English, German and Italian.
   an invite: the library by day, a viewer that also plays videos, selecting many, sending without a
   PIN, and an admin's settings. One file downloads as it is; several as one ZIP, whose exact size is
   known at once and which the browser's download list resumes. Chrome and Edge on a computer can
-  also save them straight into a folder, a folder per day, skipping files already there.
-- **Folders.** Every file lies in one folder, a directory on the drive. Admins see every folder, make,
-  rename and delete them, switch who sees each one, per person or per invite, and move files between
-  them; someone who loses a folder stops seeing its files. Members see the folders they were given.
-  The library shows one folder or all of them, and sending goes into the folder open in the library
-  unless another one is chosen. Deleting a folder sends its files to Recently deleted, and restoring
-  one brings the folder back. Until there is a second folder, the library and sending look as
-  before.
+  also save them straight into a folder, a folder per day, skipping files already there. With a
+  bucket there is no ZIP: several files download one by one.
+- **Folders.** Every file lies in one folder: a directory on the drive, or with a bucket a name in
+  the database. Admins see every folder, make, rename and delete them, switch who sees each one,
+  per person or per invite, and move files between them; someone who loses a folder stops seeing
+  its files. Members see the folders they were given. The library shows one folder or all of them,
+  and sending goes into the folder open in the library unless another one is chosen. Deleting a
+  folder sends its files to Recently deleted, and restoring one brings the folder back. Until there
+  is a second folder, the library and sending look as before.
 - **A PIN sends into one folder.** Made with "Guests also see this folder", everyone with it also
   sees and downloads what is in that folder, but deletes nothing and sees nobody's name: for a
   wedding, everyone's photos for everyone.
@@ -147,14 +154,14 @@ Both speak English, German and Italian.
   with a PIN, with the PIN; with neither, it waits for one, or can be dropped. The files wait on the
   phone until the server has them.
 - The app plays videos and sound itself: a copy on the phone if there is one, else straight from the
-  server, at home over its local address. The website's viewer zooms into photos, with two fingers,
-  a double tap, the mouse wheel or the keyboard.
+  server, at home over its local address, or from the bucket. The website's viewer zooms into
+  photos, with two fingers, a double tap, the mouse wheel or the keyboard.
 - Files saved into a folder on a computer get a mark in the library, as files saved on the phone do
   in the app. A transfer that ends while the page is in the background can say so in a
   notification, once the browser was allowed to show one.
 - Admins can give someone who forgot a password a new one, which the server makes up and shows once,
-  and see what `share check` finds about the drive, such as a full drive or FAT32. Settings show the
-  version running on the server.
+  and see what `share check` finds about the drive or the bucket, such as a full drive, FAT32 or a
+  bucket without CORS rules. Settings show the version running on the server.
 
 ## Security
 
@@ -197,6 +204,10 @@ Both speak English, German and Italian.
   storage until they are sent, and a week at most.
 - The app's player gets the phone's key only where the app's own requests would send it: plain http
   only after the proof above, and never to the https port at home, whose files it fetches first.
+- With a bucket, its keys stay on the server. Browsers and the app get links signed for one piece
+  of an upload, for an hour and for exactly that piece's size, or for one file, for 12 hours. Such a
+  link works for anyone who has it until it ends, even after the file was deleted. The app never
+  sends its key to the bucket: it asks the server for a link and fetches that without the key.
 - The website loads nothing from elsewhere, fonts included, and has a strict Content Security
   Policy. Its cookies are HttpOnly and SameSite=Strict, and `__Host-` except over plain http at
   home, where browsers keep no secure ones. Only Share's own pages can change something: a request
@@ -258,10 +269,12 @@ Without Docker:
    `SHA256SUMS`. Or build them: `scripts/build-linux.sh` makes the Linux ones in `dist/`,
    `scripts/build-windows.sh` the Windows ones, and on Windows the PowerShell scripts
    `scripts\build-linux.ps1` and `scripts\build-windows.ps1` do the same.
-2. Write `config.json` from `config.example.json`, with at least `public_url` and `storage_dir`,
-   and the `proxy` line from the guide you follow.
+2. Write `config.json` from `config.example.json`, with at least `public_url` and `storage_dir`
+   (or `data_dir` and `s3`, see [Files in an S3 bucket](#files-in-an-s3-bucket)), and the `proxy`
+   line from the guide you follow.
 3. Run `share init` once; with the files on a drive of their own, mount it first. `share check`
-   says whether the drive suits: ext4 is best, FAT32 can't hold files over 4 GiB.
+   says whether the drive suits: ext4 is best, FAT32 can't hold files over 4 GiB. With a bucket, it
+   says whether the bucket answers and lets Share's pages in.
 4. Run `share serve` as a service, on Linux with
    [`deploy/systemd/share.service`](deploy/systemd/share.service). The first start prints an invite
    for the first admin, who opens it on their phone, or in a browser.
@@ -311,9 +324,9 @@ day folders back out first.
 
 ## Configuration
 
-`config.example.json` has the common settings. Everything except `public_url` and `storage_dir`
-has a default. Unknown or misspelled fields stop the server with a message saying which one, and
-settings of earlier versions with where they went.
+`config.example.json` has the common settings. Everything except `public_url` and where the files
+go, `storage_dir` or `s3`, has a default. Unknown or misspelled fields stop the server with a
+message saying which one, and settings of earlier versions with where they went.
 
 The ports:
 
@@ -344,6 +357,90 @@ For the app, two settings matter:
 - `app.apk_file`: the APK the invite page offers for download, with `share.apk.json` next to it for
   its version. Without it, the page only offers `app.play_store_url`, once there is one.
 
+### Files in an S3 bucket
+
+Instead of `storage_dir`, Share can keep the files in a bucket of Amazon S3 or of a service that
+speaks its API, such as Cloudflare R2, Backblaze B2 or MinIO. It is one or the other: a server
+doesn't mix them, and it remembers where its files are, so it refuses to start when
+`config.json` names another place while it has files. The database and the thumbnails stay in
+`data_dir`, which is required then:
+
+```json
+{
+  "public_url": "https://share.example.com",
+  "data_dir": "/var/lib/share",
+  "time_zone": "Europe/Rome",
+  "s3": {
+    "endpoint": "https://<account id>.r2.cloudflarestorage.com",
+    "region": "auto",
+    "bucket": "family-share",
+    "prefix": "share/",
+    "access_key_id": "…",
+    "secret_access_key": "…"
+  }
+}
+```
+
+| Service | `endpoint` | `region` |
+|---------|------------|----------|
+| Cloudflare R2 | `https://<account id>.r2.cloudflarestorage.com` | `auto` |
+| Backblaze B2 | the bucket's endpoint, e.g. `https://s3.eu-central-003.backblazeb2.com` | `eu-central-003` |
+| Amazon S3 | `https://s3.eu-central-1.amazonaws.com` | `eu-central-1` |
+| MinIO or AIStor | e.g. `https://minio.example.com`, with `"path_style": true` | the one it was given, `us-east-1` unless set |
+
+The endpoint is the service's address without the bucket in it. Plain http is for a bucket at home
+only, and works only for pages that are opened over plain http too: browsers don't let an https
+page send to an http address. `prefix` starts every key, `<prefix>files/<id>`; without it Share
+uses the whole bucket.
+
+Setting up the bucket:
+
+1. **CORS rules**, so that Share's pages may send to the bucket and fetch from it: `share check`
+   tries them and, when they don't let the pages in, prints the rules to set, for `public_url` and
+   `home_url`. On R2 they go into the bucket's settings; elsewhere, e.g.,
+   `aws s3api put-bucket-cors --bucket family-share --cors-configuration file://cors.json`, with
+   `--endpoint-url` for B2. For `npm run dev`, add `http://localhost:5173` to the origins.
+2. **A lifecycle rule** that aborts unfinished multipart uploads after 7 days, as a safety net:
+   Share drops the uploads it gives up on itself, after `upload.incomplete_ttl_hours`. R2 adds
+   such a rule to new buckets.
+3. **A key for this bucket only**, which reads, writes and deletes objects and multipart uploads:
+   on R2 an API token with "Object Read & Write" for the bucket, on B2 an application key for the
+   bucket, on Amazon S3 a user with a policy like this one:
+
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {"Effect": "Allow", "Action": ["s3:ListBucket", "s3:ListBucketMultipartUploads"], "Resource": "arn:aws:s3:::family-share"},
+       {"Effect": "Allow", "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:AbortMultipartUpload", "s3:ListMultipartUploadParts"], "Resource": "arn:aws:s3:::family-share/share/*"}
+     ]
+   }
+   ```
+
+   Without `s3:ListBucket`, Amazon S3 answers "access denied" for a file that isn't there,
+   instead of "not found".
+4. **Back up `data_dir`.** Its database is the only record of the files' names, folders and days;
+   the bucket holds their bytes under ids.
+5. **One prefix per server.** Two servers on the same bucket and prefix drop each other's uploads.
+
+What is different with a bucket:
+
+- There is no ZIP. "Download N" downloads the files one by one; Chrome and Edge on a computer can
+  still save them into a folder.
+- The files come from the bucket also at home: the home address carries only the API and the
+  thumbnails.
+- A link to a file works for anyone who has it, for 12 hours, even after the file was deleted.
+- There is no free-space check; the bucket's own limits apply, and files can have up to 5 TiB.
+  Pieces have at least 5 MiB (`upload.chunk_size_mib`).
+- `share serve` waits at the start until the bucket answers, with a clock close to its own: a
+  computer without a clock of its own, such as a Raspberry Pi, signs links that fail until it has
+  the time. Keys the bucket refuses stop it at once.
+- MinIO and AIStor drop unfinished uploads a day after they started (`stale_uploads_expiry`), so an
+  upload paused for longer starts over.
+- The website's Content Security Policy lets its pages reach the bucket, so anyone can read the
+  bucket's address there, on R2 with the account's id. Every link names the access key's id, but
+  not its secret.
+
 ## Repository
 
 | Folder | What's in it |
@@ -368,6 +465,10 @@ scripts/build-linux.sh                         # dist/share-linux-arm64, dist/sh
 scripts/build-windows.sh                       # dist/share-windows-{amd64,arm64}.exe
 docker build -t share .                        # the Docker image
 ```
+
+The server's tests use a bucket of their own. To run the bucket tests against a real one instead,
+on a fresh prefix, set `SHARE_TEST_S3` to its `s3` setting:
+`(cd server && SHARE_TEST_S3='{"endpoint": …}' go test ./internal/s3 ./internal/app)`.
 
 CI checks every push and pull request. A push to `main` also leaves the server for Linux and
 Windows as the artifact `share-server` for a day, and the signed APK as `share-apk` once the

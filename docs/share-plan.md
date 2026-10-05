@@ -1,7 +1,7 @@
 # Share — plan
 
-Status: built; what works is in the README's status. Screens: [share-mockup.html](share-mockup.html)
-(numbers below refer to its screens).
+Status: built; the README says what it does, and [s3-plan.md](s3-plan.md) how the files can be in
+an S3 bucket. Screens: [share-mockup.html](share-mockup.html) (numbers below refer to its screens).
 
 Share is a self-hosted place to collect files. Anyone with a PIN sends photos, videos and documents
 through a website, without an account. People with an account see and download the folders they
@@ -12,16 +12,18 @@ app will go on Google Play later.
 ## Parts
 
 - **Server**: one Go binary. It serves the website, the API, uploads and downloads, and keeps every
-  file in one of its folders, each a directory inside the storage folder set in `config.json`. It
-  runs wherever its owner wants: a small computer at home, a VPS, or a container. So it must not
-  depend on anything machine-specific, and it works behind a tunnel, behind a reverse proxy, or on
-  its own.
+  file in one of its folders, each a directory inside the storage folder set in `config.json`. Or
+  the files are in an S3 bucket, and the website and the app send to it and fetch from it directly,
+  with links the server signs. It runs wherever its owner wants: a small computer at home, a VPS,
+  or a container. So it must not depend on anything machine-specific, and it works behind a tunnel,
+  behind a reverse proxy, or on its own.
 - **Website** (PWA): for sending with a PIN (1–6), and for people with an account everything the app
-  does (22–37). Uppy runs headless under our own screens: tus for uploads, Golden Retriever to survive
-  a closed tab. Phones get one column and the app's bars; tablets and computers a card in the middle,
-  or two panes from 1024 points wide, and the account's pages a header with Library, Send and
-  Settings. Computers can drop files and folders, and an invite opened there shows a QR code for the
-  phone, or signs in the browser.
+  does (22–37). Uppy runs headless under our own screens: tus for uploads, or with a bucket our own
+  plugin that sends the parts there, and Golden Retriever to survive a closed tab. Phones get one
+  column and the app's bars; tablets and computers a card in the middle, or two panes from 1024
+  points wide, and the account's pages a header with Library, Send and Settings. Computers can drop
+  files and folders, and an invite opened there shows a QR code for the phone, or signs in the
+  browser.
 - **App** (Flutter, Android): library, bulk download, sending, and the admin screens (7–21).
 
 ## Access
@@ -46,6 +48,9 @@ app will go on Google Play later.
 - **Every file lies in exactly one folder**, a real directory on the drive:
   `<storage>/Wedding Anna & Marco/2026-09-26/IMG_0001.jpg`. The database keeps each file's path
   within its folder, so renaming a folder renames one directory and changes one row.
+- **In a bucket** every file is one object named after its id, and its folder, day and name are
+  only rows in the database: moving, renaming, deleting and restoring change nothing in the bucket,
+  and only deleting for good removes the object.
 - **Who sees what**: admins see every folder; members see the folders they were given, with a switch
   per person (41, 42) and per invite (47). Nothing tells members about the others.
 - **The library** shows one folder or all of them, and the choice stays on the phone or in the
@@ -72,7 +77,8 @@ app will go on Google Play later.
 - In a browser (24–28): one file downloads as it is; several as one ZIP, stored without compression
   and laid out before the files are read, so its size is exact and the browser resumes it. Chrome
   and Edge on a computer can save them into a folder instead, a folder per day, skipping files that
-  are there already (26, 27).
+  are there already (26, 27). With a bucket there is no ZIP: several files download one by one,
+  each straight from the bucket.
 
 ## Network
 
@@ -96,14 +102,20 @@ app will go on Google Play later.
 - **The website always uses the public address.** Browsers don't let a public page switch to a local one.
 - **Uploads** use tus in chunks below Cloudflare's 100 MB request limit (Free and Pro plans), e.g. 50 MB.
   A running upload can switch between the two addresses, because both reach the same tus upload.
-- **Downloads** have no size limit through Cloudflare. They resume with HTTP range requests.
+  With a bucket, the parts go straight to it, each with a link the server signs, past Cloudflare
+  and the server; which parts the bucket has always comes from the server, so an upload goes on
+  wherever it stopped.
+- **Downloads** have no size limit through Cloudflare. They resume with HTTP range requests. With a
+  bucket they come from there, also at home, with links that work for 12 hours.
 - **Cloudflare's terms** want video and other large files served through its paid products, not the
   normal proxy. Downloads over the local address avoid it at home. On a server with a public address,
-  Cloudflare can be DNS-only in front of a reverse proxy, which also removes the 100 MB limit.
+  Cloudflare can be DNS-only in front of a reverse proxy, which also removes the 100 MB limit. With
+  a bucket, the files don't pass its proxy at all.
 - **Videos and sound play in the app.** A copy on the phone plays first. Otherwise the player streams
   with the phone's key: at home over the local address (plain http after the proof), away through the
   public address, which loads only what is watched rather than the whole file. Over the https port at
-  home the file is fetched first, because the player can't pin Share's own certificate.
+  home the file is fetched first, because the player can't pin Share's own certificate. With a
+  bucket, the player streams a link from the server, without the phone's key.
 
 ## Languages
 

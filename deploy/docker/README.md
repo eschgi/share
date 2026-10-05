@@ -36,6 +36,31 @@ or `docker compose exec share share check`.
   (`- /srv/share:/data`) and give it to the container's user: `sudo chown -R 65532:65532 /srv/share`.
 - `config.json` is read when Share starts: after a change, `docker compose restart share`.
 
+## Files in an S3 bucket
+
+With the files in a bucket ([the README](../../README.md#files-in-an-s3-bucket) has how to set it
+up), the volume holds only the database and the thumbnails. In `config.json`, `data_dir` and `s3`
+take the place of `storage_dir`:
+
+```json
+{
+  "public_url": "https://share.example.com",
+  "data_dir": "/data",
+  "time_zone": "Europe/Rome",
+  "proxy": {"headers": "x-forwarded", "trusted_proxies": ["172.30.0.2"]},
+  "s3": {
+    "endpoint": "https://<account id>.r2.cloudflarestorage.com",
+    "region": "auto",
+    "bucket": "family-share",
+    "access_key_id": "…",
+    "secret_access_key": "…"
+  }
+}
+```
+
+`docker compose run --rm share init` then checks the bucket instead of preparing a folder, and
+prints the CORS rules when the bucket still needs them.
+
 ## Upgrading
 
 `docker compose pull && docker compose up -d`
