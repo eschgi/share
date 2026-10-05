@@ -33,6 +33,7 @@ type Config struct {
 	HTTPS           *HTTPS   `json:"https"`
 	Proxy           *Proxy   `json:"proxy"`
 	StorageDir      string   `json:"storage_dir"`
+	S3              *S3      `json:"s3"` // instead of storage_dir: the files in a bucket
 	DataDir         string   `json:"data_dir"`
 	TimeZone        string   `json:"time_zone"`
 	Languages       []string `json:"languages"`
@@ -193,8 +194,32 @@ func Default() Config {
 // ChunkSize is the tus chunk size in bytes that clients are told to use.
 func (c *Config) ChunkSize() int64 { return int64(c.Upload.ChunkSizeMiB) << 20 }
 
-// MaxFileSize is the largest accepted upload in bytes; 0 means no limit.
-func (c *Config) MaxFileSize() int64 { return c.Upload.MaxFileSizeGiB << 30 }
+// MaxFileSize is the largest accepted upload in bytes; 0 means no limit. A bucket keeps files
+// of up to 5 TiB.
+func (c *Config) MaxFileSize() int64 {
+	n := c.Upload.MaxFileSizeGiB << 30
+	if c.S3 != nil && (n == 0 || n > S3MaxFileSize) {
+		return S3MaxFileSize
+	}
+	return n
+}
+
+// StorageKey says where the files are, for the database to notice when that changes: "disk",
+// or the bucket and the prefix.
+func (c *Config) StorageKey() string {
+	if c.S3 == nil {
+		return "disk"
+	}
+	return "s3:" + c.S3.Bucket + "/" + c.S3.Prefix
+}
+
+// Origins are the addresses Share's pages are opened at, which a bucket must let them use.
+func (c *Config) Origins() []string {
+	if c.HomeURL != "" {
+		return []string{c.PublicURL, c.HomeURL}
+	}
+	return []string{c.PublicURL}
+}
 
 // MinFreeSpace is the space uploads must leave free on the storage drive, in bytes.
 func (c *Config) MinFreeSpace() int64 { return c.Upload.MinFreeSpaceMiB << 20 }
@@ -340,18 +365,28 @@ func (c *Config) complete() error {
 		}
 	}
 
-	if c.StorageDir == "" {
-		bad("storage_dir", "is required")
-	} else if !filepath.IsAbs(c.StorageDir) {
+	switch {
+	case c.S3 != nil && c.StorageDir != "":
+		bad("storage_dir", `and "s3" can't both be set: the files are either on a drive or in a bucket`)
+	case c.S3 != nil:
+		c.S3.complete(bad)
+	case c.StorageDir == "":
+		bad("storage_dir", `is required, or "s3" for a bucket`)
+	case !filepath.IsAbs(c.StorageDir):
 		bad("storage_dir", "must be an absolute path")
-	} else {
+	default:
 		c.StorageDir = filepath.Clean(c.StorageDir)
 	}
-	if c.DataDir == "" && c.StorageDir != "" {
+	switch {
+	case c.DataDir == "" && c.S3 != nil:
+		bad("data_dir", `is required with "s3": the database and the thumbnails stay on this machine`)
+	case c.DataDir == "" && c.StorageDir != "":
 		c.DataDir = filepath.Join(c.StorageDir, ".share")
-	} else if c.DataDir != "" && !filepath.IsAbs(c.DataDir) {
+	case c.DataDir == "":
+		// Without storage_dir there is nothing to put it into; that is reported above.
+	case !filepath.IsAbs(c.DataDir):
 		bad("data_dir", "must be an absolute path")
-	} else {
+	default:
 		c.DataDir = filepath.Clean(c.DataDir)
 	}
 
@@ -381,6 +416,12 @@ func (c *Config) complete() error {
 	}
 	if u.MaxFileSizeGiB < 0 {
 		bad("upload.max_file_size_gib", "must be 0 (no limit) or more")
+	}
+	if c.S3 != nil && u.ChunkSizeMiB < 5 {
+		bad("upload.chunk_size_mib", `must be at least 5 with "s3": the pieces of a file in a bucket are 5 MiB or more`)
+	}
+	if c.S3 != nil && u.MaxFileSizeGiB > S3MaxFileSize>>30 {
+		bad("upload.max_file_size_gib", `must be at most %d with "s3": a bucket keeps files of up to 5 TiB`, S3MaxFileSize>>30)
 	}
 	if u.MinFreeSpaceMiB < 0 {
 		bad("upload.min_free_space_mib", "must be 0 or more")
@@ -418,9 +459,15 @@ func (c *Config) complete() error {
 // parseOrigin accepts an origin such as https://share.example.com (a trailing slash is
 // fine). Plain http only for an address on a home network or this machine (homenet.Host).
 func parseOrigin(raw string) (*url.URL, error) {
+	return parseOriginLike(raw, "https://share.example.com", "for addresses at home, such as http://192.168.1.20:8080 or http://share.local:8080")
+}
+
+// parseOriginLike is parseOrigin with its own examples for the messages: like is a good
+// address, atHome says where plain http is fine.
+func parseOriginLike(raw, like, atHome string) (*url.URL, error) {
 	u, err := url.Parse(strings.TrimSpace(raw))
 	if err != nil || u.Host == "" {
-		return nil, fmt.Errorf("%q is not a URL like https://share.example.com", raw)
+		return nil, fmt.Errorf("%q is not a URL like %s", raw, like)
 	}
 	if u.Path != "" && u.Path != "/" || u.RawQuery != "" || u.Fragment != "" || u.User != nil {
 		return nil, fmt.Errorf("%q must be just scheme and host, without a path", raw)
@@ -429,7 +476,7 @@ func parseOrigin(raw string) (*url.URL, error) {
 	case "https":
 	case "http":
 		if !homenet.Host(u.Hostname()) {
-			return nil, fmt.Errorf("%q must use https://: plain http is only for addresses at home, such as http://192.168.1.20:8080 or http://share.local:8080", raw)
+			return nil, fmt.Errorf("%q must use https://: plain http is only %s", raw, atHome)
 		}
 	default:
 		return nil, fmt.Errorf("%q must use https://", raw)

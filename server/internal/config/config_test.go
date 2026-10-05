@@ -1,6 +1,8 @@
 package config
 
 import (
+	"encoding/json"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -10,6 +12,23 @@ import (
 )
 
 const minimal = `{"public_url": "https://share.example.com", "storage_dir": "/mnt/usb/share"}`
+
+// bucket is a valid "s3" object.
+const bucket = `{"endpoint": "https://s3.eu-central-1.amazonaws.com", "region": "eu-central-1", "bucket": "share",
+	"access_key_id": "AKIAIOSFODNN7EXAMPLE", "secret_access_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"}`
+
+// s3With is a config with the bucket, where the JSON object over replaces some of its fields.
+func s3With(over string) string {
+	var obj map[string]any
+	if err := json.Unmarshal([]byte(bucket), &obj); err != nil {
+		panic(err)
+	}
+	if err := json.Unmarshal([]byte(over), &obj); err != nil {
+		panic(err)
+	}
+	b, _ := json.Marshal(obj)
+	return `{"public_url": "https://a.example", "data_dir": "/d", "s3": ` + string(b) + `}`
+}
 
 func TestDefaults(t *testing.T) {
 	cfg, err := Parse([]byte(minimal))
@@ -106,6 +125,25 @@ func TestErrors(t *testing.T) {
 		{"bad language", `{"public_url": "https://a.example", "storage_dir": "/s", "languages": ["en", "fr"]}`, `"fr" is not available`},
 		{"default not in languages", `{"public_url": "https://a.example", "storage_dir": "/s", "languages": ["de"]}`, "default_language"},
 		{"chunk too big", `{"public_url": "https://a.example", "storage_dir": "/s", "upload": {"chunk_size_mib": 100}}`, "chunk_size_mib"},
+		{"no storage", `{"public_url": "https://a.example"}`, `storage_dir: is required, or "s3" for a bucket`},
+		{"drive and bucket", `{"public_url": "https://a.example", "storage_dir": "/s", "data_dir": "/d", "s3": ` + bucket + `}`, `"s3" can't both be set`},
+		{"bucket without data_dir", `{"public_url": "https://a.example", "s3": ` + bucket + `}`, `data_dir: is required with "s3"`},
+		{"unknown bucket field", s3With(`{"bucket": "share", "storage_class": "STANDARD"}`), "unknown field"},
+		{"no endpoint", s3With(`{"endpoint": ""}`), "s3.endpoint: is required"},
+		{"http endpoint on the internet", s3With(`{"endpoint": "http://s3.example.com"}`), "plain http is only for a bucket at home"},
+		{"endpoint with a path", s3With(`{"endpoint": "https://s3.example.com/share"}`), "without a path"},
+		{"endpoint with the bucket", s3With(`{"endpoint": "https://Share.s3.example.com"}`), "already names the bucket"},
+		{"no region", s3With(`{"region": ""}`), "s3.region: is required"},
+		{"bad region", s3With(`{"region": "EU Central"}`), "is not a region name"},
+		{"no bucket", s3With(`{"bucket": ""}`), "s3.bucket: is required"},
+		{"bad bucket", s3With(`{"bucket": "my bucket"}`), "is not a bucket name"},
+		{"bucket like an address", s3With(`{"bucket": "192.168.1.20"}`), "is not a bucket name"},
+		{"bad prefix", s3With(`{"prefix": "share/../other"}`), "s3.prefix"},
+		{"prefix with spaces", s3With(`{"prefix": "my files"}`), "s3.prefix"},
+		{"no key id", s3With(`{"access_key_id": ""}`), "s3.access_key_id: is required"},
+		{"no secret", s3With(`{"secret_access_key": ""}`), "s3.secret_access_key: is required"},
+		{"pieces too small for a bucket", `{"public_url": "https://a.example", "data_dir": "/d", "s3": ` + bucket + `, "upload": {"chunk_size_mib": 4}}`, "at least 5"},
+		{"file too big for a bucket", `{"public_url": "https://a.example", "data_dir": "/d", "s3": ` + bucket + `, "upload": {"max_file_size_gib": 6000}}`, "at most 5120"},
 		{"package without scheme", `{"public_url": "https://a.example", "storage_dir": "/s", "app": {"android_package": "com.example.share", "link_scheme": ""}}`, "app.link_scheme"},
 		{"bad package", `{"public_url": "https://a.example", "storage_dir": "/s", "app": {"android_package": "share", "link_scheme": "share"}}`, "android_package"},
 	} {
@@ -231,5 +269,54 @@ func TestDeployExamplesAreValid(t *testing.T) {
 	})
 	if err != nil || found == 0 {
 		t.Fatalf("looking for examples in deploy/: %d found, %v", found, err)
+	}
+}
+
+func TestS3(t *testing.T) {
+	cfg, err := Parse([]byte(`{"public_url": "https://share.example.com", "home_url": "http://192.168.8.52:8080", "data_dir": "/srv/share-data",
+		"s3": {"endpoint": "HTTPS://S3.EU-Central-1.Amazonaws.com:443/", "region": "eu-central-1", "bucket": "Family-Files",
+		"prefix": "/share", "access_key_id": "AKIAIOSFODNN7EXAMPLE", "secret_access_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.S3.Endpoint != "https://s3.eu-central-1.amazonaws.com" || cfg.S3.Prefix != "share/" || cfg.StorageDir != "" || cfg.DataDir != "/srv/share-data" {
+		t.Errorf("endpoint %q, prefix %q, storage %q, data %q", cfg.S3.Endpoint, cfg.S3.Prefix, cfg.StorageDir, cfg.DataDir)
+	}
+	if cfg.StorageKey() != "s3:Family-Files/share/" || cfg.MaxFileSize() != 5<<40 {
+		t.Errorf("key %q, largest file %d", cfg.StorageKey(), cfg.MaxFileSize())
+	}
+	if got := cfg.Origins(); !slices.Equal(got, []string{"https://share.example.com", "http://192.168.8.52:8080"}) {
+		t.Errorf("origins %v", got)
+	}
+	for _, leak := range []string{fmt.Sprint(*cfg.S3), fmt.Sprintf("%+v", *cfg.S3), fmt.Sprintf("%#v", *cfg.S3), fmt.Sprintf("%+v", *cfg)} {
+		if strings.Contains(leak, "wJalrXUtnFEMI") {
+			t.Errorf("the secret shows: %s", leak)
+		}
+	}
+
+	cfg, err = Parse([]byte(`{"public_url": "https://a.example", "data_dir": "/d", "upload": {"max_file_size_gib": 10}, "s3": ` + bucket + `}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.MaxFileSize() != 10<<30 || cfg.S3.Prefix != "" || cfg.StorageKey() != "s3:share/" {
+		t.Errorf("largest file %d, prefix %q, key %q", cfg.MaxFileSize(), cfg.S3.Prefix, cfg.StorageKey())
+	}
+	if disk, _ := Parse([]byte(minimal)); disk.StorageKey() != "disk" {
+		t.Errorf("disk key %q", disk.StorageKey())
+	}
+
+	// Plain http only for a bucket at home, such as MinIO in the same network.
+	for endpoint, want := range map[string]string{
+		"http://192.168.1.20:9000":  "http://192.168.1.20:9000",
+		"http://[fd12::52]:9000":    "http://[fd12::52]:9000",
+		"http://minio.local:80":     "http://minio.local",
+		"https://[2001:db8::1]:443": "https://[2001:db8::1]",
+	} {
+		cfg, err := Parse([]byte(s3With(`{"endpoint": "` + endpoint + `", "path_style": true}`)))
+		if err != nil {
+			t.Errorf("%s: %v", endpoint, err)
+		} else if cfg.S3.Endpoint != want || !cfg.S3.PathStyle {
+			t.Errorf("%s: endpoint %q, path style %v", endpoint, cfg.S3.Endpoint, cfg.S3.PathStyle)
+		}
 	}
 }

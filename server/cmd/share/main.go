@@ -128,6 +128,10 @@ func (f *flags) load() (*config.Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", *f.config, err)
 	}
+	if cfg.S3 != nil {
+		// Until the commands know buckets, none of them may treat the drive as the storage.
+		return nil, fmt.Errorf(`%s: "s3": files in a bucket aren't supported yet`, *f.config)
+	}
 	return cfg, nil
 }
 
