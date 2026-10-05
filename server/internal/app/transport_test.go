@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/eschgi/share/server/internal/auth"
 	"github.com/eschgi/share/server/internal/db"
@@ -198,6 +199,41 @@ func TestThroughAProxy(t *testing.T) {
 	rec, cookies = unlockWeb(t, e.app.Handler, pin.Code, "192.168.8.30:50000", nil)
 	if rec.Code != http.StatusOK || len(cookies) != 1 || cookies[0].Name != "share_pin" || cookies[0].Secure {
 		t.Errorf("at home: %d %v", rec.Code, cookies)
+	}
+}
+
+// Cloud Run's front end connects from a link-local address and says who is visiting in
+// X-Forwarded-For. With the setting the Cloud Run guide gives, Share trusts it, and nobody
+// counts as at home, whatever the header claims.
+func TestThroughCloudRun(t *testing.T) {
+	e := newEnvWith(t, `"proxy": {"headers": "x-forwarded", "trusted_proxies": ["169.254.0.0/16"]}`)
+	pin := e.newPin(db.PinPermanent)
+	frontEnd := "169.254.8.129:41234"
+	for _, forwardedFor := range []string{"203.0.113.9", "192.168.1.5", "192.168.1.5, 203.0.113.9"} {
+		rec, cookies := unlockWeb(t, e.app.Handler, pin.Code, frontEnd, map[string]string{"X-Forwarded-For": forwardedFor, "X-Forwarded-Proto": "https"})
+		if rec.Code != http.StatusOK || len(cookies) != 1 || cookies[0].Name != "__Host-share_pin" || !cookies[0].Secure {
+			t.Errorf("X-Forwarded-For %s: %d %s %v", forwardedFor, rec.Code, rec.Body, cookies)
+		}
+	}
+	// Cloud Run's own probes come without the headers: only /healthz answers them.
+	rec, cookies := unlockWeb(t, e.app.Handler, pin.Code, frontEnd, nil)
+	refused(t, "without the headers", rec, cookies, http.StatusBadRequest, "proxy_headers")
+	req := httptest.NewRequest("GET", "http://share.example.test/healthz", nil)
+	req.RemoteAddr = frontEnd
+	rec = httptest.NewRecorder()
+	e.app.Handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Errorf("/healthz: %d", rec.Code)
+	}
+}
+
+func TestShutdownWait(t *testing.T) {
+	if w := shutdownWait(); w != 20*time.Second {
+		t.Errorf("elsewhere: %v", w)
+	}
+	t.Setenv("K_SERVICE", "share")
+	if w := shutdownWait(); w != 8*time.Second {
+		t.Errorf("on Cloud Run: %v", w)
 	}
 }
 

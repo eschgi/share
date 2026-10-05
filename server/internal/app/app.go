@@ -257,6 +257,15 @@ func (a *App) Close() error {
 	return errors.Join(a.Lib.Close(), a.DB.Close())
 }
 
+// shutdownWait is how long running requests get when the server stops: 20 seconds, but 8 on
+// Cloud Run, which ends the process 10 seconds after asking it to stop.
+func shutdownWait() time.Duration {
+	if os.Getenv("K_SERVICE") != "" {
+		return 8 * time.Second
+	}
+	return 20 * time.Second
+}
+
 // lastRun reads when a periodic job last ran from the database, so that a server that only
 // runs for minutes at a time still does its hourly and daily work.
 func lastRun(d *db.DB) func(context.Context, string) time.Time {
@@ -279,7 +288,8 @@ func recordRun(d *db.DB) func(context.Context, string, time.Time) {
 }
 
 // Serve repairs what the last run left behind and does the housekeeping that is due, then
-// answers requests until ctx ends, and shuts down gracefully: running requests get 20 seconds.
+// answers requests until ctx ends, and shuts down gracefully: running requests get some time
+// to finish (shutdownWait).
 func (a *App) Serve(ctx context.Context) error {
 	a.sched.RunDue(ctx)
 	if token, err := a.Auth.FirstStartInvite(ctx); err != nil {
@@ -343,7 +353,7 @@ func (a *App) Serve(ctx context.Context) error {
 	case <-ctx.Done():
 		log.Printf("share: shutting down")
 	}
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownWait())
 	defer cancel()
 	for _, s := range servers {
 		if serr := s.Shutdown(shutdownCtx); err == nil {
