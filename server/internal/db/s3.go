@@ -6,10 +6,10 @@ import (
 	"time"
 )
 
-// PurgeToS3Garbage removes a trashed file's row and notes its object for removal, in one
-// transaction: an object is never forgotten, even if the bucket can't be reached right now.
-// It returns false if the file isn't in the trash.
-func (d *DB) PurgeToS3Garbage(ctx context.Context, id, key string, at time.Time) (bool, error) {
+// PurgeToS3Garbage removes a trashed file's row and notes its objects (the file, its
+// thumbnail) for removal, in one transaction: an object is never forgotten, even if the bucket
+// can't be reached right now. It returns false if the file isn't in the trash.
+func (d *DB) PurgeToS3Garbage(ctx context.Context, id string, at time.Time, keys ...string) (bool, error) {
 	var purged bool
 	err := d.Tx(ctx, func(tx *sql.Tx) error {
 		res, err := tx.ExecContext(ctx, "DELETE FROM files WHERE id = ? AND state = 'trashed'", id)
@@ -20,8 +20,13 @@ func (d *DB) PurgeToS3Garbage(ctx context.Context, id, key string, at time.Time)
 			return nil
 		}
 		purged = true
-		_, err = tx.ExecContext(ctx, "INSERT OR REPLACE INTO s3_garbage (key, created_at) VALUES (?, ?)", key, ms(at))
-		return err
+		for _, key := range keys {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO s3_garbage (key, created_at) VALUES (?, ?)
+				ON CONFLICT (key) DO UPDATE SET created_at = excluded.created_at`, key, ms(at)); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 	return purged, err
 }

@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"image/jpeg"
 	"io"
+	"io/fs"
 	"net/http"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -15,6 +18,7 @@ import (
 	"github.com/eschgi/share/server/internal/api"
 	"github.com/eschgi/share/server/internal/auth"
 	"github.com/eschgi/share/server/internal/db"
+	"github.com/eschgi/share/server/internal/s3"
 )
 
 // noRedirects is a copy of a client that stops at a redirect, to look at it.
@@ -183,4 +187,79 @@ func TestS3ServerMakesThumbnailsFromTheBucket(t *testing.T) {
 	if _, err := jpeg.Decode(bytes.NewReader(r.body)); r.status != http.StatusOK || err != nil {
 		t.Errorf("thumbnail: %d, %v", r.status, err)
 	}
+	if stored, err := e.app.S3.ReadAll(context.Background(), e.app.S3.ThumbKey(id), 1<<20); err != nil || !bytes.Equal(stored, r.body) {
+		t.Errorf("the thumbnail in the bucket: %d bytes, %v", len(stored), err)
+	}
+}
+
+// Thumbnails go into the bucket next to the files, come back through the server, and leave
+// with their file when it is deleted for good.
+func TestS3ThumbnailsLiveInTheBucket(t *testing.T) {
+	e := newS3Env(t)
+	ctx := context.Background()
+	admin := e.admin()
+	phone := s3Client{e: e, token: admin.token}
+	id := phone.send("IMG_1.jpg", jpegBytes(t, 64, 48, 1), e.firstFolder().ID)
+	thumb := jpegBytes(t, 32, 24, 2)
+	if r := e.putThumb(admin.token, id, "?width=4032&height=3024", "image/jpeg", thumb); r.status != http.StatusNoContent {
+		t.Fatalf("PUT: %d %s", r.status, r.body)
+	}
+	if stored, err := e.app.S3.ReadAll(ctx, e.app.S3.ThumbKey(id), 1<<20); err != nil || !bytes.Equal(stored, thumb) {
+		t.Fatalf("the thumbnail in the bucket: %d bytes, %v", len(stored), err)
+	}
+	if _, err := os.Stat(e.app.Thumbs.Path(id)); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("a thumbnail in the data folder: %v", err)
+	}
+
+	r := e.get("/api/files/"+id+"/thumb", admin.token)
+	etag := r.header.Get("ETag")
+	if r.status != http.StatusOK || !bytes.Equal(r.body, thumb) || etag == "" || r.header.Get("Content-Type") != "image/jpeg" {
+		t.Fatalf("GET: %d, %d bytes, %v", r.status, len(r.body), r.header)
+	}
+	calls := 0
+	if e.fake != nil {
+		calls = len(e.fake.Calls())
+	}
+	r = e.do(nil, "GET", "/api/files/"+id+"/thumb", admin.token, nil, map[string]string{"If-None-Match": `W/"x", ` + etag})
+	if r.status != http.StatusNotModified || r.header.Get("ETag") != etag || len(r.body) != 0 {
+		t.Errorf("GET with the ETag: %d %s", r.status, r.body)
+	}
+	if e.fake != nil && len(e.fake.Calls()) != calls {
+		t.Errorf("a known thumbnail asked the bucket: %v", e.fake.Calls()[calls:])
+	}
+
+	// Deleted for good: both objects go, also when the bucket was away at the time.
+	other := phone.send("IMG_2.jpg", jpegBytes(t, 64, 48, 3), e.firstFolder().ID)
+	if r := e.putThumb(admin.token, other, "", "image/jpeg", thumb); r.status != http.StatusNoContent {
+		t.Fatalf("PUT: %d %s", r.status, r.body)
+	}
+	for _, path := range []string{"/api/files/delete", "/api/trash/purge"} {
+		if r := e.sendJSON("POST", path, admin.token, map[string]any{"ids": []string{id}}); r.status != http.StatusOK {
+			t.Fatalf("%s: %d %s", path, r.status, r.body)
+		}
+	}
+	gone := func(id string) {
+		t.Helper()
+		for _, key := range []string{e.app.S3.Key(id), e.app.S3.ThumbKey(id)} {
+			if _, err := e.app.S3.Stat(ctx, key); !errors.Is(err, s3.ErrNoObject) {
+				t.Errorf("%s after the purge: %v", key, err)
+			}
+		}
+	}
+	gone(id)
+	if e.fake == nil {
+		return
+	}
+	if r := e.sendJSON("POST", "/api/files/delete", admin.token, map[string]any{"ids": []string{other}}); r.status != http.StatusOK {
+		t.Fatalf("delete: %d %s", r.status, r.body)
+	}
+	e.fake.Down(true)
+	if r := e.sendJSON("POST", "/api/trash/purge", admin.token, map[string]any{"ids": []string{other}}); r.status != http.StatusOK {
+		t.Fatalf("purge while the bucket is away: %d %s", r.status, r.body)
+	}
+	e.fake.Down(false)
+	if err := e.app.Lib.Reconcile(ctx, time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	gone(other)
 }

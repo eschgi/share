@@ -23,7 +23,7 @@ const MarkerName = ".share-storage"
 // Layout names the folders.
 type Layout struct {
 	StorageDir string // the library: a directory per folder, with the day folders inside
-	DataDir    string // database, thumbnails, certificates
+	DataDir    string // database, certificates, and the thumbnails on a drive
 }
 
 // UploadsDir holds unfinished tus uploads. It sits inside the storage folder, on the same
@@ -191,8 +191,8 @@ func CheckS3(ctx context.Context, dataDir string, b *s3.Bucket, origins []string
 	return r
 }
 
-// checkData looks at the data folder, where the database and the thumbnails are on a drive
-// and with a bucket alike. It reports false when the folder can't be used at all.
+// checkData looks at the data folder, where the database is on a drive and with a bucket
+// alike. It reports false when the folder can't be used at all.
 func (r *Report) checkData(dir string) bool {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		r.problem("data_unreadable", "data folder: %v", err)

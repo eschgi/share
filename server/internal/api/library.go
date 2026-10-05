@@ -1,9 +1,11 @@
 package api
 
 import (
+	"bytes"
 	"encoding/base64"
 	"errors"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"slices"
@@ -336,8 +338,21 @@ func (a *API) thumb(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusNotFound, "not_found", "This file has no thumbnail.")
 		return
 	}
-	file, err := os.Open(a.Thumbs.Path(f.ID))
-	if errors.Is(err, os.ErrNotExist) {
+	etag := `"` + f.ID + "-" + strconv.FormatInt(f.UpdatedAt.UnixMilli(), 36) + `"`
+	cached := func() {
+		h := w.Header()
+		h.Set("Cache-Control", "private, max-age=86400")
+		h.Set("ETag", etag)
+	}
+	// A thumbnail the browser has already is confirmed from the row alone, without reading
+	// it: in a bucket that would be a request there.
+	if etagMatches(r.Header.Get("If-None-Match"), etag) {
+		cached()
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+	data, err := a.Thumbs.Read(r.Context(), f.ID)
+	if errors.Is(err, fs.ErrNotExist) {
 		httpx.WriteError(w, http.StatusNotFound, "not_found", "This file has no thumbnail.")
 		return
 	}
@@ -345,13 +360,20 @@ func (a *API) thumb(w http.ResponseWriter, r *http.Request) {
 		internal(w, "thumbnail", err)
 		return
 	}
-	defer file.Close()
-	h := w.Header()
-	h.Set("Content-Type", "image/jpeg")
-	h.Set("Cache-Control", "private, max-age=86400")
-	h.Set("X-Content-Type-Options", "nosniff")
-	h.Set("ETag", `"`+f.ID+"-"+strconv.FormatInt(f.UpdatedAt.UnixMilli(), 36)+`"`)
-	http.ServeContent(w, r, "", f.UpdatedAt, file)
+	cached()
+	w.Header().Set("Content-Type", "image/jpeg")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	http.ServeContent(w, r, "", f.UpdatedAt, bytes.NewReader(data))
+}
+
+// etagMatches reports whether an If-None-Match header names etag, compared weakly.
+func etagMatches(header, etag string) bool {
+	for _, t := range strings.Split(header, ",") {
+		if t = strings.TrimSpace(t); t == "*" || strings.TrimPrefix(t, "W/") == etag {
+			return true
+		}
+	}
+	return false
 }
 
 // writeTimeout is how long one piece of a download may take to go out. The server has no

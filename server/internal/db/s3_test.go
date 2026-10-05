@@ -58,10 +58,10 @@ func TestPurgeToS3Garbage(t *testing.T) {
 	if _, err := d.TrashFiles(ctx, []string{a}, "admin", t0); err != nil {
 		t.Fatal(err)
 	}
-	if purged, err := d.PurgeToS3Garbage(ctx, b, "files/"+b, t0); err != nil || purged {
+	if purged, err := d.PurgeToS3Garbage(ctx, b, t0, "files/"+b); err != nil || purged {
 		t.Fatalf("purging a file that isn't in the trash: %v, %v", purged, err)
 	}
-	if purged, err := d.PurgeToS3Garbage(ctx, a, "files/"+a, t0); err != nil || !purged {
+	if purged, err := d.PurgeToS3Garbage(ctx, a, t0, "files/"+a, "thumbs/"+a+".jpg"); err != nil || !purged {
 		t.Fatalf("purging a trashed file: %v, %v", purged, err)
 	}
 	if _, err := d.FileByID(ctx, a); err != ErrNotFound {
@@ -71,11 +71,13 @@ func TestPurgeToS3Garbage(t *testing.T) {
 		t.Fatal(err)
 	}
 	keys, err := d.S3Garbage(ctx, 10)
-	if err != nil || !slices.Equal(keys, []string{"files/" + a}) {
+	if err != nil || !slices.Equal(keys, []string{"files/" + a, "thumbs/" + a + ".jpg"}) {
 		t.Fatalf("garbage %v, %v", keys, err)
 	}
-	if err := d.ForgetS3Garbage(ctx, "files/"+a); err != nil {
-		t.Fatal(err)
+	for _, key := range keys {
+		if err := d.ForgetS3Garbage(ctx, key); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if keys, _ := d.S3Garbage(ctx, 10); len(keys) != 0 {
 		t.Errorf("garbage after forgetting: %v", keys)

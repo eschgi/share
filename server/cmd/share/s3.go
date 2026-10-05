@@ -14,7 +14,7 @@ import (
 var openBucket = func(c *config.S3) (*s3.Bucket, error) { return s3.Open(c, s3.Options{}) }
 
 // initS3 is `share init` with the files in a bucket, which needs nothing made: only the data
-// folder, for the database and the thumbnails. Then it checks as `share check` does.
+// folder, for the database. Then it checks as `share check` does.
 func initS3(cfg *config.Config) error {
 	if err := os.MkdirAll(cfg.DataDir, 0o700); err != nil {
 		return err

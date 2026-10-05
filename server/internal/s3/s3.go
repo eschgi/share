@@ -128,6 +128,9 @@ func (b *Bucket) Prefix() string { return b.prefix }
 // Key is the object of a file: one per file id, whatever its name and folder.
 func (b *Bucket) Key(id string) string { return b.prefix + "files/" + id }
 
+// ThumbKey is the object of a file's thumbnail.
+func (b *Bucket) ThumbKey(id string) string { return b.prefix + "thumbs/" + id + ".jpg" }
+
 // Origin is where browsers send and fetch the files: the scheme and host of the bucket's
 // links, for the website's Content-Security-Policy.
 func (b *Bucket) Origin() string { return b.origin }
@@ -234,10 +237,15 @@ func (b *Bucket) Uploads(ctx context.Context, each func(Upload) error) error {
 	}
 }
 
+// Put stores a small object in one request, such as a thumbnail.
+func (b *Bucket) Put(ctx context.Context, key string, data []byte, contentType, disposition string) error {
+	_, err := b.core.PutObject(ctx, b.name, key, bytes.NewReader(data), int64(len(data)), "", "", minio.PutObjectOptions{ContentType: contentType, ContentDisposition: disposition})
+	return b.mapErr(ctx, err)
+}
+
 // PutEmpty stores an empty file, which needs no upload.
 func (b *Bucket) PutEmpty(ctx context.Context, key, contentType, disposition string) error {
-	_, err := b.core.PutObject(ctx, b.name, key, bytes.NewReader(nil), 0, "", "", minio.PutObjectOptions{ContentType: contentType, ContentDisposition: disposition})
-	return b.mapErr(ctx, err)
+	return b.Put(ctx, key, nil, contentType, disposition)
 }
 
 // Stat is the size of an object; ErrNoObject if there is none.
@@ -279,6 +287,27 @@ func (b *Bucket) Head(ctx context.Context, key string, n int) ([]byte, error) {
 		return nil, b.mapErr(ctx, err)
 	}
 	return head, nil
+}
+
+// ReadAll reads a small object whole, in one request; an object of more than max bytes is
+// refused.
+func (b *Bucket) ReadAll(ctx context.Context, key string, max int64) ([]byte, error) {
+	body, info, _, err := b.core.GetObject(ctx, b.name, key, minio.GetObjectOptions{})
+	if err != nil {
+		return nil, b.mapErr(ctx, err)
+	}
+	defer body.Close()
+	if info.Size > max {
+		return nil, fmt.Errorf("%s has %d bytes, more than %d", key, info.Size, max)
+	}
+	data, err := io.ReadAll(io.LimitReader(body, max+1))
+	if err != nil {
+		return nil, b.mapErr(ctx, err)
+	}
+	if int64(len(data)) > max {
+		return nil, fmt.Errorf("%s has more than %d bytes", key, max)
+	}
+	return data, nil
 }
 
 // Remove deletes an object; one that isn't there is gone already.

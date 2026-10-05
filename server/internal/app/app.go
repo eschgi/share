@@ -164,6 +164,9 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 	}
 	openOriginal := func(ctx context.Context, f db.File) (io.ReadSeekCloser, error) { return lib.Open(ctx, f) }
 	th := &thumbs.Store{DB: d, Dir: layout.ThumbsDir(), Open: openOriginal, Now: now, Logf: log.Printf}
+	if bucket != nil {
+		th.Bucket = bucket // the thumbnails go next to the files
+	}
 	lib.OnPurged = th.Remove
 	var crcs *checksum.Store
 	if bucket == nil {

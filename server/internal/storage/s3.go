@@ -225,7 +225,11 @@ func (lib *Library) purgeS3(ctx context.Context, fileIDs []string) ([]db.File, e
 		}
 		var out []db.File
 		for _, f := range files {
-			ok, err := lib.DB.PurgeToS3Garbage(ctx, f.ID, lib.s3.Key(f.ID), lib.Now())
+			keys := []string{lib.s3.Key(f.ID)}
+			if f.Thumb == db.ThumbClient || f.Thumb == db.ThumbServer {
+				keys = append(keys, lib.s3.ThumbKey(f.ID))
+			}
+			ok, err := lib.DB.PurgeToS3Garbage(ctx, f.ID, lib.Now(), keys...)
 			if err != nil {
 				return out, err
 			}

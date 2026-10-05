@@ -151,6 +151,26 @@ func flow(t *testing.T, b *s3.Bucket, client *http.Client, strict bool) {
 		t.Errorf("parts of an aborted upload: %v", err)
 	}
 
+	small := b.ThumbKey(newID())
+	if !strings.HasSuffix(small, ".jpg") || !strings.Contains(small, "thumbs/") {
+		t.Errorf("thumbnail key %q", small)
+	}
+	if err := b.Put(ctx, small, data[:300], "image/jpeg", ""); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := b.ReadAll(ctx, small, 300); err != nil || !bytes.Equal(got, data[:300]) {
+		t.Errorf("read back %d bytes, %v", len(got), err)
+	}
+	if _, err := b.ReadAll(ctx, small, 299); err == nil {
+		t.Error("an object over the limit was read")
+	}
+	if err := b.Remove(ctx, small); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.ReadAll(ctx, small, 300); !errors.Is(err, s3.ErrNoObject) {
+		t.Errorf("reading what was removed: %v", err)
+	}
+
 	empty := b.Key(newID())
 	if err := b.PutEmpty(ctx, empty, "text/plain", `attachment; filename="empty.txt"`); err != nil {
 		t.Fatal(err)

@@ -379,7 +379,7 @@ func (c *Config) complete() error {
 	}
 	switch {
 	case c.DataDir == "" && c.S3 != nil:
-		bad("data_dir", `is required with "s3": the database and the thumbnails stay on this machine`)
+		bad("data_dir", `is required with "s3": the database stays on this machine`)
 	case c.DataDir == "" && c.StorageDir != "":
 		c.DataDir = filepath.Join(c.StorageDir, ".share")
 	case c.DataDir == "":
