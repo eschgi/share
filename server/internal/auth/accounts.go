@@ -327,17 +327,30 @@ func (s *Service) findInvite(ctx context.Context, r *http.Request, token string)
 }
 
 // FirstStartInvite makes the invite for the first admin while nobody has an account, and
-// returns its token; once someone has, it returns "". An earlier first-start invite is
-// replaced, since only its hash was kept and it can't be shown again.
+// returns its token; once someone has, it returns "". Until the server stops it returns the
+// same invite while that can be used, so the link in the log and the setup page's are one. An
+// invite from an earlier start is replaced, since only its hash was kept and it can't be
+// shown again.
 func (s *Service) FirstStartInvite(ctx context.Context) (string, error) {
+	s.firstMu.Lock()
+	defer s.firstMu.Unlock()
 	n, err := s.DB.UserCount(ctx)
 	if err != nil || n > 0 {
 		return "", err
+	}
+	if s.firstInvite != "" {
+		in, err := s.DB.InviteByToken(ctx, ids.HashToken(s.firstInvite))
+		if err == nil && in.UsedAt == nil && in.RevokedAt == nil && s.Now().Before(in.ExpiresAt) {
+			return s.firstInvite, nil
+		}
 	}
 	if err := s.DB.RevokeInvitesBy(ctx, FirstStart, s.Now()); err != nil {
 		return "", err
 	}
 	token, _, err := s.CreateInvite(ctx, "Admin", db.RoleAdmin, "", FirstStart, nil, firstStartLifetime)
+	if err == nil {
+		s.firstInvite = token
+	}
 	return token, err
 }
 

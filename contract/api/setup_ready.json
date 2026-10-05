@@ -1,0 +1,21 @@
+{
+  "method": "GET",
+  "path": "/api/setup",
+  "auth": "the setup link's secret, in the header X-Share-Setup",
+  "status": 200,
+  "response": {
+    "ready": true,
+    "needs_admin": true,
+    "name": "Share",
+    "languages": ["en", "de", "it"],
+    "default_language": "en",
+    "storage_dir": "",
+    "exists": false,
+    "empty": false,
+    "fs_type": "",
+    "total_bytes": 0,
+    "free_bytes": 0,
+    "warnings": []
+  },
+  "notes": "The server after a setup from the website, until it stops: ready, and needs_admin while nobody has an account. A server that started without setting up anything answers 404 not_found: the folder was set up already."
+}

@@ -272,12 +272,14 @@ Without Docker:
 2. Write `config.json` from `config.example.json`, with at least `public_url` and `storage_dir`
    (or `data_dir` and `s3`, see [Files in an S3 bucket](#files-in-an-s3-bucket)), and the `proxy`
    line from the guide you follow.
-3. Run `share init` once; with the files on a drive of their own, mount it first. `share check`
-   says whether the drive suits: ext4 is best, FAT32 can't hold files over 4 GiB. With a bucket, it
-   says whether the bucket answers and lets Share's pages in.
+3. With the files on a drive of their own, mount it. With a bucket, `share check` says whether the
+   bucket answers and lets Share's pages in.
 4. Run `share serve` as a service, on Linux with
-   [`deploy/systemd/share.service`](deploy/systemd/share.service). The first start prints an invite
-   for the first admin, who opens it on their phone, or in a browser.
+   [`deploy/systemd/share.service`](deploy/systemd/share.service). The first start prints a link
+   to a page that shows the storage folder and its drive, and what suits it (ext4 is best, FAT32
+   can't hold files over 4 GiB), and sets the folder up; then it opens the invite for the first
+   admin, on a phone or in the browser. `share init` sets the folder up on the command line
+   instead. With a bucket there is nothing to set up, and the first start prints the invite.
 
 ### HTTPS without a proxy
 

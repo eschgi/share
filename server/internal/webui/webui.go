@@ -112,6 +112,8 @@ func (u *UI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		u.page(w, r, "index.html")
 	case p == "/join":
 		u.page(w, r, "join.html")
+	case p == "/setup":
+		u.page(w, r, "setup.html")
 	case p == "/manifest.webmanifest":
 		w.Header().Set("Cache-Control", "no-cache")
 		http.ServeContent(w, r, "manifest.webmanifest", time.Time{}, bytes.NewReader(u.manifest))

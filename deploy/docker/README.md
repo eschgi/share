@@ -20,9 +20,12 @@ Two setups to copy, each a folder with a `compose.yaml`:
    - For `cloudflared/`, put the tunnel's token into a file `.env`: `TUNNEL_TOKEN=…`. In the
      tunnel's public hostname, the service is `http://127.0.0.1:8080`
      ([the tunnel guide](../cloudflared/README.md) has the rest).
-2. Prepare the storage folder in the volume, once: `docker compose run --rm share init`
-3. Start: `docker compose up -d`
-4. `docker compose logs share` shows the link for the first admin.
+2. Start: `docker compose up -d`
+3. `docker compose logs share` shows a link to set up the storage folder in the volume. Open it,
+   check what the page says about the folder and its drive, and set it up: the page then goes on
+   to your invite as the first admin. (Or, before the first start,
+   `docker compose run --rm share init` sets the folder up; the log then shows the first admin's
+   link instead.)
 
 Share's commands run in the container, e.g. `docker compose exec share share pin create --day`
 or `docker compose exec share share check`.
@@ -58,8 +61,9 @@ take the place of `storage_dir`:
 }
 ```
 
-`docker compose run --rm share init` then checks the bucket instead of preparing a folder, and
-prints the CORS rules when the bucket still needs them.
+There is no folder to set up then: the log shows the first admin's link right away.
+`docker compose run --rm share check` says whether the bucket answers, and prints the CORS rules
+when the bucket still needs them.
 
 ## Upgrading
 

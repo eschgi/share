@@ -34,6 +34,7 @@
     "s3_no_zip":              {"status": 409, "meaning": "S3: a bucket sends no ZIP (GET /api/downloads/{id}); download the files one by one."},
     "pin_taken":              {"status": 409, "meaning": "A PIN had this code before; codes are never used twice. Pick another one."},
     "username_taken":         {"status": 409, "meaning": "Someone else has that username."},
+    "already_set_up":         {"status": 409, "meaning": "The setup page asked for the first admin's invite, but someone has an account already: sign in instead."},
     "invite_expired":         {"status": 410, "meaning": "The invite has expired."},
     "invite_revoked":         {"status": 410, "meaning": "The invite was withdrawn, or the person it was for was removed."},
     "invite_used":            {"status": 410, "meaning": "The invite was used already; invites work once."},
@@ -45,7 +46,9 @@
     "pin_locked":             {"status": 429, "meaning": "Too many wrong PINs; wait retry_after_seconds."},
     "finalize_failed":        {"status": 500, "meaning": "tus: all bytes arrived but the file couldn't be stored yet; the client retries with HEAD."},
     "internal":               {"status": 500, "meaning": "Something failed on the server."},
+    "setup_failed":           {"status": 500, "meaning": "Setting up the storage folder didn't work; the message says why, e.g. a folder Share may not write to."},
     "busy":                   {"status": 503, "meaning": "Too many uploads (tus) or ZIP downloads running at once; retry after the Retry-After header."},
-    "s3_unavailable":         {"status": 503, "meaning": "S3: the bucket can't be reached right now, or answered that it can't; retry after the Retry-After header. Nothing sent so far is lost."}
+    "s3_unavailable":         {"status": 503, "meaning": "S3: the bucket can't be reached right now, or answered that it can't; retry after the Retry-After header. Nothing sent so far is lost."},
+    "setting_up":             {"status": 503, "meaning": "The storage folder isn't set up yet, so only the setup page works: open the link from the server's log, or run share init."}
   }
 }

@@ -69,7 +69,11 @@ func TestFirstStartInviteMakesTheAdmin(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
 	old, _ := e.app.Auth.FirstStartInvite(ctx)
-	token, _ := e.app.Auth.FirstStartInvite(ctx) // a restart before anyone used it
+	if again, _ := e.app.Auth.FirstStartInvite(ctx); again != old {
+		t.Error("another first-start invite while the server runs")
+	}
+	restarted := auth.NewService(e.app.DB, e.clock.Now) // a restart before anyone used it
+	token, _ := restarted.FirstStartInvite(ctx)
 	if r := e.postJSON(nil, "/api/invites/peek", "", map[string]string{"token": old}, nil); r.errorCode() != "invite_revoked" {
 		t.Errorf("the earlier first-start invite: %d %s, want invite_revoked", r.status, r.body)
 	}

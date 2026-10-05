@@ -111,7 +111,7 @@ type Report struct {
 func Check(l Layout, minFree int64) Report {
 	var r Report
 	if _, err := os.Stat(filepath.Join(l.StorageDir, MarkerName)); err != nil {
-		r.problem("marker_missing", "%s has no %s marker; mount the drive or volume and run `share init`", l.StorageDir, MarkerName)
+		r.problem("marker_missing", "%s has no %s marker; mount the drive or volume, and set the folder up on the page whose link `share serve` logs, or with `share init`", l.StorageDir, MarkerName)
 		return r
 	}
 	var err error
@@ -128,15 +128,7 @@ func Check(l Layout, minFree int64) Report {
 			r.problem("other_drive", "%s is on another drive than %s; finishing uploads needs both on one drive", dir, l.StorageDir)
 		}
 	}
-	switch r.Storage.Type {
-	case "vfat":
-		r.warn("fat32", "the storage drive is FAT32: files over 4 GiB can't be stored; ext4 is recommended")
-		r.MaxFileSize = 4<<30 - 1
-	case "exfat", "ntfs", "ntfs3", "fuseblk":
-		r.warn("ignores_case", "the storage drive is %s: it ignores case in names and is slower than ext4", r.Storage.Type)
-	case "tmpfs", "squashfs", "overlay", "ubifs", "jffs2":
-		r.problem("not_a_drive", "the storage folder is on %s: memory, flash or a container's own layer, not a drive or a volume", r.Storage.Type)
-	}
+	r.checkDrive()
 	if !r.checkData(l.DataDir) {
 		return r
 	}
@@ -148,6 +140,58 @@ func Check(l Layout, minFree int64) Report {
 		r.warn("low_space", "only %s free on the storage drive; uploads stop at %s (min_free_space_mib)", gib(free), gib(minFree))
 	}
 	return r
+}
+
+// checkDrive notes what the type of the storage drive means for Share.
+func (r *Report) checkDrive() {
+	switch r.Storage.Type {
+	case "vfat":
+		r.warn("fat32", "the storage drive is FAT32: files over 4 GiB can't be stored; ext4 is recommended")
+		r.MaxFileSize = 4<<30 - 1
+	case "exfat", "ntfs", "ntfs3", "fuseblk":
+		r.warn("ignores_case", "the storage drive is %s: it ignores case in names and is slower than ext4", r.Storage.Type)
+	case "tmpfs", "squashfs", "overlay", "ubifs", "jffs2":
+		r.problem("not_a_drive", "the storage folder is on %s: memory, flash or a container's own layer, not a drive or a volume", r.Storage.Type)
+	}
+}
+
+// Unset is what can be seen of a storage folder before it is set up: whether it is there,
+// whether it is empty, and the drive under it (that of the nearest folder above it that is).
+type Unset struct {
+	Exists bool
+	Empty  bool
+	Report Report // the drive's findings, as Check gives them
+}
+
+// CheckUnset looks at a storage folder that has no marker yet, changing nothing. An empty
+// folder may be a drive that isn't mounted: the setup page says so.
+func CheckUnset(l Layout) Unset {
+	var u Unset
+	dir := l.StorageDir
+	for {
+		info, err := os.Stat(dir)
+		if err == nil && info.IsDir() {
+			break
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			u.Report.problem("storage_unreadable", "storage folder: nothing above %s can be read", l.StorageDir)
+			return u
+		}
+		dir = parent
+	}
+	if dir == l.StorageDir {
+		u.Exists = true
+		entries, err := os.ReadDir(dir)
+		u.Empty = err == nil && len(entries) == 0
+	}
+	var err error
+	if u.Report.Storage, err = Stat(dir); err != nil {
+		u.Report.problem("storage_unreadable", "storage folder: %v", err)
+		return u
+	}
+	u.Report.checkDrive()
+	return u
 }
 
 // CheckS3 is Check for a library in a bucket: whether the bucket takes Share's keys, whether

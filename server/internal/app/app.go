@@ -37,6 +37,9 @@ type Options struct {
 	WaitForStorage bool // wait for the storage marker instead of failing (a drive may mount late)
 	Upload         *upload.Config
 	Version        string // the program's version, for the About screens; "dev" when empty
+	// SetupSecret is the secret of the setup link when the storage folder was just set up from
+	// the website (RunSetup): the setup page then asks for the first admin's invite with it.
+	SetupSecret string
 	// CheckStorage looks at the drives or the bucket for the admins' storage page;
 	// storage.Check or storage.CheckS3 when nil.
 	CheckStorage func(context.Context) storage.Report
@@ -205,6 +208,9 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 		upload.NewS3Handler(upCfg, authSvc, lib, now).Register(mux)
 	}
 	apiHandlers.Register(mux)
+	if opts.SetupSecret != "" {
+		registerSetup(mux, cfg, opts.SetupSecret, d, authSvc)
+	}
 	mux.Handle("/", ui)
 
 	a := &App{Cfg: cfg, DB: d, Lib: lib, Auth: authSvc, Tus: tus, S3: bucket, Thumbs: th, CRCs: crcs, UI: ui, Local: local, now: now}

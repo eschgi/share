@@ -56,13 +56,13 @@ export function onSignedOut(f: (() => void) | null): void {
   whenSignedOut = f;
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown, headers?: Record<string, string>): Promise<T> {
   let res: Response;
   try {
     res = await fetch(path, {
       method,
       credentials: 'same-origin',
-      headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
+      headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...headers },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
@@ -132,6 +132,38 @@ export interface AppInfo {
 }
 
 export const getApp = () => request<AppInfo>('GET', '/api/app');
+
+// Setting up the storage folder (/setup), before the server starts: with the secret of the link
+// in its log, new at every start.
+
+export interface SetupStatus {
+  /** The folder is set up and Share runs. */
+  ready: boolean;
+  /** Share runs and nobody has an account yet: the page asks for the first admin's invite. */
+  needs_admin: boolean;
+  name: string;
+  languages: string[];
+  default_language: string;
+  /** Before the setup: the folder, what it holds, and its drive (or the drive of the nearest
+   * folder above, when it doesn't exist yet). */
+  storage_dir: string;
+  exists: boolean;
+  empty: boolean;
+  fs_type: string;
+  total_bytes: number;
+  free_bytes: number;
+  warnings: StorageWarning[];
+}
+
+const setupHeader = (secret: string) => ({ 'X-Share-Setup': secret });
+
+export const getSetup = (secret: string) => request<SetupStatus>('GET', '/api/setup', undefined, setupHeader(secret));
+
+/** Sets the folder up; then the server starts for real, and for a moment nothing answers. */
+export const startSetup = (secret: string) => request<void>('POST', '/api/setup', {}, setupHeader(secret));
+
+/** The first admin's invite, while nobody has an account. */
+export const setupInvite = (secret: string) => request<{ invite: string }>('POST', '/api/setup/invite', {}, setupHeader(secret));
 
 // People with an account. A browser signs in with "client": "web": its key comes back as a
 // cookie the page can't read, never in the body. POSTs send {} at least: the server wants JSON

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/eschgi/share/server/internal/db"
@@ -125,6 +126,10 @@ type Service struct {
 	// Wrong current passwords per person, when changing it: someone at an unlocked phone or
 	// browser mustn't be able to try passwords there without end.
 	passwordPerUser *ratelimit.Limiter
+
+	// The first admin's invite made since the start, given again while it can be used.
+	firstMu     sync.Mutex
+	firstInvite string
 }
 
 // NewService returns a Service with the standard limits.
