@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import de from '../account/i18n/de.json';
 import en from '../account/i18n/en.json';
 import it from '../account/i18n/it.json';
-import { download, startDownload, zipLimit } from '../account/library/actions';
+import { download, downloadEach, eachLimit, startDownload, zipLimit, type EachNote } from '../account/library/actions';
 import { LibraryModel } from '../account/library/model';
 import { Tile } from '../account/library/Tile';
 import { canSaveToFolder } from '../account/save/folder';
@@ -16,7 +16,7 @@ import { SaveChoice } from '../account/save/SaveChoice';
 import { SavePanel } from '../account/save/SavePanel';
 import { startSave } from '../account/save/store';
 import { Viewer } from '../account/viewer/Viewer';
-import { ApiError, createDownload, getFileIds, getFiles, getFolders, getLibrary, zipUrl, type FolderInfo } from '../api';
+import { ApiError, createDownload, getFileIds, getFiles, getFolders, getInfo, getLibrary, zipUrl, type FolderInfo } from '../api';
 import { Icon } from '../components/Icon';
 import { Page } from '../components/Page';
 import { formatBytes, formatCount, formatDay } from '../format';
@@ -32,6 +32,9 @@ export function See({ name, onEnded }: { name: string; onEnded: () => void }) {
   const [choosing, setChoosing] = useState<{ ids: string[]; bytes: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  /** With the files in a bucket, which sends no ZIP, several download one by one. */
+  const [s3, setS3] = useState(false);
+  const [note, setNote] = useState<EachNote | null>(null);
   const [, redraw] = useState(0);
   const end = useRef<HTMLDivElement>(null);
   const ended = useRef(onEnded);
@@ -50,6 +53,12 @@ export function See({ name, onEnded }: { name: string; onEnded: () => void }) {
       () => {},
     );
 
+  useEffect(() => {
+    void getInfo().then(
+      (info) => setS3(info.storage === 's3'),
+      () => {},
+    );
+  }, []);
   useEffect(() => {
     const stop = model.subscribe(() => redraw((n) => n + 1));
     void model.reload();
@@ -86,12 +95,19 @@ export function See({ name, onEnded }: { name: string; onEnded: () => void }) {
       const { ids, bytes } = await getFileIds(model.filter);
       if (ids.length > zipLimit) return setProblem(t('zip.tooMany'));
       if (ids.length > 1 && canSaveToFolder()) return setChoosing({ ids, bytes });
+      if (ids.length > 1 && s3) return each(ids);
       await download(ids, model.files.find((f) => f.id === ids[0]));
     } catch (e) {
       failed(e);
     } finally {
       setBusy(false);
     }
+  }
+
+  function each(ids: string[]) {
+    setChoosing(null);
+    if (ids.length > eachLimit) return setProblem(t('each.tooMany', { n: eachLimit }));
+    downloadEach(ids, setNote, { t, tn });
   }
 
   async function zip(ids: string[]) {
@@ -137,6 +153,24 @@ export function See({ name, onEnded }: { name: string; onEnded: () => void }) {
           {problem}
         </p>
       )}
+      {note && (
+        <p class="help" role="status">
+          {note.text}
+          {note.action && (
+            <button
+              type="button"
+              class="tbtn"
+              onClick={() => {
+                const run = note.action!.run;
+                setNote(null);
+                run();
+              }}
+            >
+              {note.action.label}
+            </button>
+          )}
+        </p>
+      )}
       <div class="gfiles">
         {model.sections.map((s) => {
           const first = offset;
@@ -174,8 +208,8 @@ export function See({ name, onEnded }: { name: string; onEnded: () => void }) {
         <SaveChoice
           count={choosing.ids.length}
           bytes={choosing.bytes}
-          zipName={guestZipName(name, days.map((d) => d.day), now)}
-          onZip={() => void zip(choosing.ids)}
+          zipName={s3 ? null : guestZipName(name, days.map((d) => d.day), now)}
+          onOther={() => (s3 ? each(choosing.ids) : void zip(choosing.ids))}
           onFolder={(dir) => void intoFolder(choosing.ids, dir)}
           onClose={() => setChoosing(null)}
         />

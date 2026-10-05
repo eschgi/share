@@ -163,5 +163,7 @@ export const fetchFile: FetchFile = async (id, from, etag, signal): Promise<Answ
     if (etag) headers.set('If-Range', etag);
   }
   const res = await fetch(contentPath(id), { headers, signal, cache: 'no-store' });
-  return { status: res.status, etag: res.headers.get('ETag'), body: res.ok && res.body ? chunksOf(res.body) : nothing() };
+  // With the files in a bucket the answer comes from there, after the server's redirect.
+  const remote = res.url !== '' && new URL(res.url).origin !== location.origin;
+  return { status: res.status, etag: res.headers.get('ETag'), body: res.ok && res.body ? chunksOf(res.body) : nothing(), remote };
 };

@@ -29,6 +29,8 @@ export interface Answer {
   status: number;
   etag: string | null;
   body: AsyncIterable<Uint8Array>;
+  /** It came from elsewhere: from the bucket, after the server's redirect. */
+  remote?: boolean;
 }
 
 /** Asks for a file from byte `from` on; with etag, the rest only if it is still the same file. */
@@ -167,11 +169,18 @@ export async function saveFiles(items: SaveItem[], folder: Folder, fetchFile: Fe
     let written = 0;
     let etag: string | null = null;
     let delay = 1000;
+    let refusedByBucket = 0;
     try {
       for (;;) {
         if (stopped()) throw stopAll.signal.reason;
         try {
           const res = await fetchFile(item.id, written, etag, stopAll.signal);
+          if ((res.status === 401 || res.status === 403) && res.remote) {
+            // The bucket's link ended, or a clock is off: the server gives a fresh one. Not
+            // being signed in can't be it; after a few tries this file fails.
+            if (++refusedByBucket <= 3) continue;
+            throw new StatusError(res.status);
+          }
           if (res.status === 401 || res.status === 403) {
             stop('signedOut');
             throw new StatusError(res.status);

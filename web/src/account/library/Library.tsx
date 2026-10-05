@@ -36,6 +36,8 @@ import {
   canShareFiles,
   deleteMany,
   download,
+  downloadEach,
+  eachLimit,
   filesToShare,
   knownTrashDays,
   learnTrashDays,
@@ -323,12 +325,32 @@ export function Library() {
   const problemText = (e: unknown) =>
     e instanceof ApiError && e.code === 'busy' ? t('zip.busy') : t(e instanceof ApiError && e.status > 0 ? 'common.failed' : 'common.offline');
 
-  /** Several files go into a folder or a ZIP, where the browser can save into folders (screen 26). */
+  /** With the files in a bucket, which sends no ZIP, several download one by one. */
+  const s3 = info?.storage === 's3';
+
+  /** Several files go into a folder, where the browser can save into folders (screen 26), or a
+   * ZIP, or from a bucket one by one. */
   function downloadSelected() {
     if (busy) return;
     if (picked.count > zipLimit) return toast({ text: t('zip.tooMany') });
     if (picked.count > 1 && canSaveToFolder()) return setChoosing(true);
+    if (picked.count > 1 && s3) return void downloadSelectedEach();
     void downloadAsZip();
+  }
+
+  async function downloadSelectedEach() {
+    setChoosing(false);
+    if (picked.count > eachLimit) return toast({ text: t('each.tooMany', { n: eachLimit }) });
+    setBusy(true);
+    try {
+      const ids = await selectedIds(sel, idsOfDay);
+      clear();
+      downloadEach(ids, toast, { t, tn });
+    } catch (e) {
+      toast({ text: problemText(e) });
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function downloadAsZip() {
@@ -734,8 +756,8 @@ export function Library() {
         <SaveChoice
           count={picked.count}
           bytes={picked.bytes}
-          zipName={zipName()}
-          onZip={() => void downloadAsZip()}
+          zipName={s3 ? null : zipName()}
+          onOther={() => void (s3 ? downloadSelectedEach() : downloadAsZip())}
           onFolder={(dir) => void saveIntoFolder(dir)}
           onClose={() => setChoosing(false)}
         />

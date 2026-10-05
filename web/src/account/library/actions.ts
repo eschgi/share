@@ -1,6 +1,7 @@
-// What can be done with files: download them, one or as a ZIP; share them on a phone; delete
-// them and bring them back (admins).
+// What can be done with files: download them, one or as a ZIP, or one by one from a bucket;
+// share them on a phone; delete them and bring them back (admins).
 import { contentPath, contentUrl, createDownload, deleteFiles, getStorage, moveFiles, restoreFiles, zipUrl, type FileInfo, type ZipDownload } from '../../api';
+import type { I18n } from '../../i18n';
 
 /** The most files one ZIP takes (the server's limit). */
 export const zipLimit = 10_000;
@@ -25,6 +26,81 @@ export async function download(ids: string[], one?: FileInfo): Promise<ZipDownlo
   const zip = await createDownload(ids);
   startDownload(zipUrl(zip), zip.name);
   return zip;
+}
+
+/** The most files that download one by one at a time. */
+export const eachLimit = 100;
+
+/** iPhones and iPads start one download per tap, not a row of them. */
+export function tapEach(): boolean {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+export interface EachOptions {
+  /** Hears each file as it starts: how many have, of how many. */
+  onStart?: (started: number, total: number) => void;
+  signal?: AbortSignal;
+  /** Lets the browser download a link; the tests watch instead. */
+  start?: (href: string) => void;
+  wait?: (ms: number) => Promise<void>;
+}
+
+/**
+ * Downloads files one by one, each straight from the bucket after the server's redirect: a
+ * bucket sends no ZIP. One a second, so the browser keeps up with them; the first in the click,
+ * where the browser allows it. Resolves with how many started.
+ */
+export async function downloadOneByOne(ids: string[], opts: EachOptions = {}): Promise<number> {
+  const start = opts.start ?? ((href: string) => startDownload(href));
+  const wait = opts.wait ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  const total = Math.min(ids.length, eachLimit);
+  let started = 0;
+  for (const id of ids.slice(0, total)) {
+    if (started > 0) await wait(1000);
+    if (opts.signal?.aborted) break;
+    start(contentPath(id));
+    started++;
+    opts.onStart?.(started, total);
+  }
+  return started;
+}
+
+/** A line about downloads one by one, for a toast or a page. */
+export interface EachNote {
+  text: string;
+  action?: { label: string; run: () => void };
+  /** Waits for a tap: it stays until it is used. */
+  sticky?: boolean;
+}
+
+/**
+ * Downloads files one by one and says how it goes: a second apart, with a way to stop; on an
+ * iPhone or iPad one per tap, which each note asks for. The last note downloads them again.
+ */
+export function downloadEach(ids: string[], note: (n: EachNote) => void, i18n: Pick<I18n, 't' | 'tn'>): void {
+  const { t, tn } = i18n;
+  const total = Math.min(ids.length, eachLimit);
+  const again = { label: t('zip.again'), run: () => downloadEach(ids, note, i18n) };
+  if (tapEach()) {
+    const next = (started: number) => {
+      if (started === total) return note({ text: tn('each.started', total), action: again });
+      const tap = () => {
+        startDownload(contentPath(ids[started])); // in the tap, which the browser asks for
+        next(started + 1);
+      };
+      note({ text: t('each.next', { n: started, total }), action: { label: t('each.nextButton'), run: tap }, sticky: true });
+    };
+    return next(0);
+  }
+  const stop = new AbortController();
+  const cancel = { label: t('common.cancel'), run: () => stop.abort() };
+  note({ text: t('each.starting', { n: 1, total }), action: cancel });
+  void downloadOneByOne(ids, {
+    signal: stop.signal,
+    onStart: (n) => {
+      if (n < total) note({ text: t('each.starting', { n: n + 1, total }), action: cancel });
+    },
+  }).then((n) => note({ text: tn('each.started', n), action: again }));
 }
 
 /** Sends ids in parts of 1000, the most the server takes at once; says how many changed. */

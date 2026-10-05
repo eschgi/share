@@ -68,7 +68,7 @@ export function Account({ me: first, notice }: AccountProps) {
   }, [lang]);
 
   useEffect(() => {
-    if (!toast) return;
+    if (!toast || toast.sticky) return;
     const id = setTimeout(() => setToast(null), toast.action ? 10_000 : 6_000);
     return () => clearTimeout(id);
   }, [toast]);

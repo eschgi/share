@@ -234,6 +234,7 @@ export function FolderPage({
 /** A new folder's name, or a new name for folder; a new folder opens its page. */
 export function FolderNameDialog({ folder, onClose }: { folder?: FolderInfo; onClose: () => void }) {
   const { t } = useI18n();
+  const { info } = useAccount();
   const [name, setName] = useState(folder?.name ?? '');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -277,7 +278,8 @@ export function FolderNameDialog({ folder, onClose }: { folder?: FolderInfo; onC
             <Icon name="alert" />
             {problem}
           </p>
-        ) : (
+        ) : folder && info?.storage === 's3' ? null : (
+          // A bucket has no directories to rename with the folder.
           <p class="help">{t(folder ? 'folders.renameHelp' : 'folders.newHelp')}</p>
         )}
         <div class="dbtns">
