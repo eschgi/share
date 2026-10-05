@@ -4,8 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/eschgi/share/server/internal/ids"
 )
@@ -34,6 +36,28 @@ func (d *DB) SetMeta(ctx context.Context, key, value string) error {
 		"INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
 		key, value)
 	return err
+}
+
+// JobRun is when the periodic job of that name last ran without an error; the zero time if
+// it never did.
+func (d *DB) JobRun(ctx context.Context, name string) (time.Time, error) {
+	v, err := d.Meta(ctx, "job:"+name)
+	if errors.Is(err, ErrNotFound) {
+		return time.Time{}, nil
+	}
+	if err != nil {
+		return time.Time{}, err
+	}
+	n, err := strconv.ParseInt(v, 10, 64)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("the last run of %s: %w", name, err)
+	}
+	return fromMS(n), nil
+}
+
+// SetJobRun records a run of the periodic job of that name.
+func (d *DB) SetJobRun(ctx context.Context, name string, at time.Time) error {
+	return d.SetMeta(ctx, "job:"+name, strconv.FormatInt(ms(at), 10))
 }
 
 // ServerID returns this server's permanent random id, creating it on first use. Apps compare

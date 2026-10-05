@@ -228,8 +228,9 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 	})
 	outer.Handle("/", a.guard(sameOrigin(mux)))
 	a.Handler = outer
-	a.sched = &jobs.Scheduler{Now: now, Logf: log.Printf, Tasks: []jobs.Task{
-		{Name: "reconcile uploads", Every: 5 * time.Minute, Run: func(ctx context.Context) error {
+	a.sched = &jobs.Scheduler{Now: now, Logf: log.Printf, Last: lastRun(d), Ran: recordRun(d), Tasks: []jobs.Task{
+		// Also at every start: it repairs what a stop in the middle of something left behind.
+		{Name: "reconcile uploads", Every: 5 * time.Minute, AtStart: true, Run: func(ctx context.Context) error {
 			authSvc.PruneLimits()
 			if tus != nil {
 				tus.PruneQueues()
@@ -266,12 +267,31 @@ func (a *App) Close() error {
 	return errors.Join(a.Lib.Close(), a.DB.Close())
 }
 
-// Serve repairs what the last run left behind, then answers requests until ctx ends, and
-// shuts down gracefully: running requests get 20 seconds.
-func (a *App) Serve(ctx context.Context) error {
-	if err := a.Lib.Reconcile(ctx, a.Cfg.IncompleteTTL()); err != nil {
-		log.Printf("storage: reconcile: %v", err)
+// lastRun reads when a periodic job last ran from the database, so that a server that only
+// runs for minutes at a time still does its hourly and daily work.
+func lastRun(d *db.DB) func(context.Context, string) time.Time {
+	return func(ctx context.Context, name string) time.Time {
+		t, err := d.JobRun(ctx, name)
+		if err != nil {
+			log.Printf("jobs: %s: %v", name, err)
+		}
+		return t
 	}
+}
+
+// recordRun notes a run of a periodic job in the database.
+func recordRun(d *db.DB) func(context.Context, string, time.Time) {
+	return func(ctx context.Context, name string, at time.Time) {
+		if err := d.SetJobRun(ctx, name, at); err != nil {
+			log.Printf("jobs: %s: %v", name, err)
+		}
+	}
+}
+
+// Serve repairs what the last run left behind and does the housekeeping that is due, then
+// answers requests until ctx ends, and shuts down gracefully: running requests get 20 seconds.
+func (a *App) Serve(ctx context.Context) error {
+	a.sched.RunDue(ctx)
 	if token, err := a.Auth.FirstStartInvite(ctx); err != nil {
 		log.Printf("share: first-start invite: %v", err)
 	} else if token != "" {

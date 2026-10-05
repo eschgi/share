@@ -77,6 +77,24 @@ func TestServerIDIsStable(t *testing.T) {
 	}
 }
 
+func TestJobRuns(t *testing.T) {
+	d := openTest(t)
+	ctx := context.Background()
+	if at, err := d.JobRun(ctx, "empty the trash"); err != nil || !at.IsZero() {
+		t.Fatalf("a job that never ran: %v, %v", at, err)
+	}
+	when := t0.Add(90 * time.Minute)
+	if err := d.SetJobRun(ctx, "empty the trash", when); err != nil {
+		t.Fatal(err)
+	}
+	if at, err := d.JobRun(ctx, "empty the trash"); err != nil || !at.Equal(when) {
+		t.Errorf("after a run: %v, %v", at, err)
+	}
+	if at, _ := d.JobRun(ctx, "expire PINs and sessions"); !at.IsZero() {
+		t.Errorf("another job: %v", at)
+	}
+}
+
 func TestPinCodesAreNeverReused(t *testing.T) {
 	d := openTest(t)
 	ctx := context.Background()

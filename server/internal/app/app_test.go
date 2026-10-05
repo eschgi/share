@@ -637,6 +637,51 @@ func TestServeShutsDownGracefully(t *testing.T) {
 	}
 }
 
+// A server that only ever lives for minutes, as on Cloud Run, still empties the trash: the
+// start does the housekeeping that is due.
+func TestStartDoesTheHousekeepingThatIsDue(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	admin := e.admin()
+	id := tus{e, admin.token}.sendFile("IMG_1.jpg", jpegBytes(t, 32, 24, 1))
+	if r := e.sendJSON("POST", "/api/files/delete", admin.token, map[string]any{"ids": []string{id}}); r.status != http.StatusOK {
+		t.Fatalf("delete: %d %s", r.status, r.body)
+	}
+	if err := e.app.DB.SetJobRun(ctx, "empty the trash", e.clock.Now()); err != nil {
+		t.Fatal(err)
+	}
+	e.clock.Add(31 * 24 * time.Hour)
+
+	serveBriefly := func() {
+		t.Helper()
+		ctx, cancel := context.WithCancel(ctx)
+		done := make(chan error, 1)
+		go func() { done <- e.app.Serve(ctx) }()
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+		if err := <-done; err != nil {
+			t.Fatalf("Serve: %v", err)
+		}
+	}
+	serveBriefly()
+	if _, err := e.app.DB.FileByID(ctx, id); !errors.Is(err, db.ErrNotFound) {
+		t.Errorf("a file deleted 31 days ago is still there: %v", err)
+	}
+	for _, job := range []string{"reconcile uploads", "expire PINs and sessions", "empty the trash"} {
+		if at, err := e.app.DB.JobRun(ctx, job); err != nil || !at.Equal(e.clock.Now()) {
+			t.Errorf("%s last ran at %v, %v", job, at, err)
+		}
+	}
+	e.clock.Add(time.Minute)
+	serveBriefly()
+	if at, _ := e.app.DB.JobRun(ctx, "empty the trash"); at.Equal(e.clock.Now()) {
+		t.Error("the trash was emptied again a minute later")
+	}
+	if at, _ := e.app.DB.JobRun(ctx, "reconcile uploads"); !at.Equal(e.clock.Now()) {
+		t.Error("the repairs didn't run at the second start")
+	}
+}
+
 func readFixture(t *testing.T, name string) map[string]any {
 	t.Helper()
 	b, err := os.ReadFile(filepath.Join("..", "..", "..", "contract", name))
