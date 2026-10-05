@@ -36,6 +36,9 @@ func (lib *Library) Trash(ctx context.Context, fileIDs []string, by string) ([]d
 }
 
 func (lib *Library) moveToTrash(ctx context.Context, f db.File) error {
+	if lib.root == nil {
+		return nil // in a bucket the trash is a state of the row
+	}
 	if _, err := lib.root.Lstat(trashPath(f.ID)); err == nil {
 		return nil // moved before a crash
 	}
@@ -103,7 +106,7 @@ func (lib *Library) restorePath(ctx context.Context, f db.File) (string, error) 
 		if err != nil {
 			return "", err
 		}
-		if _, statErr := lib.root.Lstat(inFolder(folder, rel)); taken || statErr == nil || try > 0 {
+		if taken || lib.exists(inFolder(folder, rel)) || try > 0 {
 			if rel, err = lib.freePath(ctx, folder, f.UploadDay, f.Name, nil); err != nil {
 				return "", err
 			}
@@ -121,6 +124,9 @@ func (lib *Library) restorePath(ctx context.Context, f db.File) (string, error) 
 }
 
 func (lib *Library) moveFromTrash(ctx context.Context, f db.File) error {
+	if lib.root == nil {
+		return nil
+	}
 	dst, err := lib.locate(ctx, f)
 	if err != nil {
 		return err
@@ -149,6 +155,9 @@ func (lib *Library) moveFromTrash(ctx context.Context, f db.File) error {
 // Purge removes trashed files for good: their rows, their bytes and (through OnPurged) their
 // thumbnails. It returns the files it removed.
 func (lib *Library) Purge(ctx context.Context, fileIDs []string) ([]db.File, error) {
+	if lib.s3 != nil {
+		return lib.purgeS3(ctx, fileIDs)
+	}
 	lib.mu.Lock()
 	defer lib.mu.Unlock()
 	files, err := lib.DB.TrashedByID(ctx, fileIDs)
@@ -199,6 +208,9 @@ func (lib *Library) removePurged(id string) {
 //   - bytes in the trash whose file is ready again (a restore) go back to the library;
 //     bytes without a row (a purge) are removed.
 func (lib *Library) reconcileTrash(ctx context.Context) error {
+	if lib.root == nil {
+		return nil // with nothing on a drive, every trashed file would look gone
+	}
 	lib.mu.Lock()
 	defer lib.mu.Unlock()
 	trashed, err := lib.DB.Trashed(ctx)

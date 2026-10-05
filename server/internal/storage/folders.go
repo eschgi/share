@@ -25,6 +25,9 @@ func EnsureFirstFolder(ctx context.Context, d *db.DB, storageDir, name string, n
 		name = "Share"
 	}
 	dir, err := freeDir(ctx, d, name, func(dir string) bool {
+		if storageDir == "" {
+			return false // in a bucket
+		}
 		_, err := os.Lstat(filepath.Join(storageDir, dir))
 		return err == nil
 	})
@@ -94,7 +97,11 @@ func (lib *Library) relocate(ctx context.Context) error {
 }
 
 // relocateFolder moves what lies under from into dir, and reports whether nothing is left.
+// In a bucket nothing lies anywhere: it is done at once.
 func (lib *Library) relocateFolder(dir, from string) (bool, error) {
+	if lib.root == nil {
+		return true, nil
+	}
 	if from != "" {
 		return lib.merge(from, dir)
 	}
@@ -208,8 +215,10 @@ func (lib *Library) CreateFolder(ctx context.Context, name, by string) (db.Folde
 	if err := lib.DB.InsertFolder(ctx, f); err != nil {
 		return db.Folder{}, err
 	}
-	if err := lib.root.MkdirAll(dir, 0o755); err != nil {
-		lib.Logf("storage: making the directory %q: %v", dir, err) // the first file makes it too
+	if lib.root != nil {
+		if err := lib.root.MkdirAll(dir, 0o755); err != nil {
+			lib.Logf("storage: making the directory %q: %v", dir, err) // the first file makes it too
+		}
 	}
 	return f, nil
 }
@@ -275,7 +284,8 @@ func (lib *Library) DeleteFolder(ctx context.Context, id, by string) ([]db.File,
 	}
 	for _, f := range receiving {
 		if f.FolderID == id {
-			if err := lib.Terminate(ctx, f.ID); err != nil {
+			// Not cut short when the request ends: in a bucket each one is a call.
+			if err := lib.Terminate(context.WithoutCancel(ctx), f.ID); err != nil && !errors.Is(err, ErrFinished) {
 				lib.Logf("storage: dropping %s: %v", f.ID, err)
 			}
 		}
@@ -334,6 +344,9 @@ func (lib *Library) dropEmptyFolders(ctx context.Context) error {
 
 // removeEmptyDirs removes a folder's directory if only empty day folders are left in it.
 func (lib *Library) removeEmptyDirs(dir string) {
+	if lib.root == nil {
+		return
+	}
 	entries, err := fs.ReadDir(lib.root.FS(), dir)
 	if err != nil {
 		return
@@ -403,6 +416,10 @@ func (lib *Library) MoveFiles(ctx context.Context, fileIDs []string, folderID st
 	var done []string
 	dirs := map[string]bool{}
 	for i, f := range moved {
+		if lib.root == nil {
+			done = append(done, f.ID) // in a bucket the row was all there was to move
+			continue
+		}
 		dst := inFolder(to, f.RelPath)
 		if err := lib.root.MkdirAll(path.Dir(dst), 0o755); err != nil {
 			lib.Logf("storage: moving %s: %v", f.ID, err) // the reconciler tries again
