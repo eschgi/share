@@ -151,6 +151,9 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 		upCfg = *opts.Upload
 	}
 	upCfg.MaxFileSize, upCfg.MinFreeSpace = maxFile, cfg.MinFreeSpace()
+	if upCfg.ChunkSize == 0 {
+		upCfg.ChunkSize = cfg.ChunkSize()
+	}
 	var tus *upload.TusHandler
 	if bucket == nil {
 		if tus, err = upload.NewTusHandler(upCfg, authSvc, lib, now); err != nil {
@@ -202,6 +205,7 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 		mux.HandleFunc(upload.BasePath, func(w http.ResponseWriter, r *http.Request) {
 			httpx.WriteError(w, http.StatusNotFound, "not_found", "Files go into the bucket here, not over tus.")
 		})
+		upload.NewS3Handler(upCfg, authSvc, lib, now).Register(mux)
 	}
 	apiHandlers.Register(mux)
 	mux.Handle("/", ui)

@@ -49,6 +49,7 @@ type env struct {
 	free   atomic.Int64
 	report atomic.Pointer[storage.Report] // what the storage page finds; nothing when nil
 	fake   *s3test.Server                 // the bucket of an S3 env, unless it is a real one
+	part   int64                          // the parts' size in an S3 env
 }
 
 func newEnv(t *testing.T) *env { return newEnvWith(t, "") }

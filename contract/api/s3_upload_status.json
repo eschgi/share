@@ -1,0 +1,15 @@
+{
+  "method": "GET",
+  "path": "/api/s3/uploads/q3ld5x2k7mbqz4bwdbyj6qsqxa",
+  "auth": "pin",
+  "status": 200,
+  "response": {
+    "id": "q3ld5x2k7mbqz4bwdbyj6qsqxa",
+    "state": "receiving",
+    "size": 52428800,
+    "part_size": 20971520,
+    "parts": 3,
+    "done_parts": [1, 3]
+  },
+  "notes": "Where an upload stands, for a client that comes back after a break: done_parts are the parts the bucket has with their size; send the others (with links from /parts), then complete. state is receiving, finishing (being finished right now) or complete; a finished upload lists every part as done, so a client whose complete answer got lost learns it is done. 404 not_found: start the file again (the upload isn't the caller's, was cancelled, or the bucket dropped it). 503 s3_unavailable with Retry-After while the bucket can't be asked."
+}

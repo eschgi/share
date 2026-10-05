@@ -1,0 +1,9 @@
+{
+  "method": "POST",
+  "path": "/api/s3/uploads/q3ld5x2k7mbqz4bwdbyj6qsqxa/complete",
+  "auth": "pin",
+  "request": {},
+  "status": 200,
+  "response": {"id": "q3ld5x2k7mbqz4bwdbyj6qsqxa"},
+  "notes": "Puts the parts together into the file, which then is in the library; id is the file's id, for its thumbnail (PUT /api/files/{id}/thumb). Safe to send again, e.g. after a lost answer or Cloudflare's 524 on a long one: a finished upload answers the same. 409 s3_parts_missing while a part is missing or has the wrong size: GET the state, send what's missing, complete again. 404 not_found: start the file again. 503 s3_unavailable with Retry-After while the bucket can't be reached; the parts stay. DELETE /api/s3/uploads/{id} cancels an unfinished upload (204), and answers 403 forbidden once it is finished."
+}

@@ -1,6 +1,7 @@
-// Package upload receives files over tus. tusd does the protocol; this package puts a guard
-// in front of it (authentication, ownership, tombstones for finished uploads, load limits)
-// and hooks that tie uploads to the library.
+// Package upload receives files: over tus onto the drive, where tusd does the protocol and
+// this package puts a guard in front of it (authentication, ownership, tombstones for
+// finished uploads, load limits) and hooks that tie uploads to the library; or as multipart
+// uploads straight into a bucket, which this package starts, follows and finishes.
 package upload
 
 import (
@@ -36,6 +37,7 @@ type Config struct {
 	MaxFileSize   int64 // bytes; 0 = no limit
 	MinFreeSpace  int64 // bytes that must stay free on the drive
 	MaxUnfinished int   // unfinished uploads per principal
+	ChunkSize     int64 // the smallest part of an upload into a bucket, in bytes
 	PerPrincipal  int   // PATCH requests at once per principal
 	Global        int   // PATCH requests at once in total
 	QueueWait     time.Duration
@@ -355,7 +357,15 @@ func firstNonEmpty(vals ...string) string {
 
 func parseMillis(v string) *time.Time {
 	n, err := strconv.ParseInt(v, 10, 64)
-	if err != nil || n <= 0 {
+	if err != nil {
+		return nil
+	}
+	return millis(n)
+}
+
+// millis is a time in Unix milliseconds; nil for none.
+func millis(n int64) *time.Time {
+	if n <= 0 {
 		return nil
 	}
 	t := time.UnixMilli(n).UTC()

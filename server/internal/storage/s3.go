@@ -38,9 +38,11 @@ func (lib *Library) S3() *s3.Bucket { return lib.s3 }
 // S3PartSize is the size of an upload's parts but the last: chunk, or for a file that would
 // need more than s3.MaxParts of them the next whole MiB that does.
 func S3PartSize(size, chunk int64) int64 {
+	if size <= chunk*s3.MaxParts {
+		return chunk
+	}
 	need := (size + s3.MaxParts - 1) / s3.MaxParts
-	need = (need + 1<<20 - 1) &^ (1<<20 - 1)
-	return max(chunk, need)
+	return (need + 1<<20 - 1) &^ (1<<20 - 1)
 }
 
 // S3PartCount is how many parts an upload of size bytes has; none for an empty file.
