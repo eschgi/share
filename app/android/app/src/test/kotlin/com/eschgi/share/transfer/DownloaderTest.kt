@@ -189,4 +189,59 @@ class DownloaderTest {
     fun backoffGrowsToHalfAMinute() {
         assertEquals(listOf(1000L, 2000L, 4000L, 8000L, 16000L, 30000L, 30000L), (1..7).map { DownloadEngine.backoff(it) })
     }
+
+    // From a bucket: the same server plays it, at /bucket/ with a signed-looking query.
+
+    private var linksGiven = 0
+
+    private fun bucketLink() = "http://127.0.0.1:${server.port}/bucket/$id?X-Amz-Credential=AKIA%2F20261005%2Fauto%2Fs3%2Faws4_request&n=${linksGiven++}&X-Amz-Signature=sig"
+
+    private fun fetchS3(sink: DownloadSink, link: () -> S3Links.Answer = { S3Links.Answer.Link(bucketLink()) }) =
+        Downloader(bufferSize = 64 * 1024).fetchS3(id, data.size.toLong(), sink, link)
+
+    @Test
+    fun fromTheBucketWithoutTheKey() {
+        assertEquals(Downloader.Outcome.Done, fetchS3(sink()))
+        assertArrayEquals(data, partial().readBytes())
+        val req = requests.single()
+        assertTrue(req.path.startsWith("/bucket/$id?X-Amz-Credential=AKIA%2F20261005%2Fauto%2Fs3%2Faws4_request&"))
+        assertEquals(null, req.header("Authorization"))
+        assertEquals("identity", req.header("Accept-Encoding"))
+    }
+
+    @Test
+    fun resumesFromTheBucketWithRangeAlone() {
+        partial().writeBytes(data.copyOf(1_000_000))
+        assertEquals(Downloader.Outcome.Done, fetchS3(sink()))
+        assertArrayEquals(data, partial().readBytes())
+        assertEquals("bytes=1000000-", requests.single().header("Range"))
+        assertEquals(null, requests.single().header("If-Range")) // an object never changes
+    }
+
+    @Test
+    fun aRefusedLinkIsAskedForAgainKeepingWhatArrived() {
+        partial().writeBytes(data.copyOf(500_000))
+        var refusals = 1
+        behaviour = { req, res -> if (refusals-- > 0) res.send(403) else serve(req, res) }
+        assertEquals(Downloader.Outcome.Done, fetchS3(sink()))
+        assertEquals(2, linksGiven)
+        assertEquals(listOf("bytes=500000-", "bytes=500000-"), requests.map { it.header("Range") })
+        assertArrayEquals(data, partial().readBytes())
+
+        // The bucket keeps refusing, even with a 401: wait, never sign out.
+        requests.clear()
+        behaviour = { _, res -> res.send(401) }
+        assertEquals(Downloader.Outcome.Retry(null, 401), fetchS3(sink().also { it.truncate() }))
+        assertEquals(2, requests.size)
+    }
+
+    @Test
+    fun aMissingObjectAsksTheServer() {
+        behaviour = { _, res -> res.send(404) }
+        var asked = 0
+        assertEquals(Downloader.Outcome.Gone, fetchS3(sink()) { if (asked++ == 0) S3Links.Answer.Link(bucketLink()) else S3Links.Answer.Gone })
+        assertEquals(Downloader.Outcome.Failed(404, "the bucket doesn't have the file"), fetchS3(sink()))
+        assertEquals(Downloader.Outcome.SignedOut, fetchS3(sink()) { S3Links.Answer.SignedOut })
+        assertEquals(Downloader.Outcome.Failed(0, "a link to plain http outside home"), fetchS3(sink()) { S3Links.Answer.Link("http://bucket.example.com/x") })
+    }
 }

@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:share_app/data/models.dart';
 import 'package:share_app/data/platform.dart';
 import 'package:share_app/data/server.dart';
+import 'package:video_player/video_player.dart';
 
 import 'support/contract.dart';
 
@@ -63,5 +64,23 @@ void main() {
     expect(stream.isCopy, isFalse);
     expect(stream.uri.path, '/api/files/bbbbbbbbbbbbbbbbbbbbbbbbbb/content');
     expect(stream.headers['Authorization'], startsWith('Bearer shd_'));
+  });
+
+  test('a link to the bucket reaches the player as it was signed', () {
+    final link = fixture['play_s3'] as Map;
+    final s3 = PlaySource.fromMap(link);
+    expect(s3.isCopy, isFalse);
+    expect(s3.uri.toString(), link['uri']);
+    expect(s3.headers.keys, ['User-Agent'], reason: 'no key goes to the bucket');
+    expect(VideoPlayerController.networkUrl(s3.uri, httpHeaders: s3.headers).dataSource, link['uri']);
+    // Other services' links, and a bucket's at home, keep their escapes too.
+    for (final uri in [
+      'https://acct.r2.cloudflarestorage.com/share-files/share/files/b?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=key%2F20261005%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20261005T101500Z&X-Amz-Expires=43200&X-Amz-SignedHeaders=host&response-content-disposition=attachment%3B%20filename%3D%22a%20b.mp4%22&X-Amz-Signature=ab',
+      'https://s3.eu-central-003.backblazeb2.com/share-files/share/files/b?X-Amz-Credential=003abc%2F20261005%2Feu-central-003%2Fs3%2Faws4_request&X-Amz-Signature=cd',
+      'http://192.168.8.52:9000/share/files/b?X-Amz-Credential=minio%2F20261005%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Signature=ef',
+      'http://[fd12::52]:9000/share/files/b?X-Amz-Credential=minio%2F20261005%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Signature=ef',
+    ]) {
+      expect(PlaySource.fromMap({'uri': uri, 'headers': const {}}).uri.toString(), uri);
+    }
   });
 }

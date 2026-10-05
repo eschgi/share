@@ -84,7 +84,7 @@ internal fun outcomeOf(conn: HttpURLConnection): UploadOutcome {
 }
 
 /** The code of the server's JSON error, if the answer is one (tusd's own are text). */
-private fun errorCode(conn: HttpURLConnection): String? = try {
+internal fun errorCode(conn: HttpURLConnection): String? = try {
     val body = conn.errorStream?.use { String(it.readBytes(), Charsets.UTF_8) } ?: return null
     JSONObject(body).optJSONObject("error")?.optString("code")?.ifEmpty { null }
 } catch (e: IOException) {

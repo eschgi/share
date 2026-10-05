@@ -124,6 +124,17 @@ class PlatformContractTest {
     }
 
     @Test
+    fun playingFromABucketKeepsTheLinkAsItIs() {
+        val expected = fixture.getJSONObject("play_s3")
+        val answer = Playback.linkOf(expected.getString("uri"))
+        assertEquals(expected.getString("uri"), answer["uri"])
+        @Suppress("UNCHECKED_CAST")
+        val sent = answer["headers"] as Map<String, String>
+        assertEquals(expected.getJSONObject("headers").keys().asSequence().toSet(), sent.keys) // the app's name only, no key
+        assertEquals(fixture.getJSONObject("play_copy").keys().asSequence().toSet(), answer.keys)
+    }
+
+    @Test
     fun aPausedBatchSaysWhy() {
         val batch = UploadBatch("b", UploadBatch.PIN, "paused", "pin_ended", 0)
         val row = UploadRow("b", 0, Picked("content://x", "a.jpg", 10, "image/jpeg"), UploadRow.QUEUED, "u1", 4)

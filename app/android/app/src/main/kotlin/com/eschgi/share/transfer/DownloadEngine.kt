@@ -7,7 +7,9 @@ import android.util.Log
 import androidx.core.net.toUri
 import com.eschgi.share.net.RouteMonitor
 import com.eschgi.share.net.ServerConnection
+import com.eschgi.share.net.ServerInfo
 import java.io.FileNotFoundException
+import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
@@ -169,8 +171,12 @@ object DownloadEngine {
                     }
                 val route = RouteMonitor.settled(app)
                 val home = Credentials.atHome(item.auth, route.isLocal)
-                val outcome = downloader.fetch(file.id, file.size, sink, open = { server.open(it, home) }, abort = abort) {
-                    live[file.id] = it
+                val open = { path: String -> server.open(path, home) }
+                val onBytes = { bytes: Long -> live[file.id] = bytes }
+                val outcome = when (ServerInfo.of(server.config) { server.open(it, home, readTimeoutMs = 15_000) }?.storage) {
+                    null -> Downloader.Outcome.Retry(IOException("the server didn't say where its files are"))
+                    ServerInfo.Storage.DISK -> downloader.fetch(file.id, file.size, sink, open = open, abort = abort, onBytes = onBytes)
+                    ServerInfo.Storage.S3 -> downloader.fetchS3(file.id, file.size, sink, link = { S3Links.fetch(file.id, open) }, abort = abort, onBytes = onBytes)
                 }
                 when (outcome) {
                     Downloader.Outcome.Done -> {
