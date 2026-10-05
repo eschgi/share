@@ -50,20 +50,22 @@ type File struct {
 	DeletedBy        string
 	CRC32            *uint32 // known once the checksum worker or a download worked it out
 	MovedFrom        string  // a move to another folder in progress: "<folder id>/<rel_path>" of the bytes
+	S3UploadID       string  // in a bucket: the multipart upload of a receiving file
+	S3PartSize       int64   // in a bucket: the size of every part but the last
 }
 
 const fileColumns = `id, state, name, size, received, mime, kind, rel_path, upload_day, created_at, updated_at,
 	uploaded_at, client_modified_at, width, height, duration_ms, thumb, pin_id, pin_session_id, user_id,
-	device_id, deleted_at, deleted_by, crc32, folder_id, moved_from`
+	device_id, deleted_at, deleted_by, crc32, folder_id, moved_from, s3_upload_id, s3_part_size`
 
 func scanFile(row interface{ Scan(...any) error }) (File, error) {
 	var f File
-	var relPath, day, pinID, sessionID, userID, deviceID, deletedBy, folderID, movedFrom sql.NullString
+	var relPath, day, pinID, sessionID, userID, deviceID, deletedBy, folderID, movedFrom, s3Upload sql.NullString
 	var created, updated int64
-	var uploaded, clientModified, deleted, width, height, duration, crc sql.NullInt64
+	var uploaded, clientModified, deleted, width, height, duration, crc, s3PartSize sql.NullInt64
 	err := row.Scan(&f.ID, &f.State, &f.Name, &f.Size, &f.Received, &f.Mime, &f.Kind, &relPath, &day,
 		&created, &updated, &uploaded, &clientModified, &width, &height, &duration, &f.Thumb,
-		&pinID, &sessionID, &userID, &deviceID, &deleted, &deletedBy, &crc, &folderID, &movedFrom)
+		&pinID, &sessionID, &userID, &deviceID, &deleted, &deletedBy, &crc, &folderID, &movedFrom, &s3Upload, &s3PartSize)
 	if errors.Is(err, sql.ErrNoRows) {
 		return f, ErrNotFound
 	}
@@ -71,6 +73,7 @@ func scanFile(row interface{ Scan(...any) error }) (File, error) {
 		return f, err
 	}
 	f.FolderID, f.RelPath, f.UploadDay, f.MovedFrom = folderID.String, relPath.String, day.String, movedFrom.String
+	f.S3UploadID, f.S3PartSize = s3Upload.String, s3PartSize.Int64
 	f.CreatedAt, f.UpdatedAt = fromMS(created), fromMS(updated)
 	f.UploadedAt, f.ClientModifiedAt, f.DeletedAt = optTime(uploaded), optTime(clientModified), optTime(deleted)
 	f.Width, f.Height, f.DurationMS = optInt(width), optInt(height), optInt(duration)
@@ -109,8 +112,9 @@ func queryFiles(ctx context.Context, q interface {
 	return out, rows.Err()
 }
 
-// InsertReceiving records a new upload before tus creates its files. The kind is only a
-// guess from the name until finalize looks at the content. Every file needs its folder.
+// InsertReceiving records a new upload: before tus creates its files, or once the bucket has
+// started its multipart upload. The kind is only a guess from the name until finalize looks
+// at the content. Every file needs its folder.
 func (d *DB) InsertReceiving(ctx context.Context, f File) error {
 	if f.FolderID == "" {
 		return errors.New("db: a file needs a folder")
@@ -118,11 +122,16 @@ func (d *DB) InsertReceiving(ctx context.Context, f File) error {
 	if f.Kind == "" {
 		f.Kind = KindDocument
 	}
+	var partSize sql.NullInt64
+	if f.S3PartSize > 0 {
+		partSize = sql.NullInt64{Int64: f.S3PartSize, Valid: true}
+	}
 	_, err := d.ExecContext(ctx, `INSERT INTO files (id, state, name, size, received, mime, kind, created_at, updated_at,
-			client_modified_at, pin_id, pin_session_id, user_id, device_id, folder_id)
-		VALUES (?, 'receiving', ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			client_modified_at, pin_id, pin_session_id, user_id, device_id, folder_id, s3_upload_id, s3_part_size)
+		VALUES (?, 'receiving', ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		f.ID, f.Name, f.Size, f.Mime, f.Kind, ms(f.CreatedAt), ms(f.UpdatedAt), nullMS(f.ClientModifiedAt),
-		nullString(f.PinID), nullString(f.PinSessionID), nullString(f.UserID), nullString(f.DeviceID), f.FolderID)
+		nullString(f.PinID), nullString(f.PinSessionID), nullString(f.UserID), nullString(f.DeviceID), f.FolderID,
+		nullString(f.S3UploadID), partSize)
 	return err
 }
 
