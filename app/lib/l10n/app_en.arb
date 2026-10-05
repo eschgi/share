@@ -1181,5 +1181,76 @@
   "themeLight": "Light",
   "@themeLight": {
     "description": "The heading above the light themes."
-  }
+  },
+  "encryptionTitle": "End-to-end encryption",
+  "encryptionEncrypted": "End-to-end encrypted",
+  "encryptionSwitch": "Encrypt new files",
+  "encryptionSwitchOn": "Only the family's phones and browsers can open them",
+  "encryptionSwitchOff": "New files are stored as they are",
+  "encryptionNoKeysHere": "This phone doesn't have the keys yet",
+  "encryptionOn": "New files in {folder} are now encrypted",
+  "@encryptionOn": {
+    "placeholders": {
+      "folder": {
+        "type": "String"
+      }
+    }
+  },
+  "encryptionAskTitle": "Encrypt new files in {folder}?",
+  "@encryptionAskTitle": {
+    "placeholders": {
+      "folder": {
+        "type": "String"
+      }
+    }
+  },
+  "encryptionAskBody": "From now on, files sent into this folder are encrypted on the phone or browser that sends them. Only the people who see the folder can open them; the server and its storage can't. Files already in it stay as they are.",
+  "encryptionAskFirst": "From now on, files sent into this folder are encrypted on the phone or browser that sends them, and only the people who see the folder can open them. Files already in it stay as they are. First comes the recovery code: keep it safe, it opens every encrypted folder should all phones and browsers be lost.",
+  "encryptionTurnOn": "Encrypt",
+  "encryptionOffTitle": "Stop encrypting new files in {folder}?",
+  "@encryptionOffTitle": {
+    "placeholders": {
+      "folder": {
+        "type": "String"
+      }
+    }
+  },
+  "encryptionOffBody": "New files are then stored as they are. Encrypted files stay encrypted, and the family's phones and browsers still open them.",
+  "encryptionTurnOff": "Stop encrypting",
+  "encryptionNewFolders": "Encrypt new folders",
+  "encryptionNewFoldersSub": "New folders encrypt their files from the start",
+  "encryptionNewFolder": "Encrypt its files end to end",
+  "encryptionMoveIntoPlain": "Encrypted files only move into an encrypted folder. Turn encryption on there first.",
+  "keysWaitingTitle": "Waiting for another phone or browser",
+  "keysWaiting": "Encrypted files open here once one of your other phones or browsers is online, or after signing in again with your password.",
+  "keysStartOver": "Start over",
+  "keysStartOverTitle": "Start over with new keys?",
+  "keysStartOverBody": "Only if none of your other phones or browsers will come back. This phone gets new keys, and encrypted folders open here once someone else who sees them is online, or with the recovery code.",
+  "keysCantOpen": "This phone can't open encrypted files yet.",
+  "recoveryTitle": "Recovery code",
+  "recoveryLead": "With this code an admin opens every encrypted folder again, should all phones and browsers be lost. It is shown only now: write it down, and keep it somewhere safe, away from this phone.",
+  "recoveryCopy": "Copy",
+  "recoveryCopied": "Recovery code copied",
+  "recoveryKept": "I wrote it down",
+  "recoveryDone": "Done",
+  "recoveryOpened": "{count, plural, =1{1 encrypted folder opened} other{{count} encrypted folders opened}}",
+  "@recoveryOpened": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "recoveryWrong": "That isn't the recovery code.",
+  "recoveryUseTitle": "Use the recovery code",
+  "recoveryUseLead": "Type the recovery code you wrote down. Every encrypted folder then opens on this phone.",
+  "recoveryCode": "Recovery code",
+  "recoveryUse": "Use the recovery code",
+  "recoveryMade": "Made. A new one replaces it",
+  "recoveryNone": "Made when the first folder is encrypted",
+  "recoveryNewTitle": "Make a new recovery code?",
+  "recoveryNewBody": "The old code then stops working. Keep the new one safe.",
+  "recoveryNewButton": "New code",
+  "viewerLocked": "This file is encrypted, and this phone doesn't have its key yet.",
+  "pinsNoKey": "Without its key: this phone can't open the folder's, so guests won't see its encrypted files."
 }

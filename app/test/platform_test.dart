@@ -26,6 +26,20 @@ void main() {
       final file = FileInfo.fromJson(json);
       expect(file.toJson(), json);
     }
+    // The video is encrypted: its key and header go along, for Kotlin to decrypt it.
+    final video = FileInfo.fromJson(((fixture['files'] as List)[1] as Map).cast());
+    expect(video.enc?.version, 1);
+    expect(video.enc?.header, 'U0hFMQABAAA9p6lLxQCBAA');
+  });
+
+  test('the keys event', () {
+    final k = KeysState.fromMap(fixture['keys_event'] as Map);
+    expect(k.ready, isTrue);
+    expect(k.hasRecovery, isTrue);
+    expect(k.encryptedFolders, 1);
+    expect(k.hasFolderKey('f4mily5x2k7mbqz4bwdbyj6qsq', 1), isTrue);
+    expect(k.hasFolderKey('f4mily5x2k7mbqz4bwdbyj6qsq', 2), isFalse);
+    expect(KeysState.fromMap(const {'status': 'something new'}).status, KeysStatus.off);
   });
 
   test('route and transfer events', () {

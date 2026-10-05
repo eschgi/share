@@ -214,6 +214,11 @@ class FakeServer {
           return json({'changed': before - trash.length});
         },
         'GET /api/admin/storage': (_) => json(storage),
+        'GET /api/admin/settings': (_) => json({'new_folders_encrypted': newFoldersEncrypted}),
+        'PUT /api/admin/settings': (req) {
+          newFoldersEncrypted = _body(req)['new_folders_encrypted'] == true;
+          return json({'new_folders_encrypted': newFoldersEncrypted});
+        },
       };
 
   http.Response _newInvite(String name, String role, String? userId, {List<String> folders = const []}) {
@@ -235,6 +240,14 @@ class FakeServer {
   /// The admin routes with an id in the path.
   http.Response? _adminPath(http.Request req) {
     final path = req.url.path;
+    final encryption = RegExp(r'^/api/folders/([^/]+)/encryption$').firstMatch(path);
+    if (req.method == 'PUT' && encryption != null) {
+      final i = folders.indexWhere((f) => f['id'] == encryption.group(1));
+      if (i < 0) return _error(404, 'not_found');
+      final on = _body(req)['encrypted'] == true;
+      folders[i] = {...folders[i], 'encrypted': on, 'key_version': folders[i]['key_version'] ?? (on ? 1 : null)};
+      return json(_withCounts(folders[i]));
+    }
     final pinAction = RegExp(r'^/api/pins/([^/]+)/(new-code|end)$').firstMatch(path);
     if (req.method == 'POST' && pinAction != null) {
       final i = pins.indexWhere((p) => p['id'] == pinAction.group(1));
@@ -338,6 +351,12 @@ class FakeServer {
   /// Files as the API returns them, newest first.
   List<Map<String, dynamic>> files = [];
 
+  /// Every file's thumbnail (stored as it is: sealed, for an encrypted one), or none.
+  Uint8List? thumb;
+
+  /// The admins' setting: new folders are encrypted from the start.
+  bool newFoldersEncrypted = false;
+
   http.Response json(Object body, [int status = 200]) =>
       http.Response.bytes(utf8.encode(jsonEncode(body)), status, headers: {'content-type': 'application/json'});
 
@@ -370,7 +389,7 @@ class FakeServer {
           if (s3 && req.headers.containsKey('Authorization')) return json({'error': {'code': 's3_use_url', 'message': ''}}, 409);
           return http.Response.bytes(contentOf(content.group(1)!), 200);
         }
-        if (req.method == 'GET' && path.endsWith('/thumb')) return http.Response.bytes(Uint8List(0), 404);
+        if (req.method == 'GET' && path.endsWith('/thumb')) return http.Response.bytes(thumb ?? Uint8List(0), thumb == null ? 404 : 200);
         final handler = routes['${req.method} $path'];
         if (handler != null) return handler(req);
         final admin = _adminPath(req);

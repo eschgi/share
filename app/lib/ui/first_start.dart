@@ -116,7 +116,7 @@ Future<void> scanInvite(BuildContext context) async {
     case final InviteLink link:
       await Navigator.push(context, MaterialPageRoute<void>(builder: (_) => InviteScreen(link: link)));
     case final PinLink link:
-      await Navigator.push(context, MaterialPageRoute<void>(builder: (_) => PinEntryScreen(server: link.server, code: link.code)));
+      await Navigator.push(context, MaterialPageRoute<void>(builder: (_) => PinEntryScreen(server: link.server, code: link.code, secret: link.secret)));
     case null:
       messenger.showSnackBar(SnackBar(content: Text(t.scanNotAnInvite)));
   }

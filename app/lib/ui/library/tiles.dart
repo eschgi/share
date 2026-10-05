@@ -2,6 +2,8 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
+import '../../app.dart';
+import '../../data/keys.dart';
 import '../../data/models.dart';
 import '../format.dart';
 import '../icons.dart';
@@ -10,7 +12,8 @@ import 'library_controller.dart';
 import 'scope.dart';
 
 /// A file's thumbnail, or its placeholder: a muted tone for photos and videos, the
-/// extension for documents.
+/// extension for documents. An encrypted file's is opened on the phone; while its folder's key
+/// isn't here, a lock shows, and it tries again when the keys change.
 class ThumbImage extends StatefulWidget {
   const ThumbImage({super.key, required this.file, this.fit = BoxFit.cover});
   final FileInfo file;
@@ -22,11 +25,24 @@ class ThumbImage extends StatefulWidget {
 
 class _ThumbImageState extends State<ThumbImage> {
   Uint8List? _bytes;
+  bool _locked = false;
+  KeysRepository? _keys;
 
   @override
   void initState() {
     super.initState();
+    if (widget.file.enc != null) _keys = Services.maybeRead(context)?.keys?..addListener(_keysChanged);
     _load();
+  }
+
+  @override
+  void dispose() {
+    _keys?.removeListener(_keysChanged);
+    super.dispose();
+  }
+
+  void _keysChanged() {
+    if (_bytes == null && _locked) _load();
   }
 
   @override
@@ -40,8 +56,17 @@ class _ThumbImageState extends State<ThumbImage> {
 
   Future<void> _load() async {
     if (!widget.file.hasThumb) return;
-    final bytes = await LibraryScope.read(context).thumb(widget.file);
-    if (mounted && bytes != null) setState(() => _bytes = bytes);
+    final library = LibraryScope.read(context);
+    final bytes = await library.thumb(widget.file);
+    if (!mounted) return;
+    if (bytes != null) {
+      setState(() {
+        _bytes = bytes;
+        _locked = false;
+      });
+    } else if (library.locked.contains(widget.file.id) != _locked) {
+      setState(() => _locked = !_locked);
+    }
   }
 
   @override
@@ -53,6 +78,18 @@ class _ThumbImageState extends State<ThumbImage> {
         final px = (box.maxWidth * MediaQuery.devicePixelRatioOf(context)).round();
         return Image.memory(_bytes!, fit: widget.fit, cacheWidth: px > 0 ? px : null, gaplessPlayback: true);
       });
+    }
+    if (_locked) {
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color.alphaBlend(const Color(0x17FFFFFF), ShareColors.tone(f.id)), Color.alphaBlend(const Color(0x3D000000), ShareColors.tone(f.id))],
+          ),
+        ),
+        child: Center(child: Icon(AppIcons.lock, size: 24, color: Colors.white.withValues(alpha: 0.6))),
+      );
     }
     if (f.kind == FileKind.document) {
       // The film strip's small tiles have room for the icon only.

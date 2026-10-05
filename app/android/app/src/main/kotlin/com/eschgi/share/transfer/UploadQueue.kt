@@ -24,6 +24,8 @@ data class UploadRow(
     /** The tus upload; once it's done, the file's id on the server. */
     val uploadId: String?,
     val bytes: Long,
+    /** Into an encrypted folder: the file's key and what goes with it, until it is sent (UploadSeal). */
+    val seal: String? = null,
 ) {
     companion object {
         const val QUEUED = "queued"
@@ -207,13 +209,18 @@ class UploadQueue(context: Context) {
 
     fun setUploadId(r: UploadRow, id: String?) = update(r, ContentValues().apply { put("upload_id", id) })
 
+    fun setSeal(r: UploadRow, seal: String?) = update(r, ContentValues().apply { put("seal", seal) })
+
     fun setBytes(r: UploadRow, bytes: Long) = update(r, ContentValues().apply { put("bytes", bytes) })
 
     fun finish(r: UploadRow, state: String, error: String? = null, uploadId: String? = r.uploadId) = update(r, ContentValues().apply {
         put("state", state)
         put("error", error)
         put("upload_id", uploadId)
-        if (state == UploadRow.DONE) put("bytes", r.file.size)
+        if (state == UploadRow.DONE) {
+            put("bytes", r.file.size)
+            putNull("seal") // the file's key isn't needed here any more
+        }
     })
 
     /** Stops the batches of [auth] until they're resumed, e.g. when a PIN ended. */
@@ -281,7 +288,10 @@ class UploadQueue(context: Context) {
     /** Cancels a batch; returns its unfinished files, whose uploads are to be removed. */
     fun cancel(batch: String): List<UploadRow> = db.writableDatabase.transaction {
         val open = rows(batch).filter { it.state == UploadRow.QUEUED || it.state == UploadRow.LOST }
-        update("uploads", ContentValues().apply { put("state", UploadRow.CANCELLED) }, "batch = ? AND state IN ('queued', 'lost')", arrayOf(batch))
+        update("uploads", ContentValues().apply {
+            put("state", UploadRow.CANCELLED)
+            putNull("seal")
+        }, "batch = ? AND state IN ('queued', 'lost')", arrayOf(batch))
         update("upload_batches", ContentValues().apply { put("state", "cancelled") }, "id = ?", arrayOf(batch))
         open
     }
@@ -313,6 +323,7 @@ class UploadQueue(context: Context) {
         state = c.getString(6),
         uploadId = if (c.isNull(7)) null else c.getString(7),
         bytes = c.getLong(8),
+        seal = if (c.isNull(9)) null else c.getString(9),
     )
 
     private fun batch(c: Cursor) = UploadBatch(
@@ -325,7 +336,7 @@ class UploadQueue(context: Context) {
     )
 
     private companion object {
-        const val COLUMNS = "u.batch, u.seq, u.uri, u.name, u.size, u.mime, u.state, u.upload_id, u.bytes"
+        const val COLUMNS = "u.batch, u.seq, u.uri, u.name, u.size, u.mime, u.state, u.upload_id, u.bytes, u.seal"
         const val BATCH_COLUMNS = "id, auth, state, paused, created_at, folder"
     }
 }

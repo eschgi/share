@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import com.eschgi.share.BuildConfig
 import com.eschgi.share.data.ServerConfig
+import com.eschgi.share.e2ee.Keys
 import com.eschgi.share.net.RouteMonitor
 import com.eschgi.share.net.ServerConnection
 import com.eschgi.share.net.ServerInfo
@@ -14,7 +15,8 @@ import java.io.IOException
  * if there is one, else straight from the server with the phone's key, or with a PIN's over the
  * public address. The https port at home has Share's own certificate, which the player can't
  * pin: there the file is fetched into the cache first, as for opening it in another app. With
- * the files in a bucket it plays from the file's link there, without any key.
+ * the files in a bucket it plays from the file's link there, without any key. An encrypted file
+ * plays from [LocalStream], which decrypts it on the phone as it plays.
  */
 object Playback {
     /** How to get at a file. */
@@ -56,6 +58,9 @@ object Playback {
         val app = context.applicationContext
         val copy = Downloads.savedUri(app, file.id) ?: Fetcher.cached(app, file)
         if (copy != null) return copyOf(copy)
+        Keys.cipher(app, auth, file.enc)?.let { cipher ->
+            return mapOf("uri" to LocalStream.url(app, file, auth, cipher), "headers" to emptyMap<String, String>())
+        }
         val (token, config) = Credentials.of(app, auth) ?: throw IOException(if (auth == Credentials.PIN) "no PIN" else "signed out")
         val home = Credentials.atHome(auth, RouteMonitor.settled(app).isLocal)
         val server = ServerConnection(config, token)

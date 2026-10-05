@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../app.dart';
 import '../data/models.dart';
+import '../data/platform.dart' show KeysException;
 import '../l10n/app_localizations.dart';
 import 'admin/delete.dart';
 import 'download_sheet.dart';
@@ -240,13 +241,18 @@ class _Page extends StatefulWidget {
 class _PageState extends State<_Page> {
   File? _original;
 
+  /// An encrypted photo whose folder's key isn't on this phone.
+  bool _sealed = false;
+
   @override
   void initState() {
     super.initState();
     if (widget.file.kind == FileKind.photo) {
       LibraryScope.read(context).original(widget.file).then((f) {
         if (mounted && f != null) setState(() => _original = f);
-      }, onError: (Object _) {});
+      }, onError: (Object e) {
+        if (mounted && e is KeysException && e.sealed) setState(() => _sealed = true);
+      });
     }
   }
 
@@ -258,6 +264,18 @@ class _PageState extends State<_Page> {
     switch (f.kind) {
       case FileKind.photo:
         final width = (MediaQuery.sizeOf(context).width * MediaQuery.devicePixelRatioOf(context) * 2).round();
+        if (_sealed) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                SizedBox(width: 160, height: 160, child: ClipRRect(borderRadius: BorderRadius.circular(14), child: ThumbImage(file: f))),
+                const SizedBox(height: 20),
+                Text(t.viewerLocked, textAlign: TextAlign.center, style: TextStyle(color: c.text2, fontSize: 15, height: 1.5)),
+              ]),
+            ),
+          );
+        }
         return InteractiveViewer(
           maxScale: 6,
           child: Center(

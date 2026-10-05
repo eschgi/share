@@ -92,11 +92,22 @@ class SessionRepository {
       await platform.writeSecret(_userKey, jsonEncode(_userJson(user)));
       _set(SignedInState(user));
       unawaited(refreshServer());
+      unawaited(_syncKeys());
     } on ApiException catch (e) {
       if (e.signedOut) return; // onSignedOut cleared it
       _set(cached != null ? SignedInState(cached) : const SignedOutState());
     } on NetworkException {
       _set(cached != null ? SignedInState(cached) : const SignedOutState());
+    }
+  }
+
+  /// The keys for encrypted folders, opened again (docs/e2ee-plan.md); with [password] right
+  /// after signing in with it, which opens them on a new phone. Never fails the session.
+  Future<void> _syncKeys({String? password}) async {
+    try {
+      await platform.syncKeys(password: password);
+    } on KeysException {
+      // the keys' state says so
     }
   }
 
@@ -121,6 +132,7 @@ class SessionRepository {
       'device_name': await platform.deviceName(),
     });
     await _signedIn(server, identity, SignedIn.fromJson(res));
+    unawaited(_syncKeys(password: password));
   }
 
   Future<InvitePeek> peekInvite(InviteLink link) async =>
@@ -132,7 +144,10 @@ class SessionRepository {
       'token': link.token,
       'device_name': await platform.deviceName(),
     });
-    await _signedIn(link.server, identity, SignedIn.fromJson(res));
+    final signedIn = SignedIn.fromJson(res);
+    await _signedIn(link.server, identity, signedIn);
+    // The keys the link's secret opens: the folders', or the person's own for a new phone.
+    unawaited(platform.keysFromInvite(link.secret, signedIn.keys).then<void>((_) {}, onError: (Object _) => _syncKeys()));
   }
 
   Future<void> _signedIn(Uri server, ServerIdentity identity, SignedIn s) async {
@@ -174,10 +189,19 @@ class SessionRepository {
   }
 
   Future<void> setPassword({required String username, required String password, String? current}) async {
+    // With the person's key open here, it stays locked with the new password, so the password
+    // opens it on a new phone or browser too.
+    String? lock;
+    try {
+      lock = await platform.passwordLock(password);
+    } on KeysException {
+      lock = null;
+    }
     await api.put('/api/me/password', {
       'username': username,
       'password': password,
       if (current != null && current.isNotEmpty) 'current_password': current,
+      'password_lock': ?lock,
     });
     final me = await api.get('/api/me');
     final user = User.fromJson(me['user'] as Json? ?? const {});
@@ -212,6 +236,7 @@ class SessionRepository {
     await platform.writeSecret(_userKey, null);
     api.token = null;
     _set(SignedOutState(byServer: byServer));
+    unawaited(_syncKeys()); // signed out: the keys go
   }
 
   static Json _userJson(User u) => {

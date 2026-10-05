@@ -24,6 +24,11 @@ import com.eschgi.share.BuildConfig
 import com.eschgi.share.MainActivity
 import com.eschgi.share.data.SecretStore
 import com.eschgi.share.data.ServerStore
+import com.eschgi.share.e2ee.E2ee
+import com.eschgi.share.e2ee.E2eeException
+import com.eschgi.share.e2ee.Keys
+import com.eschgi.share.e2ee.KeysApiError
+import com.eschgi.share.e2ee.SealedFile
 import com.eschgi.share.net.RouteMonitor
 import com.eschgi.share.net.RouteStatus
 import com.eschgi.share.net.ServerInfo
@@ -40,6 +45,9 @@ import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.IOException
 import java.util.concurrent.Executors
 
 /**
@@ -66,6 +74,7 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
 
     private val routeListener: (RouteStatus) -> Unit = { send(it.toMap() + ("type" to "route")) }
     private val transferListener: (Map<String, Any?>) -> Unit = { send(it) }
+    private val keysListener: (Map<String, Any?>) -> Unit = { send(it) }
 
     init {
         methods.setMethodCallHandler(this)
@@ -243,7 +252,72 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
                 result.success(null)
             }
             "cache.dir" -> result.success(app.cacheDir.absolutePath)
-            else -> result.notImplemented()
+            else -> if (call.method.startsWith("keys.")) keys(call, result) else result.notImplemented()
+        }
+    }
+
+    /**
+     * End-to-end encryption (docs/e2ee-plan.md): the keys live here, in [Keys], where downloads
+     * and uploads use them without Flutter; the screens ask through these methods. A key that
+     * isn't open fails as "sealed", an error answer of the server with its code, no answer as
+     * "offline".
+     */
+    private fun keys(call: MethodCall, result: MethodChannel.Result) {
+        val ring = Keys.ring(app)
+        fun file() = SealedFile.of(JSONObject(call.argument<String>("file")!!)) ?: throw E2eeException("not encrypted")
+        io.execute {
+            val value: Any? = try {
+                when (call.method) {
+                    "keys.sync" -> Keys.sync(app, call.argument<String>("password"))
+                    "keys.state" -> ring.state()
+                    "keys.thumb" -> Keys.thumb(app, auth(call), file(), call.argument<ByteArray>("data")!!)
+                    "keys.decrypt" -> Keys.decrypt(app, auth(call), file(), call.argument<ByteArray>("data")!!)
+                    "keys.encrypt_folder" -> ring.encryptFolder(call.argument<String>("folder")!!, call.argument<Int>("key_version")).toString()
+                    "keys.make_recovery" -> ring.makeRecovery()
+                    "keys.use_recovery" -> ring.useRecoveryCode(call.argument<String>("code")!!)
+                    "keys.start_over" -> {
+                        ring.startOver()
+                        ring.state()
+                    }
+                    "keys.password_lock" -> if (ring.status == com.eschgi.share.e2ee.Keyring.Status.READY) E2ee.b64u(ring.passwordLock(call.argument<String>("password")!!)) else null
+                    "keys.invite_keys" -> ring.inviteKeys(call.argument<List<String>>("folders")).let { (secret, keys) -> mapOf("secret" to secret, "keys" to keys.toString()) }
+                    "keys.person_key" -> ring.personKeyForInvite()?.let { (secret, locked) -> mapOf("secret" to secret, "locked" to locked) }
+                    "keys.pin_secret" -> ring.pinSecret(call.argument<String>("folder")!!)?.let { (secret, body) -> mapOf("secret" to secret, "body" to body.toString()) }
+                    "keys.pin_link_secret" -> ring.pinLinkSecret(call.argument<String>("folder")!!, call.argument<String>("sealed")!!, call.argument<Int>("version")!!)
+                    "keys.move_keys" -> {
+                        val files = JSONArray(call.argument<String>("files")!!)
+                        ring.moveKeys(List(files.length()) { files.getJSONObject(it) }, call.argument<String>("target")!!).toString()
+                    }
+                    "keys.from_invite" -> {
+                        val keys = JSONArray(call.argument<String>("keys") ?: "[]")
+                        Keys.account(app)?.let { ring.fromInvite(it, call.argument<String>("secret"), List(keys.length()) { i -> keys.getJSONObject(i) }) }
+                        Keys.sync(app)
+                    }
+                    "keys.open_pin" -> Keys.openPin(app, call.argument<String>("secret")!!)
+                    "keys.forget_pin" -> {
+                        Keys.forgetPin(app)
+                        null
+                    }
+                    else -> {
+                        main.post { result.notImplemented() }
+                        return@execute
+                    }
+                }
+            } catch (e: E2eeException) {
+                main.post { result.error("sealed", e.message, null) }
+                return@execute
+            } catch (e: KeysApiError) {
+                main.post { result.error(e.code, e.message, e.status) }
+                return@execute
+            } catch (e: IOException) {
+                main.post { result.error("offline", e.message, null) }
+                return@execute
+            } catch (e: Exception) {
+                Log.w(TAG, "${call.method} failed", e)
+                main.post { result.error("failed", e.message, null) }
+                return@execute
+            }
+            main.post { result.success(value) }
         }
     }
 
@@ -252,9 +326,11 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
         RouteMonitor.listen(routeListener)
         Downloads.listen(transferListener)
         Uploads.listen(transferListener)
+        Keys.listen(keysListener)
         io.execute {
             // A new listener starts from where things are, not from the next change.
             send(RouteMonitor.current(app).toMap() + ("type" to "route"))
+            send(Keys.ring(app).state())
             Downloads.snapshots(app).forEach { send(it.toMap()) }
             Uploads.snapshots(app).forEach { send(it.toMap()) }
             if (Outbox.pending(app).isNotEmpty()) send(sharedEvent())
@@ -266,6 +342,7 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
         RouteMonitor.unlisten(routeListener)
         Downloads.unlisten(transferListener)
         Uploads.unlisten(transferListener)
+        Keys.unlisten(keysListener)
     }
 
     /** What to send: from the photo picker, or any files from the document picker. */

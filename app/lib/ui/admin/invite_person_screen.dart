@@ -4,6 +4,7 @@ import '../../app.dart';
 import '../../data/api.dart';
 import '../../data/folders.dart';
 import '../../data/models.dart';
+import '../../data/platform.dart' show KeysException;
 import '../../l10n/app_localizations.dart';
 import '../folders.dart';
 import '../icons.dart';
@@ -61,8 +62,37 @@ class _InvitePersonScreenState extends State<InvitePersonScreen> {
       _error = null;
     });
     try {
-      final admin = Services.read(context).admin;
-      final invite = widget.forPerson == null ? await admin.invite(_who, _role, folders: _given) : await admin.invitePhone(widget.forPerson!.id);
+      final services = Services.read(context);
+      final admin = services.admin;
+      final person = widget.forPerson;
+      // The keys go along, locked with a secret that only the link carries, after a dot: the
+      // person's own for another phone of one's own, the encrypted folders' for someone new.
+      NewInvite invite;
+      if (person == null) {
+        final encrypted = [for (final f in services.folders.list ?? const <FolderInfo>[]) if (f.keyVersion != null) f.id];
+        final gets = _role == Role.admin ? encrypted : [for (final id in _given) if (encrypted.contains(id)) id];
+        ({String secret, List<Json> keys})? keys;
+        if (gets.isNotEmpty && services.keys.state.ready) {
+          try {
+            keys = await services.platform.inviteKeys(gets);
+          } on KeysException {
+            keys = null; // the new person waits for the family's phones instead
+          }
+        }
+        invite = await admin.invite(_who, _role, folders: _given, keys: keys?.keys ?? const []);
+        if (keys != null && keys.keys.isNotEmpty) invite = invite.withLink('${invite.link}.${keys.secret}');
+      } else {
+        ({String secret, String locked})? own;
+        if (person.isMe) {
+          try {
+            own = await services.platform.personKeyForInvite();
+          } on KeysException {
+            own = null;
+          }
+        }
+        invite = await admin.invitePhone(person.id, personKey: own?.locked);
+        if (own != null) invite = invite.withLink('${invite.link}.${own.secret}');
+      }
       if (mounted) setState(() => _invite = invite);
     } on ApiException {
       setState(() => _error = t.commonFailed);

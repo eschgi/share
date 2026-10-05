@@ -208,6 +208,50 @@ class SharedFiles {
   final int skipped;
 }
 
+/// Where this phone stands with end-to-end encryption (docs/e2ee-plan.md), as the keys in Kotlin
+/// report it (contract/app/platform.json keys_event): [ready] with the person's key open,
+/// [waiting] while no other phone or browser of the person sealed it for this one.
+enum KeysStatus { off, loading, ready, waiting, failed }
+
+class KeysState {
+  const KeysState({this.status = KeysStatus.off, this.hasRecovery = false, this.encryptedFolders = 0, this.open = const {}});
+
+  factory KeysState.fromMap(Map<Object?, Object?> m) => KeysState(
+        status: KeysStatus.values.asNameMap()[m['status']] ?? KeysStatus.off,
+        hasRecovery: m['has_recovery'] == true,
+        encryptedFolders: (m['encrypted_folders'] as num?)?.toInt() ?? 0,
+        open: {for (final o in (m['open'] as List? ?? const [])) if (o is String) o},
+      );
+
+  final KeysStatus status;
+
+  /// The server has a recovery key, which the first encrypted folder makes.
+  final bool hasRecovery;
+
+  /// How many encrypted folders the person sees.
+  final int encryptedFolders;
+
+  /// The folders' keys open here, as "folder:version".
+  final Set<String> open;
+
+  bool get ready => status == KeysStatus.ready;
+
+  bool hasFolderKey(String folder, int version) => open.contains('$folder:$version');
+}
+
+/// A call about keys failed: [code] is sealed (a key isn't open on this phone), offline, or the
+/// server's error code.
+class KeysException implements Exception {
+  const KeysException(this.code, [this.message = '']);
+  final String code;
+  final String message;
+
+  bool get sealed => code == 'sealed';
+
+  @override
+  String toString() => 'KeysException($code: $message)';
+}
+
 /// The batch whose progress [Platform.transfers] reports while files are fetched for
 /// [Platform.shareFiles] and [Platform.openFile]; [Platform.cancelDownloads] stops it.
 const fetchBatch = 'fetch';
@@ -290,6 +334,58 @@ abstract class Platform {
   /// batch, or null.
   Future<String?> sendShared(SendAuth auth, {String? folder});
   Future<void> dropShared();
+
+  // End-to-end encryption (docs/e2ee-plan.md). The keys live in Kotlin, where downloads and
+  // uploads use them without Flutter. These throw [KeysException].
+
+  /// Opens the keys, or opens them again and does what is due; with [password] right after
+  /// signing in with it. Signed out, the keys are forgotten.
+  Future<KeysState> syncKeys({String? password});
+  Stream<KeysState> get keyChanges;
+
+  /// An encrypted file's thumbnail, opened and checked to be a small JPEG.
+  Future<Uint8List> openThumb(FileInfo file, Uint8List sealed, {SendAuth auth = SendAuth.device});
+
+  /// A whole encrypted file, decrypted from [data] as stored.
+  Future<Uint8List> decryptFile(FileInfo file, Uint8List data, {SendAuth auth = SendAuth.device});
+
+  /// Admins: turns encryption on for a folder, the first time with its key; the folder's JSON.
+  Future<Json> encryptFolder(FolderInfo folder);
+
+  /// Admins: a new recovery key; its code, shown once.
+  Future<String> makeRecovery();
+
+  /// Admins: opens every encrypted folder with the recovery code; how many keys it opened.
+  Future<int> useRecoveryCode(String code);
+
+  /// A new person key on this phone, when no other phone or browser of the person will come.
+  Future<KeysState> startOver();
+
+  /// The person's key locked with a new password; null while it isn't open here.
+  Future<String?> passwordLock(String password);
+
+  /// Every version of the keys of [folders] (all encrypted ones with null), locked with a new
+  /// secret for an invite's link.
+  Future<({String secret, List<Json> keys})> inviteKeys(List<String>? folders);
+
+  /// This person's key, locked with a new secret for an invite for another of their phones.
+  Future<({String secret, String locked})?> personKeyForInvite();
+
+  /// What a PIN that shows an encrypted [folder] needs: its link's secret, and the body's secret.
+  Future<({String secret, Json body})?> pinSecret(String folder);
+
+  /// The secret of a PIN's link, opened with its folder's key; null without that key.
+  Future<String?> pinLinkSecret(String folder, String sealed, int version);
+
+  /// Admins moving encrypted files into [target]: their keys, sealed for its newest key.
+  Future<List<Json>> moveKeys(List<FileInfo> files, String target);
+
+  /// Right after accepting an invite: the keys its link's [secret] opens.
+  Future<KeysState> keysFromInvite(String? secret, List<Json> keys);
+
+  /// A PIN guest opens the folder the PIN shows with its link's secret; how many keys opened.
+  Future<int> openPinKeys(String secret);
+  Future<void> forgetPinKeys();
 }
 
 /// The real platform: MethodChannel com.eschgi.share/platform, and one event channel for
@@ -311,6 +407,8 @@ class ChannelPlatform implements Platform {
           _uploads.add(u);
         case 'shared':
           _shared.add(SharedFiles.fromMap(e));
+        case 'keys':
+          _keys.add(KeysState.fromMap(e));
       }
     }, onError: (Object _) {});
   }
@@ -324,6 +422,7 @@ class ChannelPlatform implements Platform {
   final _uploads = StreamController<UploadState>.broadcast();
   final _lastUploads = <String, UploadState>{};
   final _shared = StreamController<SharedFiles>.broadcast();
+  final _keys = StreamController<KeysState>.broadcast();
 
   Future<T?> _invoke<T>(String method, [Object? args]) async {
     try {
@@ -486,6 +585,87 @@ class ChannelPlatform implements Platform {
 
   @override
   Future<void> dropShared() => _soft('shared.drop');
+
+  Future<T?> _keysCall<T>(String method, [Object? args]) async {
+    try {
+      return await _channel.invokeMethod<T>(method, args);
+    } on PlatformException catch (e) {
+      throw KeysException(e.code, e.message ?? '');
+    } on MissingPluginException {
+      throw const KeysException('failed');
+    }
+  }
+
+  static Map<String, Object?> _file(FileInfo f, SendAuth auth) => {'file': jsonEncode(f.toJson()), 'auth': auth.name};
+
+  @override
+  Future<KeysState> syncKeys({String? password}) async =>
+      KeysState.fromMap(await _keysCall<Map<Object?, Object?>>('keys.sync', {'password': ?password}) ?? const {});
+
+  @override
+  Stream<KeysState> get keyChanges => _keys.stream;
+
+  @override
+  Future<Uint8List> openThumb(FileInfo file, Uint8List sealed, {SendAuth auth = SendAuth.device}) async =>
+      await _keysCall<Uint8List>('keys.thumb', {..._file(file, auth), 'data': sealed}) ?? Uint8List(0);
+
+  @override
+  Future<Uint8List> decryptFile(FileInfo file, Uint8List data, {SendAuth auth = SendAuth.device}) async =>
+      await _keysCall<Uint8List>('keys.decrypt', {..._file(file, auth), 'data': data}) ?? Uint8List(0);
+
+  @override
+  Future<Json> encryptFolder(FolderInfo folder) async =>
+      jsonDecode(await _keysCall<String>('keys.encrypt_folder', {'folder': folder.id, 'key_version': ?folder.keyVersion}) ?? '{}') as Json;
+
+  @override
+  Future<String> makeRecovery() async => await _keysCall<String>('keys.make_recovery') ?? '';
+
+  @override
+  Future<int> useRecoveryCode(String code) async => await _keysCall<int>('keys.use_recovery', {'code': code}) ?? 0;
+
+  @override
+  Future<KeysState> startOver() async => KeysState.fromMap(await _keysCall<Map<Object?, Object?>>('keys.start_over') ?? const {});
+
+  @override
+  Future<String?> passwordLock(String password) => _keysCall<String>('keys.password_lock', {'password': password});
+
+  @override
+  Future<({String secret, List<Json> keys})> inviteKeys(List<String>? folders) async {
+    final m = await _keysCall<Map<Object?, Object?>>('keys.invite_keys', {'folders': folders}) ?? const {};
+    return (secret: m['secret'] as String? ?? '', keys: [for (final k in jsonDecode(m['keys'] as String? ?? '[]') as List) (k as Map).cast<String, dynamic>()]);
+  }
+
+  @override
+  Future<({String secret, String locked})?> personKeyForInvite() async {
+    final m = await _keysCall<Map<Object?, Object?>>('keys.person_key');
+    return m == null ? null : (secret: m['secret'] as String? ?? '', locked: m['locked'] as String? ?? '');
+  }
+
+  @override
+  Future<({String secret, Json body})?> pinSecret(String folder) async {
+    final m = await _keysCall<Map<Object?, Object?>>('keys.pin_secret', {'folder': folder});
+    return m == null ? null : (secret: m['secret'] as String? ?? '', body: jsonDecode(m['body'] as String? ?? '{}') as Json);
+  }
+
+  @override
+  Future<String?> pinLinkSecret(String folder, String sealed, int version) =>
+      _keysCall<String>('keys.pin_link_secret', {'folder': folder, 'sealed': sealed, 'version': version});
+
+  @override
+  Future<List<Json>> moveKeys(List<FileInfo> files, String target) async {
+    final raw = await _keysCall<String>('keys.move_keys', {'files': jsonEncode([for (final f in files) f.toJson()]), 'target': target});
+    return [for (final k in jsonDecode(raw ?? '[]') as List) (k as Map).cast<String, dynamic>()];
+  }
+
+  @override
+  Future<KeysState> keysFromInvite(String? secret, List<Json> keys) async =>
+      KeysState.fromMap(await _keysCall<Map<Object?, Object?>>('keys.from_invite', {'secret': ?secret, 'keys': jsonEncode(keys)}) ?? const {});
+
+  @override
+  Future<int> openPinKeys(String secret) async => await _keysCall<int>('keys.open_pin', {'secret': secret}) ?? 0;
+
+  @override
+  Future<void> forgetPinKeys() => _keysCall('keys.forget_pin');
 
   /// Starts with how each batch stood last: the send screen may open long after the change.
   @override

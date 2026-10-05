@@ -1,6 +1,10 @@
 package com.eschgi.share
 
 import com.eschgi.share.data.ServerConfig
+import com.eschgi.share.e2ee.DeviceKeyStore
+import com.eschgi.share.e2ee.KeyPair
+import com.eschgi.share.e2ee.Keyring
+import com.eschgi.share.e2ee.SealedFile
 import com.eschgi.share.net.Route
 import com.eschgi.share.net.RouteReason
 import com.eschgi.share.net.RouteStatus
@@ -59,8 +63,29 @@ class PlatformContractTest {
     fun readsTheFilesOfADownload() {
         val files = FileRef.parseList(fixture.getJSONArray("files").toString())
         assertEquals(4, files.size)
-        assertEquals(FileRef("bbbbbbbbbbbbbbbbbbbbbbbbbb", "VID_0412.mp4", 2000, "video/mp4", "video"), files[1])
+        assertEquals(FileRef("aaaaaaaaaaaaaaaaaaaaaaaaaa", "IMG_2041.jpg", 1000, "image/jpeg", "photo", "f4mily5x2k7mbqz4bwdbyj6qsq"), files[0])
         assertEquals(listOf(true, true, false, false), files.map { it.isMedia })
+        // The video is encrypted: its key, sealed for its folder's key, goes with it.
+        val video = files[1]
+        assertEquals("VID_0412.mp4", video.name)
+        assertEquals(SealedFile("bbbbbbbbbbbbbbbbbbbbbbbbbb", "f4mily5x2k7mbqz4bwdbyj6qsq", 1, video.enc!!.key, "U0hFMQABAAA9p6lLxQCBAA", 2000), video.enc)
+        // TransferDb keeps it as JSON and reads it back.
+        assertEquals(video, FileRef.of(video.id, video.name, video.size, video.mime, video.kind, video.folder, video.encJson()))
+        assertEquals(files[0], FileRef.of(files[0].id, files[0].name, 1000, "image/jpeg", "photo", files[0].folder, null))
+    }
+
+    @Test
+    fun keysEventIsWhatDartReads() {
+        val ring = Keyring({ _, _, _ -> throw java.io.IOException("offline") }, object : DeviceKeyStore {
+            override fun load(deviceId: String): KeyPair? = null
+
+            override fun save(deviceId: String, pair: KeyPair) {}
+        })
+        val off = ring.state()
+        val expected = fixture.getJSONObject("keys_event")
+        assertEquals(expected.keys().asSequence().toSet(), off.keys)
+        assertEquals("off", off["status"])
+        assertEquals(expected.getString("type"), off["type"])
     }
 
     @Test

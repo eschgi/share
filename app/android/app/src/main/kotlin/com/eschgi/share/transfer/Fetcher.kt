@@ -3,6 +3,7 @@ package com.eschgi.share.transfer
 import android.content.Context
 import android.net.Uri
 import androidx.core.content.FileProvider
+import com.eschgi.share.e2ee.Keys
 import com.eschgi.share.net.RouteMonitor
 import com.eschgi.share.net.ServerConnection
 import com.eschgi.share.net.ServerInfo
@@ -93,6 +94,8 @@ object Fetcher {
         abort: Abort,
         onBytes: (Long) -> Unit,
     ): Boolean {
+        // An encrypted file lands decrypted in the cache, as a saved one does in the gallery.
+        val cipher = Keys.cipher(app, auth, file.enc)
         var attempt = 0
         while (true) {
             val home = Credentials.atHome(auth, RouteMonitor.settled(app).isLocal)
@@ -100,8 +103,8 @@ object Fetcher {
             // Asked only now, for a file that isn't on the phone: what is there opens offline.
             val outcome = when (ServerInfo.of(server.config) { server.open(it, home, readTimeoutMs = 15_000) }?.storage) {
                 null -> Downloader.Outcome.Retry(IOException("the server didn't say where its files are"))
-                ServerInfo.Storage.DISK -> downloader.fetch(file.id, file.size, sink, open = open, abort = abort, onBytes = onBytes)
-                ServerInfo.Storage.S3 -> downloader.fetchS3(file.id, file.size, sink, link = { S3Links.fetch(file.id, open) }, abort = abort, onBytes = onBytes)
+                ServerInfo.Storage.DISK -> downloader.fetch(file.id, file.size, sink, open = open, abort = abort, onBytes = onBytes, cipher = cipher)
+                ServerInfo.Storage.S3 -> downloader.fetchS3(file.id, file.size, sink, link = { S3Links.fetch(file.id, open) }, abort = abort, onBytes = onBytes, cipher = cipher)
             }
             when (outcome) {
                 Downloader.Outcome.Done -> {

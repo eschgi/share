@@ -89,16 +89,18 @@ class LibraryRepository {
   Directory? _originals;
 
   /// A photo at full size for the viewer, from the cache, the server or its bucket. Only the
-  /// last few are kept; videos and documents open through the platform instead.
+  /// last few are kept; videos and documents open through the platform instead. An encrypted
+  /// one is decrypted here (docs/e2ee-plan.md); throws KeysException while its key isn't.
   Future<File?> original(FileInfo f) async {
     final base = await platform.cacheDir();
     if (base.isEmpty) return null;
     final dir = _originals ??= await Directory('$base/originals').create(recursive: true);
     final file = File('${dir.path}/${f.id}');
     if (await file.exists() && await file.length() == f.size) return file;
-    final bytes = await _onS3()
+    var bytes = await _onS3()
         ? await api.s3Bytes((await _get('/api/s3/files/${f.id}/url'))['url'] as String) // without the key
         : await _bytes('/api/files/${f.id}/content');
+    if (f.enc != null) bytes = await platform.decryptFile(f, bytes, auth: auth);
     await file.writeAsBytes(bytes, flush: false);
     final all = [await for (final e in dir.list()) if (e is File) e];
     if (all.length > 30) {
@@ -116,8 +118,12 @@ class LibraryRepository {
   static const _diskLimit = 150 << 20;
   Directory? _disk;
 
+  /// Encrypted files whose thumbnails didn't open here: their folder's key isn't on this phone.
+  final locked = <String>{};
+
   /// The thumbnail JPEG of a file, from memory, the disk cache or the server. The cache key
-  /// includes updated_at, which changes when a better thumbnail arrives.
+  /// includes updated_at, which changes when a better thumbnail arrives. An encrypted file's
+  /// is opened here, and kept opened, as the file cache keeps its files.
   Future<Uint8List?> thumb(FileInfo f) async {
     if (!f.hasThumb) return null;
     final key = '${f.id}-${f.updatedAt.millisecondsSinceEpoch}';
@@ -132,9 +138,14 @@ class LibraryRepository {
     } else {
       try {
         bytes = await _bytes('/api/files/${f.id}/thumb');
+        if (f.enc != null) bytes = await platform.openThumb(f, bytes, auth: auth);
       } on ApiException {
         return null;
+      } on KeysException catch (e) {
+        if (e.sealed) locked.add(f.id);
+        return null;
       }
+      locked.remove(f.id);
       if (file != null) {
         await file.writeAsBytes(bytes, flush: false);
         _trimDisk(dir!).ignore();

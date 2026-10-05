@@ -3,6 +3,8 @@ package com.eschgi.share.transfer
 import android.content.Context
 import android.util.Log
 import androidx.core.net.toUri
+import com.eschgi.share.e2ee.E2eeException
+import com.eschgi.share.e2ee.FolderPublicKey
 import com.eschgi.share.net.RouteMonitor
 import com.eschgi.share.net.ServerConnection
 import com.eschgi.share.net.ServerInfo
@@ -13,7 +15,7 @@ import java.util.concurrent.ConcurrentHashMap
  * Sends what [UploadQueue] has queued, one file at a time, until the queue is empty or the
  * host stops it. Signed-in phones send over the route RouteMonitor picked; with a PIN over the
  * public address. Every file keeps its tus upload, so any later run goes on where the server has
- * it.
+ * it. Into an encrypted folder each file goes up encrypted, with a key of its own (UploadSeal).
  */
 object UploadEngine {
     private const val TAG = "UploadEngine"
@@ -62,6 +64,10 @@ object UploadEngine {
         val queue = UploadQueue(app)
         val seen = LinkedHashSet<String>()
         val progress = Progress(app, host, seen)
+        // The key each batch's folder is encrypted for (null: plain), asked once a run.
+        val targets = HashMap<String, FolderPublicKey?>()
+        // How often each file got a new seal because the server asked for one.
+        val reseals = HashMap<String, Int>()
         try {
             TransferNotification.cancelSentSummary(app)
             var attempts = 0
@@ -102,34 +108,53 @@ object UploadEngine {
                 current = key to abort
                 // Into a bucket the bytes go over the internet, wherever the phone is.
                 progress.local = local && info?.storage == ServerInfo.Storage.DISK
-                val source = ContentSource(app.contentResolver, item.file.uri.toUri())
+                val plain = ContentSource(app.contentResolver, item.file.uri.toUri())
+                val lastModified = Outbox.lastModified(app, item.file.uri.toUri())
                 val onBytes = { bytes: Long ->
                     live[key] = bytes
                     progress.publish()
                 }
+                var seal: UploadSeal? = null
                 val outcome = try {
+                    val (sealed, uploadId) = sealOf(queue, item, lastModified, targets) { batchId ->
+                        UploadSeal.target(batch.auth, batch.folder) { path -> server.open(path, local, readTimeoutMs = 15_000) }.also { targets[batchId] = it }
+                    }
+                    seal = sealed
+                    // The encrypted stream goes up for a file into an encrypted folder.
+                    val source = seal?.let { SealedSource(it, plain) } ?: plain
+                    val size = seal?.encryptedSize ?: item.file.size
                     when (info?.storage) {
                         null -> UploadOutcome.Retry(IOException("the server didn't say how it takes files"))
                         ServerInfo.Storage.DISK -> tus.upload(
-                            item.file.name, item.file.mime, item.file.size, source, item.uploadId,
+                            item.file.name, item.file.mime, size, source, uploadId,
                             if (local) LOCAL_CHUNK else info.chunkSize,
                             open = { method, path -> server.open(path, local, method = method) },
                             abort = abort,
                             onCreated = { queue.setUploadId(item, it) },
                             onBytes = onBytes,
                             folder = batch.folder,
-                            lastModified = Outbox.lastModified(app, item.file.uri.toUri()),
+                            lastModified = lastModified,
+                            enc = seal?.enc(),
                         )
                         ServerInfo.Storage.S3 -> s3.upload(
-                            item.file.name, item.file.size, source, item.uploadId,
+                            item.file.name, size, source, uploadId,
                             open = { method, path -> server.open(path, local, method = method) },
                             abort = abort,
                             onCreated = { queue.setUploadId(item, it) },
                             onBytes = onBytes,
                             folder = batch.folder,
-                            lastModified = Outbox.lastModified(app, item.file.uri.toUri()),
+                            lastModified = lastModified,
+                            enc = seal?.enc(),
                         )
                     }
+                } catch (e: UploadSeal.HttpFailure) {
+                    when (e.status) {
+                        401 -> if (batch.auth == UploadBatch.PIN) UploadOutcome.PinEnded else UploadOutcome.SignedOut
+                        404 -> UploadOutcome.Failed(404, "folder_gone")
+                        else -> UploadOutcome.Retry(e, e.status)
+                    }
+                } catch (e: IOException) {
+                    UploadOutcome.Retry(e) // asking which key to encrypt for failed
                 } finally {
                     current = null
                 }
@@ -140,7 +165,7 @@ object UploadEngine {
                         live.remove(key)
                         // The thumbnail reads the file once more: its grant goes only afterwards.
                         try {
-                            sendThumb(app, server, local, item, outcome.id)
+                            sendThumb(app, server, local, item, outcome.id, seal)
                         } finally {
                             release(app, item)
                         }
@@ -154,7 +179,15 @@ object UploadEngine {
                         // Cancelled: the batch is gone from the queue already.
                     }
                     is UploadOutcome.Failed -> {
-                        if (outcome.code in FOLDER_GONE) {
+                        if (outcome.code in UploadSeal.RESEAL && (reseals[key] ?: 0) < 2) {
+                            // Sealed for an older version of the folder's key, or plain into a folder
+                            // encrypted since (or the other way round): a new seal, and a new upload.
+                            reseals[key] = (reseals[key] ?: 0) + 1
+                            targets.remove(batch.id)
+                            queue.setSeal(item, null)
+                            queue.setUploadId(item, null)
+                            live.remove(key)
+                        } else if (outcome.code in FOLDER_GONE) {
                             // The file stays queued until the person chooses another folder.
                             queue.pauseBatch(batch.id, UploadBatch.FOLDER_GONE)
                         } else {
@@ -184,15 +217,56 @@ object UploadEngine {
         }
     }
 
-    /** The picture of a sent file. Best effort: photos without one get one from the server. */
-    private fun sendThumb(app: Context, server: ServerConnection, local: Boolean, item: UploadRow, fileId: String) {
+    /**
+     * The seal [item] goes up with, and the upload to go on with: the one it has, unless the file
+     * changed since (or can't tell, for one already under way): then a new key and a new upload,
+     * so no chunk is ever encrypted twice with the same nonce for other bytes. A file that
+     * hasn't started gets a seal when its folder is encrypted ([target] asks once a batch); one
+     * under way without a seal goes on plain, as the server took it.
+     */
+    private fun sealOf(
+        queue: UploadQueue,
+        item: UploadRow,
+        lastModified: Long?,
+        targets: Map<String, FolderPublicKey?>,
+        target: (batch: String) -> FolderPublicKey?,
+    ): Pair<UploadSeal?, String?> {
+        var seal = UploadSeal.parse(item.seal)
+        var uploadId = item.uploadId
+        if (seal != null) {
+            val same = seal.fits(item.file.size, lastModified) && (uploadId == null || (lastModified != null && seal.lastModified != null))
+            if (!same) {
+                seal = null
+                uploadId = null
+                queue.setSeal(item, null)
+                queue.setUploadId(item, null)
+            }
+        }
+        if (seal == null && uploadId == null) {
+            val folder = if (targets.containsKey(item.batch)) targets[item.batch] else target(item.batch)
+            if (folder != null) {
+                seal = UploadSeal.new(folder, item.file.size, lastModified)
+                queue.setSeal(item, seal.toJson())
+            }
+        }
+        return seal to uploadId
+    }
+
+    /** The picture of a sent file, sealed with its key for an encrypted one. Best effort: photos without one get one from the server. */
+    private fun sendThumb(app: Context, server: ServerConnection, local: Boolean, item: UploadRow, fileId: String, seal: UploadSeal?) {
         val thumb = try {
             UploadThumbs.make(app, item.file.uri.toUri(), item.file.kind)
         } catch (e: Exception) {
             Log.w(TAG, "thumbnail of ${item.file.name}", e)
             return
         }
-        val jpeg = thumb.jpeg ?: return
+        val jpeg = thumb.jpeg?.let { j ->
+            try {
+                seal?.sealThumb(j) ?: j
+            } catch (e: E2eeException) {
+                null
+            }
+        } ?: return
         val query = listOfNotNull(
             thumb.width?.let { "width=$it" },
             thumb.height?.let { "height=$it" },
@@ -202,7 +276,8 @@ object UploadEngine {
             val conn = server.open("/api/files/$fileId/thumb" + if (query.isEmpty()) "" else "?$query", local, method = "PUT")
             try {
                 conn.doOutput = true
-                conn.setRequestProperty("Content-Type", "image/jpeg")
+                // A sealed thumbnail is nothing the server can look into.
+                conn.setRequestProperty("Content-Type", if (seal != null) "application/octet-stream" else "image/jpeg")
                 conn.setFixedLengthStreamingMode(jpeg.size)
                 conn.outputStream.use { it.write(jpeg) }
                 if (conn.responseCode != 204) Log.i(TAG, "thumbnail of ${item.file.name}: ${conn.responseCode}")

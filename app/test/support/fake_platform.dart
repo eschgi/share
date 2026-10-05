@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:share_app/data/models.dart';
 import 'package:share_app/data/platform.dart';
@@ -211,4 +212,121 @@ class FakePlatform implements Platform {
     sharedWaiting = 0;
     sharedDropped++;
   }
+
+  // End-to-end encryption: the keys in Kotlin, as far as the screens can tell. Encrypted files
+  // "decrypt" to their stored bytes, except in [sealedFolders], whose keys aren't here.
+  KeysState keysState = const KeysState(status: KeysStatus.ready);
+  final keysEvents = StreamController<KeysState>.broadcast();
+  Set<String> sealedFolders = {};
+
+  /// The folders that have a key: encrypted now, or before.
+  Set<String> encryptedFolders = {};
+
+  /// The passwords syncKeys got (null for none), and what else was asked.
+  final keySyncs = <String?>[];
+  final keyCalls = <String>[];
+  String recoveryCode = '7SEN-4M38-3QV2-Z38M-JEGM-QXC8-FHPD-HJ4M';
+  final linkSecret = 'S' * 43;
+
+  void setKeys(KeysState s) {
+    keysState = s;
+    keysEvents.add(s);
+  }
+
+  /// As Kotlin, every sync says where the keys stand.
+  @override
+  Future<KeysState> syncKeys({String? password}) async {
+    keySyncs.add(password);
+    keysEvents.add(keysState);
+    return keysState;
+  }
+
+  @override
+  Stream<KeysState> get keyChanges => keysEvents.stream;
+
+  @override
+  Future<Uint8List> openThumb(FileInfo file, Uint8List sealed, {SendAuth auth = SendAuth.device}) async {
+    if (sealedFolders.contains(file.folder)) throw const KeysException('sealed');
+    return sealed;
+  }
+
+  @override
+  Future<Uint8List> decryptFile(FileInfo file, Uint8List data, {SendAuth auth = SendAuth.device}) async {
+    if (sealedFolders.contains(file.folder)) throw const KeysException('sealed');
+    return data;
+  }
+
+  @override
+  Future<Json> encryptFolder(FolderInfo folder) async {
+    keyCalls.add('encrypt ${folder.id}');
+    return {'id': folder.id, 'encrypted': true, 'key_version': folder.keyVersion ?? 1};
+  }
+
+  @override
+  Future<String> makeRecovery() async {
+    keyCalls.add('recovery');
+    setKeys(KeysState(status: keysState.status, hasRecovery: true, encryptedFolders: keysState.encryptedFolders, open: keysState.open));
+    return recoveryCode;
+  }
+
+  @override
+  Future<int> useRecoveryCode(String code) async {
+    keyCalls.add('use $code');
+    if (code.replaceAll('-', '').toUpperCase() != recoveryCode.replaceAll('-', '')) throw const KeysException('sealed');
+    return 2;
+  }
+
+  @override
+  Future<KeysState> startOver() async {
+    keyCalls.add('start over');
+    return keysState;
+  }
+
+  @override
+  Future<String?> passwordLock(String password) async => keysState.ready ? 'lock-$password' : null;
+
+  @override
+  Future<({String secret, List<Json> keys})> inviteKeys(List<String>? folders) async {
+    keyCalls.add('invite ${folders?.join(',')}');
+    final open = [for (final f in folders ?? encryptedFolders.toList()) if (encryptedFolders.contains(f) && !sealedFolders.contains(f)) f];
+    return (secret: linkSecret, keys: [for (final f in open) {'folder': f, 'version': 1, 'locked': 'locked-$f'}]);
+  }
+
+  @override
+  Future<({String secret, String locked})?> personKeyForInvite() async => keysState.ready ? (secret: linkSecret, locked: 'locked-person') : null;
+
+  @override
+  Future<({String secret, Json body})?> pinSecret(String folder) async {
+    if (!encryptedFolders.contains(folder)) return null;
+    keyCalls.add('pin $folder');
+    return (secret: linkSecret, body: {'sealed': 'sealed-secret', 'version': 1, 'keys': const []});
+  }
+
+  @override
+  Future<String?> pinLinkSecret(String folder, String sealed, int version) async => sealedFolders.contains(folder) ? null : linkSecret;
+
+  @override
+  Future<List<Json>> moveKeys(List<FileInfo> files, String target) async {
+    keyCalls.add('move ${files.map((f) => f.id).join(',')} $target');
+    return [for (final f in files) {'id': f.id, 'version': 1, 'key': 'moved-${f.id}'}];
+  }
+
+  final invitesOpened = <(String?, List<Json>)>[];
+
+  @override
+  Future<KeysState> keysFromInvite(String? secret, List<Json> keys) async {
+    invitesOpened.add((secret, keys));
+    return keysState;
+  }
+
+  final pinSecrets = <String?>[];
+
+  @override
+  Future<int> openPinKeys(String secret) async {
+    pinSecrets.add(secret);
+    return 1;
+  }
+
+  @override
+  Future<void> forgetPinKeys() async => pinSecrets.add(null);
 }

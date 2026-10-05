@@ -6,7 +6,8 @@ app sends with a PIN, like the website. Admins manage PINs, people and Recently 
 
 Flutter draws the screens. Kotlin (`android/app/src/main/kotlin`) does what has to work without
 them: the phone's key in the Android KeyStore, the choice between the local and the public
-address, and the transfers. Downloads and uploads (in pieces, by tus or straight into the server's
+address, the transfers, and the keys of encrypted folders (`e2ee/`, see docs/e2ee-plan.md), which
+the transfers and the player use to encrypt and decrypt on the phone. Downloads and uploads (in pieces, by tus or straight into the server's
 S3 bucket) keep going when the app is closed and continue where they stopped. Links to a bucket
 are fetched without the phone's key, which goes only to Share.
 

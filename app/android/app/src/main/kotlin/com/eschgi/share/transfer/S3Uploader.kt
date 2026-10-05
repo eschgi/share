@@ -31,7 +31,8 @@ class S3Uploader(
      * Uploads [size] bytes of [source] as [name], signed in into [folder]. [open] makes a request
      * to the server with the given method and path, on the current route and with the right
      * key. [onCreated] hears the id of a new upload (keep it: it's what a later try continues),
-     * [onBytes] how far it is.
+     * [onBytes] how far it is. Into an encrypted folder, [source] gives the encrypted stream,
+     * [size] is its size, and [enc] goes along (UploadSeal.enc).
      */
     fun upload(
         name: String,
@@ -44,6 +45,7 @@ class S3Uploader(
         onBytes: (Long) -> Unit = {},
         folder: String? = null,
         lastModified: Long? = null,
+        enc: JSONObject? = null,
     ): UploadOutcome {
         var id = uploadId
         var restarted = false
@@ -59,6 +61,7 @@ class S3Uploader(
                 val body = JSONObject().put("name", name).put("size", size)
                 lastModified?.let { body.put("last_modified_ms", it) }
                 folder?.let { body.put("folder", it) }
+                enc?.let { body.put("enc", it) }
                 when (val created = call(open, "POST", "/api/s3/uploads", body, abort)) {
                     is Step.End -> return ended(created.outcome)
                     is Step.Ok -> {

@@ -48,6 +48,7 @@ class TransferDb private constructor(context: Context) : SQLiteOpenHelper(contex
         createShared(db)
         version4(db)
         version5(db)
+        version6(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -55,6 +56,18 @@ class TransferDb private constructor(context: Context) : SQLiteOpenHelper(contex
         if (oldVersion < 3) createShared(db)
         if (oldVersion < 4) version4(db)
         if (oldVersion < 5) version5(db)
+        if (oldVersion < 6) version6(db)
+    }
+
+    /**
+     * Version 6, end-to-end encryption: a download knows its file's folder and, for an encrypted
+     * one, its key sealed for the folder's key (the API's enc, as JSON); an upload into an
+     * encrypted folder keeps its file key, header and sealed key until it is done (UploadSeal).
+     */
+    private fun version6(db: SQLiteDatabase) {
+        db.execSQL("ALTER TABLE items ADD COLUMN folder TEXT")
+        db.execSQL("ALTER TABLE items ADD COLUMN enc TEXT")
+        db.execSQL("ALTER TABLE uploads ADD COLUMN seal TEXT")
     }
 
     /** Version 5: whose key fetches a download batch; a PIN that shows its folder downloads too. */
@@ -125,6 +138,8 @@ class TransferDb private constructor(context: Context) : SQLiteOpenHelper(contex
                     put("size", f.size)
                     put("mime", f.mime)
                     put("kind", f.kind)
+                    put("folder", f.folder)
+                    put("enc", f.encJson())
                     put("state", if (f.id in skipped) TransferItem.SKIPPED else TransferItem.QUEUED)
                 })
             }
@@ -140,7 +155,7 @@ class TransferDb private constructor(context: Context) : SQLiteOpenHelper(contex
             null,
         ).use { c ->
             while (c.moveToNext()) {
-                val item = item(c).copy(auth = c.getString(9))
+                val item = item(c).copy(auth = c.getString(c.getColumnIndexOrThrow("auth")))
                 if (item.file.id !in exclude) return item
             }
         }
@@ -293,15 +308,23 @@ class TransferDb private constructor(context: Context) : SQLiteOpenHelper(contex
 
     private fun item(c: Cursor) = TransferItem(
         batch = c.getString(0),
-        file = FileRef(id = c.getString(1), name = c.getString(2), size = c.getLong(3), mime = c.getString(4), kind = c.getString(5)),
+        file = FileRef.of(
+            id = c.getString(1),
+            name = c.getString(2),
+            size = c.getLong(3),
+            mime = c.getString(4),
+            kind = c.getString(5),
+            folder = if (c.isNull(9)) null else c.getString(9),
+            enc = if (c.isNull(10)) null else c.getString(10),
+        ),
         state = c.getString(6),
         bytes = c.getLong(7),
         target = if (c.isNull(8)) null else c.getString(8),
     )
 
     companion object {
-        private const val VERSION = 5
-        private const val ITEM_COLUMNS = "i.batch, i.file_id, i.name, i.size, i.mime, i.kind, i.state, i.bytes, i.target"
+        private const val VERSION = 6
+        private const val ITEM_COLUMNS = "i.batch, i.file_id, i.name, i.size, i.mime, i.kind, i.state, i.bytes, i.target, i.folder, i.enc"
 
         @Volatile private var instance: TransferDb? = null
 

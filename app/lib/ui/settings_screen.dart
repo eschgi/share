@@ -15,6 +15,7 @@ import 'admin/pins_screen.dart';
 import 'about_screen.dart';
 import 'admin/trash_screen.dart';
 import 'devices.dart';
+import 'encryption.dart';
 import 'format.dart';
 import 'icons.dart';
 import 'server_screen.dart';
@@ -255,6 +256,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ]),
       ],
+      const EncryptionSettings(),
       const SizedBox(height: 14),
     ];
   }

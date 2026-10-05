@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'data/admin.dart';
 import 'data/api.dart';
 import 'data/folders.dart';
+import 'data/keys.dart';
 import 'data/library.dart';
 import 'data/pin.dart';
 import 'data/platform.dart';
@@ -30,6 +31,7 @@ class AppServices {
     folders = FolderStore(library: library, platform: platform);
     admin = AdminRepository(api: this.api);
     pin = PinRepository(api: this.api, platform: platform);
+    keys = KeysRepository(platform: platform, api: this.api);
   }
 
   final Platform platform;
@@ -42,6 +44,9 @@ class AppServices {
   late final FolderStore folders;
   late final AdminRepository admin;
   late final PinRepository pin;
+
+  /// End-to-end encryption on this phone (docs/e2ee-plan.md).
+  late final KeysRepository keys;
 
   /// The language the person picked, or null for the phone's.
   final language = ValueNotifier<String?>(null);
@@ -86,6 +91,9 @@ class Services extends InheritedWidget {
   /// For one-off reads, e.g. in initState or callbacks.
   static AppServices read(BuildContext context) => context.getInheritedWidgetOfExactType<Services>()!.services;
 
+  /// The same, where a widget may be shown without them, as in a few tests.
+  static AppServices? maybeRead(BuildContext context) => context.getInheritedWidgetOfExactType<Services>()?.services;
+
   @override
   bool updateShouldNotify(Services old) => old.services != services;
 }
@@ -104,9 +112,16 @@ class _ShareAppState extends State<ShareApp> {
   StreamSubscription<String>? _links;
   StreamSubscription<SharedFiles>? _shared;
 
+  /// Coming back to the app, the keys may have news: someone to seal for, a new version.
+  late final _lifecycle = AppLifecycleListener(onResume: () {
+    final s = widget.services;
+    if (s.session.current is SignedInState) unawaited(s.keys.sync());
+  });
+
   @override
   void initState() {
     super.initState();
+    _lifecycle;
     final s = widget.services;
     unawaited(s.start());
     _links = s.platform.links.listen(_open);
@@ -118,6 +133,7 @@ class _ShareAppState extends State<ShareApp> {
   void dispose() {
     _links?.cancel();
     _shared?.cancel();
+    _lifecycle.dispose();
     super.dispose();
   }
 
@@ -134,7 +150,7 @@ class _ShareAppState extends State<ShareApp> {
       case final InviteLink link:
         _navigator.currentState?.push(MaterialPageRoute<void>(builder: (_) => InviteScreen(link: link)));
       case final PinLink link:
-        _navigator.currentState?.push(MaterialPageRoute<void>(builder: (_) => PinEntryScreen(server: link.server, code: link.code)));
+        _navigator.currentState?.push(MaterialPageRoute<void>(builder: (_) => PinEntryScreen(server: link.server, code: link.code, secret: link.secret)));
       case null:
         break;
     }
