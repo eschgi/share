@@ -12,9 +12,9 @@
          itself is merged in by androidx.work. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
-    <!-- usesCleartextTraffic: plain http to a server at home. Android can't tell addresses at
-         home from others, so the app checks that itself and refuses http:// for any other
-         (isHomeHost in lib/data/server.dart). -->
+    <!-- usesCleartextTraffic: plain http to a server or a bucket at home. Android can't tell
+         addresses at home from others, so the app checks that itself and refuses http:// for
+         any other (isHomeHost in lib/data/server.dart and net/HomeHosts.kt). -->
     <application
         android:label="@string/app_name"
         android:name=".ShareApplication"

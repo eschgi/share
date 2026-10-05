@@ -2,6 +2,8 @@ package com.eschgi.share.net
 
 import com.eschgi.share.TestServer
 import com.eschgi.share.data.ServerConfig
+import com.eschgi.share.selfSigned
+import com.eschgi.share.serving
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -9,13 +11,10 @@ import org.junit.BeforeClass
 import org.junit.ClassRule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
-import java.io.File
 import java.net.ServerSocket
 import java.security.KeyStore
 import java.security.MessageDigest
 import java.security.cert.X509Certificate
-import javax.net.ssl.KeyManagerFactory
-import javax.net.ssl.SSLContext
 
 /**
  * The local address check against a real TLS server with a self-signed certificate, like
@@ -93,9 +92,7 @@ class LocalProbeTest {
         ServerConfig("https://share.example.com", "https://127.0.0.1:$port", pins, serverId)
 
     private fun serve(cert: Pair<KeyStore, X509Certificate>, serverId: String): Int {
-        val keys = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm()).apply { init(cert.first, PASS) }
-        val tls = SSLContext.getInstance("TLS").apply { init(keys.keyManagers, null, null) }
-        val server = TestServer(tls) { req, res ->
+        val server = TestServer(serving(cert)) { req, res ->
             if (req.path == "/api/info") {
                 res.send(200, """{"server_id":"$serverId","name":"Share","api_version":1}""".toByteArray(), mapOf("Content-Type" to "application/json"))
             } else {
@@ -107,8 +104,6 @@ class LocalProbeTest {
     }
 
     companion object {
-        private val PASS = "test-only".toCharArray()
-
         @get:ClassRule
         @JvmStatic
         val tmp = TemporaryFolder()
@@ -121,23 +116,8 @@ class LocalProbeTest {
         @BeforeClass
         @JvmStatic
         fun certificates() {
-            certA = selfSigned("a")
-            certB = selfSigned("b")
-        }
-
-        /** A throwaway self-signed EC certificate from the JDK's keytool, so no key is committed. */
-        private fun selfSigned(name: String): Pair<KeyStore, X509Certificate> {
-            val file = File(tmp.root, "$name.p12")
-            val keytool = File(System.getProperty("java.home"), "bin/keytool").path
-            val process = ProcessBuilder(
-                keytool, "-genkeypair", "-alias", "local", "-keyalg", "EC", "-groupname", "secp256r1",
-                "-validity", "2", "-dname", "CN=share-test-$name", "-ext", "SAN=ip:127.0.0.1",
-                "-keystore", file.path, "-storetype", "PKCS12", "-storepass", String(PASS), "-keypass", String(PASS),
-            ).redirectErrorStream(true).start()
-            val output = process.inputStream.bufferedReader().readText()
-            check(process.waitFor() == 0) { "keytool failed: $output" }
-            val store = KeyStore.getInstance("PKCS12").apply { file.inputStream().use { load(it, PASS) } }
-            return store to (store.getCertificate("local") as X509Certificate)
+            certA = selfSigned(tmp.root, "a")
+            certB = selfSigned(tmp.root, "b")
         }
     }
 }
