@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import contract from '../../contract/pin_codes.json';
-import { cleanPinInput, normalizePin, pinAlphabet, pinFromHash, pinLength } from '../src/pin';
+import { cleanPinInput, normalizePin, pinAlphabet, pinFromHash, pinLength, pinSecretFromHash } from '../src/pin';
 
 describe('PIN rules', () => {
   it('uses the same alphabet and length as the server', () => {
@@ -21,5 +21,14 @@ describe('PIN rules', () => {
     expect(pinFromHash('#k7m2q')).toBe('K7M2Q');
     expect(pinFromHash('#nope')).toBeNull();
     expect(pinFromHash('')).toBeNull();
+  });
+
+  it('reads the secret of a PIN link that shows an encrypted folder', () => {
+    const secret = 'x'.repeat(42) + 'A';
+    expect(pinFromHash(`#K7M2Q.${secret}`)).toBe('K7M2Q');
+    expect(pinSecretFromHash(`#K7M2Q.${secret}`)).toBe(secret);
+    expect(pinSecretFromHash('#K7M2Q')).toBeNull();
+    expect(pinSecretFromHash(`#K7M2Q.${secret.slice(2)}`)).toBeNull();
+    expect(pinSecretFromHash(`#.${secret}`)).toBeNull();
   });
 });

@@ -1,7 +1,8 @@
 // Thumbnails for the library, made in the browser right after a photo or video is sent. The
 // server can't read videos, and the phone shows every photo format it can decode itself.
 // They go to the server one at a time, and a failure only means the file has no thumbnail
-// (for photos the server then makes one).
+// (for photos the server then makes one). An encrypted file's goes up sealed with its key.
+import { sealedThumb, type FileSeal } from './e2ee/upload';
 
 const side = 512; // the longer side, in pixels
 const quality = 0.8;
@@ -105,19 +106,20 @@ function draw(source: CanvasImageSource, w: number, h: number): Promise<Blob | n
 export class ThumbQueue {
   private tail: Promise<void> = Promise.resolve();
 
-  add(fileId: string, data: Blob, kind: ThumbKind): void {
-    this.tail = this.tail.then(() => this.send(fileId, data, kind)).catch(() => {});
+  /** seal: an encrypted file's, whose thumbnail goes up sealed with its key. */
+  add(fileId: string, data: Blob, kind: ThumbKind, seal: FileSeal | null = null): void {
+    this.tail = this.tail.then(() => this.send(fileId, data, kind, seal)).catch(() => {});
   }
 
-  private async send(fileId: string, data: Blob, kind: ThumbKind): Promise<void> {
+  private async send(fileId: string, data: Blob, kind: ThumbKind, seal: FileSeal | null): Promise<void> {
     const thumb = await makeThumb(data, kind);
     if (!thumb) return;
     const q = new URLSearchParams({ width: String(thumb.width), height: String(thumb.height) });
     if (thumb.durationMs !== undefined) q.set('duration_ms', String(thumb.durationMs));
     await fetch(`/api/files/${encodeURIComponent(fileId)}/thumb?${q}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'image/jpeg' },
-      body: thumb.jpeg,
+      headers: { 'Content-Type': seal ? 'application/octet-stream' : 'image/jpeg' },
+      body: seal ? await sealedThumb(seal, thumb.jpeg) : thumb.jpeg,
       credentials: 'same-origin',
     });
   }

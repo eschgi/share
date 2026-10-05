@@ -4,7 +4,7 @@ import { allTotals, dropTarget, hasChoices, inviteDefault, moveDefault, sendTarg
 import { uploadMeta } from '../src/uploader';
 
 function folder(id: string, files = 1, bytes = 100): FolderInfo {
-  return { id, name: id, files, bytes, senders: 1, people: 2, admins_only: false, cover: null, created_at: '2026-09-12T08:00:00Z' };
+  return { id, name: id, files, bytes, senders: 1, people: 2, admins_only: false, cover: null, created_at: '2026-09-12T08:00:00Z', encrypted: false, key_version: null };
 }
 
 describe('folders', () => {
@@ -49,9 +49,9 @@ describe('sending into folders', () => {
   });
 
   it('says the folder in an upload, and the inbox key of a shared file', () => {
-    expect(uploadMeta(undefined, undefined)).toEqual({});
-    expect(uploadMeta(7, 'wedding')).toEqual({ shareKey: '7', folder: 'wedding' });
-    expect(uploadMeta(undefined, 'family')).toEqual({ folder: 'family' });
+    expect(uploadMeta(undefined, undefined)).toEqual({ enc: '' });
+    expect(uploadMeta(7, 'wedding')).toEqual({ enc: '', shareKey: '7', folder: 'wedding' });
+    expect(uploadMeta(undefined, 'family')).toEqual({ enc: '', folder: 'family' });
   });
 });
 

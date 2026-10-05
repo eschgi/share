@@ -1,6 +1,8 @@
 import type { ComponentType } from 'preact';
 import { useEffect, useMemo, useReducer, useRef, useState } from 'preact/hooks';
-import { ApiError, endSession, getInfo, getSession, unlock, type Info } from './api';
+import { ApiError, endSession, getInfo, getSession, unlock, type EncryptKey, type Info } from './api';
+import { fromB64u } from './e2ee/bytes';
+import { forgetPinSecret, keepPinSecret } from './e2ee/pinlink';
 import { DropZone } from './components/DropZone';
 import { Page, PagePlaces, type Places } from './components/Page';
 import { useLeaveWarning } from './device';
@@ -8,7 +10,7 @@ import { formatPercent } from './format';
 import { I18nContext, isLang, languages, makeI18n, pickLanguage, storeLanguage, storedLanguage, type Lang } from './i18n';
 import { claimShared, dropShared, shareFailed, sharedGone, type Shared } from './incoming';
 import { noticeLanguage, notify } from './notify';
-import { pinFromHash } from './pin';
+import { pinFromHash, pinSecretFromHash } from './pin';
 import { DoneScreen } from './screens/DoneScreen';
 import { PinScreen } from './screens/PinScreen';
 import { ReadyScreen } from './screens/ReadyScreen';
@@ -56,6 +58,11 @@ export function App() {
   const [, setTick] = useState(0);
   const redraw = () => setTick((n) => n + 1);
   const uploader = useRef<Uploader | null>(null);
+  /** The PIN's session for the uploader, which outlives renders; and the key its folder's files
+   * are encrypted for, once asked again after the server refused an older one. */
+  const sessionNow = useRef(state.session);
+  sessionNow.current = state.session;
+  const encryptKey = useRef<EncryptKey | null | undefined>(undefined);
   /** A PIN that shows its folder: sending, or looking into the folder. */
   const [tab, setTab] = useState<'send' | 'see'>('send');
   const [See, setSee] = useState<SeeModule['See'] | null>(null);
@@ -77,7 +84,7 @@ export function App() {
     };
   }, []);
 
-  async function doUnlock(code: string) {
+  async function doUnlock(code: string, secret?: string | null) {
     dispatch({ type: 'unlockStarted' });
     try {
       const res = await unlock(code);
@@ -91,6 +98,8 @@ export function App() {
         location.reload(); // the first load failed; start clean with the new session
         return;
       }
+      // The secret of a link of a PIN that shows an encrypted folder opens it on the See tab.
+      if (secret) keepPinSecret(secret);
       dispatch({ type: 'unlocked', session: res.session });
       uploader.current.resume(); // the server has moved unfinished uploads to this session
     } catch (e) {
@@ -102,6 +111,7 @@ export function App() {
     // A PIN in the link (share.example.com/#K7M2Q) unlocks by itself; take it out of the
     // address so it doesn't stay in the history.
     const hashPin = pinFromHash(location.hash);
+    const hashSecret = pinSecretFromHash(location.hash);
     if (location.hash) history.replaceState(null, '', location.pathname + location.search);
     (async () => {
       try {
@@ -122,10 +132,18 @@ export function App() {
           onRejected: (name) => setRejected((r) => (r.includes(name) ? r : [...r, name])),
           onRestored: () => dispatch({ type: 'restored' }),
           onSharedGone: sharedGone,
+          encryptFor: () => {
+            const s = sessionNow.current;
+            const e = encryptKey.current !== undefined ? encryptKey.current : s?.kind === 'pin' ? s.encrypt : null;
+            return e ? { folder: e.folder, version: e.version, publicKey: fromB64u(e.public_key) } : null;
+          },
+          refreshKeys: async () => {
+            encryptKey.current = (await getSession()).session?.encrypt ?? null;
+          },
         }, keepQueue);
         void claimShared().then(setShared);
         if (hashPin) {
-          await doUnlock(hashPin);
+          await doUnlock(hashPin, hashSecret);
           return;
         }
         const { session, ended } = await getSession();
@@ -185,6 +203,7 @@ export function App() {
   // PIN replaces it.
   const forgetPin = async () => {
     await endSession().catch(() => {});
+    forgetPinSecret();
     uploader.current?.clear();
     dispatch({ type: 'pinForgotten' });
   };

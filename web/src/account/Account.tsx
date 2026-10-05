@@ -4,6 +4,7 @@ import './account.css';
 import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
 import { getInfo, getMe, onSignedOut, type Info, type Me } from '../api';
 import { Icon } from '../components/Icon';
+import { keyring } from '../e2ee/keyring';
 import { Page } from '../components/Page';
 import { setSignedInHint } from '../hint';
 import { noticeLanguage } from '../notify';
@@ -58,8 +59,19 @@ export function Account({ me: first, notice }: AccountProps) {
       location.replace('/sign-in?signed_out=1&next=' + encodeURIComponent(location.pathname));
     };
     onSignedOut(signedOut);
-    if (first) startSender(signedOut);
-    return () => onSignedOut(null);
+    if (first) {
+      startSender(signedOut);
+      void keyring.start(first);
+    }
+    // Coming back to the page, the keys may have news: someone to seal for, a new version.
+    const back = () => {
+      if (document.visibilityState === 'visible' && keyring.me) void keyring.refresh();
+    };
+    document.addEventListener('visibilitychange', back);
+    return () => {
+      onSignedOut(null);
+      document.removeEventListener('visibilitychange', back);
+    };
   }, []);
 
   useEffect(() => {

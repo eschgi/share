@@ -11,6 +11,7 @@ import { useRoute } from '../../router';
 import { storedTheme, type ThemeChoice } from '../../theme';
 import { got, useAdminData, type AdminData } from '../admin/data';
 import { FolderNameDialog, FolderPage, FoldersList } from '../admin/Folders';
+import { EncryptionSettings } from '../e2ee/Encryption';
 import { InviteDialog, PeopleGroup } from '../admin/People';
 import { NewPinDialog, PinsList } from '../admin/Pins';
 import { SelectAllTrash, TrashList, useTrash } from '../admin/Trash';
@@ -302,6 +303,7 @@ function SettingsList({ data, current }: { data: AdminData; current?: Page }) {
               </div>
             )}
           </div>
+          <EncryptionSettings />
           <div class="group">
             {languageRow}
             {themeRow}
@@ -348,6 +350,7 @@ function SettingsList({ data, current }: { data: AdminData; current?: Page }) {
               </div>
             </>
           )}
+          <EncryptionSettings />
           <div class="group">{passwordRow}</div>
         </>
       ) : (

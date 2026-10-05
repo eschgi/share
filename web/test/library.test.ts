@@ -18,6 +18,7 @@ function file(id: string, day: string, size = 100): FileInfo {
     duration_ms: null,
     has_thumb: true,
     from: null,
+    enc: null,
   };
 }
 

@@ -3,6 +3,7 @@
 // queue that a closed page interrupted. The screens' steps are the PIN pages' (state.ts).
 import { useEffect, useState } from 'preact/hooks';
 import { getInfo } from '../../api';
+import { keyring } from '../../e2ee/keyring';
 import { claimShared, dropShared, sharedGone, type Shared } from '../../incoming';
 import { notify } from '../../notify';
 import { initialState, reduce, type Action, type State } from '../../state';
@@ -52,6 +53,14 @@ export function startSender(signedOut: () => void): void {
           foldersGone++;
           void refreshFolders();
           changed();
+        },
+        // An encrypted folder's new files are encrypted for its newest key.
+        encryptFor: (folder) => {
+          const f = foldersNow().list?.find((x) => x.id === folder);
+          return f?.encrypted ? keyring.encryptFor(f.id) : null;
+        },
+        refreshKeys: async () => {
+          await Promise.all([refreshFolders(), keyring.refresh()]);
         },
       },
       keepQueue,

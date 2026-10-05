@@ -6,6 +6,7 @@
 import { BasePlugin, EventManager, type Body, type DefinePluginOpts, type Meta, type PluginOpts, type Uppy, type UppyFile } from '@uppy/core';
 import { filterFilesToEmitUploadStarted, filterFilesToUpload } from '@uppy/core/utils';
 import type { S3NewUpload, S3PartUrl, S3PartUrls, S3UploadStatus } from './api';
+import { bytesOf, encOf, sealOf, sizeOf } from './e2ee/upload';
 import { doneBytes, missingParts, partSpan, s3FailureAction, Slots, stale } from './s3parts';
 
 /** What a file keeps of its upload into the bucket, also across a closed page. */
@@ -221,7 +222,9 @@ export default class S3Upload<M extends Meta, B extends Body> extends BasePlugin
     const file = this.uppy.getFile(id);
     const data = file?.data;
     if (!file || !(data instanceof Blob)) throw new Error('The file has to be picked again.');
-    const size = data.size;
+    // Into an encrypted folder the parts are pieces of the encrypted stream (e2ee/upload.ts).
+    const size = sizeOf(data);
+    const seal = sealOf(data);
     let state = file.s3;
     let done: Set<number> | null = state ? null : new Set(); // null: ask the server
     let links = new Map<number, S3PartUrl>();
@@ -237,7 +240,13 @@ export default class S3Upload<M extends Meta, B extends Body> extends BasePlugin
         if (!state) {
           const lastModified = data instanceof File ? data.lastModified : Number(file.meta.lastModified) || undefined;
           const folder = typeof file.meta.folder === 'string' ? file.meta.folder : undefined;
-          const plan = await this.api<S3NewUpload>('POST', '/api/s3/uploads', { name: file.name, size, last_modified_ms: lastModified, folder });
+          const plan = await this.api<S3NewUpload>('POST', '/api/s3/uploads', {
+            name: file.name,
+            size,
+            last_modified_ms: lastModified,
+            folder,
+            enc: seal ? encOf(seal) : undefined,
+          });
           state = { id: plan.id, partSize: plan.part_size, parts: plan.parts };
           this.uppy.setFileState(id, { s3: state });
           links = byNumber(plan.urls);
@@ -265,8 +274,9 @@ export default class S3Upload<M extends Meta, B extends Body> extends BasePlugin
           }
           const [start, end] = partSpan(n, size, upload.partSize);
           const before = doneBytes(have, size, upload.partSize);
-          // Sliced without a type, so no Content-Type goes along: only the length is signed.
-          const status = await this.transport.put(link.url, data.slice(start, end), (sent) => this.progress(id, before + sent, size), signal);
+          // Without a type, so no Content-Type goes along: only the length is signed.
+          const part = seal ? new Blob([await bytesOf(data, start, end)]) : data.slice(start, end);
+          const status = await this.transport.put(link.url, part, (sent) => this.progress(id, before + sent, size), signal);
           if (stopped()) return false;
           if (status < 200 || status >= 300) throw new S3Failure('bucket', status);
           have.add(n);

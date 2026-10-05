@@ -307,3 +307,10 @@ video.vpic {
     grid-row: 1 / -1;
   }
 }
+/* An encrypted file whose folder's key isn't open here downloads nothing. */
+.vbtn[aria-disabled='true'],
+.vactions a[aria-disabled='true'],
+.vdoc .btn[aria-disabled='true'] {
+  opacity: 0.45;
+  pointer-events: none;
+}

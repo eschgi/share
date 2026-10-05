@@ -1,0 +1,144 @@
+/* End-to-end encryption: the recovery code, which is printed too, and the banner of a browser
+ * that waits for its keys. */
+.recovery-print {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  margin-top: 18px;
+  padding: 18px 14px;
+  border: 1px solid var(--line-soft);
+  border-radius: 18px;
+  background: var(--s2);
+  text-align: center;
+}
+/* In two lines of four groups. */
+.recovery-code {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 19px;
+  font-weight: 500;
+  line-height: 1.6;
+  letter-spacing: 0.06em;
+  user-select: all;
+}
+.recovery-code span {
+  display: block;
+  white-space: nowrap;
+}
+.recovery-print .qr {
+  width: 168px;
+  height: 168px;
+}
+.recovery-note {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.recovery-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+.recovery-actions .btn {
+  width: auto;
+  padding: 0 16px;
+}
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 18px;
+  font-size: 15px;
+  line-height: 1.45;
+  cursor: pointer;
+}
+.check input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 1px 0 0;
+  accent-color: var(--accent);
+}
+.input.mono {
+  font-family: var(--mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Over the library, while this browser waits for another one, or the recovery code. */
+.keysbanner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 10px 12px;
+  margin: 10px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line-soft);
+  border-radius: 14px;
+  background: var(--s1);
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.45;
+}
+.keysbanner > .ic {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  margin-top: 1px;
+  color: var(--accent-text);
+}
+.keysbanner > span:not(.keysbanner-actions) {
+  display: flex;
+  flex: 1 1 260px;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.keysbanner b {
+  color: var(--text);
+  font-weight: 600;
+}
+.keysbanner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.keysbanner-actions .btn.xs {
+  margin: 0;
+}
+.keysbanner-actions .btn.link {
+  height: 36px;
+  padding: 0 8px;
+  font-size: 14px;
+}
+
+/* Printing the recovery code prints only it. */
+@media print {
+  html,
+  body {
+    background: #fff;
+  }
+  body * {
+    visibility: hidden;
+  }
+  .recovery-print,
+  .recovery-print * {
+    visibility: visible;
+  }
+  .recovery-print {
+    position: fixed;
+    inset: 0 0 auto;
+    border: 0;
+    background: #fff;
+    color: #000;
+  }
+  .recovery-note {
+    color: #333;
+  }
+}

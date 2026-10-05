@@ -1,12 +1,15 @@
 import './viewer.css';
 import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { contentUrl, thumbUrl, type FileInfo } from '../../api';
+import { contentUrl, type FileInfo } from '../../api';
 import { Icon } from '../../components/Icon';
+import { downloadDecrypted, useContentSrc, useKeyring, useThumbSrc } from '../../e2ee/hooks';
+import type { Keyring } from '../../e2ee/keyring';
 import { useMedia } from '../../device';
 import { formatBytes, formatDay, formatDuration, formatTime } from '../../format';
 import { useI18n } from '../../i18n';
 import { useOverlay } from '../../router';
 import { Modal } from '../components/Modal';
+import { startDownload } from '../library/actions';
 import { Thumb } from '../library/Tile';
 import { ToastContext, useLayer } from '../layers';
 import { lockScroll } from '../scroll';
@@ -46,6 +49,7 @@ export function Viewer({ files, id, more, onMove, onClose, onDelete, folderOf }:
   const stage = useRef<HTMLDivElement>(null);
   const top = useLayer();
   const toast = useContext(ToastContext);
+  const keys = useKeyring();
   useOverlay(true, onClose);
 
   useLayoutEffect(() => {
@@ -87,7 +91,7 @@ export function Viewer({ files, id, more, onMove, onClose, onDelete, folderOf }:
     .join(' · ');
   const [from, to] = filmRange(index, files.length);
   const download = (
-    <a class="vbtn" href={contentUrl(file)} download={file.name}>
+    <a class="vbtn" {...downloadProps(file, keys)}>
       <Icon name="download" />
       {t('viewer.download')}
     </a>
@@ -197,7 +201,7 @@ export function Viewer({ files, id, more, onMove, onClose, onDelete, folderOf }:
         {file.name} · {size}
       </p>
       <nav class="vactions narrow-only">
-        <a href={contentUrl(file)} download={file.name}>
+        <a {...downloadProps(file, keys)}>
           <Icon name="download" />
           {t('viewer.download')}
         </a>
@@ -228,12 +232,33 @@ export function Viewer({ files, id, more, onMove, onClose, onDelete, folderOf }:
   );
 }
 
-/** The file itself: the photo, the video or the sound, or why it isn't shown. */
+/** A download link's attributes: the file from the server, or for an encrypted one, decrypted
+ * on the way; none while its folder's key isn't open here. */
+function downloadProps(file: FileInfo, keys: Keyring) {
+  const sealedAway = !!file.enc && !keys.hasFolderKey(file.folder, file.enc.version);
+  return {
+    href: sealedAway ? undefined : contentUrl(file),
+    download: file.name,
+    'aria-disabled': sealedAway || undefined,
+    onClick: (e: MouseEvent) => {
+      if (!file.enc) return;
+      e.preventDefault();
+      if (!sealedAway) downloadDecrypted(file, startDownload).catch(() => {});
+    },
+  };
+}
+
+/** The file itself: the photo, the video or the sound, or why it isn't shown. An encrypted one
+ * is decrypted here: a photo whole, a video and a sound through the service worker. */
 function Media({ file, zoom, moving }: { file: FileInfo; zoom: Zoom; moving: boolean }) {
   const { t } = useI18n();
   const kind = previewOf(file);
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
+  const thumb = useThumbSrc(file);
+  const content = useContentSrc(file, kind !== 'image', kind !== 'none');
+  const keys = useKeyring();
+  const locked = !!file.enc && (content.locked || !keys.hasFolderKey(file.folder, file.enc.version));
 
   if (kind === 'image') {
     const rest = zoom.scale === 1 && zoom.x === 0 && zoom.y === 0;
@@ -241,35 +266,35 @@ function Media({ file, zoom, moving }: { file: FileInfo; zoom: Zoom; moving: boo
     const zoomClass = moving ? '' : ' eased';
     return (
       <div class="vmedia">
-        {file.has_thumb && !loaded && <img class={`vpic${zoomClass}`} src={thumbUrl(file)} alt="" draggable={false} style={{ transform }} />}
-        {!failed && (
+        {file.has_thumb && !loaded && thumb.src && <img class={`vpic${zoomClass}`} src={thumb.src} alt="" draggable={false} style={{ transform }} />}
+        {!failed && content.src && (
           <img
             class={`vpic${zoomClass}${loaded ? '' : ' loading'}`}
             draggable={false}
             style={{ transform }}
-            src={contentUrl(file)}
+            src={content.src}
             alt={file.name}
             onLoad={() => setLoaded(true)}
             onError={() => setFailed(true)}
           />
         )}
-        {failed && <p class="vnote">{t('viewer.cantShow')}</p>}
+        {(failed || locked) && <p class="vnote">{t(locked ? 'viewer.locked' : 'viewer.cantShow')}</p>}
       </div>
     );
   }
   if (kind === 'video') {
     return (
       <div class="vmedia">
-        {failed ? (
+        {failed || locked || !content.src ? (
           <>
-            {file.has_thumb && <img class="vpic" src={thumbUrl(file)} alt="" />}
-            <p class="vnote">{t('viewer.cantPlay')}</p>
+            {file.has_thumb && thumb.src && <img class="vpic" src={thumb.src} alt="" />}
+            {(failed || locked) && <p class="vnote">{t(locked ? 'viewer.locked' : 'viewer.cantPlay')}</p>}
           </>
         ) : (
           <video
             class="vpic"
-            src={contentUrl(file)}
-            poster={file.has_thumb ? thumbUrl(file) : undefined}
+            src={content.src}
+            poster={file.has_thumb && thumb.src ? thumb.src : undefined}
             controls
             playsInline
             preload="metadata"
@@ -284,12 +309,12 @@ function Media({ file, zoom, moving }: { file: FileInfo; zoom: Zoom; moving: boo
       <span class="vdoc-thumb">
         <Thumb key={file.updated_at} file={file} />
       </span>
-      {kind === 'audio' && !failed ? (
-        <audio src={contentUrl(file)} controls preload="metadata" onError={() => setFailed(true)} />
+      {kind === 'audio' && !failed && !locked ? (
+        content.src && <audio src={content.src} controls preload="metadata" onError={() => setFailed(true)} />
       ) : (
-        <p class="vnote">{t('viewer.noPreview')}</p>
+        <p class="vnote">{t(locked ? 'viewer.locked' : 'viewer.noPreview')}</p>
       )}
-      <a class="btn sm primary" href={contentUrl(file)} download={file.name}>
+      <a class="btn sm primary" {...downloadProps(file, keys)}>
         <Icon name="download" />
         {t('viewer.download')}
       </a>

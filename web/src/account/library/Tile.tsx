@@ -1,17 +1,27 @@
 import { useState } from 'preact/hooks';
-import { thumbUrl, type FileInfo } from '../../api';
+import type { FileInfo } from '../../api';
 import { Icon } from '../../components/Icon';
+import { useThumbSrc } from '../../e2ee/hooks';
 import { formatDuration } from '../../format';
 import { useI18n } from '../../i18n';
 import { toneClass } from '../colors';
 import { extOf } from '../viewer/view';
 
 /** A file's thumbnail, or until there is one, the app's placeholder: a muted tone for photos and
- * videos, the name for documents. */
+ * videos, the name for documents. An encrypted file's is decrypted here; while its folder's key
+ * isn't open here, a lock shows instead. */
 export function Thumb({ file }: { file: FileInfo }) {
   const [broken, setBroken] = useState(false);
-  if (file.has_thumb && !broken) {
-    return <img class="thumb" src={thumbUrl(file)} alt="" loading="lazy" decoding="async" draggable={false} onError={() => setBroken(true)} />;
+  const thumb = useThumbSrc(file);
+  if (file.has_thumb && !broken && thumb.src) {
+    return <img class="thumb" src={thumb.src} alt="" loading="lazy" decoding="async" draggable={false} onError={() => setBroken(true)} />;
+  }
+  if (thumb.locked) {
+    return (
+      <span class={`thumb ph ${toneClass(file.id)}`}>
+        <Icon name="lock" class="tico" />
+      </span>
+    );
   }
   if (file.kind === 'document') {
     return (

@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'preact/hooks';
 import { ApiError, getAbout, getMyDevices, setPassword, signOutDevice, type ListedDevice } from '../../api';
 import { Icon } from '../../components/Icon';
+import { b64u } from '../../e2ee/bytes';
+import { keyring } from '../../e2ee/keyring';
 import { daysAgo, formatWait } from '../../format';
 import { pickLanguage, useI18n, type I18n, type Lang } from '../../i18n';
 import { applyTheme, darkThemes, lightThemes, resolveTheme, storeTheme, type Theme, type ThemeChoice } from '../../theme';
@@ -271,7 +273,10 @@ export function PasswordDialog({ onClose }: { onClose: () => void }) {
     setBusy(true);
     setProblem(null);
     try {
-      await setPassword(username.trim(), next, has ? current : undefined);
+      // With the person's key open here, it stays locked with the new password, so the
+      // password opens it in a new browser too.
+      const lock = keyring.status === 'ready' ? b64u(await keyring.passwordLock(next)) : undefined;
+      await setPassword(username.trim(), next, has ? current : undefined, lock);
     } catch (err) {
       setBusy(false);
       if (!(err instanceof ApiError) || err.status === 0) return setProblem(t('common.offline'));

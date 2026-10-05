@@ -8,6 +8,7 @@ import { suggestedUsername, validUsername } from '../account/settings/username';
 import { ApiError, createFirstAdmin, getMe, getSetup, startSetup, type SetupStatus } from '../api';
 import { thisBrowser } from '../browser';
 import { DropZone } from '../components/DropZone';
+import { keyring } from '../e2ee/keyring';
 import { Icon } from '../components/Icon';
 import { Page } from '../components/Page';
 import { formatBytes } from '../format';
@@ -152,12 +153,15 @@ export function SetupPage() {
     }
     forgetSecret();
     // The answer carries the cookie, but a browser that blocks cookies drops it silently.
+    let me;
     try {
-      await getMe();
+      me = await getMe();
     } catch {
       setBusy(false);
       return setProblem(t('setup.noCookie'));
     }
+    // The admin's keys for encrypted folders, locked with the password too.
+    await keyring.signedIn(me, password);
     setSignedInHint(true);
     location.replace('/library');
   }

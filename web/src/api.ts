@@ -23,6 +23,15 @@ export interface Session {
   folder_name: string | null;
   /** The PIN also shows what is in its folder. */
   shows_folder: boolean;
+  /** The key new files into the folder are encrypted for; null while it is plain. */
+  encrypt: EncryptKey | null;
+}
+
+/** The newest version of an encrypted folder's key, which uploads seal their file keys for. */
+export interface EncryptKey {
+  folder: string;
+  version: number;
+  public_key: string;
 }
 
 export class ApiError extends Error {
@@ -215,13 +224,23 @@ export const getMe = () => request<Me>('GET', '/api/me');
 export const login = (username: string, password: string, deviceName: string) =>
   request<Me>('POST', '/api/auth/login', { username, password, device_name: deviceName, client: 'web' });
 
+/** A key locked with the secret of an invite's link: a version of a folder's key, or the
+ * person's own key (folder null). */
+export interface InviteKey {
+  folder: string | null;
+  version: number;
+  public_key: string;
+  locked: string;
+}
+
 export const acceptInvite = (token: string, deviceName: string) =>
-  request<Me>('POST', '/api/invites/accept', { token, device_name: deviceName, client: 'web' });
+  request<Me & { keys: InviteKey[] }>('POST', '/api/invites/accept', { token, device_name: deviceName, client: 'web' });
 
 export const logout = () => request<void>('POST', '/api/auth/logout', {});
 
-export const setPassword = (username: string, password: string, current?: string) =>
-  request<void>('PUT', '/api/me/password', { username, password, current_password: current || undefined });
+/** Sets the username and password; lock is the person's key locked with the new password. */
+export const setPassword = (username: string, password: string, current?: string, lock?: string) =>
+  request<void>('PUT', '/api/me/password', { username, password, current_password: current || undefined, password_lock: lock });
 
 export const deleteMe = () => request<void>('POST', '/api/me/delete', {});
 
@@ -255,6 +274,16 @@ export interface FileInfo {
   has_thumb: boolean;
   /** Who sent it, if they have an account; null for a PIN. */
   from: string | null;
+  /** How it is encrypted (docs/e2ee-plan.md); null for a plain file. size is the plain size. */
+  enc: FileEnc | null;
+}
+
+/** An encrypted file: the version of its folder's key that its file key is sealed for, that
+ * sealed key, and the header its stored bytes start with. */
+export interface FileEnc {
+  version: number;
+  key: string;
+  header: string;
 }
 
 export interface LibraryDay {
@@ -327,6 +356,10 @@ export interface FolderInfo {
   /** Its newest photo or video with a thumbnail. */
   cover: FileInfo | null;
   created_at: string;
+  /** New files must be encrypted. */
+  encrypted: boolean;
+  /** The newest version of its key; null if it was never encrypted. */
+  key_version: number | null;
 }
 
 /** The folders this person sees, the oldest first. */
@@ -351,7 +384,8 @@ export interface ZipDownload {
   name: string;
   size: number;
   count: number;
-  files: { id: string; path: string; size: number }[];
+  /** Encrypted files are listed, with their plain size, but the ZIP leaves them out. */
+  files: { id: string; folder: string; path: string; size: number; enc: FileEnc | null }[];
 }
 
 export const createDownload = (ids: string[]) => request<ZipDownload>('POST', '/api/downloads', { ids });
@@ -363,8 +397,16 @@ export const deleteFiles = (ids: string[]) => request<{ changed: number }>('POST
 
 export const restoreFiles = (ids: string[]) => request<{ changed: number }>('POST', '/api/trash/restore', { ids });
 
+/** A file key sealed for another folder's key, for moving an encrypted file there. */
+export interface MovedKey {
+  id: string;
+  version: number;
+  key: string;
+}
+
 /** Admins: files go into another folder, and who sees them with it. At most 1000 ids at once. */
-export const moveFiles = (ids: string[], folder: string) => request<{ changed: number }>('POST', '/api/files/move', { ids, folder });
+export const moveFiles = (ids: string[], folder: string, keys?: MovedKey[]) =>
+  request<{ changed: number }>('POST', '/api/files/move', { ids, folder, keys: keys?.length ? keys : undefined });
 
 /** Admins: the drive or the bucket, the library and Recently deleted. */
 export interface Storage {
@@ -448,12 +490,22 @@ export interface PinInfo {
   folder: string;
   /** Guests with it also see and download what is in the folder. */
   shows_folder: boolean;
+  /** For a PIN that shows an encrypted folder: its link's secret, sealed for that version of
+   * the folder's key, so admins' devices can show the whole link again. */
+  secret: { sealed: string; version: number } | null;
 }
 
 export const getPins = () => request<{ pins: PinInfo[] }>('GET', '/api/pins');
 export const suggestPin = () => request<{ code: string }>('GET', '/api/pins/suggest');
-export const createPin = (kind: PinInfo['kind'], code: string, folder: string, shows_folder = false) =>
-  request<PinInfo>('POST', '/api/pins', { kind, code, folder, shows_folder });
+/** What the secret of a PIN link that shows an encrypted folder brings. */
+export interface PinSecret {
+  sealed: string;
+  version: number;
+  keys: { version: number; locked: string }[];
+}
+
+export const createPin = (kind: PinInfo['kind'], code: string, folder: string, shows_folder = false, secret?: PinSecret) =>
+  request<PinInfo>('POST', '/api/pins', { kind, code, folder, shows_folder, secret });
 export const newPinCode = (id: string) => request<PinInfo>('POST', `/api/pins/${encodeURIComponent(id)}/new-code`, {});
 export const endPin = (id: string) => request<void>('POST', `/api/pins/${encodeURIComponent(id)}/end`, {});
 
@@ -499,9 +551,19 @@ export const removePerson = (id: string) => request<void>('DELETE', `/api/users/
 export const newPassword = (id: string, username?: string) =>
   request<{ username: string; password: string }>('POST', `/api/users/${encodeURIComponent(id)}/password`, { username });
 /** An invite for someone new; a member sees folders, an admin every folder. */
-export const createInvite = (name: string, role: Role, folders: string[]) =>
-  request<NewInvite>('POST', '/api/invites', role === 'member' ? { name, role, folders } : { name, role });
-export const inviteDevice = (userId: string) => request<NewInvite>('POST', `/api/users/${encodeURIComponent(userId)}/invites`, {});
+/** A version of a folder's key locked with the secret of an invite's link. */
+export interface LockedFolderKey {
+  folder: string;
+  version: number;
+  locked: string;
+}
+
+export const createInvite = (name: string, role: Role, folders: string[], keys?: LockedFolderKey[]) =>
+  request<NewInvite>('POST', '/api/invites', { name, role, folders: role === 'member' ? folders : undefined, keys: keys?.length ? keys : undefined });
+/** An invite for another phone or browser of someone; personKey, their key locked with the
+ * link's secret, when it is the caller's own. */
+export const inviteDevice = (userId: string, personKey?: string) =>
+  request<NewInvite>('POST', `/api/users/${encodeURIComponent(userId)}/invites`, { person_key: personKey });
 export const withdrawInvite = (id: string) => request<void>('DELETE', `/api/invites/${encodeURIComponent(id)}`);
 
 export interface TrashedFile extends FileInfo {
@@ -520,3 +582,74 @@ export interface TrashedFolder {
 
 export const getTrash = () => request<{ files: TrashedFile[]; folders: TrashedFolder[]; trash_days: number }>('GET', '/api/trash');
 export const purgeFiles = (ids: string[]) => request<{ changed: number }>('POST', '/api/trash/purge', { ids });
+
+// End-to-end encryption (docs/e2ee-plan.md): binary values are base64url without padding.
+
+/** What this browser can open, and what it can seal for others. */
+export interface KeysAnswer {
+  device_key: string | null;
+  person: { public_key: string | null; sealed: string | null; password_lock: string | null };
+  folders: { folder: string; version: number; public_key: string; sealed: string | null }[];
+  recovery_key: string | null;
+  todo: {
+    devices: { id: string; public_key: string }[];
+    people: { folder: string; version: number; user: string; public_key: string }[];
+    recovery: { folder: string; version: number }[];
+    rekey: string[];
+    pins: { pin: string; folder: string; version: number; secret_version: number; secret_sealed: string }[];
+  };
+}
+
+export const getKeys = () => request<KeysAnswer>('GET', '/api/keys');
+export const putDeviceKey = (public_key: string) => request<void>('PUT', '/api/keys/device', { public_key });
+export const putPersonKey = (public_key: string, sealed: string, start_over = false) =>
+  request<void>('PUT', '/api/keys/person', { public_key, sealed, start_over: start_over || undefined });
+export const putPasswordLock = (password_lock: string) => request<void>('PUT', '/api/keys/password-lock', { password_lock });
+
+/** What this browser sealed or locked from its to-do list. */
+export interface Grants {
+  devices: { device: string; sealed: string }[];
+  people: { folder: string; version: number; user: string; sealed: string }[];
+  recovery: { folder: string; version: number; sealed: string }[];
+  pins: { pin: string; version: number; locked: string }[];
+}
+
+export const postGrants = (g: Grants) => request<void>('POST', '/api/keys/grants', g);
+
+/** A version of a folder's key, made here: sealed for this person and for the recovery key. */
+export interface NewFolderKey {
+  public_key: string;
+  sealed: string;
+  recovery_sealed: string;
+}
+
+export const setFolderEncryption = (folder: string, encrypted: boolean, key?: NewFolderKey) =>
+  request<FolderInfo>('PUT', `/api/folders/${encodeURIComponent(folder)}/encryption`, { encrypted, key });
+export const postFolderKey = (folder: string, version: number, key: NewFolderKey) =>
+  request<void>('POST', `/api/folders/${encodeURIComponent(folder)}/keys`, { version, ...key });
+
+/** Admins: the recovery key, and the folder keys sealed for it. */
+export interface Recovery {
+  public_key: string | null;
+  locked: string | null;
+  folders: { folder: string; version: number; public_key: string; sealed: string }[];
+}
+
+export const getRecovery = () => request<Recovery>('GET', '/api/recovery');
+export const putRecovery = (public_key: string, locked: string) => request<void>('PUT', '/api/recovery', { public_key, locked });
+
+/** Admins: the settings for the whole server. */
+export interface Settings {
+  new_folders_encrypted: boolean;
+}
+
+export const getSettings = () => request<Settings>('GET', '/api/admin/settings');
+export const putSettings = (s: Settings) => request<Settings>('PUT', '/api/admin/settings', s);
+
+/** A PIN that shows its folder: the folder's keys, locked with its link's secret. */
+export interface PinKeys {
+  folder: string;
+  keys: { version: number; public_key: string; locked: string }[];
+}
+
+export const getPinKeys = () => request<PinKeys>('GET', '/api/pin/keys');

@@ -39,6 +39,7 @@ import {
   downloadEach,
   eachLimit,
   filesToShare,
+  hrefsOf,
   knownTrashDays,
   learnTrashDays,
   moveMany,
@@ -64,6 +65,8 @@ import {
   type Selection,
 } from './selection';
 import { Tile } from './Tile';
+import { KeysBanner } from '../e2ee/Encryption';
+import { SealError } from '../../e2ee/formats';
 
 const kinds: { kind: FileKind | null; label: string }[] = [
   { kind: null, label: 'library.all' },
@@ -323,7 +326,13 @@ export function Library() {
 
   const idsOfDay = (day: string) => getFileIds(model.filter, day).then((r) => r.ids);
   const problemText = (e: unknown) =>
-    e instanceof ApiError && e.code === 'busy' ? t('zip.busy') : t(e instanceof ApiError && e.status > 0 ? 'common.failed' : 'common.offline');
+    e instanceof SealError
+      ? t('keys.cantOpen')
+      : e instanceof ApiError && e.code === 'not_encrypted'
+        ? t('encryption.moveIntoPlain')
+        : e instanceof ApiError && e.code === 'busy'
+          ? t('zip.busy')
+          : t(e instanceof ApiError && e.status > 0 ? 'common.failed' : 'common.offline');
 
   /** With the files in a bucket, which sends no ZIP, several download one by one. */
   const s3 = info?.storage === 's3';
@@ -344,8 +353,10 @@ export function Library() {
     setBusy(true);
     try {
       const ids = await selectedIds(sel, idsOfDay);
+      // The list says which are encrypted, and how to open them.
+      const href = hrefsOf((await createDownload(ids)).files);
       clear();
-      downloadEach(ids, toast, { t, tn });
+      downloadEach(ids, toast, { t, tn }, href);
     } catch (e) {
       toast({ text: problemText(e) });
     } finally {
@@ -358,9 +369,14 @@ export function Library() {
     setBusy(true);
     try {
       const ids = await selectedIds(sel, idsOfDay);
-      const zip = await download(ids, model.files.find((f) => f.id === ids[0]));
+      const got = await download(ids, model.files.find((f) => f.id === ids[0]));
       clear();
-      if (zip) {
+      if (got?.each) {
+        // Encrypted files go into no ZIP: all of them one by one, decrypted.
+        if (ids.length > eachLimit) return toast({ text: t('each.tooMany', { n: eachLimit }) });
+        downloadEach(ids, toast, { t, tn }, got.each);
+      } else if (got) {
+        const { zip } = got;
         toast({
           text: t('zip.started', { n: zip.count, size: formatBytes(zip.size, lang) }),
           action: { label: t('zip.again'), run: () => startDownload(zipUrl(zip), zip.name) },
@@ -606,6 +622,7 @@ export function Library() {
               {t(touch ? 'select.tipTouch' : 'select.tipMouse')}
             </p>
           )}
+          <KeysBanner />
           {sections.map((s) => {
             const day: LibraryDay = { day: s.day, count: s.count, bytes: s.bytes };
             const state = dayState(sel, day);

@@ -23,12 +23,13 @@ import { Avatar, RoleBadge, Switch } from '../components/Bits';
 import { Confirm, Modal } from '../components/Modal';
 import { useAccount } from '../context';
 import { inviteDefault } from '../folders/model';
-import { FolderCover, useFolderLines } from '../folders/Folders';
+import { FolderCover, FolderName, useFolderLines } from '../folders/Folders';
 import { refreshFolders, useFolders } from '../folders/store';
 import { lastUsed } from '../settings/dialogs';
 import { personLine } from './format';
 import { NewPasswordDialog } from './NewPassword';
 import { copyText, sharesLinks, shareText } from './share';
+import { keyring } from '../../e2ee/keyring';
 
 /** When an invite ends: "21:00" today, else with the day. */
 function inviteEnd(lang: Lang, when: string): string {
@@ -189,7 +190,7 @@ function PersonDialog({ person, onClose }: { person: Person; onClose: () => void
                 >
                   <FolderCover folder={f} />
                   <span class="rt">
-                    <b>{f.name}</b>
+                    <FolderName folder={f} />
                     <span>{f.admins_only ? `${lines.count(f.files)} · ${t('folders.onlyAdminsLine')}` : lines.holds(f.files, f.bytes)}</span>
                   </span>
                   <Switch on={sees} locked={admin} />
@@ -345,7 +346,7 @@ function InviteInfo({ invite, people, onClose }: { invite: OpenInvite; people: P
  * someone who has an account. */
 export function InviteDialog({ forPerson, onClose }: { forPerson?: Person; onClose: () => void }) {
   const { t } = useI18n();
-  const { toast } = useAccount();
+  const { toast, me } = useAccount();
   const folders = useFolders();
   const list = folders.list ?? [];
   const lines = useFolderLines();
@@ -366,7 +367,21 @@ export function InviteDialog({ forPerson, onClose }: { forPerson?: Person; onClo
     setBusy(true);
     setProblem(null);
     try {
-      setInvite(forPerson ? await inviteDevice(forPerson.id) : await createInvite(who, role, given));
+      // The keys go along, locked with a secret that only the link carries, after a dot: the
+      // person's own for another phone or browser of one's own, the folders' for someone new.
+      let made: NewInvite;
+      if (forPerson) {
+        const own = forPerson.id === me.user.id ? await keyring.personKeyForInvite() : null;
+        made = await inviteDevice(forPerson.id, own?.locked);
+        if (own) made = { ...made, link: `${made.link}.${own.secret}` };
+      } else {
+        const encrypted = list.filter((f) => f.key_version !== null).map((f) => f.id);
+        const gets = role === 'admin' ? encrypted : given.filter((id) => encrypted.includes(id));
+        const keys = gets.length > 0 && keyring.status === 'ready' ? await keyring.inviteKeys(gets) : null;
+        made = await createInvite(who, role, given, keys?.keys);
+        if (keys?.keys.length) made = { ...made, link: `${made.link}.${keys.secret}` };
+      }
+      setInvite(made);
     } catch (e) {
       setProblem(t(e instanceof ApiError && e.status > 0 ? 'common.failed' : 'common.offline'));
     } finally {
@@ -433,7 +448,7 @@ export function InviteDialog({ forPerson, onClose }: { forPerson?: Person; onClo
                     <button key={f.id} type="button" class="row" role="checkbox" aria-checked={on} disabled={!!invite} onClick={() => pick(f.id)}>
                       <FolderCover folder={f} />
                       <span class="rt">
-                        <b>{f.name}</b>
+                        <FolderName folder={f} />
                         <span>{lines.about(f)}</span>
                       </span>
                       <span class={`cbx${on ? ' on' : ''}`} aria-hidden="true">

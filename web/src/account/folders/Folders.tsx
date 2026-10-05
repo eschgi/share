@@ -2,7 +2,8 @@ import '../save/save.css';
 import './folders.css';
 import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
-import { thumbUrl, type FolderInfo } from '../../api';
+import type { FileInfo, FolderInfo } from '../../api';
+import { useThumbSrc } from '../../e2ee/hooks';
 import { Icon } from '../../components/Icon';
 import { formatBytes, formatCount } from '../../format';
 import { useI18n } from '../../i18n';
@@ -10,6 +11,21 @@ import { toneClass } from '../colors';
 import { Modal } from '../components/Modal';
 import { allTotals } from './model';
 import { showFolder } from './store';
+
+/** A folder's name, with a lock while its new files are encrypted. */
+export function FolderName({ folder }: { folder: FolderInfo }) {
+  const { t } = useI18n();
+  return (
+    <b>
+      {folder.name}
+      {folder.encrypted && (
+        <span class="flock" role="img" aria-label={t('encryption.encrypted')} title={t('encryption.encrypted')}>
+          <Icon name="lock" />
+        </span>
+      )}
+    </b>
+  );
+}
 
 /** A folder's picture: its newest photo or video, a document for one without pictures, and the
  * library's for all folders. */
@@ -23,13 +39,7 @@ export function FolderCover({ folder, large }: { folder: FolderInfo | 'all'; lar
     );
   }
   const c = folder.cover;
-  if (c?.has_thumb) {
-    return (
-      <span class={`fcov${size}`}>
-        <img src={thumbUrl(c)} alt="" loading="lazy" decoding="async" draggable={false} />
-      </span>
-    );
-  }
+  if (c?.has_thumb) return <CoverThumb file={c} size={size} />;
   if (c) {
     return (
       <span class={`fcov ph ${toneClass(c.id)}${size}`}>
@@ -83,7 +93,7 @@ export function FolderChoices({
             <input type="radio" name="folder" class="sr-only" checked={value === f.id} disabled={!!extra} onChange={() => onChoose(f.id)} />
             <FolderCover folder={f} />
             <span class="dt">
-              <b>{f.name}</b>
+              <FolderName folder={f} />
               <span>{extra ? `${extra} · ${lines.seen(f)}` : lines.about(f)}</span>
             </span>
             <i class="radio" />
@@ -161,7 +171,7 @@ export function FolderSheet({ list, shown, onClose }: { list: FolderInfo[]; show
     <button key={id ?? 'all'} type="button" class="row" aria-pressed={(shown?.id ?? null) === id} onClick={() => choose(id)}>
       <FolderCover folder={cover} />
       <span class="rt">
-        <b>{name}</b>
+        {cover === 'all' ? <b>{name}</b> : <FolderName folder={cover} />}
         <span>{line}</span>
       </span>
       {(shown?.id ?? null) === id && <Icon name="check" class="tick" />}
@@ -188,7 +198,7 @@ export function FolderColumn({ list, shown }: { list: FolderInfo[]; shown: Folde
       <button key={id ?? 'all'} type="button" class={`frow${on ? ' on' : ''}`} aria-current={on ? 'true' : undefined} onClick={() => showFolder(id)}>
         <FolderCover folder={cover} />
         <span>
-          <b>{name}</b>
+          {cover === 'all' ? <b>{name}</b> : <FolderName folder={cover} />}
           <span>{lines.count(files)}</span>
         </span>
       </button>
@@ -200,5 +210,22 @@ export function FolderColumn({ list, shown }: { list: FolderInfo[]; shown: Folde
       {row(null, 'all', t('folders.all'), all.files)}
       {list.map((f) => row(f.id, f, f.name, f.files))}
     </nav>
+  );
+}
+
+/** A folder's cover from its newest photo or video, decrypted if it is encrypted. */
+function CoverThumb({ file, size }: { file: FileInfo; size: string }) {
+  const thumb = useThumbSrc(file);
+  if (!thumb.src) {
+    return (
+      <span class={`fcov ph ${toneClass(file.id)}${size}`}>
+        <Icon name={thumb.locked ? 'lock' : 'image'} />
+      </span>
+    );
+  }
+  return (
+    <span class={`fcov${size}`}>
+      <img src={thumb.src} alt="" loading="lazy" decoding="async" draggable={false} />
+    </span>
   );
 }
