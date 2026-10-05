@@ -163,6 +163,40 @@ Both speak English, German and Italian.
   and see what `share check` finds about the drive or the bucket, such as a full drive, FAT32 or a
   bucket without CORS rules. Settings show the version running on the server.
 
+## End-to-end encryption
+
+A folder can be encrypted end to end: then only the phones and browsers of the people who see it can
+open its files, not the server, its drive or bucket, its database, or whoever gets hold of them.
+The design and the formats are in [docs/e2ee-plan.md](docs/e2ee-plan.md).
+
+- **Per folder.** An admin turns it on in the folder's settings, on the website or in the app, and
+  can make it the default for new folders. From then on each new file is encrypted on the phone or
+  browser that sends it, with a key of its own, contents and thumbnail alike; files already in the
+  folder stay as they are. Turning it off makes new files plain again, and the encrypted ones still
+  open. Names, days, sizes and who sees which folder stay readable to the server, so the library,
+  search and sorting work as before.
+- **The keys come by themselves.** Every phone and browser has a key of its own, which never leaves
+  it. Whoever is online with a key seals it for those who lack it: someone given a folder, a new
+  phone of someone, the recovery key. A new phone or browser shows encrypted files as locked and
+  waits for another one of the person; signing in with the password opens them at once, and an
+  invite carries the keys in its link, after the token, where the server never sees them.
+- **The recovery code.** The first encrypted folder shows its admin a recovery code, once: written
+  down or printed, it opens every encrypted folder again should all phones and browsers be lost.
+  A new one can be made in the settings, which ends the old one.
+- **PINs.** Guests with a PIN send into an encrypted folder encrypted, and can't read anything back.
+  A PIN that also shows an encrypted folder needs its whole link, which carries a secret after a
+  dot that opens the folder; the code alone sends, and shows encrypted files as locked.
+- **What stays possible.** Videos play and seek, downloads, "one by one" and saving into a folder
+  give the original files, decrypted on the device. ZIPs leave encrypted files out; they download
+  one by one instead. Moving encrypted files works only into another encrypted folder. The
+  command line has no keys: `share invite` and showing PINs refuse encrypted folders and point to
+  the app or the website.
+- **What it doesn't protect:** the names and other details above; files someone already downloaded;
+  a server that was taken over and sends browsers changed website code, since the website comes
+  from the server (the app's code doesn't); anyone holding the whole link of a PIN that shows an
+  encrypted folder, by design. A password opens the keys, so they are as safe as the password, which
+  the server sees at sign-in.
+
 ## Security
 
 - A PIN only lets people send. Nobody can see or download anything with it, and others with the same
@@ -204,6 +238,9 @@ Both speak English, German and Italian.
   storage until they are sent, and a week at most.
 - The app's player gets the phone's key only where the app's own requests would send it: plain http
   only after the proof above, and never to the https port at home, whose files it fetches first.
+- Encrypted folders' files and thumbnails are encrypted on the sending device and decrypted only on
+  the family's devices; see [End-to-end encryption](#end-to-end-encryption) for what that protects
+  and what not.
 - With a bucket, its keys stay on the server. Browsers and the app get links signed for one piece
   of an upload, for an hour and for exactly that piece's size, or for one file, for 12 hours. Such a
   link works for anyone who has it until it ends, even after the file was deleted. The app never

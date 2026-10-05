@@ -1,7 +1,8 @@
 # Share — plan
 
-Status: built; the README says what it does, and [s3-plan.md](s3-plan.md) how the files can be in
-an S3 bucket. Screens: [share-mockup.html](share-mockup.html) (numbers below refer to its screens).
+Status: built; the README says what it does, [s3-plan.md](s3-plan.md) how the files can be in an
+S3 bucket, and [e2ee-plan.md](e2ee-plan.md) how a folder is encrypted end to end. Screens:
+[share-mockup.html](share-mockup.html) (numbers below refer to its screens).
 
 Share is a self-hosted place to collect files. Anyone with a PIN sends photos, videos and documents
 through a website, without an account. People with an account see and download the folders they
@@ -66,6 +67,11 @@ app will go on Google Play later.
   PIN see and download what is in it, without names and without deleting anything (46).
 - **One folder looks like none**: the folder's name, the choices and the folder column appear only
   with the second folder.
+- **Encrypted folders** (e2ee-plan.md): an admin turns end-to-end encryption on per folder, or for
+  new folders by default. Their new files and thumbnails are encrypted on the sending phone or
+  browser, and open only on the devices of the people who see the folder; names, days and sizes
+  stay readable to the server. Keys reach new devices and people from whoever is online with them,
+  with the password, through invite and PIN links, or with the admins' recovery code.
 - **Upgrading** puts everything that was there into a first folder named after the server, and
   moves the day folders into its directory; the moves resume after an interruption. The clients name
   the folders of every upload, PIN and invite, and the server refuses those that don't (API

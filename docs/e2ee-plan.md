@@ -130,9 +130,12 @@ the sizes match. The thumbnail is sealed before it is sent.
 
 **Reading:** thumbnails and photos are fetched as before and decrypted on the device. The website's
 service worker serves videos and downloads decrypted, with ranges, so a video seeks; without a
-service worker (the first visit, `npm run dev`), the page decrypts into memory. The app decrypts
-into its cache to play, save, share or open a file. Downloading several encrypted files goes one by
-one; saving into a folder (Chrome and Edge) decrypts while writing.
+service worker (the first visit, `npm run dev`), the page decrypts into memory. The app's player
+plays an encrypted video or sound from a small server on 127.0.0.1 that decrypts while it streams,
+with ranges, the way the service worker does; saving into the gallery or Downloads decrypts while
+writing and resumes at a chunk; opening or sharing a file decrypts into the cache. Downloading
+several encrypted files goes one by one; saving into a folder (Chrome and Edge) decrypts while
+writing.
 
 **Invites:** the inviting device locks every version of the invite's encrypted folders' keys (all
 encrypted folders for an admin) with a secret that only the link carries, after a dot:
@@ -178,7 +181,7 @@ New:
 - `GET /api/pin/keys`: for a PIN session that shows its folder, the folder keys locked for its link.
 
 Changed:
-- `FileInfo` gets `enc` (`{version, key, header}` or null); `size` is the plain size.
+- `FileInfo` gets `enc` (`{version, key, header, plain_size}` or null); `size` is the plain size.
 - `FolderInfo` gets `encrypted` and `key_version` (the newest, or null).
 - tus metadata gets `enc`, S3's `POST /api/s3/uploads` gets `enc`: `{version, key, header,
   plain_size}`; the upload's size is the encrypted size.
@@ -186,12 +189,17 @@ Changed:
 - `POST /api/files/move` gets `keys` for encrypted files.
 - `POST /api/invites` gets `keys`, `POST /api/users/{id}/invites` gets `person_key`, and accepting an
   invite returns them.
-- `POST /api/pins` gets `secret` and `keys` for a PIN that shows an encrypted folder; `GET
-  /api/session` gets `encrypt` (the folder's newest public key, or null).
+- `POST /api/pins` gets `secret` (`{sealed, version, keys}`) for a PIN that shows an encrypted
+  folder; `GET /api/pins` and the answers about a PIN give `{sealed, version}` of it back, so an
+  admin's device opens the secret with the folder key and hands on the whole link again. `GET
+  /api/session` and unlocking a PIN give `encrypt` (the folder's newest public key, or null).
+- `POST /api/downloads` lists each file's folder and `enc`, so one by one and saving into a folder
+  can decrypt.
 - New error codes: `encryption_required` (409, an upload into an encrypted folder came plain),
   `key_outdated` (409, sealed for a key version that isn't the newest), `not_encrypted` (409, moving
-  encrypted files into a folder without keys), `keys_needed` (409, the command line asked for an
-  encrypted folder).
+  encrypted files into a folder without keys, or an encrypted upload into one), `key_exists` (409,
+  a person key that is there already), `no_key` (409, what needs a key that isn't there yet). The
+  command line refuses what would give access to an encrypted folder by itself.
 
 ## Server (`server/`)
 
@@ -235,13 +243,18 @@ Changed:
 
 - Kotlin `e2ee/`: the same formats in plain JVM code (unit-tested against `contract/crypto`; the
   Android stubs make `android.*` useless in unit tests).
-- A key manager in Kotlin, which the uploads and downloads use in the background and Dart calls
-  through the platform channel: syncing with `/api/keys`, turning folders on, the recovery code,
-  invites and PINs with secrets, sealing for moves.
-- Uploads: the per-file key and header kept in `transfers.db` with the upload; an encrypting source
-  that starts at any offset; sealed thumbnails.
-- Reading: thumbnails decrypted through the channel; photos, videos and "open" or "share" decrypted
-  into the cache by the fetcher; saving several decrypts while writing and resumes at a chunk.
+- `e2ee/Keyring.kt`, the website's keyring in Kotlin, which the uploads, downloads and the player use
+  in the background and Dart calls through the platform channel (`keys.*`, and `keys` events,
+  contract/app/platform.json): syncing with `/api/keys`, turning folders on, the recovery code,
+  invites and PINs with secrets, sealing for moves. `Keys` wires it to Android: the device key in
+  `SecretStore`, the server on the route the app picked, and after a restart it opens the keys again
+  by itself. A PIN link's secret stays in `SecretStore` while the PIN works on the phone.
+- Uploads: each file's seal (its key, header and sealed key, with its size and time) kept in
+  `transfers.db` (version 6) until it is sent; an encrypting source that starts at any offset; tus
+  and S3 get `enc`; sealed thumbnails; a 409 for another key version seals anew.
+- Reading: thumbnails opened through the channel, which also checks their size; photos decrypted
+  through the channel; videos and sound from `LocalStream` on 127.0.0.1; saving and "open" or
+  "share" decrypt while writing, and resume at a chunk.
 - Dart screens for the same switches, codes and states as the website; strings in the three arb
   files.
 
@@ -266,13 +279,28 @@ Changed:
   seeking video show them; a download and "save into a folder" give the original bytes; a second
   browser waits until the first grants it, or opens with the password; the recovery code restores an
   admin; a PIN guest sends but can't read back; turning encryption off makes new files plain.
-- Kotlin tests for the encrypting source and the decrypting sinks; on the phone (by the user):
-  send, view, play and save in an encrypted folder.
+- Kotlin tests: the keyring's flows against a fake keys API, as the website's test; downloads that
+  decrypt, resume at a chunk and refuse a changed chunk; the local stream's ranges; a tus upload of
+  the encrypted stream with its `enc`. Dart tests: links with secrets, the screens and what they
+  hand Kotlin and the server. On the phone (by the user): send, view, play and save in an encrypted
+  folder.
 
 ## Pitfalls
 
 - A file's key must stay the same through every retry of its upload, or a resumed upload mixes two
   encryptions; it goes into the upload's saved state before the upload is created.
+- The same key and header must never encrypt other bytes: the chunks' nonces would repeat. A file
+  picked again, or changed in place, starts over with a new key and a new upload: the website
+  compares the file's time, the app its size and time, and an app upload under way whose time can't
+  be told starts over too.
+- tus-js-client counts what a slice of its `fileReader` holds by its `size`: the encrypted pieces
+  are Blobs, not byte arrays, or the upload stalls.
+- Uppy's tus plugin sends every allowed meta field, a missing one as "undefined": `enc` is empty for
+  plain files.
+- Chrome sends a link's `download` past the service worker: decrypted downloads go through a hidden
+  frame. While a worker streams, the page sends it a message now and then, so it isn't stopped.
+- Refreshing the keys must not empty the open folder keys on the way, or a thumbnail decrypting just
+  then shows a lock until the page reloads.
 - HKDF-Extract with no salt uses 32 zero bytes as HMAC's key; WebCrypto refuses an empty HMAC key.
 - WebCrypto's ECDH gives P-256's shared x-coordinate, which is HPKE's DH output; a non-extractable
   private key can still derive bits, so the device key never needs exporting.
