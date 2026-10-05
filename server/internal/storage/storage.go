@@ -166,7 +166,11 @@ func CheckS3(ctx context.Context, dataDir string, b *s3.Bucket, origins []string
 	case errors.As(err, &re) && re.Kind == s3.ClockSkew:
 		r.problem("s3_clock_skew", "this machine's clock is %v off the bucket's; links to the bucket fail or end too soon until it is right", re.Skew.Abs().Round(time.Second))
 	default:
-		r.problem("s3_unreachable", "the bucket %s at %s can't be reached: %v", b.Name(), b.Endpoint(), err)
+		cause := err
+		if re != nil {
+			cause = re.Err // its own message says it can't be reached too
+		}
+		r.problem("s3_unreachable", "the bucket %s at %s can't be reached: %v", b.Name(), b.Endpoint(), cause)
 	}
 	if err == nil || re != nil && re.Kind == s3.ClockSkew && re.Err == nil {
 		var refused []string

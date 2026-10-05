@@ -512,4 +512,7 @@ func TestCheckS3(t *testing.T) {
 	if got := check(b); !slices.Equal(got, []string{"s3_unreachable"}) {
 		t.Errorf("no network: %v", got)
 	}
+	if msg := CheckS3(ctx, t.TempDir(), b, origins).Problems[0].Message; strings.Count(msg, "can't be reached") != 1 {
+		t.Errorf("no network says: %s", msg)
+	}
 }
