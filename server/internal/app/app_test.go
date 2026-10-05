@@ -26,6 +26,7 @@ import (
 	"github.com/eschgi/share/server/internal/config"
 	"github.com/eschgi/share/server/internal/db"
 	"github.com/eschgi/share/server/internal/ids"
+	"github.com/eschgi/share/server/internal/s3/s3test"
 	"github.com/eschgi/share/server/internal/storage"
 	"github.com/eschgi/share/server/internal/upload"
 )
@@ -47,6 +48,7 @@ type env struct {
 	cfg    *config.Config
 	free   atomic.Int64
 	report atomic.Pointer[storage.Report] // what the storage page finds; nothing when nil
+	fake   *s3test.Server                 // the bucket of an S3 env, unless it is a real one
 }
 
 func newEnv(t *testing.T) *env { return newEnvWith(t, "") }
