@@ -1,5 +1,5 @@
 {
-  "description": "tus 1.0.0 at /tus/ with the core, creation and termination extensions. Authenticate every request (PIN cookie or Authorization: Bearer). Upload ids are file ids.",
+  "description": "tus 1.0.0 at /tus/ with the core, creation and termination extensions, when the files are on a drive (storage \"disk\"); with a bucket /tus/ is 404 and uploads go through /api/s3/uploads. Authenticate every request (PIN cookie or Authorization: Bearer). Upload ids are file ids.",
   "create": {
     "method": "POST",
     "path": "/tus/",

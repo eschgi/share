@@ -101,6 +101,10 @@ func (a *API) download(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if a.S3 != nil {
+		httpx.WriteError(w, http.StatusConflict, "s3_no_zip", "The files are in a bucket, which sends no ZIP: download them one by one.")
+		return
+	}
 	sel, ok := a.Downloads.Get(r.PathValue("id"), p.Key())
 	if !ok {
 		httpx.WriteError(w, http.StatusNotFound, "not_found", "No such download, or it's over a day old. Choose the files again.")

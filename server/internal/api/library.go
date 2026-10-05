@@ -282,10 +282,21 @@ func (a *API) file(w http.ResponseWriter, r *http.Request) {
 }
 
 // content sends a file as it was uploaded. Downloads resume with Range (and If-Range, the ETag
-// being the file id), and nothing along the way may cache or change them.
+// being the file id), and nothing along the way may cache or change them. From a bucket a
+// browser goes on to a link there; the app asks for the link itself (fileURL).
 func (a *API) content(w http.ResponseWriter, r *http.Request) {
 	_, f, ok := a.readyFile(w, r)
 	if !ok {
+		return
+	}
+	if a.S3 != nil {
+		// A redirect would take the phone's key along to the bucket: media players send their
+		// headers again after one.
+		if r.Header.Get("Authorization") != "" {
+			httpx.WriteError(w, http.StatusConflict, "s3_use_url", "The file is in a bucket: ask /api/s3/files/{id}/url for its link and fetch that without your key.")
+			return
+		}
+		a.redirectToBucket(w, r, f)
 		return
 	}
 	file, err := a.Lib.OpenFile(r.Context(), f)

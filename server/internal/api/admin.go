@@ -669,6 +669,9 @@ func (a *API) trashChange(w http.ResponseWriter, r *http.Request, what string, c
 // StorageInfo is where the files are, how full the drive is, and what an admin should know
 // about it.
 type StorageInfo struct {
+	Storage    string           `json:"storage"` // "disk" or "s3"
+	S3Bucket   string           `json:"s3_bucket"`
+	S3Endpoint string           `json:"s3_endpoint"`
 	StorageDir string           `json:"storage_dir"`
 	FSType     string           `json:"fs_type"`
 	TotalBytes int64            `json:"total_bytes"`
@@ -695,7 +698,10 @@ func (a *API) storageInfo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
-	info := StorageInfo{StorageDir: a.Cfg.StorageDir, TrashDays: a.Cfg.TrashDays}
+	info := StorageInfo{Storage: a.storageMode(), StorageDir: a.Cfg.StorageDir, TrashDays: a.Cfg.TrashDays}
+	if a.S3 != nil {
+		info.S3Bucket, info.S3Endpoint = a.S3.Name(), a.S3.Endpoint()
+	}
 	var err error
 	if info.Files, info.Bytes, err = a.Auth.DB.LibraryStats(ctx); err == nil {
 		info.TrashFiles, info.TrashBytes, err = a.Auth.DB.TrashStats(ctx)
@@ -704,8 +710,10 @@ func (a *API) storageInfo(w http.ResponseWriter, r *http.Request) {
 		internal(w, "storage", err)
 		return
 	}
-	if fs, err := storage.Stat(a.Cfg.StorageDir); err == nil {
-		info.FSType, info.TotalBytes, info.FreeBytes = fs.Type, fs.Total, fs.Free
+	if a.S3 == nil {
+		if fs, err := storage.Stat(a.Cfg.StorageDir); err == nil {
+			info.FSType, info.TotalBytes, info.FreeBytes = fs.Type, fs.Total, fs.Free
+		}
 	}
 	report := a.CheckStorage(ctx)
 	info.Warnings = make([]StorageWarning, 0, len(report.Problems)+len(report.Warnings))

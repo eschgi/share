@@ -586,8 +586,8 @@ func TestInfoMatchesContract(t *testing.T) {
 	}
 	got := r.json(t)
 	assertShape(t, "info", readFixture(t, "api/info.json")["response"], got)
-	if got["api_version"].(float64) != 2 {
-		t.Errorf("api_version = %v, want 2: every upload, PIN and invite names its folders", got["api_version"])
+	if got["api_version"].(float64) != 3 || got["storage"] != "disk" {
+		t.Errorf("api_version = %v, storage %v; want 3 and disk: files may be in a bucket", got["api_version"], got["storage"])
 	}
 	if got["chunk_size_bytes"].(float64) != 20<<20 {
 		t.Errorf("chunk_size_bytes = %v", got["chunk_size_bytes"])

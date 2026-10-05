@@ -194,7 +194,7 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 	}
 	apiHandlers := &api.API{
 		Cfg: cfg, Auth: authSvc, ServerID: serverID, MaxFileSize: maxFile, Lib: lib, Thumbs: th, Local: local,
-		APK: &api.APK{Path: cfg.App.APKFile}, Downloads: dl, Checksums: crcs, Now: now, ServerVersion: version,
+		APK: &api.APK{Path: cfg.App.APKFile}, Downloads: dl, Checksums: crcs, S3: bucket, Now: now, ServerVersion: version,
 		CheckStorage: checkStorage,
 	}
 

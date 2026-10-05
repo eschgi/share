@@ -4,6 +4,9 @@
   "auth": "admin",
   "status": 200,
   "response": {
+    "storage": "disk",
+    "s3_bucket": "",
+    "s3_endpoint": "",
     "storage_dir": "/mnt/usb/share",
     "fs_type": "exfat",
     "total_bytes": 1000204886016,
@@ -21,5 +24,5 @@
       }
     ]
   },
-  "notes": "Where the files are (set in config.json on the server) and how full the drive is. files and bytes count the library; the trash is counted apart. fs_type, total_bytes and free_bytes are empty or 0 if the drive can't be asked. warnings is what `share check` finds, problems first; [] when all is well. Their codes and levels are in contract/storage_warnings.json; message is the console's English text."
+  "notes": "Where the files are (set in config.json on the server) and how full the drive is. storage is \"disk\" or \"s3\"; with a bucket, s3_bucket and s3_endpoint name it, and storage_dir, fs_type, total_bytes and free_bytes are empty or 0. files and bytes count the library; the trash is counted apart. fs_type, total_bytes and free_bytes are empty or 0 if the drive can't be asked. warnings is what `share check` finds, problems first; [] when all is well. Their codes and levels are in contract/storage_warnings.json; message is the console's English text."
 }

@@ -18,12 +18,13 @@ import (
 	"github.com/eschgi/share/server/internal/downloads"
 	"github.com/eschgi/share/server/internal/httpx"
 	"github.com/eschgi/share/server/internal/localtls"
+	"github.com/eschgi/share/server/internal/s3"
 	"github.com/eschgi/share/server/internal/storage"
 	"github.com/eschgi/share/server/internal/thumbs"
 )
 
 // Version is the API version, sent in /api/info so apps can tell what the server speaks.
-const Version = 2
+const Version = 3
 
 // API holds what the handlers need.
 type API struct {
@@ -36,7 +37,8 @@ type API struct {
 	Local       *localtls.Loader // Share's own certificate on the https port; nil without one
 	APK         *APK
 	Downloads   *downloads.Store
-	Checksums   *checksum.Store
+	Checksums   *checksum.Store // nil in a bucket, which sends no ZIP
+	S3          *s3.Bucket      // where the files are in S3 mode; nil on a drive
 	Now         func() time.Time
 	// ServerVersion is the program's version, e.g. v0.1.0-3-gabc1234, for /api/about.
 	ServerVersion string
@@ -79,6 +81,9 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/files/{id}/thumb", a.putThumb)
 	mux.HandleFunc("POST /api/downloads", a.createDownload)
 	mux.HandleFunc("GET /api/downloads/{id}", a.download)
+	if a.S3 != nil {
+		mux.HandleFunc("GET /api/s3/files/{id}/url", a.fileURL)
+	}
 	a.registerAdmin(mux)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusNotFound, "not_found", "No such API endpoint.")
@@ -94,6 +99,7 @@ type Info struct {
 	DefaultLanguage  string   `json:"default_language"`
 	ChunkSizeBytes   int64    `json:"chunk_size_bytes"`
 	MaxFileSizeBytes int64    `json:"max_file_size_bytes"`
+	Storage          string   `json:"storage"` // "disk": tus and /content; "s3": the bucket
 }
 
 func (a *API) info(w http.ResponseWriter, r *http.Request) {
@@ -105,6 +111,7 @@ func (a *API) info(w http.ResponseWriter, r *http.Request) {
 		DefaultLanguage:  a.Cfg.DefaultLanguage,
 		ChunkSizeBytes:   a.Cfg.ChunkSize(),
 		MaxFileSizeBytes: a.MaxFileSize,
+		Storage:          a.storageMode(),
 	})
 }
 

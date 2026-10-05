@@ -30,6 +30,8 @@
     "offset_mismatch":        {"status": 409, "meaning": "tus: the upload is at a different offset; HEAD and continue from there."},
     "s3_parts_missing":       {"status": 409, "meaning": "S3: completing an upload whose parts aren't all in the bucket with their size (or one was sent again meanwhile); GET the upload's state, send the missing parts, complete again."},
     "s3_upload_finished":     {"status": 409, "meaning": "S3: links were asked for parts of an upload that is finished already."},
+    "s3_use_url":             {"status": 409, "meaning": "S3: /api/files/{id}/content with an Authorization header. Ask GET /api/s3/files/{id}/url for the file's link and fetch that without the key."},
+    "s3_no_zip":              {"status": 409, "meaning": "S3: a bucket sends no ZIP (GET /api/downloads/{id}); download the files one by one."},
     "pin_taken":              {"status": 409, "meaning": "A PIN had this code before; codes are never used twice. Pick another one."},
     "username_taken":         {"status": 409, "meaning": "Someone else has that username."},
     "invite_expired":         {"status": 410, "meaning": "The invite has expired."},
