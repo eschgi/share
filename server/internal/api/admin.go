@@ -78,13 +78,25 @@ type PinInfo struct {
 	Folder    string     `json:"folder"`     // the id of the folder it sends into
 	// ShowsFolder: guests with it also see and download what is in the folder.
 	ShowsFolder bool `json:"shows_folder"`
+	// Secret: for a PIN that shows an encrypted folder, its link's secret sealed for version
+	// version of the folder's key, so that an admin's device can make the whole link again.
+	Secret *PinSecretInfo `json:"secret"`
+}
+
+type PinSecretInfo struct {
+	Sealed  B64 `json:"sealed"`
+	Version int `json:"version"`
 }
 
 func (a *API) pinInfo(p db.Pin, s db.PinStat) PinInfo {
-	return PinInfo{
+	info := PinInfo{
 		ID: p.ID, Code: p.Code, Kind: p.Kind, CreatedAt: p.CreatedAt, ExpiresAt: p.ExpiresAt,
 		Link: a.Cfg.PublicURL + "/#" + p.Code, Files: s.Files, Phones: s.Phones, Folder: p.FolderID, ShowsFolder: p.ShowsFolder,
 	}
+	if p.Secret != nil {
+		info.Secret = &PinSecretInfo{Sealed: p.Secret.Sealed, Version: p.Secret.Version}
+	}
+	return info
 }
 
 // PinList is the live PINs: permanent ones first, then the newest.

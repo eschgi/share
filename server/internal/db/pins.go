@@ -24,7 +24,9 @@ type Pin struct {
 	EndedAt     *time.Time
 	FolderID    string // the folder it sends into; "" once that folder is gone for good
 	ShowsFolder bool   // guests with it also see and download what is in the folder
-	Secret      *PinSecret
+	// Secret: what its link's secret brings for an encrypted folder; read with the PIN, but
+	// without Keys.
+	Secret *PinSecret
 }
 
 // PinSecret is what the link of a PIN that shows an encrypted folder brings: its secret,
@@ -43,12 +45,17 @@ func (p Pin) LiveAt(now time.Time) bool {
 
 const pinColumns = "id, code, kind, created_by, created_at, expires_at, ended_at, folder_id, shows_folder"
 
+// pinSelect is what a PIN is read with: its columns and its link's sealed secret.
+const pinSelect = pinColumns + ", secret_sealed, secret_version"
+
 func scanPin(row interface{ Scan(...any) error }) (Pin, error) {
 	var p Pin
 	var created int64
 	var expires, ended sql.NullInt64
 	var folderID sql.NullString
-	err := row.Scan(&p.ID, &p.Code, &p.Kind, &p.CreatedBy, &created, &expires, &ended, &folderID, &p.ShowsFolder)
+	var secretSealed []byte
+	var secretVersion sql.NullInt64
+	err := row.Scan(&p.ID, &p.Code, &p.Kind, &p.CreatedBy, &created, &expires, &ended, &folderID, &p.ShowsFolder, &secretSealed, &secretVersion)
 	if errors.Is(err, sql.ErrNoRows) {
 		return p, ErrNotFound
 	}
@@ -59,6 +66,9 @@ func scanPin(row interface{ Scan(...any) error }) (Pin, error) {
 	p.ExpiresAt = optTime(expires)
 	p.EndedAt = optTime(ended)
 	p.FolderID = folderID.String
+	if secretSealed != nil {
+		p.Secret = &PinSecret{Sealed: secretSealed, Version: int(secretVersion.Int64)}
+	}
 	return p, nil
 }
 
@@ -91,17 +101,17 @@ func (d *DB) InsertPin(ctx context.Context, p Pin) error {
 
 // PinByCode looks up a PIN by its code, live or not.
 func (d *DB) PinByCode(ctx context.Context, code string) (Pin, error) {
-	return scanPin(d.QueryRowContext(ctx, "SELECT "+pinColumns+" FROM pins WHERE code = ?", code))
+	return scanPin(d.QueryRowContext(ctx, "SELECT "+pinSelect+" FROM pins WHERE code = ?", code))
 }
 
 // PinByID looks up a PIN by id.
 func (d *DB) PinByID(ctx context.Context, id string) (Pin, error) {
-	return scanPin(d.QueryRowContext(ctx, "SELECT "+pinColumns+" FROM pins WHERE id = ?", id))
+	return scanPin(d.QueryRowContext(ctx, "SELECT "+pinSelect+" FROM pins WHERE id = ?", id))
 }
 
 // Pins lists every PIN, newest first.
 func (d *DB) Pins(ctx context.Context) ([]Pin, error) {
-	rows, err := d.QueryContext(ctx, "SELECT "+pinColumns+" FROM pins ORDER BY created_at DESC, id")
+	rows, err := d.QueryContext(ctx, "SELECT "+pinSelect+" FROM pins ORDER BY created_at DESC, id")
 	if err != nil {
 		return nil, err
 	}
