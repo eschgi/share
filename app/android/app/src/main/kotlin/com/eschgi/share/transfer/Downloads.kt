@@ -3,7 +3,9 @@ package com.eschgi.share.transfer
 import android.content.Context
 import android.net.Uri
 import androidx.core.net.toUri
+import com.eschgi.share.data.ServerStore
 import com.eschgi.share.net.RouteMonitor
+import com.eschgi.share.net.ServerInfo
 import java.util.UUID
 import java.util.concurrent.CopyOnWriteArraySet
 
@@ -105,7 +107,8 @@ object Downloads {
     fun snapshots(context: Context): List<BatchSnapshot> {
         val db = TransferDb.get(context)
         val live = DownloadEngine.liveBytes()
-        val local = RouteMonitor.current(context).isLocal
+        // From a bucket the bytes come over the internet, wherever the phone is.
+        val local = RouteMonitor.current(context).isLocal && !ServerInfo.knownS3(ServerStore(context).config())
         return db.recentBatches(System.currentTimeMillis() - RECENT_MS).map { b ->
             BatchSnapshot.of(b.id, running = b.state == "active", noSpace = b.noSpace, items = db.items(b.id), live = live, local = local)
         }

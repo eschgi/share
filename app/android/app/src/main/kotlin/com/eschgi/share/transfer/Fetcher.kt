@@ -46,7 +46,8 @@ object Fetcher {
             if (!force && now - reported < 250_000_000) return
             reported = now
             val states = items.map { if (it.file.id in finished) it.copy(state = TransferItem.DONE) else it }
-            Downloads.emit(BatchSnapshot.of(BATCH, running, false, states, live, local).toMap())
+            // Known after the first file it fetches: from a bucket nothing comes over the address at home.
+            Downloads.emit(BatchSnapshot.of(BATCH, running, false, states, live, local && !ServerInfo.knownS3(config)).toMap())
         }
         try {
             for (file in files) {
