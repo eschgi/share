@@ -10,6 +10,8 @@ export interface Info {
   max_file_size_bytes: number;
   /** Where the files are: disk (sent over tus) or s3 (a bucket, sent straight there). */
   storage: 'disk' | 's3';
+  /** Nobody has an account yet: visitors without a PIN go to /setup. */
+  setup: boolean;
 }
 
 /** A PIN session; GET /api/session is only about those (a signed-in browser is /api/me). */
@@ -133,13 +135,14 @@ export interface AppInfo {
 
 export const getApp = () => request<AppInfo>('GET', '/api/app');
 
-// Setting up the storage folder (/setup), before the server starts: with the secret of the link
-// in its log, new at every start.
+// Setting Share up (/setup) while nobody has an account: the storage folder on a drive, then the
+// first admin. From outside the home network only in the first minutes after the server starts,
+// or with the secret of the link in its log.
 
 export interface SetupStatus {
   /** The folder is set up and Share runs. */
   ready: boolean;
-  /** Share runs and nobody has an account yet: the page asks for the first admin's invite. */
+  /** Share runs and nobody has an account yet: the page makes the first admin. */
   needs_admin: boolean;
   name: string;
   languages: string[];
@@ -155,15 +158,22 @@ export interface SetupStatus {
   warnings: StorageWarning[];
 }
 
-const setupHeader = (secret: string) => ({ 'X-Share-Setup': secret });
+const setupHeader = (secret: string | null): Record<string, string> => (secret ? { 'X-Share-Setup': secret } : {});
 
-export const getSetup = (secret: string) => request<SetupStatus>('GET', '/api/setup', undefined, setupHeader(secret));
+export const getSetup = (secret: string | null) => request<SetupStatus>('GET', '/api/setup', undefined, setupHeader(secret));
 
 /** Sets the folder up; then the server starts for real, and for a moment nothing answers. */
-export const startSetup = (secret: string) => request<void>('POST', '/api/setup', {}, setupHeader(secret));
+export const startSetup = (secret: string | null) => request<void>('POST', '/api/setup', {}, setupHeader(secret));
 
-/** The first admin's invite, while nobody has an account. */
-export const setupInvite = (secret: string) => request<{ invite: string }>('POST', '/api/setup/invite', {}, setupHeader(secret));
+export interface FirstAdmin {
+  name: string;
+  username: string;
+  password: string;
+  device_name: string;
+}
+
+/** Makes the first admin and signs this browser in. */
+export const createFirstAdmin = (secret: string | null, admin: FirstAdmin) => request<void>('POST', '/api/setup/admin', admin, setupHeader(secret));
 
 // People with an account. A browser signs in with "client": "web": its key comes back as a
 // cookie the page can't read, never in the body. POSTs send {} at least: the server wants JSON

@@ -100,9 +100,14 @@ type Info struct {
 	ChunkSizeBytes   int64    `json:"chunk_size_bytes"`
 	MaxFileSizeBytes int64    `json:"max_file_size_bytes"`
 	Storage          string   `json:"storage"` // "disk": tus and /content; "s3": the bucket
+	Setup            bool     `json:"setup"`   // nobody has an account yet: the website offers /setup
 }
 
 func (a *API) info(w http.ResponseWriter, r *http.Request) {
+	setup, err := a.Auth.NoAccounts(r.Context())
+	if err != nil {
+		log.Printf("info: %v", err)
+	}
 	httpx.WriteJSON(w, http.StatusOK, Info{
 		ServerID:         a.ServerID,
 		Name:             a.Cfg.Name,
@@ -112,6 +117,7 @@ func (a *API) info(w http.ResponseWriter, r *http.Request) {
 		ChunkSizeBytes:   a.Cfg.ChunkSize(),
 		MaxFileSizeBytes: a.MaxFileSize,
 		Storage:          a.storageMode(),
+		Setup:            setup,
 	})
 }
 

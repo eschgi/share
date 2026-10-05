@@ -47,7 +47,7 @@ export function Root() {
       const pinLink = !!pinFromHash(location.hash);
       const hint = signedInHint();
       // Whichever pages show, they need the server's name and languages: ask meanwhile.
-      getInfo().catch(() => {});
+      const info = getInfo().catch(() => null);
       if (hint) loadAccount().catch(() => {});
       let me: Me | null = null;
       let unreachable = false;
@@ -60,7 +60,9 @@ export function Root() {
         signedOut = e instanceof ApiError && e.code === 'signed_out';
       }
       setSignedInHint(!!me || unreachable);
-      const d = decide(location.pathname, !!me || unreachable, pinLink);
+      const setup = !me && !unreachable && !!(await info)?.setup;
+      const d = decide(location.pathname, !!me || unreachable, pinLink, setup);
+      if (d.view === 'setup') return location.replace('/setup');
       if (d.redirect) history.replaceState(null, '', d.redirect);
       if (d.view === 'pin') {
         setShown({ kind: 'pin' });

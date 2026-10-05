@@ -1,11 +1,11 @@
 package app
 
-// Setting the storage folder up from the website. Before a storage folder on a drive has its
-// marker, `share serve` serves only the website's setup page and its API: nothing that needs
-// the database, which would be made in that folder too, maybe on a drive that isn't mounted.
-// The page sets the folder up, as `share init` does, with a secret from the server's log; then
-// the server starts for real, and the page asks it for the first admin's invite with the same
-// secret. A bucket needs none of this.
+// Setting Share up from the website, while nobody has an account. Before a storage folder on a
+// drive has its marker, `share serve` serves only the website's setup page and its API, which
+// sets the folder up as `share init` does: nothing that needs the database, which would be
+// made in that folder too, maybe on a drive that isn't mounted. Then the server starts for
+// real, and the same page makes the first admin. Visitors at home may do this at any time,
+// others in the first minutes after a start, or with the link in the log.
 
 import (
 	"context"
@@ -23,20 +23,53 @@ import (
 
 	"github.com/eschgi/share/server/internal/auth"
 	"github.com/eschgi/share/server/internal/config"
-	"github.com/eschgi/share/server/internal/db"
 	"github.com/eschgi/share/server/internal/httpx"
 	"github.com/eschgi/share/server/internal/storage"
 	"github.com/eschgi/share/server/internal/webui"
 )
 
-// SetupHeader carries the secret of the setup link.
-const SetupHeader = "X-Share-Setup"
+const (
+	// SetupHeader carries the secret of the setup link in the log.
+	SetupHeader = "X-Share-Setup"
+	// SetupWindow is how long after a start Share can be set up from outside the home network
+	// without the link in the log.
+	SetupWindow = 15 * time.Minute
+)
 
-// NewSetupSecret makes the secret of a setup link, new at every start.
-func NewSetupSecret() string {
+// Setup says who may set Share up while nobody has an account: visitors at home, anyone until
+// Until, and anyone with the secret of the link in the log.
+type Setup struct {
+	Secret string // new at every start
+	Until  time.Time
+}
+
+// NewSetup is the setup of a server that starts at now.
+func NewSetup(now time.Time) *Setup {
 	b := make([]byte, 24)
 	rand.Read(b)
-	return base64.RawURLEncoding.EncodeToString(b)
+	return &Setup{Secret: base64.RawURLEncoding.EncodeToString(b), Until: now.Add(SetupWindow)}
+}
+
+// Page is the setup page's address.
+func (s *Setup) Page(cfg *config.Config) string {
+	return strings.TrimSuffix(cfg.PublicURL, "/") + "/setup"
+}
+
+// Link is the setup page's address with the secret, for the log.
+func (s *Setup) Link(cfg *config.Config) string { return s.Page(cfg) + "#" + s.Secret }
+
+// allows reports whether a request may set Share up.
+func (s *Setup) allows(r *http.Request, now time.Time) bool {
+	if auth.AtHome(r) || now.Before(s.Until) {
+		return true
+	}
+	got := r.Header.Get(SetupHeader)
+	return got != "" && subtle.ConstantTimeCompare([]byte(got), []byte(s.Secret)) == 1
+}
+
+func setupClosed(w http.ResponseWriter) {
+	httpx.WriteError(w, http.StatusForbidden, "setup_closed",
+		"From outside the home network, Share can be set up only in the first minutes after it starts: restart it, or open the link in its log.")
 }
 
 // NeedsSetup reports whether the storage folder has to be set up before the server can start:
@@ -77,25 +110,15 @@ func setupStatus(cfg *config.Config) SetupStatus {
 	return SetupStatus{Name: cfg.Name, Languages: cfg.Languages, DefaultLanguage: cfg.DefaultLanguage, Warnings: []SetupFinding{}}
 }
 
-// secretOK reports whether the request carries the setup link's secret.
-func secretOK(r *http.Request, secret string) bool {
-	got := r.Header.Get(SetupHeader)
-	return got != "" && subtle.ConstantTimeCompare([]byte(got), []byte(secret)) == 1
-}
-
-func wrongSecret(w http.ResponseWriter) {
-	httpx.WriteError(w, http.StatusForbidden, "forbidden", "This setup link is from an earlier start of the server; open the newest one from its log.")
-}
-
 // setupHandler is the whole server before the folder is set up: /healthz, the setup page with
 // the website's files, and the setup API. Every other page goes to the setup page; every other
 // API call is refused until then.
-func (a *App) setupHandler(secret string, ui http.Handler, setUp func() error) http.Handler {
+func (a *App) setupHandler(setup *Setup, ui http.Handler, setUp func() error) http.Handler {
 	cfg := a.Cfg
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/setup", func(w http.ResponseWriter, r *http.Request) {
-		if !secretOK(r, secret) {
-			wrongSecret(w)
+		if !setup.allows(r, a.now()) {
+			setupClosed(w)
 			return
 		}
 		u := storage.CheckUnset(storage.Layout{StorageDir: cfg.StorageDir, DataDir: cfg.DataDir})
@@ -111,8 +134,8 @@ func (a *App) setupHandler(secret string, ui http.Handler, setUp func() error) h
 		httpx.WriteJSON(w, http.StatusOK, st)
 	})
 	mux.HandleFunc("POST /api/setup", func(w http.ResponseWriter, r *http.Request) {
-		if !secretOK(r, secret) {
-			wrongSecret(w)
+		if !setup.allows(r, a.now()) {
+			setupClosed(w)
 			return
 		}
 		if err := setUp(); err != nil {
@@ -144,7 +167,7 @@ func (a *App) setupHandler(secret string, ui http.Handler, setUp func() error) h
 // RunSetup serves the setup page until the storage folder is set up: through the page, by
 // `share init`, or by mounting a drive that has its marker. It returns nil then, with the
 // ports free again for the server.
-func RunSetup(ctx context.Context, cfg *config.Config, secret string) error {
+func RunSetup(ctx context.Context, cfg *config.Config, setup *Setup) error {
 	layout := storage.Layout{StorageDir: cfg.StorageDir, DataDir: cfg.DataDir}
 	a := &App{Cfg: cfg, now: time.Now}
 	ready := make(chan struct{})
@@ -156,7 +179,7 @@ func RunSetup(ctx context.Context, cfg *config.Config, secret string) error {
 		once.Do(func() { close(ready) })
 		return nil
 	}
-	handler := a.setupHandler(secret, webui.New(cfg, ""), setUp)
+	handler := a.setupHandler(setup, webui.New(cfg, ""), setUp)
 
 	var servers []*http.Server
 	errCh := make(chan error, 2)
@@ -203,39 +226,66 @@ func RunSetup(ctx context.Context, cfg *config.Config, secret string) error {
 	}
 }
 
-// registerSetup lets the setup page, after the hand-over, see that Share runs and ask for the
-// first admin's invite, with the secret of the setup link and while nobody has an account.
-func registerSetup(mux *http.ServeMux, cfg *config.Config, secret string, d *db.DB, authSvc *auth.Service) {
+type firstAdminRequest struct {
+	Name       string `json:"name"`
+	Username   string `json:"username"`
+	Password   string `json:"password"`
+	DeviceName string `json:"device_name"`
+}
+
+// registerSetup serves the setup page once the folder is set up: whether the first admin is
+// still to come, and making them, which signs the page's browser in.
+func (a *App) registerSetup(mux *http.ServeMux, setup *Setup) {
+	failed := func(w http.ResponseWriter, err error) {
+		log.Printf("setup: %v", err)
+		httpx.WriteError(w, http.StatusInternalServerError, "internal", "Something went wrong on the server.")
+	}
+	alreadySetUp := func(w http.ResponseWriter) {
+		httpx.WriteError(w, http.StatusConflict, "already_set_up", "Share has an admin already: sign in.")
+	}
 	mux.HandleFunc("GET /api/setup", func(w http.ResponseWriter, r *http.Request) {
-		if !secretOK(r, secret) {
-			wrongSecret(w)
-			return
-		}
-		n, err := d.UserCount(r.Context())
+		none, err := a.Auth.NoAccounts(r.Context())
 		if err != nil {
-			log.Printf("setup: %v", err)
-			httpx.WriteError(w, http.StatusInternalServerError, "internal", "Something went wrong on the server.")
+			failed(w, err)
 			return
 		}
-		st := setupStatus(cfg)
-		st.Ready, st.NeedsAdmin = true, n == 0
+		if none && !setup.allows(r, a.now()) {
+			setupClosed(w)
+			return
+		}
+		st := setupStatus(a.Cfg)
+		st.Ready, st.NeedsAdmin = true, none
 		httpx.WriteJSON(w, http.StatusOK, st)
 	})
-	mux.HandleFunc("POST /api/setup/invite", func(w http.ResponseWriter, r *http.Request) {
-		if !secretOK(r, secret) {
-			wrongSecret(w)
+	mux.HandleFunc("POST /api/setup/admin", func(w http.ResponseWriter, r *http.Request) {
+		var req firstAdminRequest
+		if !httpx.DecodeJSON(w, r, &req) {
 			return
 		}
-		token, err := authSvc.FirstStartInvite(r.Context())
-		if err != nil {
-			log.Printf("setup: %v", err)
-			httpx.WriteError(w, http.StatusInternalServerError, "internal", "Something went wrong on the server.")
+		if none, err := a.Auth.NoAccounts(r.Context()); err != nil {
+			failed(w, err)
+			return
+		} else if !none {
+			alreadySetUp(w)
 			return
 		}
-		if token == "" {
-			httpx.WriteError(w, http.StatusConflict, "already_set_up", "Share has an admin already: sign in.")
+		if !setup.allows(r, a.now()) {
+			setupClosed(w)
 			return
 		}
-		httpx.WriteJSON(w, http.StatusCreated, map[string]string{"invite": token})
+		s, err := a.Auth.FirstAdmin(r.Context(), r, req.Name, req.Username, req.Password, req.DeviceName)
+		var input *auth.InputError
+		switch {
+		case err == nil:
+			auth.SetAccountCookie(w, r, s.Token)
+			auth.ClearSessionCookie(w, r)
+			w.WriteHeader(http.StatusNoContent)
+		case errors.As(err, &input):
+			httpx.WriteError(w, http.StatusBadRequest, "bad_request", "The "+input.Field+" "+input.Problem+".")
+		case errors.Is(err, auth.ErrNotFirst):
+			alreadySetUp(w)
+		default:
+			failed(w, err)
+		}
 	})
 }

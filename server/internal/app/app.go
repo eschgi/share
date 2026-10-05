@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -37,9 +36,9 @@ type Options struct {
 	WaitForStorage bool // wait for the storage marker instead of failing (a drive may mount late)
 	Upload         *upload.Config
 	Version        string // the program's version, for the About screens; "dev" when empty
-	// SetupSecret is the secret of the setup link when the storage folder was just set up from
-	// the website (RunSetup): the setup page then asks for the first admin's invite with it.
-	SetupSecret string
+	// Setup says who may make the first admin on the setup page, while nobody has an account;
+	// only visitors at home when nil.
+	Setup *Setup
 	// CheckStorage looks at the drives or the bucket for the admins' storage page;
 	// storage.Check or storage.CheckS3 when nil.
 	CheckStorage func(context.Context) storage.Report
@@ -64,6 +63,7 @@ type App struct {
 
 	now   func() time.Time
 	sched *jobs.Scheduler
+	setup *Setup
 
 	hintsMu sync.Mutex
 	hints   map[string]time.Time // when each hint about the proxy was last logged
@@ -208,12 +208,13 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 		upload.NewS3Handler(upCfg, authSvc, lib, now).Register(mux)
 	}
 	apiHandlers.Register(mux)
-	if opts.SetupSecret != "" {
-		registerSetup(mux, cfg, opts.SetupSecret, d, authSvc)
-	}
 	mux.Handle("/", ui)
 
-	a := &App{Cfg: cfg, DB: d, Lib: lib, Auth: authSvc, Tus: tus, S3: bucket, Thumbs: th, CRCs: crcs, UI: ui, Local: local, now: now}
+	a := &App{Cfg: cfg, DB: d, Lib: lib, Auth: authSvc, Tus: tus, S3: bucket, Thumbs: th, CRCs: crcs, UI: ui, Local: local, now: now, setup: opts.Setup}
+	if a.setup == nil {
+		a.setup = &Setup{}
+	}
+	a.registerSetup(mux, a.setup)
 	// Health checks get their answer however they arrive, also from a proxy that names no
 	// visitor. Everything else goes through the guard. Browsers may only change state from
 	// this site itself; the app sends no Origin.
@@ -298,11 +299,12 @@ func recordRun(d *db.DB) func(context.Context, string, time.Time) {
 // to finish (shutdownWait).
 func (a *App) Serve(ctx context.Context) error {
 	a.sched.RunDue(ctx)
-	if token, err := a.Auth.FirstStartInvite(ctx); err != nil {
-		log.Printf("share: first-start invite: %v", err)
-	} else if token != "" {
-		log.Printf("share: nobody has an account yet. To become the admin, open this link on your phone or computer; it works once, for 7 days:")
-		log.Printf("share:   %s/join#%s", strings.TrimSuffix(a.Cfg.PublicURL, "/"), token)
+	if none, err := a.Auth.NoAccounts(ctx); err != nil {
+		log.Printf("share: %v", err)
+	} else if none {
+		log.Printf("share: nobody has an account yet: open %s to make the first admin; from outside the home network within %d minutes of this start, or later with this link:",
+			a.setup.Page(a.Cfg), int(SetupWindow/time.Minute))
+		log.Printf("share:   %s", a.setup.Link(a.Cfg))
 		log.Printf("share: or make an invite with your name: share invite --admin --name YOURNAME")
 	}
 

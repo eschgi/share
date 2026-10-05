@@ -145,22 +145,22 @@ func serve(args []string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	log.Printf("share %s starting", version)
-	var secret string
+	setup := app.NewSetup(time.Now())
 	if app.NeedsSetup(cfg) {
 		// A new storage folder, or a drive that isn't mounted yet: the website's setup page
 		// shows which, and sets the folder up, as `share init` does.
-		secret = app.NewSetupSecret()
-		log.Printf("share: the storage folder %s isn't set up yet. To set it up, open this link:", cfg.StorageDir)
-		log.Printf("share:   %s/setup#%s", strings.TrimSuffix(cfg.PublicURL, "/"), secret)
+		log.Printf("share: the storage folder %s isn't set up yet: open %s to set it up; from outside the home network within %d minutes of this start, or later with this link:",
+			cfg.StorageDir, setup.Page(cfg), int(app.SetupWindow/time.Minute))
+		log.Printf("share:   %s", setup.Link(cfg))
 		log.Printf("share: or run `share init`, or mount the drive that has it")
-		if err := app.RunSetup(ctx, cfg, secret); err != nil {
+		if err := app.RunSetup(ctx, cfg, setup); err != nil {
 			if ctx.Err() != nil {
 				return nil // stopped before anyone set it up
 			}
 			return err
 		}
 	}
-	a, err := app.New(ctx, cfg, app.Options{WaitForStorage: true, Version: version, SetupSecret: secret})
+	a, err := app.New(ctx, cfg, app.Options{WaitForStorage: true, Version: version, Setup: setup})
 	if err != nil {
 		return err
 	}

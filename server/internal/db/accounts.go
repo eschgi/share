@@ -16,6 +16,9 @@ const (
 // ErrLastAdmin means the change would leave nobody who can manage the server.
 var ErrLastAdmin = errors.New("the last admin can't go")
 
+// ErrNotFirst means someone was to be the first with an account, but someone else is.
+var ErrNotFirst = errors.New("someone has an account already")
+
 // User is a person with an account.
 type User struct {
 	ID           string
@@ -56,6 +59,24 @@ func insertUser(ctx context.Context, tx *sql.Tx, u User) error {
 // InsertUser adds a person. It returns ErrConflict if the username is taken.
 func (d *DB) InsertUser(ctx context.Context, u User) error {
 	return d.Tx(ctx, func(tx *sql.Tx) error { return insertUser(ctx, tx, u) })
+}
+
+// InsertFirstUser adds the first person with an account and signs in their phone or browser;
+// ErrNotFirst if someone has an account already.
+func (d *DB) InsertFirstUser(ctx context.Context, u User, dv Device, tokenHash []byte) error {
+	return d.Tx(ctx, func(tx *sql.Tx) error {
+		var n int
+		if err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM users").Scan(&n); err != nil {
+			return err
+		}
+		if n > 0 {
+			return ErrNotFirst
+		}
+		if err := insertUser(ctx, tx, u); err != nil {
+			return err
+		}
+		return insertDevice(ctx, tx, dv, tokenHash)
+	})
 }
 
 // UserByID returns one person.
@@ -341,13 +362,6 @@ func (d *DB) OpenInvites(ctx context.Context, now time.Time) ([]Invite, error) {
 		out = append(out, in)
 	}
 	return out, rows.Err()
-}
-
-// RevokeInvitesBy ends the open invites made by createdBy, e.g. an older first-start invite.
-func (d *DB) RevokeInvitesBy(ctx context.Context, createdBy string, at time.Time) error {
-	_, err := d.ExecContext(ctx, "UPDATE invites SET revoked_at = ? WHERE created_by = ? AND used_at IS NULL AND revoked_at IS NULL",
-		ms(at), createdBy)
-	return err
 }
 
 // UseInvite accepts an invite in one transaction: it creates the person (unless the invite

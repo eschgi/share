@@ -1,7 +1,7 @@
 {
   "method": "GET",
   "path": "/api/setup",
-  "auth": "the setup link's secret, in the header X-Share-Setup",
+  "auth": "none once someone has an account; until then as in setup.json",
   "status": 200,
   "response": {
     "ready": true,
@@ -17,5 +17,5 @@
     "free_bytes": 0,
     "warnings": []
   },
-  "notes": "The server after a setup from the website, until it stops: ready, and needs_admin while nobody has an account. A server that started without setting up anything answers 404 not_found: the folder was set up already."
+  "notes": "Once the storage folder is set up, or with the files in a bucket: ready, and needs_admin while nobody has an account; the page then makes the first admin with POST /api/setup/admin."
 }

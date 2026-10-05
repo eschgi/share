@@ -41,12 +41,12 @@ func (e *env) accept(inviteToken, deviceName string) signedIn {
 	return signedIn{v["token"].(string), v["user"].(map[string]any)["id"].(string), v}
 }
 
-// admin makes the first admin through the first-start invite, as on a new server.
+// admin makes the first admin with an invite from the console, as `share invite --admin` does.
 func (e *env) admin() signedIn {
 	e.t.Helper()
-	token, err := e.app.Auth.FirstStartInvite(context.Background())
-	if err != nil || token == "" {
-		e.t.Fatalf("first-start invite: %q, %v", token, err)
+	token, _, err := e.app.Auth.CreateInvite(context.Background(), "Admin", db.RoleAdmin, "", "cli", nil, auth.InviteLifetime)
+	if err != nil {
+		e.t.Fatalf("invite for the first admin: %v", err)
 	}
 	return e.accept(token, "Stefan's phone")
 }
@@ -65,19 +65,12 @@ func (e *env) invite(p signedIn, name, role string) string {
 	return token
 }
 
-func TestFirstStartInviteMakesTheAdmin(t *testing.T) {
+func TestConsoleInviteMakesAnAdmin(t *testing.T) {
 	e := newEnv(t)
-	ctx := context.Background()
-	old, _ := e.app.Auth.FirstStartInvite(ctx)
-	if again, _ := e.app.Auth.FirstStartInvite(ctx); again != old {
-		t.Error("another first-start invite while the server runs")
+	token, _, err := e.app.Auth.CreateInvite(context.Background(), "Admin", db.RoleAdmin, "", "cli", nil, auth.InviteLifetime)
+	if err != nil {
+		t.Fatal(err)
 	}
-	restarted := auth.NewService(e.app.DB, e.clock.Now) // a restart before anyone used it
-	token, _ := restarted.FirstStartInvite(ctx)
-	if r := e.postJSON(nil, "/api/invites/peek", "", map[string]string{"token": old}, nil); r.errorCode() != "invite_revoked" {
-		t.Errorf("the earlier first-start invite: %d %s, want invite_revoked", r.status, r.body)
-	}
-
 	r := e.postJSON(nil, "/api/invites/peek", "", map[string]string{"token": token}, nil)
 	assertShape(t, "peek", readFixture(t, "api/invite_peek.json")["response"], r.json(t))
 	if v := r.json(t); v["role"] != "admin" || v["inviter"] != nil || v["adds_phone"] != false {
@@ -90,9 +83,6 @@ func TestFirstStartInviteMakesTheAdmin(t *testing.T) {
 	assertShape(t, "me", readFixture(t, "api/me.json")["response"], me.json(t))
 	if u := me.json(t)["user"].(map[string]any); u["role"] != "admin" || u["has_password"] != false {
 		t.Errorf("me: %v", u)
-	}
-	if again, _ := e.app.Auth.FirstStartInvite(ctx); again != "" {
-		t.Error("another first-start invite once someone has an account")
 	}
 }
 

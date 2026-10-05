@@ -25,9 +25,10 @@ Put Cloud Run and the database in the same city: every request asks the database
 4. **Check it from your computer**, with the release's `share` program or the Docker image and
    the same `config.json`: `share check` says whether the database and the bucket answer, and
    prints the CORS rules if the bucket still needs them.
-5. **The first admin, also from your computer:** `share invite --admin --name YOURNAME` prints
-   the invite link. (The link a new server prints into its log is replaced at every start, and
-   Cloud Run starts often.)
+5. **The first admin:** once it runs (below), open the service's address within 15 minutes and
+   make your account on the setup page. Cloud Run starts Share again after a pause, which opens
+   those minutes again. Or, from your computer, `share invite --admin --name YOURNAME` prints an
+   invite.
 
 ## Deploying
 

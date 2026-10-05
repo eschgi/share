@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import admin from '../../contract/api/setup_admin.json';
 import setup from '../../contract/api/setup.json';
-import invite from '../../contract/api/setup_invite.json';
+import ready from '../../contract/api/setup_ready.json';
 import start from '../../contract/api/setup_start.json';
-import { ApiError, getSetup, setupInvite, startSetup } from '../src/api';
-import { secretFromHash, setupProblem, stillStarting } from '../src/setupflow';
+import { ApiError, createFirstAdmin, getSetup, startSetup, type SetupStatus } from '../src/api';
+import { secretFromHash, setupProblem, setupStep, stillStarting } from '../src/setupflow';
 
 describe('secretFromHash', () => {
   it('takes the secret of a setup link', () => {
@@ -17,22 +18,28 @@ describe('secretFromHash', () => {
   });
 });
 
-describe('setupProblem', () => {
-  it('says which link to open', () => {
-    const forbidden = new ApiError(403, 'forbidden', 'This setup link is from an earlier start.');
-    expect(setupProblem(forbidden, true)).toEqual({ kind: 'link', key: 'setup.earlier' });
-    expect(setupProblem(forbidden, false)).toEqual({ kind: 'link', key: 'setup.noSecret' });
+describe('setupStep', () => {
+  it('sets the folder up, then makes the first admin', () => {
+    const folder = setup.response as SetupStatus;
+    expect(setupStep(folder)).toEqual({ kind: 'folder', status: folder });
+    expect(setupStep(ready.response as SetupStatus)).toEqual({ kind: 'admin' });
+    expect(setupStep({ ...(ready.response as SetupStatus), needs_admin: false })).toEqual({ kind: 'done' });
   });
-  it('takes a server without a setup, or with an admin, as set up', () => {
-    expect(setupProblem(new ApiError(404, 'not_found', 'No such thing.'), true)).toEqual({ kind: 'done' });
-    expect(setupProblem(new ApiError(409, 'already_set_up', 'Share has an admin already.'), true)).toEqual({ kind: 'done' });
+});
+
+describe('setupProblem', () => {
+  it('says when only home, a restart or the link in the log lets one in', () => {
+    expect(setupProblem(new ApiError(403, 'setup_closed', '…'))).toEqual({ kind: 'closed' });
+  });
+  it('takes a server with an admin as set up', () => {
+    expect(setupProblem(new ApiError(409, 'already_set_up', 'Share has an admin already.'))).toEqual({ kind: 'done' });
   });
   it("gives the server's words, or none when it can't be reached", () => {
-    expect(setupProblem(new ApiError(403, 'proxy_untrusted', 'A proxy config.json doesn’t name.'), true)).toEqual({
+    expect(setupProblem(new ApiError(403, 'proxy_untrusted', 'A proxy config.json doesn’t name.'))).toEqual({
       kind: 'failed',
       reason: 'A proxy config.json doesn’t name.',
     });
-    expect(setupProblem(new ApiError(0, 'network', 'The server can’t be reached.'), true)).toEqual({ kind: 'failed', reason: null });
+    expect(setupProblem(new ApiError(0, 'network', 'The server can’t be reached.'))).toEqual({ kind: 'failed', reason: null });
   });
 });
 
@@ -43,7 +50,7 @@ describe('stillStarting', () => {
     expect(stillStarting(new TypeError('Failed to fetch'))).toBe(true);
   });
   it('stops at an answer', () => {
-    expect(stillStarting(new ApiError(403, 'forbidden', ''))).toBe(false);
+    expect(stillStarting(new ApiError(403, 'setup_closed', ''))).toBe(false);
     expect(stillStarting(new ApiError(404, 'not_found', ''))).toBe(false);
   });
 });
@@ -53,24 +60,24 @@ describe('the setup API', () => {
     vi.unstubAllGlobals();
   });
 
-  it('sends the secret in its header, as the contract has it', async () => {
+  it('asks as the contract has it, with the secret of the link when there is one', async () => {
     const calls: [string, RequestInit][] = [];
     vi.stubGlobal('fetch', async (path: string, init: RequestInit) => {
       calls.push([path, init]);
-      if (path === invite.path) return Response.json(invite.response, { status: invite.status });
       if (init.method === 'GET') return Response.json(setup.response);
-      return new Response(null, { status: start.status });
+      return new Response(null, { status: 204 });
     });
-    expect(await getSetup('s3cret')).toEqual(setup.response);
+    expect(await getSetup(null)).toEqual(setup.response);
     await startSetup('s3cret');
-    expect(await setupInvite('s3cret')).toEqual(invite.response);
+    await createFirstAdmin(null, admin.request);
     expect(calls.map(([path, init]) => `${init.method} ${path}`)).toEqual([
       `${setup.method} ${setup.path}`,
       `${start.method} ${start.path}`,
-      `${invite.method} ${invite.path}`,
+      `${admin.method} ${admin.path}`,
     ]);
-    for (const [, init] of calls) expect(init.headers).toMatchObject({ 'X-Share-Setup': 's3cret' });
+    expect(calls[0][1].headers).not.toHaveProperty('X-Share-Setup');
+    expect(calls[1][1].headers).toMatchObject({ 'X-Share-Setup': 's3cret', 'Content-Type': 'application/json' });
     expect(JSON.parse(calls[1][1].body as string)).toEqual(start.request);
-    expect(calls[1][1].headers).toMatchObject({ 'Content-Type': 'application/json' });
+    expect(JSON.parse(calls[2][1].body as string)).toEqual(admin.request);
   });
 });

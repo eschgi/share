@@ -7,9 +7,16 @@ export type SetupState =
   | { kind: 'folder'; status: SetupStatus }
   | { kind: 'starting' }
   | { kind: 'slow' }
+  | { kind: 'admin' }
   | { kind: 'done' }
-  | { kind: 'link'; key: string }
+  | { kind: 'closed' }
   | { kind: 'failed'; reason: string | null };
+
+/** Where an answer leads: the folder to set up, the first admin to make, or nothing to do. */
+export function setupStep(st: SetupStatus): SetupState {
+  if (!st.ready) return { kind: 'folder', status: st };
+  return { kind: st.needs_admin ? 'admin' : 'done' };
+}
 
 /** The secret from the link in the server's log: <server>/setup#… */
 export function secretFromHash(hash: string): string | null {
@@ -17,13 +24,11 @@ export function secretFromHash(hash: string): string | null {
   return /^[A-Za-z0-9_-]{20,}$/.test(s) ? s : null;
 }
 
-/** What a failed request means for the page; hadSecret: whether it had a secret to send. A
- * failed one: the server's words, or none when it can't be reached. */
-export function setupProblem(e: unknown, hadSecret: boolean): SetupState {
-  if (e instanceof ApiError && e.code === 'forbidden') return { kind: 'link', key: hadSecret ? 'setup.earlier' : 'setup.noSecret' };
-  // A server that didn't set anything up (the folder was ready already), or one that has an
-  // admin already.
-  if (e instanceof ApiError && (e.status === 404 || e.code === 'already_set_up')) return { kind: 'done' };
+/** What a failed request means for the page. A failed one: the server's words, or none when
+ * it can't be reached. */
+export function setupProblem(e: unknown): SetupState {
+  if (e instanceof ApiError && e.code === 'setup_closed') return { kind: 'closed' };
+  if (e instanceof ApiError && e.code === 'already_set_up') return { kind: 'done' };
   return { kind: 'failed', reason: e instanceof ApiError && e.status > 0 ? e.message : null };
 }
 

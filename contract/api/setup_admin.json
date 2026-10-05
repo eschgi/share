@@ -1,0 +1,13 @@
+{
+  "method": "POST",
+  "path": "/api/setup/admin",
+  "auth": "while nobody has an account: a visitor at home, anyone in the first 15 minutes after the server started, or the setup link's secret in the header X-Share-Setup",
+  "status": 204,
+  "request": {
+    "name": "Stefan",
+    "username": "stefan",
+    "password": "correct horse",
+    "device_name": "Chrome · Windows"
+  },
+  "notes": "Makes the first admin, with a username and password (as PUT /api/me/password takes them), and signs this browser in: its key comes as the cookie, as after a sign-in, and a browser at home gets a session that works only at home. Errors: 400 bad_request (the message names the field), 403 setup_closed, 409 already_set_up once someone has an account."
+}

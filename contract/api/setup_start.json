@@ -1,8 +1,8 @@
 {
   "method": "POST",
   "path": "/api/setup",
-  "auth": "the setup link's secret, in the header X-Share-Setup",
+  "auth": "while nobody has an account: a visitor at home, anyone in the first 15 minutes after the server started, or the setup link's secret in the header X-Share-Setup",
   "status": 204,
   "request": {},
-  "notes": "Sets up the storage folder, as share init does, and has the server start for real on the same port; for a moment nothing answers. Errors: 403 forbidden, 500 setup_failed with the reason in message, such as a folder Share may not write to."
+  "notes": "Sets up the storage folder, as share init does, and has the server start for real on the same port; for a moment nothing answers. Errors: 403 setup_closed, 500 setup_failed with the reason in message, such as a folder Share may not write to."
 }

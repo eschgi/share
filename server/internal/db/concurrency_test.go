@@ -55,6 +55,28 @@ func TestTheLastAdminStaysUnderConcurrency(t *testing.T) {
 	}
 }
 
+// Two first admins at the same time, as from two setup pages: only one of them is.
+func TestOneFirstUser(t *testing.T) {
+	d := openTest(t)
+	ctx := context.Background()
+	var wg sync.WaitGroup
+	errs := make([]error, 2)
+	for i := range errs {
+		wg.Go(func() {
+			u := User{ID: ids.New(), Name: "Admin", Role: RoleAdmin, CreatedAt: t0, CreatedBy: "setup"}
+			dv := Device{ID: ids.New(), UserID: u.ID, Name: "Browser", Client: ClientWeb, CreatedAt: t0, LastSeenAt: t0}
+			errs[i] = d.InsertFirstUser(ctx, u, dv, []byte(u.ID))
+		})
+	}
+	wg.Wait()
+	if (errs[0] == nil) == (errs[1] == nil) || !errors.Is(errs[0], ErrNotFirst) && !errors.Is(errs[1], ErrNotFirst) {
+		t.Fatalf("errors %v", errs)
+	}
+	if n, err := d.UserCount(ctx); n != 1 || err != nil {
+		t.Errorf("%d people, %v", n, err)
+	}
+}
+
 // A transaction that collides with another one runs again and then goes through.
 func TestTxRunsAgainAfterAConflict(t *testing.T) {
 	if !pgtest.Enabled() {

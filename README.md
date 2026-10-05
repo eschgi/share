@@ -238,7 +238,7 @@ cat > config.json <<EOF
 EOF
 server/share init                  # prepares the storage folder and checks the drive
 server/share pin create --day      # prints a PIN and a link
-server/share serve                 # http://localhost:8080; also prints an invite for the first admin
+server/share serve                 # http://localhost:8080 starts with your account as the admin
 ```
 
 Plain `http://` works on the server itself and from the home network; from anywhere else Share
@@ -275,11 +275,13 @@ Without Docker:
 3. With the files on a drive of their own, mount it. With a bucket, `share check` says whether the
    bucket answers and lets Share's pages in.
 4. Run `share serve` as a service, on Linux with
-   [`deploy/systemd/share.service`](deploy/systemd/share.service). The first start prints a link
-   to a page that shows the storage folder and its drive, and what suits it (ext4 is best, FAT32
-   can't hold files over 4 GiB), and sets the folder up; then it opens the invite for the first
-   admin, on a phone or in the browser. `share init` sets the folder up on the command line
-   instead. With a bucket there is nothing to set up, and the first start prints the invite.
+   [`deploy/systemd/share.service`](deploy/systemd/share.service).
+5. Open your address. While nobody has an account, it shows the setup page: the storage folder
+   and its drive, with what suits it (ext4 is best, FAT32 can't hold files over 4 GiB), and then
+   your account as the admin. From outside the network at home this works in the first 15
+   minutes after Share starts; later, restart it, or open the link from its log, which works until
+   the next start. `share init` sets the folder up on the command line instead; with a bucket
+   there is no folder to set up.
 
 ### HTTPS without a proxy
 
