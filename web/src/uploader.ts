@@ -1,11 +1,13 @@
 // Uppy runs headless underneath our own screens: tus for resumable uploads in chunks the
-// server chooses (below Cloudflare's 100 MB request limit), and Golden Retriever to bring the
-// queue back after the page was closed.
+// server chooses (below Cloudflare's 100 MB request limit), or with the files in a bucket our
+// S3 uploader, which sends the parts straight there; and Golden Retriever to bring the queue
+// back after the page was closed.
 import Uppy, { type Body, type Meta, type UppyFile } from '@uppy/core';
 import GoldenRetriever, { type GoldenRetrieverOptions } from '@uppy/golden-retriever';
 import Tus from '@uppy/tus';
 import { errorCode, type Info } from './api';
 import type { Shared } from './inbox';
+import S3Upload, { abortS3Upload } from './s3upload';
 import { dedupeBatches, matchGhosts, unbatched } from './restore';
 import { ThumbQueue } from './thumbs';
 
@@ -133,28 +135,23 @@ export class Uploader {
       allowMultipleUploadBatches: true,
       restrictions: { maxFileSize: info.max_file_size_bytes > 0 ? info.max_file_size_bytes : null },
     });
-    this.uppy.use(Tus, {
-      endpoint: new URL('/tus/', location.href).href,
-      chunkSize: info.chunk_size_bytes,
-      limit: 3,
-      retryDelays: [0, 1000, 3000, 5000, 10000, 20000, 30000, 60000, 60000, 60000],
-      removeFingerprintOnSuccess: true,
-      allowedMetaFields: ['name', 'type', 'lastModified', 'folder'],
-      onShouldRetry: (err, _attempt, _opts, next) => {
-        const status = err.originalResponse?.getStatus() ?? 0;
-        if (status === 401) {
-          this.endSession(errorCode(err.originalResponse?.getBody()) !== 'session_ended');
-          return false;
-        }
-        if (status === 404 && errorCode(err.originalResponse?.getBody()) === 'folder_gone') {
-          this.folderGone = true;
-          return false;
-        }
-        // Full drive, too large, too many: retrying won't help.
-        if (status === 403 || status === 413) return false;
-        return next(err);
-      },
-    });
+    const retryDelays = [0, 1000, 3000, 5000, 10000, 20000, 30000, 60000, 60000, 60000];
+    if (info.storage === 's3') {
+      this.uppy.use(S3Upload, { limit: 3, retryDelays, refused: (status, code) => this.refused(status, code) });
+    } else {
+      this.uppy.use(Tus, {
+        endpoint: new URL('/tus/', location.href).href,
+        chunkSize: info.chunk_size_bytes,
+        limit: 3,
+        retryDelays,
+        removeFingerprintOnSuccess: true,
+        allowedMetaFields: ['name', 'type', 'lastModified', 'folder'],
+        onShouldRetry: (err, _attempt, _opts, next) => {
+          const status = err.originalResponse?.getStatus() ?? 0;
+          return this.refused(status, errorCode(err.originalResponse?.getBody())) ? false : next(err);
+        },
+      });
+    }
 
     this.restoring = keepQueue;
     if (keepQueue) {
@@ -306,7 +303,10 @@ export class Uploader {
   retryFailed(folder?: string): void {
     for (const f of this.uppy.getFiles()) {
       if (!f.error || f.isGhost) continue;
-      if (this.folderless.delete(f.id) && folder !== undefined) this.uppy.setFileMeta(f.id, { folder });
+      if (this.folderless.delete(f.id) && folder !== undefined) {
+        this.uppy.setFileMeta(f.id, { folder });
+        this.uppy.setFileState(f.id, { s3: undefined }); // a bucket's upload belongs to its folder
+      }
       this.uppy.retryUpload(f.id).catch(() => {});
     }
   }
@@ -366,11 +366,31 @@ export class Uploader {
 
   /** Removes an unfinished upload from the server. */
   private terminate(f: UppyFile<Meta, Body>): void {
+    if (f.progress.uploadComplete) return;
+    if (f.s3) {
+      abortS3Upload(f.s3.id);
+      return;
+    }
     const url = f.tus?.uploadUrl;
-    if (!url || f.progress.uploadComplete) return;
+    if (!url) return;
     fetch(url, { method: 'DELETE', headers: { 'Tus-Resumable': '1.0.0' }, credentials: 'same-origin', keepalive: true }).catch(
       () => {},
     );
+  }
+
+  /** An answer that ends a file, over tus or into the bucket: true when trying again won't
+   * help. A 401 ends the session for every file; a gone folder asks for another one. */
+  private refused(status: number, code: string | undefined): boolean {
+    if (status === 401) {
+      this.endSession(code !== 'session_ended');
+      return true;
+    }
+    if (status === 404 && code === 'folder_gone') {
+      this.folderGone = true;
+      return true;
+    }
+    // Full drive, too large, too many: retrying won't help.
+    return status === 403 || status === 413;
   }
 
   /**
