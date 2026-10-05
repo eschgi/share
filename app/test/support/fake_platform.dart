@@ -144,8 +144,11 @@ class FakePlatform implements Platform {
   @override
   Future<({String name, int code})> appVersion() async => (name: '0.3.0', code: 3);
 
+  /// Where the app may keep files; none unless a test gives one.
+  String cache = '';
+
   @override
-  Future<String> cacheDir() async => '';
+  Future<String> cacheDir() async => cache;
 
   /// What pickAndSend gives back, and what was asked: what, how, and into which folder.
   String? nextPick = 'up-1';

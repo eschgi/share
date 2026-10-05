@@ -11,7 +11,7 @@ import 'contract.dart';
 class FakeServer {
   FakeServer() {
     routes = {
-      'GET /api/info': (_) => json(contractResponse('api/info.json')),
+      'GET /api/info': (_) => json({...contractResponse('api/info.json'), 'storage': s3 ? 's3' : 'disk'}),
       'GET /api/me': (_) => json(me),
       'POST /api/invites/peek': (_) => json(contractResponse('api/invite_peek.json')),
       'POST /api/invites/accept': (_) => json(contractResponse('api/invite_accept.json')),
@@ -341,9 +341,35 @@ class FakeServer {
   http.Response json(Object body, [int status = 200]) =>
       http.Response.bytes(utf8.encode(jsonEncode(body)), status, headers: {'content-type': 'application/json'});
 
+  /// The files are in a bucket: the app fetches them by link from [bucketHost].
+  bool s3 = false;
+
+  static const bucketHost = 'bucket.example.com';
+
+  /// A file's link in the bucket, signed the way S3 does it.
+  static String bucketLink(String id) =>
+      'https://$bucketHost/share/files/$id?X-Amz-Credential=AKIA%2F20261005%2Fauto%2Fs3%2Faws4_request&response-content-disposition=attachment%3B%20filename%3D%22x.jpg%22&X-Amz-Signature=sig';
+
+  /// What a file holds, from the server or the bucket.
+  static Uint8List contentOf(String id) => Uint8List.fromList(utf8.encode('the bytes of $id'));
+
   http.Client get client => MockClient((req) async {
         requests.add(req);
         final path = req.url.path;
+        if (req.url.host == bucketHost) {
+          if (req.headers.containsKey('Authorization')) return http.Response('a key at the bucket', 400);
+          final id = path.split('/').last;
+          return req.url.toString() == bucketLink(id) ? http.Response.bytes(contentOf(id), 200) : http.Response('a changed link', 403);
+        }
+        final link = RegExp(r'^/api/s3/files/([a-z2-7]+)/url$').firstMatch(path);
+        if (link != null) {
+          return s3 ? json({'url': bucketLink(link.group(1)!), 'expires_at': '2026-10-05T22:00:00Z'}) : json({'error': {'code': 'not_found', 'message': ''}}, 404);
+        }
+        final content = RegExp(r'^/api/files/([a-z2-7]+)/content$').firstMatch(path);
+        if (content != null) {
+          if (s3 && req.headers.containsKey('Authorization')) return json({'error': {'code': 's3_use_url', 'message': ''}}, 409);
+          return http.Response.bytes(contentOf(content.group(1)!), 200);
+        }
         if (req.method == 'GET' && path.endsWith('/thumb')) return http.Response.bytes(Uint8List(0), 404);
         final handler = routes['${req.method} $path'];
         if (handler != null) return handler(req);

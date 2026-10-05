@@ -152,4 +152,29 @@ void main() {
     await expectLater(api.storage(server: down), throwsA(isA<ApiException>()));
     expect(await api.storage(server: down), Storage.s3); // a failure isn't kept
   });
+
+  test('a link to the bucket is fetched as it is, never with the key', () async {
+    String? seen;
+    var keys = 0;
+    var signedOut = 0;
+    final bucket = MockClient((req) async {
+      seen = req.url.toString();
+      if (req.headers.containsKey('Authorization')) keys++;
+      return http.Response.bytes([1, 2, 3], req.url.host == 'deny.example.com' ? 403 : 200);
+    });
+    final api = Api(platform: platform, publicClient: bucket, localClient: (_) => client('local'))
+      ..config = config
+      ..token = 'shd_x'
+      ..onSignedOut = () => signedOut++;
+    platform.current = const RouteStatus(ServerRoute.local); // at home, still not over the address there
+    const link = 'https://acct.r2.cloudflarestorage.com/share/files/b?X-Amz-Credential=key%2F20261005%2Fauto%2Fs3%2Faws4_request&response-content-disposition=attachment%3B%20filename%3D%22a%20b.jpg%22&X-Amz-Signature=ab';
+    expect(await api.s3Bytes(link), [1, 2, 3]);
+    expect(seen, link);
+    expect(keys, 0);
+    expect(calls, isEmpty);
+    await expectLater(api.s3Bytes('https://deny.example.com/x'), throwsA(isA<ApiException>().having((e) => e.status, 'status', 403)));
+    expect(signedOut, 0);
+    await expectLater(api.s3Bytes('http://bucket.example.com/x'), throwsA(isA<ApiException>().having((e) => e.code, 'code', 'insecure_link')));
+    expect(await api.s3Bytes('http://192.168.8.52:9000/share/files/b?X-Amz-Signature=cd'), [1, 2, 3]);
+  });
 }

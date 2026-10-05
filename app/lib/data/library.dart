@@ -56,6 +56,9 @@ class LibraryRepository {
 
   Future<Uint8List> _bytes(String path) => pin == null ? api.bytes(path) : api.bytesFrom(pin!.server, path, bearer: pin!.token);
 
+  /// Whether the server keeps its files in a bucket, where they are fetched by link.
+  Future<bool> _onS3() async => await (pin == null ? api.storage() : api.storage(server: pin!.server)) == Storage.s3;
+
   /// The folders the person sees, the oldest first.
   /// GET /api/folders as the server sent it, which the folder store keeps on the phone.
   Future<Json> folders() => _get('/api/folders');
@@ -85,15 +88,17 @@ class LibraryRepository {
 
   Directory? _originals;
 
-  /// A photo at full size for the viewer, from the cache or the server. Only the last few are
-  /// kept; videos and documents open through the platform instead.
+  /// A photo at full size for the viewer, from the cache, the server or its bucket. Only the
+  /// last few are kept; videos and documents open through the platform instead.
   Future<File?> original(FileInfo f) async {
     final base = await platform.cacheDir();
     if (base.isEmpty) return null;
     final dir = _originals ??= await Directory('$base/originals').create(recursive: true);
     final file = File('${dir.path}/${f.id}');
     if (await file.exists() && await file.length() == f.size) return file;
-    final bytes = await _bytes('/api/files/${f.id}/content');
+    final bytes = await _onS3()
+        ? await api.s3Bytes((await _get('/api/s3/files/${f.id}/url'))['url'] as String) // without the key
+        : await _bytes('/api/files/${f.id}/content');
     await file.writeAsBytes(bytes, flush: false);
     final all = [await for (final e in dir.list()) if (e is File) e];
     if (all.length > 30) {
