@@ -12,6 +12,10 @@
     "drive_full": {"level": "problem", "meaning": "The storage drive has no more room than min_free_space_mib keeps free: uploads stop."},
     "fat32": {"level": "warning", "meaning": "The storage drive is FAT32: files over 4 GiB can't be stored."},
     "ignores_case": {"level": "warning", "meaning": "The storage drive is exFAT or NTFS: it ignores case in names and is slower than ext4."},
-    "low_space": {"level": "warning", "meaning": "Less than 1 GiB is left before uploads stop."}
+    "low_space": {"level": "warning", "meaning": "Less than 1 GiB is left before uploads stop."},
+    "s3_unreachable": {"level": "problem", "meaning": "The bucket (\"s3\") can't be reached: no network, a wrong endpoint, or trouble at the service."},
+    "s3_denied": {"level": "problem", "meaning": "The bucket refuses Share's keys: a wrong access key or secret, a key without rights to the bucket, or no such bucket."},
+    "s3_cors": {"level": "problem", "meaning": "The bucket's CORS rules don't let Share's pages send files to it and fetch them; `share check` prints the rules to set."},
+    "s3_clock_skew": {"level": "problem", "meaning": "This machine's clock is more than 5 minutes off the bucket's: links to the bucket fail, or end too soon."}
   }
 }

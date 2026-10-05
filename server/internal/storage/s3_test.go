@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/eschgi/share/server/internal/config"
 	"github.com/eschgi/share/server/internal/db"
 	"github.com/eschgi/share/server/internal/ids"
 	"github.com/eschgi/share/server/internal/s3"
@@ -464,5 +465,50 @@ func TestReconcileS3WithoutTheBucket(t *testing.T) {
 	}
 	if !slices.ContainsFunc(fx.logs, func(l string) bool { return strings.Contains(l, "finishing") }) {
 		t.Errorf("nothing logged: %q", fx.logs)
+	}
+}
+
+func TestCheckS3(t *testing.T) {
+	ctx := context.Background()
+	fake := s3test.New(t)
+	open := func(c *config.S3) *s3.Bucket {
+		b, err := s3.Open(c, s3.Options{Transport: fake.Client().Transport, MaxRetries: 1})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+	b := open(fake.Config("lib/"))
+	origins := []string{"https://share.example.test", "http://192.168.8.52:8080"}
+	check := func(b *s3.Bucket) []string {
+		var codes []string
+		for _, f := range CheckS3(ctx, t.TempDir(), b, origins).Problems {
+			if strings.HasPrefix(f.Code, "s3_") { // the temporary data folder may be in memory
+				codes = append(codes, f.Code)
+			}
+		}
+		return codes
+	}
+	if got := check(b); len(got) != 0 {
+		t.Errorf("a good bucket: %v", got)
+	}
+	fake.SetCORS(false)
+	if got := check(b); !slices.Equal(got, []string{"s3_cors"}) {
+		t.Errorf("without CORS rules: %v", got)
+	}
+	fake.SetCORS(true)
+	fake.SetSkew(20 * time.Minute)
+	if got := check(b); !slices.Equal(got, []string{"s3_clock_skew"}) {
+		t.Errorf("a clock 20 minutes off: %v", got)
+	}
+	fake.SetSkew(0)
+	wrong := fake.Config("lib/")
+	wrong.AccessKeyID = "AKIDSOMEONEELSE0"
+	if got := check(open(wrong)); !slices.Equal(got, []string{"s3_denied"}) {
+		t.Errorf("unknown keys: %v", got)
+	}
+	fake.Down(true)
+	if got := check(b); !slices.Equal(got, []string{"s3_unreachable"}) {
+		t.Errorf("no network: %v", got)
 	}
 }

@@ -1,5 +1,5 @@
-// Package storage owns the files on disk: the storage folder and its checks, the library
-// layout, and moving finished uploads into the library.
+// Package storage owns the library's files, on a drive or in a bucket: the storage and its
+// checks, the library layout, and moving finished uploads into the library.
 package storage
 
 import (
@@ -9,7 +9,10 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
+
+	"github.com/eschgi/share/server/internal/s3"
 )
 
 // MarkerName is the file `share init` puts into the storage folder. The server waits for it
@@ -107,65 +110,115 @@ type Report struct {
 // free on the storage drive.
 func Check(l Layout, minFree int64) Report {
 	var r Report
-	problem := func(code, format string, args ...any) {
-		r.Problems = append(r.Problems, Finding{code, fmt.Sprintf(format, args...)})
-	}
-	warn := func(code, format string, args ...any) {
-		r.Warnings = append(r.Warnings, Finding{code, fmt.Sprintf(format, args...)})
-	}
-
 	if _, err := os.Stat(filepath.Join(l.StorageDir, MarkerName)); err != nil {
-		problem("marker_missing", "%s has no %s marker; mount the drive or volume and run `share init`", l.StorageDir, MarkerName)
+		r.problem("marker_missing", "%s has no %s marker; mount the drive or volume and run `share init`", l.StorageDir, MarkerName)
 		return r
 	}
 	var err error
 	if r.Storage, err = Stat(l.StorageDir); err != nil {
-		problem("storage_unreadable", "storage folder: %v", err)
+		r.problem("storage_unreadable", "storage folder: %v", err)
 		return r
 	}
 	for _, dir := range []string{l.UploadsDir(), l.TrashDir()} {
 		info, err := Stat(dir)
 		switch {
 		case err != nil:
-			problem("folder_missing", "%s is missing; run `share init`", dir)
+			r.problem("folder_missing", "%s is missing; run `share init`", dir)
 		case info.Device != r.Storage.Device:
-			problem("other_drive", "%s is on another drive than %s; finishing uploads needs both on one drive", dir, l.StorageDir)
+			r.problem("other_drive", "%s is on another drive than %s; finishing uploads needs both on one drive", dir, l.StorageDir)
 		}
 	}
 	switch r.Storage.Type {
 	case "vfat":
-		warn("fat32", "the storage drive is FAT32: files over 4 GiB can't be stored; ext4 is recommended")
+		r.warn("fat32", "the storage drive is FAT32: files over 4 GiB can't be stored; ext4 is recommended")
 		r.MaxFileSize = 4<<30 - 1
 	case "exfat", "ntfs", "ntfs3", "fuseblk":
-		warn("ignores_case", "the storage drive is %s: it ignores case in names and is slower than ext4", r.Storage.Type)
+		r.warn("ignores_case", "the storage drive is %s: it ignores case in names and is slower than ext4", r.Storage.Type)
 	case "tmpfs", "squashfs", "overlay", "ubifs", "jffs2":
-		problem("not_a_drive", "the storage folder is on %s: memory, flash or a container's own layer, not a drive or a volume", r.Storage.Type)
+		r.problem("not_a_drive", "the storage folder is on %s: memory, flash or a container's own layer, not a drive or a volume", r.Storage.Type)
 	}
-
-	if err := os.MkdirAll(l.DataDir, 0o700); err != nil {
-		problem("data_unreadable", "data folder: %v", err)
+	if !r.checkData(l.DataDir) {
 		return r
-	}
-	if r.Data, err = Stat(l.DataDir); err != nil {
-		problem("data_unreadable", "data folder: %v", err)
-		return r
-	}
-	switch r.Data.Type {
-	case "fuseblk", "nfs", "cifs", "smb2":
-		problem("data_unsafe", "the data folder is on %s; SQLite isn't safe there — set data_dir to a local disk", r.Data.Type)
-	case "tmpfs":
-		problem("data_in_memory", "the data folder is in memory (tmpfs) and would be lost on restart")
-	case "overlay":
-		problem("data_in_memory", "the data folder is inside the container (overlay) and would be lost when the container is made anew; put it on a volume")
 	}
 	// Uploads stop where they would leave less than minFree; say so a while before.
 	switch free := r.Storage.Free; {
 	case free <= minFree:
-		problem("drive_full", "the storage drive is full: %s free, and uploads leave %s (min_free_space_mib)", gib(free), gib(minFree))
+		r.problem("drive_full", "the storage drive is full: %s free, and uploads leave %s (min_free_space_mib)", gib(free), gib(minFree))
 	case free < minFree+1<<30:
-		warn("low_space", "only %s free on the storage drive; uploads stop at %s (min_free_space_mib)", gib(free), gib(minFree))
+		r.warn("low_space", "only %s free on the storage drive; uploads stop at %s (min_free_space_mib)", gib(free), gib(minFree))
 	}
 	return r
+}
+
+// CheckS3 is Check for a library in a bucket: whether the bucket takes Share's keys, whether
+// this machine's clock is close enough to the bucket's, and whether Share's pages on origins
+// may send files there and fetch them (CORS); and the data folder, as on a drive.
+func CheckS3(ctx context.Context, dataDir string, b *s3.Bucket, origins []string) Report {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	var r Report
+	err := b.Reach(ctx)
+	var re *s3.ReachError
+	switch {
+	case err == nil:
+	case errors.As(err, &re) && re.Kind == s3.Denied:
+		r.problem("s3_denied", "the bucket %s refuses Share's keys, or doesn't exist: %v", b.Name(), re.Err)
+	case errors.As(err, &re) && re.Kind == s3.ClockSkew:
+		r.problem("s3_clock_skew", "this machine's clock is %v off the bucket's; links to the bucket fail or end too soon until it is right", re.Skew.Abs().Round(time.Second))
+	default:
+		r.problem("s3_unreachable", "the bucket %s at %s can't be reached: %v", b.Name(), b.Endpoint(), err)
+	}
+	if err == nil || re != nil && re.Kind == s3.ClockSkew && re.Err == nil {
+		var refused []string
+		for _, origin := range origins {
+			var ce *s3.CORSError
+			switch err := b.CORS(ctx, origin); {
+			case errors.As(err, &ce):
+				refused = append(refused, origin)
+			case err != nil:
+				r.problem("s3_unreachable", "the bucket's CORS rules can't be asked: %v", err)
+			}
+		}
+		if len(refused) > 0 {
+			r.problem("s3_cors", "the bucket's CORS rules don't let Share's pages on %s send and fetch files; `share check` prints the rules to set", strings.Join(refused, " and "))
+		}
+	}
+	r.checkData(dataDir)
+	return r
+}
+
+// checkData looks at the data folder, where the database and the thumbnails are on a drive
+// and with a bucket alike. It reports false when the folder can't be used at all.
+func (r *Report) checkData(dir string) bool {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		r.problem("data_unreadable", "data folder: %v", err)
+		return false
+	}
+	var err error
+	if r.Data, err = Stat(dir); err != nil {
+		r.problem("data_unreadable", "data folder: %v", err)
+		return false
+	}
+	switch r.Data.Type {
+	case "fuseblk", "nfs", "cifs", "smb2":
+		r.problem("data_unsafe", "the data folder is on %s; SQLite isn't safe there — set data_dir to a local disk", r.Data.Type)
+	case "tmpfs":
+		r.problem("data_in_memory", "the data folder is in memory (tmpfs) and would be lost on restart")
+	case "overlay":
+		r.problem("data_in_memory", "the data folder is inside the container (overlay) and would be lost when the container is made anew; put it on a volume")
+	}
+	return true
+}
+
+// problem notes something that keeps Share from working well. The codes are literals, so
+// the test against contract/storage_warnings.json finds them in this file.
+func (r *Report) problem(code, format string, args ...any) {
+	r.Problems = append(r.Problems, Finding{code, fmt.Sprintf(format, args...)})
+}
+
+// warn notes something worth knowing.
+func (r *Report) warn(code, format string, args ...any) {
+	r.Warnings = append(r.Warnings, Finding{code, fmt.Sprintf(format, args...)})
 }
 
 func gib(b int64) string { return fmt.Sprintf("%.1f GiB", float64(b)/(1<<30)) }

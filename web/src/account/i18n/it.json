@@ -375,5 +375,9 @@
   "storage.warn.fat32": "Il disco è FAT32: i file oltre 4 GB non si possono salvare.",
   "storage.warn.ignores_case": "Il disco è exFAT o NTFS: non distingue maiuscole e minuscole nei nomi ed è più lento di ext4.",
   "storage.warn.low_space": "Manca meno di 1 GB prima che i caricamenti si fermino.",
+  "storage.warn.s3_unreachable": "Il bucket non è raggiungibile: niente rete, un indirizzo sbagliato in config.json o un problema del servizio di archiviazione.",
+  "storage.warn.s3_denied": "Il bucket rifiuta le chiavi di Share, oppure non esiste. Controlla bucket e chiavi in config.json.",
+  "storage.warn.s3_cors": "Il bucket non permette alle pagine di Share di inviare e scaricare file. Imposta le sue regole CORS; share check le mostra.",
+  "storage.warn.s3_clock_skew": "L'orologio del server sbaglia di più di 5 minuti: i link al bucket non funzionano o scadono troppo presto.",
   "storage.warn.unknown": "Il server ha trovato qualcosa da controllare. Esegui share check sul server."
 }

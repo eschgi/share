@@ -22,8 +22,8 @@ import 'theme_sheet.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
-/// What share check found about the drive, in the admin's words; a code from a newer server
-/// gets a general line.
+/// What share check found about the drive or the bucket, in the admin's words; a code from a
+/// newer server gets a general line.
 String storageWarningText(AppLocalizations t, String code) => switch (code) {
       'marker_missing' => t.storageWarnMarkerMissing,
       'storage_unreadable' => t.storageWarnStorageUnreadable,
@@ -37,6 +37,10 @@ String storageWarningText(AppLocalizations t, String code) => switch (code) {
       'fat32' => t.storageWarnFat32,
       'ignores_case' => t.storageWarnIgnoresCase,
       'low_space' => t.storageWarnLowSpace,
+      's3_unreachable' => t.storageWarnS3Unreachable,
+      's3_denied' => t.storageWarnS3Denied,
+      's3_cors' => t.storageWarnS3Cors,
+      's3_clock_skew' => t.storageWarnS3ClockSkew,
       _ => t.storageWarnUnknown,
     };
 

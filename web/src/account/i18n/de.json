@@ -375,5 +375,9 @@
   "storage.warn.fat32": "Das Laufwerk ist FAT32: Dateien über 4 GB können nicht gespeichert werden.",
   "storage.warn.ignores_case": "Das Laufwerk ist exFAT oder NTFS: Es unterscheidet nicht zwischen Groß- und Kleinschreibung und ist langsamer als ext4.",
   "storage.warn.low_space": "Bis die Uploads stoppen, ist weniger als 1 GB frei.",
+  "storage.warn.s3_unreachable": "Der Bucket ist nicht erreichbar: kein Netz, eine falsche Adresse in config.json oder eine Störung beim Speicherdienst.",
+  "storage.warn.s3_denied": "Der Bucket lehnt die Schlüssel von Share ab, oder es gibt ihn nicht. Prüf Bucket und Schlüssel in config.json.",
+  "storage.warn.s3_cors": "Der Bucket lässt die Seiten von Share keine Dateien senden und holen. Stell seine CORS-Regeln ein; share check zeigt sie an.",
+  "storage.warn.s3_clock_skew": "Die Uhr des Servers geht um mehr als 5 Minuten falsch: Links zum Bucket schlagen fehl oder laufen zu früh ab.",
   "storage.warn.unknown": "Der Server hat etwas gefunden, das du dir ansehen solltest. Führ dort share check aus."
 }

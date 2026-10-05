@@ -585,6 +585,10 @@
   "storageWarnFat32": "The drive is FAT32: files over 4 GB can't be stored.",
   "storageWarnIgnoresCase": "The drive is exFAT or NTFS: it ignores capitals in names and is slower than ext4.",
   "storageWarnLowSpace": "Less than 1 GB is left before uploads stop.",
+  "storageWarnS3Unreachable": "The bucket can't be reached: no network, a wrong address in config.json, or trouble at the storage service.",
+  "storageWarnS3Denied": "The bucket refuses Share's keys, or doesn't exist. Check the bucket and the keys in config.json.",
+  "storageWarnS3Cors": "The bucket doesn't let Share's pages send and fetch files. Set its CORS rules; share check prints them.",
+  "storageWarnS3ClockSkew": "The server's clock is more than 5 minutes off: links to the bucket fail, or end too soon.",
   "storageWarnUnknown": "The server found something to look at. Run share check there.",
   "storageFree": "{free} free of {total}",
   "@storageFree": {
