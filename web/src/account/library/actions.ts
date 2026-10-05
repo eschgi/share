@@ -1,6 +1,6 @@
 // What can be done with files: download them, one or as a ZIP; share them on a phone; delete
 // them and bring them back (admins).
-import { contentUrl, createDownload, deleteFiles, getStorage, moveFiles, restoreFiles, zipUrl, type FileInfo, type ZipDownload } from '../../api';
+import { contentPath, contentUrl, createDownload, deleteFiles, getStorage, moveFiles, restoreFiles, zipUrl, type FileInfo, type ZipDownload } from '../../api';
 
 /** The most files one ZIP takes (the server's limit). */
 export const zipLimit = 10_000;
@@ -19,7 +19,7 @@ export function startDownload(href: string, name = ''): void {
 /** One file as it is; several as one ZIP, which the browser's download list shows and resumes. */
 export async function download(ids: string[], one?: FileInfo): Promise<ZipDownload | null> {
   if (ids.length === 1) {
-    startDownload(one && one.id === ids[0] ? contentUrl(one) : `/api/files/${encodeURIComponent(ids[0])}/content`, one?.name);
+    startDownload(contentPath(ids[0]), one?.name);
     return null;
   }
   const zip = await createDownload(ids);

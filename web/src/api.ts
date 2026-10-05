@@ -8,6 +8,8 @@ export interface Info {
   default_language: string;
   chunk_size_bytes: number;
   max_file_size_bytes: number;
+  /** Where the files are: disk (sent over tus) or s3 (a bucket, sent straight there). */
+  storage: 'disk' | 's3';
 }
 
 /** A PIN session; GET /api/session is only about those (a signed-in browser is /api/me). */
@@ -252,8 +254,11 @@ export const getLibrary = (f: LibraryFilter) => request<LibraryOverview>('GET', 
 export const getFiles = (f: LibraryFilter, cursor: string | null, limit: number) =>
   request<FilePage>('GET', '/api/files' + libraryQuery(f, { limit: String(limit), cursor: cursor ?? undefined }));
 
-/** A file as it was sent, as an attachment; it resumes with Range. */
-export const contentUrl = (f: FileInfo) => `/api/files/${encodeURIComponent(f.id)}/content`;
+/** A file as it was sent, as an attachment; it resumes with Range. From a bucket the server
+ * sends the browser on to it there. */
+export const contentPath = (id: string) => `/api/files/${encodeURIComponent(id)}/content`;
+
+export const contentUrl = (f: FileInfo) => contentPath(f.id);
 
 /** A file's thumbnail; its address changes when a better one arrives, so it can be cached. */
 export const thumbUrl = (f: FileInfo) => `/api/files/${encodeURIComponent(f.id)}/thumb?v=${Date.parse(f.updated_at).toString(36)}`;
@@ -319,8 +324,12 @@ export const restoreFiles = (ids: string[]) => request<{ changed: number }>('POS
 /** Admins: files go into another folder, and who sees them with it. At most 1000 ids at once. */
 export const moveFiles = (ids: string[], folder: string) => request<{ changed: number }>('POST', '/api/files/move', { ids, folder });
 
-/** Admins: the drive, the library and Recently deleted. */
+/** Admins: the drive or the bucket, the library and Recently deleted. */
 export interface Storage {
+  storage: 'disk' | 's3';
+  /** With the files in a bucket: its name and the service's address; the drive's fields are empty. */
+  s3_bucket: string;
+  s3_endpoint: string;
   storage_dir: string;
   fs_type: string;
   total_bytes: number;
@@ -343,6 +352,41 @@ export interface StorageWarning {
 }
 
 export const getStorage = () => request<Storage>('GET', '/api/admin/storage');
+
+// Sending into a bucket (storage s3): the parts go straight there, with links from the server.
+
+/** A link for sending one part, exactly size bytes, with a PUT. */
+export interface S3PartUrl {
+  number: number;
+  url: string;
+  size: number;
+}
+
+/** A new upload into the bucket: how the file is cut into parts, and links for the first ones. */
+export interface S3NewUpload {
+  id: string;
+  part_size: number;
+  /** 0 for an empty file, which only needs complete. */
+  parts: number;
+  urls: S3PartUrl[];
+  expires_at: string;
+}
+
+/** Fresh links for some parts. */
+export interface S3PartUrls {
+  urls: S3PartUrl[];
+  expires_at: string;
+}
+
+/** How far an upload into the bucket is: done_parts are those the bucket has. */
+export interface S3UploadStatus {
+  id: string;
+  state: 'receiving' | 'finishing' | 'complete';
+  size: number;
+  part_size: number;
+  parts: number;
+  done_parts: number[];
+}
 
 // Admins: upload PINs, people and invites, Recently deleted.
 

@@ -1,6 +1,7 @@
 // Chrome's and Edge's way into a folder on the computer (the File System Access API): picking
 // it, keeping it for next time, the right to write there, and the engine's folder and network
 // on top of them. Other browsers, and plain http at home, download a ZIP instead.
+import { contentPath } from '../../api';
 import type { Answer, FetchFile, Folder } from './engine';
 import { forgetMarks } from './marks';
 
@@ -161,6 +162,6 @@ export const fetchFile: FetchFile = async (id, from, etag, signal): Promise<Answ
     headers.set('Range', `bytes=${from}-`);
     if (etag) headers.set('If-Range', etag);
   }
-  const res = await fetch(`/api/files/${encodeURIComponent(id)}/content`, { headers, signal, cache: 'no-store' });
+  const res = await fetch(contentPath(id), { headers, signal, cache: 'no-store' });
   return { status: res.status, etag: res.headers.get('ETag'), body: res.ok && res.body ? chunksOf(res.body) : nothing() };
 };
