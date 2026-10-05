@@ -41,7 +41,7 @@ type API struct {
 	// ServerVersion is the program's version, e.g. v0.1.0-3-gabc1234, for /api/about.
 	ServerVersion string
 	// CheckStorage looks at the drives, for what the admins' storage page warns about.
-	CheckStorage func() storage.Report
+	CheckStorage func(context.Context) storage.Report
 
 	folderCache folderCache
 }

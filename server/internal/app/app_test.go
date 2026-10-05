@@ -72,7 +72,7 @@ func newEnvWith(t *testing.T, settings string) *env {
 	e.free.Store(1 << 40)
 	upCfg := upload.DefaultConfig()
 	upCfg.FreeSpace = func() (int64, error) { return e.free.Load(), nil }
-	checkStorage := func() storage.Report {
+	checkStorage := func(context.Context) storage.Report {
 		if r := e.report.Load(); r != nil {
 			return *r
 		}

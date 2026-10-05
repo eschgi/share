@@ -111,9 +111,26 @@ func (lib *Library) exists(p string) bool {
 	return err == nil
 }
 
-// Open opens a file of the library for reading. A row read before a rename or a move may
-// point to an old place; then the file is looked up again.
-func (lib *Library) Open(ctx context.Context, f db.File) (*os.File, error) {
+// File is a file of the library opened for reading.
+type File interface {
+	io.Reader
+	io.ReaderAt
+	io.Seeker
+	io.Closer
+}
+
+// Open opens a file of the library for reading.
+func (lib *Library) Open(ctx context.Context, f db.File) (File, error) {
+	file, err := lib.OpenFile(ctx, f)
+	if err != nil {
+		return nil, err // not a nil *os.File in a non-nil File
+	}
+	return file, nil
+}
+
+// OpenFile opens a file of the library on the drive, for sendfile. A row read before a
+// rename or a move may point to an old place; then the file is looked up again.
+func (lib *Library) OpenFile(ctx context.Context, f db.File) (*os.File, error) {
 	for try := 0; ; try++ {
 		p, err := lib.locate(ctx, f)
 		if err != nil {

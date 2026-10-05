@@ -127,7 +127,7 @@ func (a *API) download(w http.ResponseWriter, r *http.Request) {
 	}
 	h := w.Header()
 	h.Set("Content-Type", "application/zip")
-	h.Set("Content-Disposition", contentDisposition(sel.Name))
+	h.Set("Content-Disposition", storage.ContentDisposition(sel.Name))
 	h.Set("Cache-Control", "private, no-store, no-transform")
 	h.Set("Content-Security-Policy", "sandbox")
 	h.Set("X-Content-Type-Options", "nosniff")

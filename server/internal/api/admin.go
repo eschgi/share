@@ -707,7 +707,7 @@ func (a *API) storageInfo(w http.ResponseWriter, r *http.Request) {
 	if fs, err := storage.Stat(a.Cfg.StorageDir); err == nil {
 		info.FSType, info.TotalBytes, info.FreeBytes = fs.Type, fs.Total, fs.Free
 	}
-	report := a.CheckStorage()
+	report := a.CheckStorage(ctx)
 	info.Warnings = make([]StorageWarning, 0, len(report.Problems)+len(report.Warnings))
 	for _, f := range report.Problems {
 		info.Warnings = append(info.Warnings, StorageWarning{Code: f.Code, Level: "problem", Message: f.Message})

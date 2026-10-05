@@ -15,6 +15,7 @@ import (
 	"github.com/eschgi/share/server/internal/db"
 	"github.com/eschgi/share/server/internal/httpx"
 	"github.com/eschgi/share/server/internal/ids"
+	"github.com/eschgi/share/server/internal/storage"
 )
 
 // FileInfo is a file in the library.
@@ -287,7 +288,7 @@ func (a *API) content(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	file, err := a.Lib.Open(r.Context(), f)
+	file, err := a.Lib.OpenFile(r.Context(), f)
 	if errors.Is(err, os.ErrNotExist) {
 		httpx.WriteError(w, http.StatusNotFound, "not_found", "The file is missing on the server's drive.")
 		return
@@ -307,7 +308,7 @@ func (a *API) content(w http.ResponseWriter, r *http.Request) {
 	if f.Mime == "" {
 		h.Set("Content-Type", "application/octet-stream")
 	}
-	h.Set("Content-Disposition", contentDisposition(f.Name))
+	h.Set("Content-Disposition", storage.ContentDisposition(f.Name))
 	h.Set("Cache-Control", "private, no-store, no-transform")
 	h.Set("Content-Security-Policy", "sandbox")
 	h.Set("X-Content-Type-Options", "nosniff")
@@ -340,35 +341,6 @@ func (a *API) thumb(w http.ResponseWriter, r *http.Request) {
 	h.Set("X-Content-Type-Options", "nosniff")
 	h.Set("ETag", `"`+f.ID+"-"+strconv.FormatInt(f.UpdatedAt.UnixMilli(), 36)+`"`)
 	http.ServeContent(w, r, "", f.UpdatedAt, file)
-}
-
-// contentDisposition makes the file save under its own name: an ASCII stand-in for old
-// clients, and the real name as UTF-8 (RFC 6266).
-func contentDisposition(name string) string {
-	var ascii, enc strings.Builder
-	for _, c := range name {
-		if c < 0x20 || c > 0x7E || c == '"' || c == '\\' {
-			ascii.WriteByte('_')
-		} else {
-			ascii.WriteRune(c)
-		}
-	}
-	for _, b := range []byte(name) {
-		if isAttrChar(b) {
-			enc.WriteByte(b)
-		} else {
-			enc.WriteString("%" + strings.ToUpper(strconv.FormatInt(int64(b)|0x100, 16)[1:]))
-		}
-	}
-	return `attachment; filename="` + ascii.String() + `"; filename*=UTF-8''` + enc.String()
-}
-
-func isAttrChar(b byte) bool {
-	switch {
-	case 'a' <= b && b <= 'z', 'A' <= b && b <= 'Z', '0' <= b && b <= '9':
-		return true
-	}
-	return strings.IndexByte("!#$&+-.^_`|~", b) >= 0
 }
 
 // writeTimeout is how long one piece of a download may take to go out. The server has no

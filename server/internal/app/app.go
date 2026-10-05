@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -35,7 +36,7 @@ type Options struct {
 	Upload         *upload.Config
 	Version        string // the program's version, for the About screens; "dev" when empty
 	// CheckStorage looks at the drives for the admins' storage page; storage.Check when nil.
-	CheckStorage func() storage.Report
+	CheckStorage func(context.Context) storage.Report
 }
 
 // App is a running server's parts.
@@ -82,7 +83,7 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 	}
 	checkStorage := opts.CheckStorage
 	if checkStorage == nil {
-		checkStorage = func() storage.Report { return storage.Check(layout, cfg.MinFreeSpace()) }
+		checkStorage = func(context.Context) storage.Report { return storage.Check(layout, cfg.MinFreeSpace()) }
 	}
 
 	d, err := db.Open(layout.DBPath())
@@ -124,9 +125,10 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 		d.Close()
 		return nil, err
 	}
-	th := &thumbs.Store{DB: d, Dir: layout.ThumbsDir(), Root: lib.Root(), Open: lib.Open, Now: now, Logf: log.Printf}
+	openOriginal := func(ctx context.Context, f db.File) (io.ReadSeekCloser, error) { return lib.Open(ctx, f) }
+	th := &thumbs.Store{DB: d, Dir: layout.ThumbsDir(), Open: openOriginal, Now: now, Logf: log.Printf}
 	lib.OnPurged = th.Remove
-	crcs := &checksum.Store{DB: d, Root: lib.Root(), Open: lib.Open, Pace: checksum.Pace, Logf: log.Printf}
+	crcs := &checksum.Store{DB: d, Root: lib.Root(), Open: lib.OpenFile, Pace: checksum.Pace, Logf: log.Printf}
 	lib.OnReady = crcs.Wake
 	dl := &downloads.Store{Now: now}
 	ui := webui.New(cfg)

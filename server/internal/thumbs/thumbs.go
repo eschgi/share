@@ -71,21 +71,12 @@ type Meta struct {
 type Store struct {
 	DB   *db.DB
 	Dir  string
-	Root *os.Root // the storage folder, for reading library files
-	// Open opens a library file; without it the file is read at its path in Root.
-	Open func(context.Context, db.File) (*os.File, error)
+	Open func(context.Context, db.File) (io.ReadSeekCloser, error) // opens a library file
 	Now  func() time.Time
 	Logf func(string, ...any)
 
 	mu     sync.Mutex     // one writer at a time, so a sent and a made thumbnail never cross
 	failed map[string]int // read errors per photo, for giving up after a few
-}
-
-func (s *Store) open(ctx context.Context, f db.File) (*os.File, error) {
-	if s.Open != nil {
-		return s.Open(ctx, f)
-	}
-	return s.Root.Open(f.RelPath)
 }
 
 // Path is where the thumbnail of file id is kept.
@@ -276,7 +267,7 @@ func (s *Store) make(ctx context.Context, f db.File) error {
 	default:
 		return unusable{fmt.Errorf("can't read %s", f.Mime)}
 	}
-	file, err := s.open(ctx, f)
+	file, err := s.Open(ctx, f)
 	if errors.Is(err, fs.ErrNotExist) {
 		return unusable{err}
 	}
