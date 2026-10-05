@@ -28,8 +28,9 @@ const usage = `Share — a self-hosted file drop.
 
 Usage:
   share serve                 run the server
-  share init                  create the storage folder layout (once, with the drive mounted)
-  share check                 check config, folders and drives
+  share init                  create the storage folder layout (once, with the drive mounted);
+                              with the files in a bucket ("s3"), only the data folder
+  share check                 check config, folders and drives, or the bucket and its CORS rules
   share health                check that the running server answers, e.g. for a container
   share folders               list the folders, with what they hold and who sees them
   share pin create --permanent|--day [--folder NAME] [--show]
@@ -128,10 +129,6 @@ func (f *flags) load() (*config.Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", *f.config, err)
 	}
-	if cfg.S3 != nil {
-		// Until the commands know buckets, none of them may treat the drive as the storage.
-		return nil, fmt.Errorf(`%s: "s3": files in a bucket aren't supported yet`, *f.config)
-	}
 	return cfg, nil
 }
 
@@ -164,6 +161,9 @@ func initStorage(args []string) error {
 	if err != nil {
 		return err
 	}
+	if cfg.S3 != nil {
+		return initS3(cfg)
+	}
 	layout := storage.Layout{StorageDir: cfg.StorageDir, DataDir: cfg.DataDir}
 	if err := storage.Init(layout); err != nil {
 		return err
@@ -183,6 +183,9 @@ func check(args []string) error {
 	}
 	fmt.Printf("Config %s is valid. Public address: %s\n", *f.config, cfg.PublicURL)
 	fmt.Println(proxyLine(cfg))
+	if cfg.S3 != nil {
+		return checkS3(cfg)
+	}
 	return printReport(storage.Check(storage.Layout{StorageDir: cfg.StorageDir, DataDir: cfg.DataDir}, cfg.MinFreeSpace()))
 }
 
