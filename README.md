@@ -121,7 +121,7 @@ Both speak English, German and Italian.
 - **Files in a bucket.** With an S3 bucket instead of a drive, the website and the app send the
   pieces straight to the bucket and fetch the files from there, with links the server signs for
   each piece and each file. The bytes skip the server, and a tunnel in front of it with its limits;
-  the server keeps the database and the thumbnails. [Files in an S3 bucket](#files-in-an-s3-bucket)
+  the thumbnails go into the bucket too, through the server. [Files in an S3 bucket](#files-in-an-s3-bucket)
   has the setup.
 - On a computer, files and whole folders can be dropped on the page, the tab shows how far sending is,
   and closing it in the middle asks first. An invite opened there shows a QR code for the phone.
@@ -260,6 +260,7 @@ Share runs wherever you like. How visitors reach it decides the setup:
 | A VPS or another server with a public address, also next to other apps under other names | A reverse proxy that makes the certificates: Caddy, nginx or Traefik | [`deploy/reverse-proxy`](deploy/reverse-proxy/README.md) |
 | A server with a public address, without a proxy | Share's own HTTPS, with a certificate from files | [below](#https-without-a-proxy) |
 | Docker, on any of these | The image `ghcr.io/eschgi/share`, with Caddy or a tunnel | [`deploy/docker`](deploy/docker/README.md) |
+| Google Cloud Run, which runs Share only while someone visits, with the files in a bucket and the records in PostgreSQL | Its own address, or your domain | [`deploy/cloud-run`](deploy/cloud-run/README.md) |
 
 Without Docker:
 
@@ -366,8 +367,9 @@ For the app, two settings matter:
 Instead of `storage_dir`, Share can keep the files in a bucket of Amazon S3 or of a service that
 speaks its API, such as Cloudflare R2, Backblaze B2 or MinIO. It is one or the other: a server
 doesn't mix them, and it remembers where its files are, so it refuses to start when
-`config.json` names another place while it has files. The database and the thumbnails stay in
-`data_dir`, which is required then:
+`config.json` names another place while it has files. The thumbnails go into the bucket too. The
+database stays in `data_dir`, which is required then, unless it is in
+[PostgreSQL](#the-records-in-postgresql):
 
 ```json
 {
@@ -395,7 +397,7 @@ doesn't mix them, and it remembers where its files are, so it refuses to start w
 The endpoint is the service's address without the bucket in it. Plain http is for a bucket at home
 only, and works only for pages that are opened over plain http too: browsers don't let an https
 page send to an http address. `prefix` starts every key, `<prefix>files/<id>`; without it Share
-uses the whole bucket.
+uses the whole bucket. The thumbnails are `<prefix>thumbs/<id>.jpg`.
 
 Setting up the bucket:
 
@@ -423,8 +425,8 @@ Setting up the bucket:
 
    Without `s3:ListBucket`, Amazon S3 answers "access denied" for a file that isn't there,
    instead of "not found".
-4. **Back up `data_dir`.** Its database is the only record of the files' names, folders and days;
-   the bucket holds their bytes under ids.
+4. **Back up the database**, in `data_dir` or in PostgreSQL. It is the only record of the files'
+   names, folders and days; the bucket holds their bytes and thumbnails under ids.
 5. **One prefix per server.** Two servers on the same bucket and prefix drop each other's uploads.
 
 What is different with a bucket:
@@ -444,6 +446,27 @@ What is different with a bucket:
 - The website's Content Security Policy lets its pages reach the bucket, so anyone can read the
   bucket's address there, on R2 with the account's id. Every link names the access key's id, but
   not its secret.
+
+### The records in PostgreSQL
+
+Share keeps its records (the files' names, folders and days, the people, the PINs) in SQLite, in
+`data_dir`, unless `config.json` names a PostgreSQL database:
+
+```json
+"database": {"postgres": "postgres://share:…@ep-example.eu-central-1.aws.neon.tech/share?sslmode=require"}
+```
+
+- A database on the internet needs `sslmode=require`, `verify-ca` or `verify-full`;
+  `sslmode=disable` is for one at home or on the same machine. Share is tested with PostgreSQL 17
+  and 18; a free [Neon](https://neon.tech) project is enough for a family.
+- Share makes its tables and brings them up to date when it starts. It waits while the database
+  doesn't answer, as a sleeping Neon database does for a moment, and stops at once when the
+  database refuses the password.
+- With PostgreSQL and the files in a bucket, nothing stays on the machine: `data_dir` can be left
+  out, unless the https port uses Share's own certificate, which lives there. That is how Share
+  runs on [Google Cloud Run](deploy/cloud-run/README.md).
+- `share check` says whether the database answers. Back it up the way its host offers.
+- A server doesn't move between SQLite and PostgreSQL: with the other one, it starts empty.
 
 ## Repository
 

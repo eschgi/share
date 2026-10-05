@@ -42,6 +42,9 @@ app will go on Google Play later.
   cookie the page can't read. One that signs in at home, over plain http, gets a session that works
   only at home: a cookie belongs to an address, and someone else's network has the same addresses.
 - **No uploader names**: the website doesn't ask for one.
+- **The first admin** makes their account on the setup page, which a new server shows while nobody
+  has an account: from home at any time, from elsewhere in the first 15 minutes after a start, or
+  with the link in the server's log. On a drive, the page sets up the storage folder first.
 
 ## Folders
 
@@ -84,7 +87,8 @@ app will go on Google Play later.
 
 - **How visitors reach it.** At home without a public address, through a Cloudflare Tunnel; on a server
   with one, behind a reverse proxy such as Caddy, nginx or Traefik, or with Share's own HTTPS; on
-  either, in Docker. `config.json` names the proxy (`proxy`), and Share believes a visitor's address and
+  either, in Docker. Or on Google Cloud Run, with the files in a bucket and the records in
+  PostgreSQL, so that nothing stays on a machine. `config.json` names the proxy (`proxy`), and Share believes a visitor's address and
   https only from it. A proxy Share wasn't told about is refused, so it can't make the internet look
   like the home network.
 - **Two addresses per phone** (16). The public address is required. The local address is optional,
@@ -155,7 +159,7 @@ app, JSON on the website), so others can add languages.
 - Nothing hard-coded: addresses, storage folder, ports, languages and the optional Play link come from
   configuration.
 - The server stays pure Go (no cgo), so it cross-compiles for Linux and Windows on arm64 and amd64; for
-  a database, e.g. SQLite through `modernc.org/sqlite`. CI builds release binaries for those platforms
+  a database, SQLite through `modernc.org/sqlite`, or PostgreSQL through `pgx`. CI builds release binaries for those platforms
   and a Docker image.
 - Apache-2.0 ([`LICENSE`](../LICENSE)): anyone may use, change and host it, also commercially, as long
   as they keep the notices. The fonts and icons keep their own licenses, listed in

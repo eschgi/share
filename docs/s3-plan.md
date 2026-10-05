@@ -12,8 +12,10 @@ Today every byte passes through the Go server, and behind Cloudflare also throug
 - downloads, the viewer, videos, ZIPs and the app's player read the files back from the disk.
 
 This plan adds a second kind of storage: an S3-compatible bucket. Browsers and the app move file bytes
-**straight to and from the bucket with presigned URLs**. The server keeps only the API, the database and
-the thumbnails. Disk mode, today's behaviour, stays exactly as it is.
+**straight to and from the bucket with presigned URLs**. The server keeps only the API and the
+database; the thumbnails, first planned for `data_dir`, went into the bucket too, through the server,
+so that nothing needs to stay on the machine (Google Cloud Run, with the database in PostgreSQL). Disk
+mode, today's behaviour, stays exactly as it is.
 
 Decided with the user:
 - **One storage per server**: `config.json` has either `storage_dir` (disk mode) or `s3` (S3 mode). No mixed
@@ -40,7 +42,8 @@ Also decided:
   - keep Cloudflare's limits;
   - need staging space on the disk;
   - leave each file in two places until it has been pushed. That is the mixed mode ruled out above.
-- Thumbnails and the database stay in `data_dir`, with the same endpoints.
+- The database stays in `data_dir`, or in PostgreSQL. The thumbnails keep their endpoints, and the
+  server keeps them in the bucket as `<prefix>thumbs/<id>.jpg`; a purge removes them with the file.
 - tus stays for disk mode.
 - The website gets its own small Uppy uploader plugin for S3, with no new npm package. `@uppy/aws-s3`
   6.x would make the browser call Create, List and Complete on S3 itself, with client-chosen keys, and
@@ -174,7 +177,8 @@ Contract changes:
 1. **Config** (`internal/config/config.go`, plus new `config/s3.go`):
    - New `S3 *S3` with `endpoint, region, bucket, prefix, access_key_id, secret_access_key, path_style`.
    - Exactly one of `storage_dir` and `s3` (see 336).
-   - `data_dir` is required with `s3`; today it defaults to `<storage_dir>/.share` (343-349).
+   - `data_dir` is required with `s3`, unless the database is in PostgreSQL; today it defaults to
+     `<storage_dir>/.share` (343-349).
    - Endpoint: https, or http only for a home address (reuse `parseOrigin` / homenet).
    - Region is required; it keeps presigning local, with no GetBucketLocation call.
    - Bucket name is checked, and `prefix` is normalised to end in `/`.
@@ -286,7 +290,7 @@ Contract changes:
    - runs `ClaimStorage` and `OpenS3Library`;
    - registers `S3Handler` instead of `TusHandler` and answers JSON 404 at `/tus/`;
    - has no checksum store or `CRCs.Run`, and `OnReady` stays nil;
-   - gives thumbs `Open` through a closure, with no `Root`;
+   - gives thumbs the bucket, with no `Root`;
    - gains an `Options.S3` hook so tests can use the fake.
 
    **CLI** (`cmd/share/main.go:151-199`, `accounts.go:23-32`, new `cmd/share/s3.go`):
