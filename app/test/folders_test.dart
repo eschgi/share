@@ -9,6 +9,7 @@ import 'package:share_app/ui/widgets.dart';
 
 import 'admin_test.dart' show adminServer, openSettings, tapInList;
 import 'app_test.dart' show daysAgo, signedInPhone, startApp, today;
+import 'support/contract.dart';
 import 'support/fake_platform.dart';
 import 'support/fake_server.dart';
 import 'support/fonts.dart';
@@ -212,6 +213,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Rename'));
     await tester.pumpAndSettle();
+    expect(find.text("Its folder on the server's drive gets the new name too."), findsOneWidget);
     await tester.enterText(find.byType(TextField), 'family');
     await tester.tap(find.widgetWithText(TextButton, 'Rename'));
     await tester.pumpAndSettle();
@@ -232,6 +234,28 @@ void main() {
     expect(find.text('Hochzeit Anna & Marco'), findsNothing, reason: 'back among the folders, without it');
     expect(server.trash, hasLength(4));
     expect(server.pins.where((p) => p['folder'] == wedding), isEmpty, reason: 'its PINs ended');
+  });
+
+  testWidgets('in a bucket, renaming a folder renames nothing on a drive', (tester) async {
+    final server = adminServer()
+      ..storage = {
+        ...contractResponse('api/storage.json'),
+        'storage': 's3',
+        's3_bucket': 'family-photos',
+        's3_endpoint': 'https://s3.eu-central-003.backblazeb2.com',
+        'storage_dir': '',
+      };
+    await startApp(tester, signedInPhone(), server);
+    await openSettings(tester);
+    await tapInList(tester, find.text('Folders'));
+    await tester.tap(find.text('Family'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(AppIcons.more));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Rename'));
+    await tester.pumpAndSettle();
+    expect(find.text('Rename the folder'), findsOneWidget);
+    expect(find.text("Its folder on the server's drive gets the new name too."), findsNothing);
   });
 
   testWidgets('a new folder opens at once; the last one can\'t be deleted', (tester) async {

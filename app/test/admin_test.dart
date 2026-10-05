@@ -54,6 +54,30 @@ void main() {
     expect(find.text('People'.toUpperCase()), findsNothing);
   });
 
+  testWidgets('with a bucket, the settings name it instead of a drive', (tester) async {
+    final server = adminServer()
+      ..storage = {
+        ...contractResponse('api/storage.json'),
+        'storage': 's3',
+        's3_bucket': 'family-photos',
+        's3_endpoint': 'https://s3.eu-central-003.backblazeb2.com',
+        'storage_dir': '',
+        'fs_type': '',
+        'total_bytes': 0,
+        'free_bytes': 0,
+        'warnings': [
+          {'code': 's3_cors', 'level': 'problem', 'message': "the bucket's CORS rules don't let Share's pages in"},
+        ],
+      };
+    await startApp(tester, signedInPhone(), server);
+    await openSettings(tester);
+    await tester.scrollUntilVisible(find.text('family-photos'), 200, scrollable: settingsList);
+    expect(find.text('s3.eu-central-003.backblazeb2.com\nSet in config.json on the server\n4210 files · 311 GB'), findsOneWidget);
+    expect(find.text('/mnt/usb/share'), findsNothing);
+    expect(find.textContaining('free of'), findsNothing);
+    expect(find.text("The bucket doesn't let Share's pages send and fetch files. Set its CORS rules; share check prints them."), findsOneWidget);
+  });
+
   testWidgets('a new PIN, with a code that was taken first', (tester) async {
     final server = adminServer()..usedCodes.add('R8D4W');
     final platform = signedInPhone();

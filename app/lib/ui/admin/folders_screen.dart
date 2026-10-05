@@ -386,6 +386,8 @@ class _FolderNameDialogState extends State<FolderNameDialog> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final renaming = widget.folder != null;
+    // A bucket has no directory to rename with the folder.
+    final s3 = Services.read(context).admin.storageMode == Storage.s3;
     return AlertDialog(
       title: Text(renaming ? t.folderRenameTitle : t.foldersNew),
       content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -399,7 +401,7 @@ class _FolderNameDialogState extends State<FolderNameDialog> {
             counterText: '',
             errorText: _error,
             errorMaxLines: 3,
-            helperText: _error == null ? (renaming ? t.folderRenameHelp : t.folderNewHelp) : null,
+            helperText: _error == null ? (renaming ? (s3 ? null : t.folderRenameHelp) : t.folderNewHelp) : null,
             helperMaxLines: 3,
           ),
           onChanged: (_) => setState(() => _error = null),

@@ -96,9 +96,13 @@ class AdminRepository {
 
   Future<int> purge(List<String> ids) => _inParts('/api/trash/purge', ids);
 
+  /// Where the server keeps its files, once the storage page was asked.
+  Storage? storageMode;
+
   Future<StorageInfo> storage() async {
     final info = StorageInfo.fromJson(await api.get('/api/admin/storage'));
     trashDays = info.trashDays;
+    storageMode = info.storage;
     return info;
   }
 

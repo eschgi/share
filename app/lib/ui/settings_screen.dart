@@ -44,6 +44,12 @@ String storageWarningText(AppLocalizations t, String code) => switch (code) {
       _ => t.storageWarnUnknown,
     };
 
+/// The host of a bucket's endpoint, e.g. s3.eu-central-1.amazonaws.com.
+String _hostOf(String endpoint) {
+  final host = Uri.tryParse(endpoint)?.host ?? '';
+  return host.isEmpty ? endpoint : host;
+}
+
 /// Screen 17: profile, language, server, password, signing out and deleting the account;
 /// admins also get the upload PINs, the folders, the people and the storage.
 class SettingsScreen extends StatefulWidget {
@@ -208,15 +214,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (storage != null) ...[
         SectionLabel(t.settingsStorage),
         SettingsGroup(children: [
-          SettingsRow(
-            leading: SettingsRow.icon(context, AppIcons.hardDrive),
-            title: storage.storageDir,
-            monoTitle: true,
-            subtitle: [
-              t.storageSetOnServer,
-              if (storage.totalBytes > 0) t.storageFree(formatBytes(storage.freeBytes, locale), formatBytes(storage.totalBytes, locale)),
-            ].join('\n'),
-          ),
+          // A bucket has no free space to tell of: where it is, and what the library holds.
+          if (storage.storage == Storage.s3)
+            SettingsRow(
+              leading: SettingsRow.icon(context, AppIcons.cloud),
+              title: storage.s3Bucket,
+              monoTitle: true,
+              subtitle: [
+                _hostOf(storage.s3Endpoint),
+                t.storageSetOnServer,
+                t.storageLibrary(storage.files, formatBytes(storage.bytes, locale)),
+              ].join('\n'),
+            )
+          else
+            SettingsRow(
+              leading: SettingsRow.icon(context, AppIcons.hardDrive),
+              title: storage.storageDir,
+              monoTitle: true,
+              subtitle: [
+                t.storageSetOnServer,
+                if (storage.totalBytes > 0) t.storageFree(formatBytes(storage.freeBytes, locale), formatBytes(storage.totalBytes, locale)),
+              ].join('\n'),
+            ),
           for (final w in storage.warnings)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
