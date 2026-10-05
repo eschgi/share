@@ -49,8 +49,8 @@ func DefaultConfig() Config {
 	return Config{MaxUnfinished: 200, PerPrincipal: 4, Global: 16, QueueWait: 15 * time.Second}
 }
 
-// Handler serves BasePath.
-type Handler struct {
+// TusHandler serves BasePath.
+type TusHandler struct {
 	cfg  Config
 	auth *auth.Service
 	lib  *storage.Library
@@ -64,15 +64,15 @@ type Handler struct {
 	per    map[string]chan struct{}
 }
 
-// New builds the tus handler.
-func New(cfg Config, a *auth.Service, lib *storage.Library, now func() time.Time) (*Handler, error) {
+// NewTusHandler builds the tus handler.
+func NewTusHandler(cfg Config, a *auth.Service, lib *storage.Library, now func() time.Time) (*TusHandler, error) {
 	store := filestore.New(lib.Layout.UploadsDir())
 	composer := handler.NewStoreComposer()
 	composer.UseCore(store)
 	composer.UseTerminater(store)
 	memorylocker.New().UseIn(composer)
 
-	h := &Handler{
+	h := &TusHandler{
 		cfg: cfg, auth: a, lib: lib, db: lib.DB, now: now,
 		free:   cfg.FreeSpace,
 		global: make(chan struct{}, cfg.Global),
@@ -121,7 +121,7 @@ func New(cfg Config, a *auth.Service, lib *storage.Library, now func() time.Time
 }
 
 // ServeHTTP is the guard in front of tusd.
-func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *TusHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// tusd would turn a POST into a PATCH or DELETE after our method checks.
 	r.Header.Del("X-HTTP-Method-Override")
 	w.Header().Set("Cache-Control", "no-store")
@@ -184,7 +184,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // ownedUpload loads the caller's upload for id. Someone else's upload looks exactly like a
 // missing one. An upload whose bytes have all arrived is finished first, so that a client
 // whose final response got lost learns it is done instead of starting over.
-func (h *Handler) ownedUpload(w http.ResponseWriter, r *http.Request, p *auth.Principal, id string) (db.File, bool) {
+func (h *TusHandler) ownedUpload(w http.ResponseWriter, r *http.Request, p *auth.Principal, id string) (db.File, bool) {
 	ctx := r.Context()
 	if !ids.Valid(id) {
 		httpx.WriteError(w, http.StatusNotFound, "not_found", "No such upload.")
@@ -220,7 +220,7 @@ func (h *Handler) ownedUpload(w http.ResponseWriter, r *http.Request, p *auth.Pr
 
 // tombstone answers tus requests for an upload that is already in the library: it is
 // complete, whatever the client remembers.
-func (h *Handler) tombstone(w http.ResponseWriter, r *http.Request, f db.File) {
+func (h *TusHandler) tombstone(w http.ResponseWriter, r *http.Request, f db.File) {
 	size := strconv.FormatInt(f.Size, 10)
 	w.Header().Set("Tus-Resumable", "1.0.0")
 	w.Header().Set("Upload-Offset", size)
@@ -241,7 +241,7 @@ func (h *Handler) tombstone(w http.ResponseWriter, r *http.Request, f db.File) {
 }
 
 // acquire waits for a free PATCH slot for the principal and overall.
-func (h *Handler) acquire(ctx context.Context, key string) (release func(), ok bool) {
+func (h *TusHandler) acquire(ctx context.Context, key string) (release func(), ok bool) {
 	h.mu.Lock()
 	sem := h.per[key]
 	if sem == nil {
@@ -272,7 +272,7 @@ func (h *Handler) acquire(ctx context.Context, key string) (release func(), ok b
 }
 
 // PruneQueues forgets the slot counters of principals with nothing running.
-func (h *Handler) PruneQueues() {
+func (h *TusHandler) PruneQueues() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	for k, sem := range h.per {
@@ -282,7 +282,7 @@ func (h *Handler) PruneQueues() {
 	}
 }
 
-func (h *Handler) preCreate(hook handler.HookEvent) (handler.HTTPResponse, handler.FileInfoChanges, error) {
+func (h *TusHandler) preCreate(hook handler.HookEvent) (handler.HTTPResponse, handler.FileInfoChanges, error) {
 	ctx := hook.Context
 	p, ok := auth.FromContext(ctx)
 	if !ok {
@@ -353,7 +353,7 @@ var (
 
 // folderFor is the folder an upload goes into: a PIN's into the PIN's folder, someone signed
 // in into the one they chose, among those they see.
-func (h *Handler) folderFor(ctx context.Context, p *auth.Principal, chosen string) (string, error) {
+func (h *TusHandler) folderFor(ctx context.Context, p *auth.Principal, chosen string) (string, error) {
 	if p.Kind == auth.KindPin {
 		if p.PinFolderID == "" {
 			return "", errNoFolder
@@ -384,7 +384,7 @@ func (h *Handler) folderFor(ctx context.Context, p *auth.Principal, chosen strin
 	return "", errFolderGone
 }
 
-func (h *Handler) preFinish(hook handler.HookEvent) (handler.HTTPResponse, error) {
+func (h *TusHandler) preFinish(hook handler.HookEvent) (handler.HTTPResponse, error) {
 	if err := h.lib.Finalize(hook.Context, hook.Upload.ID); err != nil {
 		log.Printf("upload %s: finishing: %v", hook.Upload.ID, err)
 		return handler.HTTPResponse{}, tusError(http.StatusInternalServerError, "finalize_failed", "The file arrived but couldn't be stored; the upload will retry.")
@@ -392,7 +392,7 @@ func (h *Handler) preFinish(hook handler.HookEvent) (handler.HTTPResponse, error
 	return handler.HTTPResponse{Header: handler.HTTPHeader{"Share-File-Id": hook.Upload.ID}}, nil
 }
 
-func (h *Handler) preTerminate(hook handler.HookEvent) (handler.HTTPResponse, error) {
+func (h *TusHandler) preTerminate(hook handler.HookEvent) (handler.HTTPResponse, error) {
 	return handler.HTTPResponse{}, h.db.DeleteFileRow(hook.Context, hook.Upload.ID)
 }
 

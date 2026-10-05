@@ -35,7 +35,7 @@ object UploadEngine {
     /** Bytes of the file on its way, by batch/seq. */
     private val live = ConcurrentHashMap<String, Long>()
 
-    private val uploader = Uploader()
+    private val tus = TusUploader()
 
     fun <T> locked(block: () -> T): T = synchronized(lock) { block() }
 
@@ -105,7 +105,7 @@ object UploadEngine {
                 current = key to abort
                 progress.local = local
                 val outcome = try {
-                    uploader.upload(
+                    tus.upload(
                         item.file.name, item.file.mime, item.file.size, ContentSource(app.contentResolver, item.file.uri.toUri()), item.uploadId, chunk,
                         open = { method, path -> server.open(path, local, method = method) },
                         abort = abort,
@@ -121,7 +121,7 @@ object UploadEngine {
                 }
                 live[key]?.let { queue.setBytes(item, it) }
                 when (outcome) {
-                    is Uploader.Outcome.Done -> {
+                    is UploadOutcome.Done -> {
                         queue.finish(item, UploadRow.DONE, uploadId = outcome.id)
                         live.remove(key)
                         // The thumbnail reads the file once more: its grant goes only afterwards.
@@ -131,15 +131,15 @@ object UploadEngine {
                             release(app, item)
                         }
                     }
-                    Uploader.Outcome.SignedOut, Uploader.Outcome.PinEnded ->
+                    UploadOutcome.SignedOut, UploadOutcome.PinEnded ->
                         // Which of the two it is follows from how the batch sends, not from the answer.
                         queue.pause(batch.auth, if (batch.auth == UploadBatch.PIN) "pin_ended" else "signed_out")
-                    Uploader.Outcome.Lost -> queue.finish(item, UploadRow.LOST)
-                    Uploader.Outcome.Stopped -> {
+                    UploadOutcome.Lost -> queue.finish(item, UploadRow.LOST)
+                    UploadOutcome.Stopped -> {
                         if (host.isStopped) return RunResult.RESCHEDULE
                         // Cancelled: the batch is gone from the queue already.
                     }
-                    is Uploader.Outcome.Failed -> {
+                    is UploadOutcome.Failed -> {
                         if (outcome.code in FOLDER_GONE) {
                             // The file stays queued until the person chooses another folder.
                             queue.pauseBatch(batch.id, UploadBatch.FOLDER_GONE)
@@ -148,7 +148,7 @@ object UploadEngine {
                             release(app, item)
                         }
                     }
-                    is Uploader.Outcome.Retry -> {
+                    is UploadOutcome.Retry -> {
                         if (!ServerConnection.online(app)) {
                             synchronized(lock) { running = false }
                             TransferNotification.sendingWaiting(app)

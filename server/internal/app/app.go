@@ -44,7 +44,7 @@ type App struct {
 	DB     *db.DB
 	Lib    *storage.Library
 	Auth   *auth.Service
-	Upload *upload.Handler
+	Upload *upload.TusHandler
 	Thumbs *thumbs.Store
 	CRCs   *checksum.Store
 	UI     *webui.UI
@@ -118,7 +118,7 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 		upCfg = *opts.Upload
 	}
 	upCfg.MaxFileSize, upCfg.MinFreeSpace = maxFile, cfg.MinFreeSpace()
-	up, err := upload.New(upCfg, authSvc, lib, now)
+	up, err := upload.NewTusHandler(upCfg, authSvc, lib, now)
 	if err != nil {
 		lib.Close()
 		d.Close()

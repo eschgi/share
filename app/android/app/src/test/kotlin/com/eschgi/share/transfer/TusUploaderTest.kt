@@ -19,7 +19,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.random.Random
 
 /** Uploads against a small tus server that behaves like the server's /tus/. */
-class UploaderTest {
+class TusUploaderTest {
     @get:Rule
     val tmp = TemporaryFolder()
 
@@ -102,7 +102,7 @@ class UploaderTest {
         created: MutableList<String> = mutableListOf(),
         folder: String? = null,
         onBytes: (Long) -> Unit = {},
-    ) = Uploader(bufferSize = 64 * 1024).upload(
+    ) = TusUploader(bufferSize = 64 * 1024).upload(
         "IMG_1.jpg", "image/jpeg", bytes.size.toLong(), source, uploadId, 1024 * 1024, ::open, abort, { created += it }, onBytes, folder,
     )
 
@@ -111,7 +111,7 @@ class UploaderTest {
         val created = mutableListOf<String>()
         val seen = mutableListOf<Long>()
         val outcome = upload(created = created) { seen += it }
-        assertEquals(Uploader.Outcome.Done("u0"), outcome)
+        assertEquals(UploadOutcome.Done("u0"), outcome)
         assertEquals(listOf("u0"), created)
         assertArrayEquals(data, uploads.getValue("u0").bytes.toByteArray())
         assertEquals("IMG_1.jpg", uploads.getValue("u0").name)
@@ -122,20 +122,20 @@ class UploaderTest {
 
     @Test
     fun intoAFolder() {
-        assertEquals(Uploader.Outcome.Done("u0"), upload(folder = "f4mily5x2k7mbqz4bwdbyj6qsq"))
+        assertEquals(UploadOutcome.Done("u0"), upload(folder = "f4mily5x2k7mbqz4bwdbyj6qsq"))
         assertEquals("f4mily5x2k7mbqz4bwdbyj6qsq", uploads.getValue("u0").folder)
     }
 
     @Test
     fun anUploadTheServerForgotStartsOverInItsFolder() {
-        assertEquals(Uploader.Outcome.Done("u0"), upload(uploadId = "gone", folder = "w3dding5x2k7mbqz4bwdbyj6qs"))
+        assertEquals(UploadOutcome.Done("u0"), upload(uploadId = "gone", folder = "w3dding5x2k7mbqz4bwdbyj6qs"))
         assertEquals("w3dding5x2k7mbqz4bwdbyj6qs", uploads.getValue("u0").folder)
     }
 
     @Test
     fun goesOnWhereTheServerHasIt() {
         uploads["u9"] = Upload(data.size.toLong(), "IMG_1.jpg").apply { bytes.write(data, 0, 2_000_000) }
-        assertEquals(Uploader.Outcome.Done("u9"), upload(uploadId = "u9"))
+        assertEquals(UploadOutcome.Done("u9"), upload(uploadId = "u9"))
         assertArrayEquals(data, uploads.getValue("u9").bytes.toByteArray())
         assertEquals(listOf("HEAD /tus/u9", "PATCH /tus/u9", "PATCH /tus/u9"), requests)
     }
@@ -157,10 +157,10 @@ class UploaderTest {
             false
         }
         val first = upload()
-        assertTrue("$first", first is Uploader.Outcome.Retry && first.progressed)
+        assertTrue("$first", first is UploadOutcome.Retry && first.progressed)
         interfere = null
         requests.clear()
-        assertEquals(Uploader.Outcome.Done("u0"), upload(uploadId = "u0"))
+        assertEquals(UploadOutcome.Done("u0"), upload(uploadId = "u0"))
         assertArrayEquals(data, uploads.getValue("u0").bytes.toByteArray())
         assertEquals("HEAD /tus/u0", requests.first())
     }
@@ -185,21 +185,21 @@ class UploaderTest {
                 false
             }
         }
-        assertEquals(Uploader.Outcome.Done("u9"), upload(uploadId = "u9"))
+        assertEquals(UploadOutcome.Done("u9"), upload(uploadId = "u9"))
         assertEquals(listOf("HEAD /tus/u9", "PATCH /tus/u9", "HEAD /tus/u9"), requests.take(3))
     }
 
     @Test
     fun anUploadTheServerForgotStartsOver() {
         val created = mutableListOf<String>()
-        assertEquals(Uploader.Outcome.Done("u0"), upload(uploadId = "gone", created = created))
+        assertEquals(UploadOutcome.Done("u0"), upload(uploadId = "gone", created = created))
         assertEquals(listOf("u0"), created)
         assertArrayEquals(data, uploads.getValue("u0").bytes.toByteArray())
     }
 
     @Test
     fun answersThatEndIt() {
-        fun answer(status: Int, code: String? = null): Uploader.Outcome {
+        fun answer(status: Int, code: String? = null): UploadOutcome {
             interfere = { _, res ->
                 val body = code?.let { """{"error":{"code":"$it","message":""}}""".toByteArray() } ?: ByteArray(0)
                 res.send(status, body, mapOf("Content-Type" to "application/json", "Retry-After" to "4"))
@@ -207,17 +207,17 @@ class UploaderTest {
             }
             return upload()
         }
-        assertEquals(Uploader.Outcome.PinEnded, answer(401, "session_ended"))
-        assertEquals(Uploader.Outcome.SignedOut, answer(401, "signed_out"))
-        assertEquals(Uploader.Outcome.Failed(413, "too_large"), answer(413, "too_large"))
-        assertEquals(Uploader.Outcome.Failed(404, "folder_gone"), answer(404, "folder_gone"))
-        assertEquals(Uploader.Outcome.Failed(403, "no_folder"), answer(403, "no_folder"))
-        assertEquals(Uploader.Outcome.Retry(null, 503, 4000), answer(503))
+        assertEquals(UploadOutcome.PinEnded, answer(401, "session_ended"))
+        assertEquals(UploadOutcome.SignedOut, answer(401, "signed_out"))
+        assertEquals(UploadOutcome.Failed(413, "too_large"), answer(413, "too_large"))
+        assertEquals(UploadOutcome.Failed(404, "folder_gone"), answer(404, "folder_gone"))
+        assertEquals(UploadOutcome.Failed(403, "no_folder"), answer(403, "no_folder"))
+        assertEquals(UploadOutcome.Retry(null, 503, 4000), answer(503))
     }
 
     @Test
     fun anEmptyFileIsDoneWhenMade() {
-        assertEquals(Uploader.Outcome.Done("u0"), upload(bytes = ByteArray(0)))
+        assertEquals(UploadOutcome.Done("u0"), upload(bytes = ByteArray(0)))
         assertEquals(listOf("POST /tus/"), requests)
     }
 
@@ -226,14 +226,14 @@ class UploaderTest {
         val gone = object : UploadSource {
             override fun openAt(offset: Long) = throw SecurityException("no permission any more")
         }
-        assertEquals(Uploader.Outcome.Lost, upload(source = gone))
+        assertEquals(UploadOutcome.Lost, upload(source = gone))
     }
 
     @Test
     fun stopsMidway() {
         val abort = Abort()
         val outcome = upload(abort = abort) { if (it > 1_500_000) abort.stop() }
-        assertEquals(Uploader.Outcome.Stopped, outcome)
+        assertEquals(UploadOutcome.Stopped, outcome)
         assertTrue(uploads.getValue("u0").bytes.size() < data.size)
     }
 }
