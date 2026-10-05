@@ -5,9 +5,7 @@ import android.util.Log
 import androidx.core.net.toUri
 import com.eschgi.share.net.RouteMonitor
 import com.eschgi.share.net.ServerConnection
-import com.eschgi.share.net.readLimited
-import org.json.JSONException
-import org.json.JSONObject
+import com.eschgi.share.net.ServerInfo
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 
@@ -26,7 +24,6 @@ object UploadEngine {
 
     /** Over the local address nothing limits a request; over Cloudflare 100 MB does. */
     private const val LOCAL_CHUNK = 64L * 1024 * 1024
-    private const val PUBLIC_CHUNK = 20L * 1024 * 1024
 
     private val lock = Any()
     @Volatile private var running = false
@@ -68,7 +65,6 @@ object UploadEngine {
             TransferNotification.cancelSentSummary(app)
             var attempts = 0
             var lastKey: String? = null
-            val chunks = HashMap<String, Long>()
             while (true) {
                 if (host.isStopped) return RunResult.RESCHEDULE
                 val item = synchronized(lock) {
@@ -100,24 +96,30 @@ object UploadEngine {
                 val (token, config) = credentials
                 val server = ServerConnection(config, token)
                 val local = batch.auth == UploadBatch.DEVICE && RouteMonitor.settled(app).isLocal
-                val chunk = chunks.getOrPut("${config.publicUrl}/$local") { chunkSize(server, local) }
+                val info = ServerInfo.of(config) { server.open(it, local, readTimeoutMs = 15_000) }
                 val abort = Abort()
                 current = key to abort
                 progress.local = local
-                val outcome = try {
-                    tus.upload(
-                        item.file.name, item.file.mime, item.file.size, ContentSource(app.contentResolver, item.file.uri.toUri()), item.uploadId, chunk,
-                        open = { method, path -> server.open(path, local, method = method) },
-                        abort = abort,
-                        onCreated = { queue.setUploadId(item, it) },
-                        onBytes = {
-                            live[key] = it
-                            progress.publish()
-                        },
-                        folder = batch.folder,
-                    )
-                } finally {
+                val outcome = if (info == null) {
                     current = null
+                    UploadOutcome.Retry(IOException("the server didn't say how it takes files"))
+                } else {
+                    try {
+                        tus.upload(
+                            item.file.name, item.file.mime, item.file.size, ContentSource(app.contentResolver, item.file.uri.toUri()), item.uploadId,
+                            if (local) LOCAL_CHUNK else info.chunkSize,
+                            open = { method, path -> server.open(path, local, method = method) },
+                            abort = abort,
+                            onCreated = { queue.setUploadId(item, it) },
+                            onBytes = {
+                                live[key] = it
+                                progress.publish()
+                            },
+                            folder = batch.folder,
+                        )
+                    } finally {
+                        current = null
+                    }
                 }
                 live[key]?.let { queue.setBytes(item, it) }
                 when (outcome) {
@@ -167,25 +169,6 @@ object UploadEngine {
             }
         } finally {
             synchronized(lock) { running = false }
-        }
-    }
-
-    /** What the server takes in one request over the public address (config: chunk_size_mib). */
-    private fun chunkSize(server: ServerConnection, local: Boolean): Long {
-        if (local) return LOCAL_CHUNK
-        return try {
-            val conn = server.open("/api/info", false, readTimeoutMs = 15_000)
-            try {
-                if (conn.responseCode != 200) return PUBLIC_CHUNK
-                val size = JSONObject(String(readLimited(conn.inputStream, 64 * 1024))).optLong("chunk_size_bytes")
-                if (size > 0) size else PUBLIC_CHUNK
-            } finally {
-                conn.disconnect()
-            }
-        } catch (e: IOException) {
-            PUBLIC_CHUNK
-        } catch (e: JSONException) {
-            PUBLIC_CHUNK
         }
     }
 

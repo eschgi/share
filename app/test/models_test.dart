@@ -76,5 +76,14 @@ void main() {
     expect(storage.trashFiles, 12);
     expect(storage.warnings.single.code, 'ignores_case');
     expect(storage.warnings.single.problem, isFalse);
+    expect(storage.storage, Storage.disk);
+
+    final bucket = StorageInfo.fromJson({...contractResponse('api/storage.json'), 'storage': 's3', 's3_bucket': 'family', 's3_endpoint': 'https://s3.eu-central-1.amazonaws.com', 'storage_dir': ''});
+    expect(bucket.storage, Storage.s3);
+    expect(bucket.s3Bucket, 'family');
+    expect(bucket.s3Endpoint, 'https://s3.eu-central-1.amazonaws.com');
+    expect(ServerIdentity.fromJson(contractResponse('api/info.json')).storage, Storage.disk);
+    expect(ServerIdentity.fromJson({...contractResponse('api/info.json'), 'storage': 's3'}).storage, Storage.s3);
+    expect(Storage.parse('ftp'), Storage.disk);
   });
 }

@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:share_app/data/api.dart';
+import 'package:share_app/data/models.dart';
 import 'package:share_app/data/platform.dart';
 import 'package:share_app/data/server.dart';
 
@@ -132,5 +133,23 @@ void main() {
     await expectLater(api.post('/api/auth/login', {}),
         throwsA(isA<ApiException>().having((e) => e.retryAfter, 'retryAfter', const Duration(seconds: 90))));
     await expectLater(api.get('/api/library'), throwsA(isA<ApiException>().having((e) => e.code, 'code', 'unavailable')));
+  });
+
+  test('asks each server once where it keeps its files', () async {
+    var asked = 0;
+    final info = MockClient((req) async {
+      calls.add('${req.method} ${req.url}');
+      if (req.url.host == 'down.example.com' && asked++ == 0) return http.Response('', 503);
+      final storage = req.url.host == 'pin.example.com' ? 'disk' : 's3';
+      return http.Response(jsonEncode({'server_id': 'x', 'storage': storage}), 200, headers: {'content-type': 'application/json'});
+    });
+    final api = Api(platform: platform, publicClient: info)..config = config;
+    expect(await api.storage(), Storage.s3);
+    expect(await api.storage(), Storage.s3);
+    expect(await api.storage(server: Uri.parse('https://pin.example.com')), Storage.disk);
+    expect(calls, ['GET https://share.example.com/api/info', 'GET https://pin.example.com/api/info']);
+    final down = Uri.parse('https://down.example.com');
+    await expectLater(api.storage(server: down), throwsA(isA<ApiException>()));
+    expect(await api.storage(server: down), Storage.s3); // a failure isn't kept
   });
 }

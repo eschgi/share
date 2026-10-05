@@ -77,6 +77,19 @@ class Api {
 
   ServerConfig? get config => _config;
 
+  final _storage = <String, Storage>{};
+
+  /// Where a server keeps its files, asked once: this phone's server over its route, or a
+  /// PIN's [server]. A failed answer isn't kept.
+  Future<Storage> storage({Uri? server}) async {
+    final base = server ?? _config?.publicUrl;
+    if (base == null) throw const NetworkException('no server');
+    final known = _storage[base.origin];
+    if (known != null) return known;
+    final info = server == null ? await get('/api/info') : await getFrom(server, '/api/info');
+    return _storage[base.origin] = Storage.parse(info['storage']);
+  }
+
   set config(ServerConfig? c) {
     _local?.close();
     _local = null;

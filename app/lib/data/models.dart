@@ -92,19 +92,30 @@ class InvitePeek {
   final bool addsPhone;
 }
 
+/// Where a server keeps the files: on its drive, sent over tus, or in a bucket (S3), where
+/// they are sent and fetched directly.
+enum Storage {
+  disk,
+  s3;
+
+  static Storage parse(Object? v) => v == 's3' ? s3 : disk;
+}
+
 /// /api/info: who the server is. Also the probe of the local address.
 class ServerIdentity {
-  const ServerIdentity({required this.serverId, required this.name, required this.chunkSize});
+  const ServerIdentity({required this.serverId, required this.name, required this.chunkSize, this.storage = Storage.disk});
 
   factory ServerIdentity.fromJson(Json j) => ServerIdentity(
         serverId: _str(j['server_id']),
         name: _str(j['name'], 'Share'),
         chunkSize: _int(j['chunk_size_bytes'], 20 << 20),
+        storage: Storage.parse(j['storage']),
       );
 
   final String serverId;
   final String name;
   final int chunkSize;
+  final Storage storage;
 }
 
 enum FileKind {
@@ -478,6 +489,9 @@ class TrashedFolder {
 
 class StorageInfo {
   const StorageInfo({
+    this.storage = Storage.disk,
+    this.s3Bucket = '',
+    this.s3Endpoint = '',
     required this.storageDir,
     this.totalBytes = 0,
     this.freeBytes = 0,
@@ -490,6 +504,9 @@ class StorageInfo {
   });
 
   factory StorageInfo.fromJson(Json j) => StorageInfo(
+        storage: Storage.parse(j['storage']),
+        s3Bucket: _str(j['s3_bucket']),
+        s3Endpoint: _str(j['s3_endpoint']),
         storageDir: _str(j['storage_dir']),
         totalBytes: _int(j['total_bytes']),
         freeBytes: _int(j['free_bytes']),
@@ -500,6 +517,11 @@ class StorageInfo {
         trashDays: _int(j['trash_days'], 30),
         warnings: [for (final w in _list(j['warnings'])) StorageWarning.fromJson(_obj(w))],
       );
+
+  final Storage storage;
+
+  /// With the files in a bucket: its name and the service's address; the drive's fields are empty.
+  final String s3Bucket, s3Endpoint;
 
   final String storageDir;
   final int totalBytes, freeBytes; // 0 if the server couldn't ask the drive

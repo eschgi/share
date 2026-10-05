@@ -26,6 +26,7 @@ import com.eschgi.share.data.SecretStore
 import com.eschgi.share.data.ServerStore
 import com.eschgi.share.net.RouteMonitor
 import com.eschgi.share.net.RouteStatus
+import com.eschgi.share.net.ServerInfo
 import com.eschgi.share.transfer.Credentials
 import com.eschgi.share.transfer.Downloads
 import com.eschgi.share.transfer.Fetcher
@@ -126,6 +127,7 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
             "server.save" -> background(result) {
                 server.save(call.argument<String>("json"), call.argument<String>("slot") ?: ServerStore.DEVICE)
                 RouteMonitor.invalidate()
+                ServerInfo.forget()
                 null
             }
             "route.get" -> background(result) {
