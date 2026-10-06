@@ -12,8 +12,8 @@ const S3MaxFileSize = 5 << 40
 
 // S3 is a bucket that holds the library instead of storage_dir: Amazon S3, or a service that
 // speaks its API, such as Cloudflare R2, Backblaze B2 or MinIO. Browsers and the app send
-// and fetch the files there directly, and the thumbnails go there too; the database stays in
-// data_dir.
+// and fetch the files there directly, and the thumbnails go there too; the records stay in
+// PostgreSQL.
 type S3 struct {
 	Endpoint        string `json:"endpoint"` // the service's address, e.g. https://s3.eu-central-1.amazonaws.com
 	Region          string `json:"region"`   // e.g. eu-central-1; "auto" on R2

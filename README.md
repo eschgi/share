@@ -259,17 +259,20 @@ The design and the formats are in [docs/e2ee-plan.md](docs/e2ee-plan.md).
 
 ## Try it locally
 
-You need Go 1.26 or newer and Node 22. With Docker instead, see [`deploy/docker`](deploy/docker/README.md).
+You need Go 1.26 or newer, Node 22, and PostgreSQL 18 or newer for the records, here from Docker.
+To run everything in Docker instead, see [`deploy/docker`](deploy/docker/README.md).
 
 ```sh
 cd web && npm ci && npm run build && cd ..        # the website, into server/internal/webui/dist
 cd server && go build -o share ./cmd/share && cd ..
+docker run -d --name share-db -p 127.0.0.1:5432:5432 -e POSTGRES_PASSWORD=share postgres:18
 
 mkdir -p ~/share-files
 cat > config.json <<EOF
 {
   "public_url": "http://localhost:8080",
   "storage_dir": "$HOME/share-files",
+  "database": {"postgres": "postgres://postgres:share@localhost/postgres?sslmode=disable"},
   "time_zone": "Europe/Rome"
 }
 EOF
@@ -289,14 +292,15 @@ the server on `127.0.0.1:8080`; `npm run dev -- --host` makes it reachable from 
 
 ## Hosting
 
-Share runs wherever you like. How visitors reach it decides the setup:
+Share runs wherever you like, and keeps its records in PostgreSQL. The easiest is Docker, whose
+setups run Share and its database together. How visitors reach it decides the rest:
 
 | Where Share runs | How visitors reach it | Guide |
 |------------------|-----------------------|-------|
+| Docker, on any of the machines below, with PostgreSQL in a container next to Share (recommended) | The image `ghcr.io/eschgi/share`, with Caddy or a tunnel | [`deploy/docker`](deploy/docker/README.md) |
 | A computer at home, such as a small server, a NAS or a Raspberry Pi, without a public address | A Cloudflare Tunnel: nothing to open in the firewall | [`deploy/cloudflared`](deploy/cloudflared/README.md) |
 | A VPS or another server with a public address, also next to other apps under other names | A reverse proxy that makes the certificates: Caddy, nginx or Traefik | [`deploy/reverse-proxy`](deploy/reverse-proxy/README.md) |
 | A server with a public address, without a proxy | Share's own HTTPS, with a certificate from files | [below](#https-without-a-proxy) |
-| Docker, on any of these | The image `ghcr.io/eschgi/share`, with Caddy or a tunnel | [`deploy/docker`](deploy/docker/README.md) |
 | Google Cloud Run, which runs Share only while someone visits, with the files in a bucket and the records in PostgreSQL | Its own address, or your domain | [`deploy/cloud-run`](deploy/cloud-run/README.md) |
 
 Without Docker:
@@ -307,14 +311,17 @@ Without Docker:
    `SHA256SUMS`. Or build them: `scripts/build-linux.sh` makes the Linux ones in `dist/`,
    `scripts/build-windows.sh` the Windows ones, and on Windows the PowerShell scripts
    `scripts\build-linux.ps1` and `scripts\build-windows.ps1` do the same.
-2. Write `config.json` from `config.example.json`, with at least `public_url` and `storage_dir`
-   (or `data_dir` and `s3`, see [Files in an S3 bucket](#files-in-an-s3-bucket)), and the `proxy`
+2. Set up a database in PostgreSQL 18 or newer ([The database](#the-database)), e.g. on the same
+   machine: `sudo -u postgres createuser --pwprompt share`, then
+   `sudo -u postgres createdb --owner share --encoding UTF8 --template template0 share`.
+3. Write `config.json` from `config.example.json`, with at least `public_url`, `storage_dir` (or
+   `s3`, see [Files in an S3 bucket](#files-in-an-s3-bucket)) and `database`, and the `proxy`
    line from the guide you follow.
-3. With the files on a drive of their own, mount it. With a bucket, `share check` says whether the
-   bucket answers and lets Share's pages in.
-4. Run `share serve` as a service, on Linux with
+4. With the files on a drive of their own, mount it. `share check` says whether the database
+   answers, and with a bucket whether the bucket answers and lets Share's pages in.
+5. Run `share serve` as a service, on Linux with
    [`deploy/systemd/share.service`](deploy/systemd/share.service).
-5. Open your address. While nobody has an account, it shows the setup page: the storage folder
+6. Open your address. While nobody has an account, it shows the setup page: the storage folder
    and its drive, with what suits it (ext4 is best, FAT32 can't hold files over 4 GiB), and then
    your account as the admin. From outside the network at home this works in the first 15
    minutes after Share starts; later, restart it, or open the link from its log, which works until
@@ -352,23 +359,22 @@ build the APK yourself is in [`app/README.md`](app/README.md).
 
 ### Upgrading
 
+From 0.1, which kept its records in SQLite in `data_dir`: Share now keeps them in PostgreSQL and
+starts empty there, without the people, PINs, folders and the library's list of files of 0.1;
+everyone joins again with a new invite. Set `database` in `config.json` (with Docker, take the
+setup's new `compose.yaml` and its `.env`). Give the new Share an empty storage folder or volume:
+it never overwrites the old files, but it doesn't show them either. Keep the old folder, with
+`<data_dir>/share.db` in it, until you no longer need 0.1.
+
 From a version before `proxy`: Share no longer trusts Cloudflare's tunnel by default. Behind a
 tunnel, add `"proxy": "cloudflare"` to `config.json` (the old `cloudflare` setting is refused with
 that hint). Without it, every request through the tunnel is turned away, and the log says why.
 
-From a version without folders: the first start puts every file and PIN into a first
-folder named after the server (`name` in `config.json`, "Share" unless set) and moves the day
-folders into its directory, `<storage_dir>/Share/`. These are renames on the same drive. If the
-server stops halfway, the next start carries on, and files can be downloaded all the while. A file
-whose name is taken in the new place stays where it is, and the log says so. The database copy that
-the upgrade leaves in `<data_dir>/backups` knows only the old layout: to go back to it, move the
-day folders back out first.
-
 ## Configuration
 
-`config.example.json` has the common settings. Everything except `public_url` and where the files
-go, `storage_dir` or `s3`, has a default. Unknown or misspelled fields stop the server with a
-message saying which one, and settings of earlier versions with where they went.
+`config.example.json` has the common settings. Everything except `public_url`, where the files go
+(`storage_dir` or `s3`) and the database has a default. Unknown or misspelled fields stop the
+server with a message saying which one, and settings of earlier versions with where they went.
 
 The ports:
 
@@ -404,14 +410,14 @@ For the app, two settings matter:
 Instead of `storage_dir`, Share can keep the files in a bucket of Amazon S3 or of a service that
 speaks its API, such as Cloudflare R2, Backblaze B2 or MinIO. It is one or the other: a server
 doesn't mix them, and it remembers where its files are, so it refuses to start when
-`config.json` names another place while it has files. The thumbnails go into the bucket too. The
-database stays in `data_dir`, which is required then, unless it is in
-[PostgreSQL](#the-records-in-postgresql):
+`config.json` names another place while it has files. The thumbnails go into the bucket too, so
+nothing needs to stay on the machine; `data_dir` is only needed for the https port's own
+certificate:
 
 ```json
 {
   "public_url": "https://share.example.com",
-  "data_dir": "/var/lib/share",
+  "database": {"postgres": "postgres://share:PASSWORD@localhost/share"},
   "time_zone": "Europe/Rome",
   "s3": {
     "endpoint": "https://<account id>.r2.cloudflarestorage.com",
@@ -462,8 +468,8 @@ Setting up the bucket:
 
    Without `s3:ListBucket`, Amazon S3 answers "access denied" for a file that isn't there,
    instead of "not found".
-4. **Back up the database**, in `data_dir` or in PostgreSQL. It is the only record of the files'
-   names, folders and days; the bucket holds their bytes and thumbnails under ids.
+4. **Back up the database.** It is the only record of the files' names, folders and days; the
+   bucket holds their bytes and thumbnails under ids.
 5. **One prefix per server.** Two servers on the same bucket and prefix drop each other's uploads.
 
 What is different with a bucket:
@@ -484,26 +490,31 @@ What is different with a bucket:
   bucket's address there, on R2 with the account's id. Every link names the access key's id, but
   not its secret.
 
-### The records in PostgreSQL
+### The database
 
-Share keeps its records (the files' names, folders and days, the people, the PINs) in SQLite, in
-`data_dir`, unless `config.json` names a PostgreSQL database:
+Share keeps its records (the files' names, folders and days, the people, the PINs, the keys of
+encrypted folders) in PostgreSQL 18 or newer, in a database with the UTF8 encoding:
 
 ```json
-"database": {"postgres": "postgres://share:…@ep-example.eu-central-1.aws.neon.tech/share?sslmode=require"}
+"database": {"postgres": "postgres://share:PASSWORD@localhost/share"}
 ```
 
+- The Docker setups run it in a container next to Share and hand it the password from `.env`, as
+  `PGPASSWORD`, so the address in their `config.json` names none:
+  `postgres://share@db/share?sslmode=disable`.
+- Elsewhere: Ubuntu 26.04 comes with PostgreSQL 18; on Debian 13 or Ubuntu 24.04 take it from
+  [postgresql.org](https://www.postgresql.org/download/), which also has the installer for
+  Windows. A free [Neon](https://neon.tech) project is enough for a family; new ones run 18.
 - A database on the internet needs `sslmode=require`, `verify-ca` or `verify-full`;
-  `sslmode=disable` is for one at home or on the same machine. Share is tested with PostgreSQL 17
-  and 18; a free [Neon](https://neon.tech) project is enough for a family.
+  `sslmode=disable` is for one at home, on the same machine or in a container next to Share.
 - Share makes its tables and brings them up to date when it starts. It waits while the database
   doesn't answer, as a sleeping Neon database does for a moment, and stops at once when the
-  database refuses the password.
-- With PostgreSQL and the files in a bucket, nothing stays on the machine: `data_dir` can be left
-  out, unless the https port uses Share's own certificate, which lives there. That is how Share
-  runs on [Google Cloud Run](deploy/cloud-run/README.md).
-- `share check` says whether the database answers. Back it up the way its host offers.
-- A server doesn't move between SQLite and PostgreSQL: with the other one, it starts empty.
+  database refuses the password or is older than PostgreSQL 18.
+- With the files in a bucket, nothing stays on the machine: `data_dir` can be left out, unless
+  the https port uses Share's own certificate, which lives there. That is how Share runs on
+  [Google Cloud Run](deploy/cloud-run/README.md).
+- `share check` says whether the database answers. Back it up with `pg_dump` (in the Docker
+  setups `docker compose exec db pg_dump -U share share > share.sql`), or the way its host offers.
 
 ## Repository
 
@@ -519,6 +530,14 @@ Share keeps its records (the files' names, folders and days, the people, the PIN
 | `docs/` | The plan, the screen mockups and the screenshots above |
 
 ## Development
+
+The server's tests need PostgreSQL 18: each test makes a schema of its own in the database that
+`SHARE_TEST_POSTGRES` names, and drops it at the end. Without it they fail and say so.
+
+```sh
+docker run -d --name share-test-db -p 127.0.0.1:5433:5432 -e POSTGRES_PASSWORD=test postgres:18
+export SHARE_TEST_POSTGRES='postgres://postgres:test@127.0.0.1:5433/postgres?sslmode=disable'
+```
 
 ```sh
 (cd server && go vet ./... && go test ./...)   # -short skips the 120 MiB upload test

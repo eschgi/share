@@ -1,16 +1,43 @@
-# Share behind Caddy, which gets and renews the certificates. How to start: ../README.md.
+# Share behind Caddy, which gets and renews the certificates, with its database next to it.
+# How to start: ../README.md. The database's password goes into a file .env next to this one:
+# POSTGRES_PASSWORD=…
 services:
   share:
     image: ghcr.io/eschgi/share:latest
     restart: unless-stopped
     # Share gives running requests 20 seconds when it stops.
     stop_grace_period: 30s
+    environment:
+      # The database's password: config.json names the database without it.
+      PGPASSWORD: ${POSTGRES_PASSWORD:?put POSTGRES_PASSWORD=… into .env}
     volumes:
       - ./config.json:/config/config.json:ro
       - share:/data
+    depends_on:
+      db:
+        condition: service_healthy
     networks:
       - web
+      - db
     # No ports: only Caddy reaches Share.
+
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: share
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?put POSTGRES_PASSWORD=… into .env}
+      POSTGRES_DB: share
+    volumes:
+      # From PostgreSQL 18 on, the image keeps its data below /var/lib/postgresql, per version.
+      - db:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "share", "-d", "share"]
+      interval: 5s
+      retries: 10
+    networks:
+      - db
+    # No ports: only Share reaches the database.
 
   caddy:
     image: caddy:2
@@ -35,8 +62,12 @@ networks:
         - subnet: 172.30.0.0/24
           # Other containers get addresses from here, so none of them takes Caddy's.
           ip_range: 172.30.0.128/25
+  # Share and its database only, without a way out: Caddy can't reach the database.
+  db:
+    internal: true
 
 volumes:
   share:
+  db:
   caddy_data:
   caddy_config:

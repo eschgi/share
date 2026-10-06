@@ -270,7 +270,7 @@ Changed:
 ## Verification
 
 - `go test ./internal/e2ee`, the website's and the app's crypto tests: all pass the same vectors.
-- Server tests, on SQLite and PostgreSQL, with keys and encrypted uploads made by `internal/e2ee`:
+- Server tests, on PostgreSQL, with keys and encrypted uploads made by `internal/e2ee`:
   fixture shapes, who may give which keys, the size checks, plain uploads refused in encrypted
   folders, thumbnails and ZIPs skipping encrypted files, grants dropped and new versions due when
   someone loses a folder.

@@ -17,8 +17,9 @@ Put Cloud Run and the database in the same city: every request asks the database
 
 1. **The bucket**, as in [Files in an S3 bucket](../../README.md#files-in-an-s3-bucket): its
    CORS rules for your public address, a lifecycle rule, a key for this bucket only.
-2. **The database:** a Neon project, and its connection string, the direct one rather than the
-   pooled one. It ends in `sslmode=require`, which Share requires for a database on the internet.
+2. **The database:** a Neon project on PostgreSQL 18, the default for new ones (Share needs 18
+   or newer), and its connection string, the direct one rather than the pooled one. It ends in
+   `sslmode=require`, which Share requires for a database on the internet.
 3. **`config.json`** from [`config.example.json`](config.example.json): the public address, the
    connection string, the bucket. `data_dir` stays out: nothing is kept on the machine. The proxy
    line trusts Cloud Run's front end, which connects from `169.254.x.x`.

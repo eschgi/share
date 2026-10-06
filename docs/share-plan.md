@@ -165,7 +165,7 @@ app, JSON on the website), so others can add languages.
 - Nothing hard-coded: addresses, storage folder, ports, languages and the optional Play link come from
   configuration.
 - The server stays pure Go (no cgo), so it cross-compiles for Linux and Windows on arm64 and amd64; for
-  a database, SQLite through `modernc.org/sqlite`, or PostgreSQL through `pgx`. CI builds release binaries for those platforms
+  the records, PostgreSQL 18 through `pgx`. CI builds release binaries for those platforms
   and a Docker image.
 - Apache-2.0 ([`LICENSE`](../LICENSE)): anyone may use, change and host it, also commercially, as long
   as they keep the notices. The fonts and icons keep their own licenses, listed in

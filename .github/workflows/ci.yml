@@ -111,6 +111,30 @@ jobs:
         with:
           fetch-depth: 0 # the tags, for the version in the image
       - uses: docker/setup-buildx-action@v4
+      - name: Check the Caddy setup
+        working-directory: deploy/docker/caddy
+        run: POSTGRES_PASSWORD=unused docker compose config --quiet
+      - name: Build the image for this machine
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: ghcr.io/eschgi/share:latest
+          cache-from: type=gha
+      - name: Start Share and its database as the tunnel's setup does
+        # Without the tunnel: Share has to become healthy and reach PostgreSQL 18.
+        working-directory: deploy/docker/cloudflared
+        run: |
+          cp config.example.json config.json
+          printf 'POSTGRES_PASSWORD=%s\nTUNNEL_TOKEN=unused\n' "$(openssl rand -hex 16)" > .env
+          if ! docker compose up -d --wait --wait-timeout 180 share; then
+            docker compose logs
+            exit 1
+          fi
+          docker compose exec -T share share check > check.txt || true
+          cat check.txt
+          grep -q 'PostgreSQL at db/share, version 18' check.txt
+          docker compose down -v
       - if: github.ref_type == 'tag'
         uses: docker/login-action@v4
         with:

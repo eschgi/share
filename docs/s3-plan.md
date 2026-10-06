@@ -42,7 +42,7 @@ Also decided:
   - keep Cloudflare's limits;
   - need staging space on the disk;
   - leave each file in two places until it has been pushed. That is the mixed mode ruled out above.
-- The database stays in `data_dir`, or in PostgreSQL. The thumbnails keep their endpoints, and the
+- The database stays in PostgreSQL. The thumbnails keep their endpoints, and the
   server keeps them in the bucket as `<prefix>thumbs/<id>.jpg`; a purge removes them with the file.
 - tus stays for disk mode.
 - The website gets its own small Uppy uploader plugin for S3, with no new npm package. `@uppy/aws-s3`
