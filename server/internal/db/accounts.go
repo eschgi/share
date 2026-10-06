@@ -47,7 +47,7 @@ func scanUser(row interface{ Scan(...any) error }) (User, error) {
 }
 
 func insertUser(ctx context.Context, tx *sql.Tx, u User) error {
-	_, err := tx.ExecContext(ctx, "INSERT INTO users ("+userColumns+") VALUES (?, ?, ?, ?, ?, ?, ?)",
+	_, err := tx.ExecContext(ctx, "INSERT INTO users ("+userColumns+") VALUES ($1, $2, $3, $4, $5, $6, $7)",
 		u.ID, u.Name, nullString(u.Username), nullString(u.PasswordHash), u.Role, u.CreatedAt, u.CreatedBy)
 	if isUniqueViolation(err) {
 		return ErrConflict
@@ -80,11 +80,11 @@ func (d *DB) InsertFirstUser(ctx context.Context, u User, dv Device, tokenHash [
 
 // UserByID returns one person.
 func (d *DB) UserByID(ctx context.Context, id string) (User, error) {
-	return scanUser(d.QueryRowContext(ctx, "SELECT "+userColumns+" FROM users WHERE id = ?", id))
+	return scanUser(d.QueryRowContext(ctx, "SELECT "+userColumns+" FROM users WHERE id = $1", id))
 }
 
 // userByUsername finds a person on users_username.
-const userByUsername = "SELECT " + userColumns + " FROM users WHERE casefold(username) = casefold(? COLLATE pg_c_utf8)"
+const userByUsername = "SELECT " + userColumns + " FROM users WHERE casefold(username) = casefold($1 COLLATE pg_c_utf8)"
 
 // UserByUsername finds a person by username, ignoring case.
 func (d *DB) UserByUsername(ctx context.Context, username string) (User, error) {
@@ -119,7 +119,7 @@ func (d *DB) UserCount(ctx context.Context) (int, error) {
 // SetLogin gives a person a username and password hash. It returns ErrConflict if the
 // username belongs to someone else, and ErrNotFound if there is no such person.
 func (d *DB) SetLogin(ctx context.Context, userID, username, passwordHash string) error {
-	res, err := d.ExecContext(ctx, "UPDATE users SET username = ?, password_hash = ? WHERE id = ?",
+	res, err := d.ExecContext(ctx, "UPDATE users SET username = $1, password_hash = $2 WHERE id = $3",
 		nullString(username), nullString(passwordHash), userID)
 	if isUniqueViolation(err) {
 		return ErrConflict
@@ -140,7 +140,7 @@ func (d *DB) SetLogin(ctx context.Context, userID, username, passwordHash string
 func (d *DB) DeleteUser(ctx context.Context, id string) error {
 	return d.Tx(ctx, func(tx *sql.Tx) error {
 		var role string
-		err := tx.QueryRowContext(ctx, "SELECT role FROM users WHERE id = ?", id).Scan(&role)
+		err := tx.QueryRowContext(ctx, "SELECT role FROM users WHERE id = $1", id).Scan(&role)
 		if noRow(err) {
 			return ErrNotFound
 		}
@@ -156,10 +156,10 @@ func (d *DB) DeleteUser(ctx context.Context, id string) error {
 				return ErrLastAdmin
 			}
 		}
-		if err := loseFolders(ctx, tx, id, "TRUE"); err != nil {
+		if err := loseFolders(ctx, tx, id, ""); err != nil {
 			return err
 		}
-		_, err = tx.ExecContext(ctx, "DELETE FROM users WHERE id = ?", id)
+		_, err = tx.ExecContext(ctx, "DELETE FROM users WHERE id = $1", id)
 		return err
 	})
 }
@@ -198,7 +198,7 @@ func insertDevice(ctx context.Context, tx *sql.Tx, dv Device, tokenHash []byte) 
 		dv.Client = ClientApp
 	}
 	_, err := tx.ExecContext(ctx,
-		"INSERT INTO devices (id, user_id, token_hash, name, client, home_only, created_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+		"INSERT INTO devices (id, user_id, token_hash, name, client, home_only, created_at, last_seen_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
 		dv.ID, dv.UserID, tokenHash, dv.Name, dv.Client, dv.HomeOnly, dv.CreatedAt, dv.LastSeenAt)
 	return err
 }
@@ -213,7 +213,7 @@ func (d *DB) InsertDevice(ctx context.Context, dv Device, tokenHash []byte) erro
 func (d *DB) DeviceByToken(ctx context.Context, tokenHash []byte) (Device, User, error) {
 	row := d.QueryRowContext(ctx, `SELECT d.id, d.user_id, d.name, d.client, d.home_only, d.created_at, d.last_seen_at, d.revoked_at,
 			u.id, u.name, u.username, u.password_hash, u.role, u.created_at, u.created_by
-		FROM devices d JOIN users u ON u.id = d.user_id WHERE d.token_hash = ?`, tokenHash)
+		FROM devices d JOIN users u ON u.id = d.user_id WHERE d.token_hash = $1`, tokenHash)
 	var dv Device
 	var u User
 	var username, hash sql.NullString
@@ -233,7 +233,7 @@ func (d *DB) DeviceByToken(ctx context.Context, tokenHash []byte) (Device, User,
 // at home is that phone's own (auth.HomeProof). ErrNotFound for unknown or signed-out phones.
 func (d *DB) DeviceTokenHash(ctx context.Context, id string) ([]byte, error) {
 	var hash []byte
-	err := d.QueryRowContext(ctx, "SELECT token_hash FROM devices WHERE id = ? AND revoked_at IS NULL", id).Scan(&hash)
+	err := d.QueryRowContext(ctx, "SELECT token_hash FROM devices WHERE id = $1 AND revoked_at IS NULL", id).Scan(&hash)
 	if noRow(err) {
 		return nil, ErrNotFound
 	}
@@ -244,7 +244,7 @@ func (d *DB) DeviceTokenHash(ctx context.Context, id string) ([]byte, error) {
 // first.
 func (d *DB) DevicesOf(ctx context.Context, userID string) ([]Device, error) {
 	rows, err := d.QueryContext(ctx, "SELECT "+deviceColumns+` FROM devices
-		WHERE user_id = ? AND revoked_at IS NULL ORDER BY last_seen_at DESC, id`, userID)
+		WHERE user_id = $1 AND revoked_at IS NULL ORDER BY last_seen_at DESC, id`, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -262,17 +262,17 @@ func (d *DB) DevicesOf(ctx context.Context, userID string) ([]Device, error) {
 
 // TouchDevice records that a phone was just used.
 func (d *DB) TouchDevice(ctx context.Context, id string, at time.Time) error {
-	_, err := d.ExecContext(ctx, "UPDATE devices SET last_seen_at = ? WHERE id = ?", at, id)
+	_, err := d.ExecContext(ctx, "UPDATE devices SET last_seen_at = $1 WHERE id = $2", at, id)
 	return err
 }
 
 // RevokeDevice signs a phone or browser out; its token stops working.
 func (d *DB) RevokeDevice(ctx context.Context, id string, at time.Time) error {
 	return d.Tx(ctx, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, "UPDATE devices SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL", at, id); err != nil {
+		if _, err := tx.ExecContext(ctx, "UPDATE devices SET revoked_at = $1 WHERE id = $2 AND revoked_at IS NULL", at, id); err != nil {
 			return err
 		}
-		_, err := tx.ExecContext(ctx, "DELETE FROM person_keys WHERE device_id = ?", id)
+		_, err := tx.ExecContext(ctx, "DELETE FROM person_keys WHERE device_id = $1", id)
 		return err
 	})
 }
@@ -281,8 +281,8 @@ func (d *DB) RevokeDevice(ctx context.Context, id string, at time.Time) error {
 // and browsers nobody used since idleBefore; their keys can't work any more. Nothing refers to
 // a device by foreign key: files and invites keep the id as plain text.
 func (d *DB) DeleteEndedDevices(ctx context.Context, revokedBefore, idleBefore time.Time) (int64, error) {
-	res, err := d.ExecContext(ctx, `DELETE FROM devices WHERE (revoked_at IS NOT NULL AND revoked_at < ?)
-		OR (client = 'web' AND last_seen_at < ?)`, revokedBefore, idleBefore)
+	res, err := d.ExecContext(ctx, `DELETE FROM devices WHERE (revoked_at IS NOT NULL AND revoked_at < $1)
+		OR (client = 'web' AND last_seen_at < $2)`, revokedBefore, idleBefore)
 	if err != nil {
 		return 0, err
 	}
@@ -339,13 +339,13 @@ func (d *DB) InsertInvite(ctx context.Context, in Invite, tokenHash []byte) erro
 	}
 	return d.Tx(ctx, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, `INSERT INTO invites (id, token_hash, name, role, user_id, created_by, created_at, expires_at, person_key)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
 			in.ID, tokenHash, in.Name, in.Role, nullString(in.UserID), in.CreatedBy, in.CreatedAt, in.ExpiresAt, personKey)
 		if err != nil {
 			return err
 		}
 		for _, f := range in.Folders {
-			if _, err := tx.ExecContext(ctx, "INSERT INTO invite_folders (invite_id, folder_id) VALUES (?, ?) ON CONFLICT DO NOTHING", in.ID, f); err != nil {
+			if _, err := tx.ExecContext(ctx, "INSERT INTO invite_folders (invite_id, folder_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", in.ID, f); err != nil {
 				return err
 			}
 		}
@@ -353,7 +353,7 @@ func (d *DB) InsertInvite(ctx context.Context, in Invite, tokenHash []byte) erro
 			if k.FolderID == "" {
 				continue
 			}
-			if _, err := tx.ExecContext(ctx, "INSERT INTO invite_keys (invite_id, folder_id, version, locked) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING",
+			if _, err := tx.ExecContext(ctx, "INSERT INTO invite_keys (invite_id, folder_id, version, locked) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",
 				in.ID, k.FolderID, k.Version, k.Locked); err != nil {
 				return err
 			}
@@ -364,13 +364,13 @@ func (d *DB) InsertInvite(ctx context.Context, in Invite, tokenHash []byte) erro
 
 // InviteByToken finds an invite by token hash, whatever its state.
 func (d *DB) InviteByToken(ctx context.Context, tokenHash []byte) (Invite, error) {
-	return scanInvite(d.QueryRowContext(ctx, "SELECT "+inviteColumns+" FROM invites WHERE token_hash = ?", tokenHash))
+	return scanInvite(d.QueryRowContext(ctx, "SELECT "+inviteColumns+" FROM invites WHERE token_hash = $1", tokenHash))
 }
 
 // OpenInvites lists invites that can still be used, newest first.
 func (d *DB) OpenInvites(ctx context.Context, now time.Time) ([]Invite, error) {
 	rows, err := d.QueryContext(ctx, "SELECT "+inviteColumns+` FROM invites
-		WHERE used_at IS NULL AND revoked_at IS NULL AND expires_at > ? ORDER BY created_at DESC, id`, now)
+		WHERE used_at IS NULL AND revoked_at IS NULL AND expires_at > $1 ORDER BY created_at DESC, id`, now)
 	if err != nil {
 		return nil, err
 	}
@@ -396,8 +396,8 @@ func (d *DB) UseInvite(ctx context.Context, inviteID string, u User, dv Device, 
 		keys = nil
 		// The person's own key, locked with the link's secret, goes to the new device once.
 		var personKey []byte
-		err := tx.QueryRowContext(ctx, `UPDATE invites SET used_at = ?, device_id = ?, person_key = NULL
-			WHERE id = ? AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ? RETURNING old.person_key`,
+		err := tx.QueryRowContext(ctx, `UPDATE invites SET used_at = $1, device_id = $2, person_key = NULL
+			WHERE id = $3 AND used_at IS NULL AND revoked_at IS NULL AND expires_at > $4 RETURNING old.person_key`,
 			now, dv.ID, inviteID, now).Scan(&personKey)
 		if noRow(err) {
 			return ErrConflict
@@ -412,7 +412,7 @@ func (d *DB) UseInvite(ctx context.Context, inviteID string, u User, dv Device, 
 			return errors.New("db: the phone must belong to the person the invite is for")
 		}
 		var exists int
-		if err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE id = ?", u.ID).Scan(&exists); err != nil {
+		if err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE id = $1", u.ID).Scan(&exists); err != nil {
 			return err
 		}
 		if exists == 0 { // a new person
@@ -420,13 +420,13 @@ func (d *DB) UseInvite(ctx context.Context, inviteID string, u User, dv Device, 
 				return err
 			}
 			if _, err := tx.ExecContext(ctx, `INSERT INTO folder_people (folder_id, user_id)
-				SELECT i.folder_id, ? FROM invite_folders i JOIN folders f ON f.id = i.folder_id
-				WHERE i.invite_id = ? AND f.deleted_at IS NULL ON CONFLICT DO NOTHING`, u.ID, inviteID); err != nil {
+				SELECT i.folder_id, $1 FROM invite_folders i JOIN folders f ON f.id = i.folder_id
+				WHERE i.invite_id = $2 AND f.deleted_at IS NULL ON CONFLICT DO NOTHING`, u.ID, inviteID); err != nil {
 				return err
 			}
 		}
 		// So do the folders' keys locked with it.
-		rows, err := tx.QueryContext(ctx, "SELECT folder_id, version, locked FROM invite_keys WHERE invite_id = ? ORDER BY folder_id, version", inviteID)
+		rows, err := tx.QueryContext(ctx, "SELECT folder_id, version, locked FROM invite_keys WHERE invite_id = $1 ORDER BY folder_id, version", inviteID)
 		if err != nil {
 			return err
 		}
@@ -442,7 +442,7 @@ func (d *DB) UseInvite(ctx context.Context, inviteID string, u User, dv Device, 
 		if err := rows.Err(); err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, "DELETE FROM invite_keys WHERE invite_id = ?", inviteID); err != nil {
+		if _, err := tx.ExecContext(ctx, "DELETE FROM invite_keys WHERE invite_id = $1", inviteID); err != nil {
 			return err
 		}
 		return insertDevice(ctx, tx, dv, tokenHash)
@@ -452,7 +452,7 @@ func (d *DB) UseInvite(ctx context.Context, inviteID string, u User, dv Device, 
 
 // DeleteOldInvites drops invites that ended before before.
 func (d *DB) DeleteOldInvites(ctx context.Context, before time.Time) (int64, error) {
-	res, err := d.ExecContext(ctx, `DELETE FROM invites WHERE expires_at < ? OR used_at < ? OR revoked_at < ?`,
+	res, err := d.ExecContext(ctx, `DELETE FROM invites WHERE expires_at < $1 OR used_at < $2 OR revoked_at < $3`,
 		before, before, before)
 	if err != nil {
 		return 0, err

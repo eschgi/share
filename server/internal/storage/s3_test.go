@@ -330,7 +330,7 @@ func TestS3LibraryChangesOnlyRows(t *testing.T) {
 
 	// Deleting a folder trashes its files and drops its unfinished uploads.
 	late := fx.upload(t, "late.jpg", "0123456789", 4, 1)
-	if _, err := fx.db.ExecContext(ctx, "UPDATE files SET folder_id = ? WHERE id = ?", other.ID, late.ID); err != nil {
+	if _, err := fx.db.ExecContext(ctx, "UPDATE files SET folder_id = $1 WHERE id = $2", other.ID, late.ID); err != nil {
 		t.Fatal(err)
 	}
 	trashed, err := fx.lib.DeleteFolder(ctx, other.ID, "admin")
@@ -419,7 +419,7 @@ func TestReconcileS3(t *testing.T) {
 	}
 
 	fx.now = fx.now.Add(ttl + time.Hour)
-	if _, err := fx.db.ExecContext(ctx, "UPDATE files SET updated_at = ? WHERE id = ?", fx.now, young.ID); err != nil {
+	if _, err := fx.db.ExecContext(ctx, "UPDATE files SET updated_at = $1 WHERE id = $2", fx.now, young.ID); err != nil {
 		t.Fatal(err)
 	}
 	if err := fx.lib.Reconcile(ctx, ttl); err != nil {

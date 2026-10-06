@@ -16,7 +16,7 @@ func (d *DB) SetRole(ctx context.Context, id, role string) error {
 	}
 	return d.Tx(ctx, func(tx *sql.Tx) error {
 		var current string
-		err := tx.QueryRowContext(ctx, "SELECT role FROM users WHERE id = ?", id).Scan(&current)
+		err := tx.QueryRowContext(ctx, "SELECT role FROM users WHERE id = $1", id).Scan(&current)
 		if noRow(err) {
 			return ErrNotFound
 		}
@@ -32,14 +32,14 @@ func (d *DB) SetRole(ctx context.Context, id, role string) error {
 				return ErrLastAdmin
 			}
 		}
-		if _, err := tx.ExecContext(ctx, "UPDATE users SET role = ? WHERE id = ?", role, id); err != nil {
+		if _, err := tx.ExecContext(ctx, "UPDATE users SET role = $1 WHERE id = $2", role, id); err != nil {
 			return err
 		}
 		if role != RoleMember {
 			return nil
 		}
 		_, err = tx.ExecContext(ctx, `INSERT INTO folder_people (folder_id, user_id)
-			SELECT id, ? FROM folders WHERE deleted_at IS NULL ON CONFLICT DO NOTHING`, id)
+			SELECT id, $1 FROM folders WHERE deleted_at IS NULL ON CONFLICT DO NOTHING`, id)
 		return err
 	})
 }
@@ -65,12 +65,12 @@ func (d *DB) SignedInDevices(ctx context.Context) (map[string][]Device, error) {
 
 // DeviceByID returns one phone, signed in or not.
 func (d *DB) DeviceByID(ctx context.Context, id string) (Device, error) {
-	return scanDevice(d.QueryRowContext(ctx, "SELECT "+deviceColumns+" FROM devices WHERE id = ?", id))
+	return scanDevice(d.QueryRowContext(ctx, "SELECT "+deviceColumns+" FROM devices WHERE id = $1", id))
 }
 
 // InviteByID returns one invite, whatever its state.
 func (d *DB) InviteByID(ctx context.Context, id string) (Invite, error) {
-	return scanInvite(d.QueryRowContext(ctx, "SELECT "+inviteColumns+" FROM invites WHERE id = ?", id))
+	return scanInvite(d.QueryRowContext(ctx, "SELECT "+inviteColumns+" FROM invites WHERE id = $1", id))
 }
 
 // RevokeInvite withdraws an invite that hasn't been used. Withdrawing it again, or a used
@@ -80,11 +80,11 @@ func (d *DB) RevokeInvite(ctx context.Context, id string, at time.Time) error {
 		return err
 	}
 	return d.Tx(ctx, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, "UPDATE invites SET revoked_at = ?, person_key = NULL WHERE id = ? AND used_at IS NULL AND revoked_at IS NULL",
+		if _, err := tx.ExecContext(ctx, "UPDATE invites SET revoked_at = $1, person_key = NULL WHERE id = $2 AND used_at IS NULL AND revoked_at IS NULL",
 			at, id); err != nil {
 			return err
 		}
-		_, err := tx.ExecContext(ctx, "DELETE FROM invite_keys WHERE invite_id = ?", id) // locked for nobody now
+		_, err := tx.ExecContext(ctx, "DELETE FROM invite_keys WHERE invite_id = $1", id) // locked for nobody now
 		return err
 	})
 }

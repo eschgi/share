@@ -12,7 +12,7 @@ import (
 func (d *DB) PurgeToS3Garbage(ctx context.Context, id string, at time.Time, keys ...string) (bool, error) {
 	var purged bool
 	err := d.Tx(ctx, func(tx *sql.Tx) error {
-		res, err := tx.ExecContext(ctx, "DELETE FROM files WHERE id = ? AND state = 'trashed'", id)
+		res, err := tx.ExecContext(ctx, "DELETE FROM files WHERE id = $1 AND state = 'trashed'", id)
 		if err != nil {
 			return err
 		}
@@ -21,7 +21,7 @@ func (d *DB) PurgeToS3Garbage(ctx context.Context, id string, at time.Time, keys
 		}
 		purged = true
 		for _, key := range keys {
-			if _, err := tx.ExecContext(ctx, `INSERT INTO s3_garbage (key, created_at) VALUES (?, ?)
+			if _, err := tx.ExecContext(ctx, `INSERT INTO s3_garbage (key, created_at) VALUES ($1, $2)
 				ON CONFLICT (key) DO UPDATE SET created_at = excluded.created_at`, key, at); err != nil {
 				return err
 			}
@@ -33,7 +33,7 @@ func (d *DB) PurgeToS3Garbage(ctx context.Context, id string, at time.Time, keys
 
 // S3Garbage returns up to limit objects still to be removed, the oldest first.
 func (d *DB) S3Garbage(ctx context.Context, limit int) ([]string, error) {
-	rows, err := d.QueryContext(ctx, "SELECT key FROM s3_garbage ORDER BY created_at, key LIMIT ?", limit)
+	rows, err := d.QueryContext(ctx, "SELECT key FROM s3_garbage ORDER BY created_at, key LIMIT $1", limit)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +51,7 @@ func (d *DB) S3Garbage(ctx context.Context, limit int) ([]string, error) {
 
 // ForgetS3Garbage notes that an object is removed.
 func (d *DB) ForgetS3Garbage(ctx context.Context, key string) error {
-	_, err := d.ExecContext(ctx, "DELETE FROM s3_garbage WHERE key = ?", key)
+	_, err := d.ExecContext(ctx, "DELETE FROM s3_garbage WHERE key = $1", key)
 	return err
 }
 

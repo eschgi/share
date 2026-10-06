@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"strings"
 	"time"
 )
 
@@ -151,7 +150,7 @@ func (d *DB) InsertReceiving(ctx context.Context, f File) error {
 	_, err := d.ExecContext(ctx, `INSERT INTO files (id, state, name, size, received, mime, kind, created_at, updated_at,
 			client_modified_at, pin_id, pin_session_id, user_id, device_id, folder_id, s3_upload_id, s3_part_size,
 			enc_version, enc_key, enc_header, plain_size)
-		VALUES (?, 'receiving', ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		VALUES ($1, 'receiving', $2, $3, 0, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)`,
 		f.ID, f.Name, f.Size, f.Mime, f.Kind, f.CreatedAt, f.UpdatedAt, f.ClientModifiedAt,
 		nullString(f.PinID), nullString(f.PinSessionID), nullString(f.UserID), nullString(f.DeviceID), f.FolderID,
 		nullString(f.S3UploadID), partSize, encVersion, encKey, encHeader, plainSize)
@@ -160,13 +159,13 @@ func (d *DB) InsertReceiving(ctx context.Context, f File) error {
 
 // FileByID returns one file row.
 func (d *DB) FileByID(ctx context.Context, id string) (File, error) {
-	return scanFile(d.QueryRowContext(ctx, "SELECT "+fileColumns+" FROM files WHERE id = ?", id))
+	return scanFile(d.QueryRowContext(ctx, "SELECT "+fileColumns+" FROM files WHERE id = $1", id))
 }
 
 // SetReceived records how many bytes of a receiving upload have arrived.
 func (d *DB) SetReceived(ctx context.Context, id string, received int64, at time.Time) error {
 	_, err := d.ExecContext(ctx,
-		"UPDATE files SET received = ?, updated_at = ? WHERE id = ? AND state = 'receiving'", received, at, id)
+		"UPDATE files SET received = $1, updated_at = $2 WHERE id = $3 AND state = 'receiving'", received, at, id)
 	return err
 }
 
@@ -174,7 +173,7 @@ func (d *DB) SetReceived(ctx context.Context, id string, received int64, at time
 func (d *DB) UnfinishedCount(ctx context.Context, pinSessionID, userID string) (int, error) {
 	var n int
 	err := d.QueryRowContext(ctx, `SELECT COUNT(*) FROM files WHERE state = 'receiving'
-		AND (pin_session_id = ? OR user_id = ?)`, nullString(pinSessionID), nullString(userID)).Scan(&n)
+		AND (pin_session_id = $1 OR user_id = $2)`, nullString(pinSessionID), nullString(userID)).Scan(&n)
 	return n, err
 }
 
@@ -187,7 +186,7 @@ func (d *DB) OutstandingBytes(ctx context.Context) (int64, error) {
 
 // relPathTaken counts the files on a path on files_rel_path, whose WHERE it repeats.
 const relPathTaken = `SELECT COUNT(*) FROM files
-	WHERE folder_id = ? AND casefold(rel_path) = casefold(? COLLATE pg_c_utf8) AND state IN ('finalizing', 'ready')`
+	WHERE folder_id = $1 AND casefold(rel_path) = casefold($2 COLLATE pg_c_utf8) AND state IN ('finalizing', 'ready')`
 
 // RelPathTaken reports whether a path in a folder is in use, ignoring case, because exFAT
 // and NTFS drives treat IMG.jpg and img.jpg as the same file.
@@ -200,8 +199,8 @@ func (d *DB) RelPathTaken(ctx context.Context, folderID, relPath string) (bool, 
 // MarkFinalizing claims a path in its folder for a complete upload. It returns false if the
 // row isn't receiving any more, and ErrConflict if the path was just taken by another upload.
 func (d *DB) MarkFinalizing(ctx context.Context, id, relPath, day string, at time.Time) (bool, error) {
-	res, err := d.ExecContext(ctx, `UPDATE files SET state = 'finalizing', rel_path = ?, upload_day = ?, updated_at = ?
-		WHERE id = ? AND state = 'receiving'`, relPath, day, at, id)
+	res, err := d.ExecContext(ctx, `UPDATE files SET state = 'finalizing', rel_path = $1, upload_day = $2, updated_at = $3
+		WHERE id = $4 AND state = 'receiving'`, relPath, day, at, id)
 	if isUniqueViolation(err) {
 		return false, ErrConflict
 	}
@@ -215,9 +214,9 @@ func (d *DB) MarkFinalizing(ctx context.Context, id, relPath, day string, at tim
 // MarkReady puts a finalized file into the library and bumps the library version.
 func (d *DB) MarkReady(ctx context.Context, id, mime, kind string, at time.Time) error {
 	return d.Tx(ctx, func(tx *sql.Tx) error {
-		res, err := tx.ExecContext(ctx, `UPDATE files SET state = 'ready', mime = ?, kind = ?, received = size,
-				uploaded_at = ?, updated_at = ?
-			WHERE id = ? AND state = 'finalizing'`, mime, kind, at, at, id)
+		res, err := tx.ExecContext(ctx, `UPDATE files SET state = 'ready', mime = $1, kind = $2, received = size,
+				uploaded_at = $3, updated_at = $4
+			WHERE id = $5 AND state = 'finalizing'`, mime, kind, at, at, id)
 		if err != nil {
 			return err
 		}
@@ -231,7 +230,7 @@ func (d *DB) MarkReady(ctx context.Context, id, mime, kind string, at time.Time)
 // DeleteFileRow removes a row. Used for uploads that are terminated or abandoned before
 // they reach the library.
 func (d *DB) DeleteFileRow(ctx context.Context, id string) error {
-	_, err := d.ExecContext(ctx, "DELETE FROM files WHERE id = ? AND state IN ('receiving', 'finalizing')", id)
+	_, err := d.ExecContext(ctx, "DELETE FROM files WHERE id = $1 AND state IN ('receiving', 'finalizing')", id)
 	return err
 }
 
@@ -240,17 +239,12 @@ func (d *DB) FilesInStates(ctx context.Context, states ...string) ([]File, error
 	if len(states) == 0 {
 		return nil, nil
 	}
-	args := make([]any, len(states))
-	for i, s := range states {
-		args[i] = s
-	}
-	return queryFiles(ctx, d, "SELECT "+fileColumns+" FROM files WHERE state IN (?"+strings.Repeat(", ?", len(states)-1)+
-		") ORDER BY updated_at, id", args...)
+	return queryFiles(ctx, d, "SELECT "+fileColumns+" FROM files WHERE state = ANY($1) ORDER BY updated_at, id", states)
 }
 
 // IdleReceiving lists receiving uploads that haven't changed since before.
 func (d *DB) IdleReceiving(ctx context.Context, before time.Time) ([]File, error) {
-	return queryFiles(ctx, d, "SELECT "+fileColumns+" FROM files WHERE state = 'receiving' AND updated_at < ? ORDER BY updated_at",
+	return queryFiles(ctx, d, "SELECT "+fileColumns+" FROM files WHERE state = 'receiving' AND updated_at < $1 ORDER BY updated_at",
 		before)
 }
 
@@ -271,11 +265,12 @@ func (d *DB) MoveFiles(ctx context.Context, moves []Move) error {
 	return d.Tx(ctx, func(tx *sql.Tx) error {
 		changed := false
 		for _, m := range moves {
-			q, args := "UPDATE files SET folder_id = ?, rel_path = ?, moved_from = ?", []any{m.FolderID, m.RelPath, m.From}
+			var p params
+			set := "folder_id = " + p.add(m.FolderID) + ", rel_path = " + p.add(m.RelPath) + ", moved_from = " + p.add(m.From)
 			if m.Enc != nil {
-				q, args = q+", enc_version = ?, enc_key = ?", append(args, m.Enc.Version, m.Enc.Key)
+				set += ", enc_version = " + p.add(m.Enc.Version) + ", enc_key = " + p.add(m.Enc.Key)
 			}
-			res, err := tx.ExecContext(ctx, q+" WHERE id = ? AND state = 'ready'", append(args, m.ID)...)
+			res, err := tx.ExecContext(ctx, "UPDATE files SET "+set+" WHERE id = "+p.add(m.ID)+" AND state = 'ready'", p...)
 			if isUniqueViolation(err) {
 				return ErrConflict
 			}
@@ -295,17 +290,8 @@ func (d *DB) MoveFiles(ctx context.Context, moves []Move) error {
 
 // FinishMoves notes that the bytes of moved files are in their new place.
 func (d *DB) FinishMoves(ctx context.Context, ids []string) error {
-	for start := 0; start < len(ids); start += 500 {
-		part := ids[start:min(start+500, len(ids))]
-		args := make([]any, len(part))
-		for i, id := range part {
-			args[i] = id
-		}
-		if _, err := d.ExecContext(ctx, "UPDATE files SET moved_from = NULL WHERE id IN (?"+strings.Repeat(", ?", len(part)-1)+")", args...); err != nil {
-			return err
-		}
-	}
-	return nil
+	_, err := d.ExecContext(ctx, "UPDATE files SET moved_from = NULL WHERE id = ANY($1)", ids)
+	return err
 }
 
 // Moving lists the files whose bytes may still be at their place before a move.

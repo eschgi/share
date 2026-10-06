@@ -2,7 +2,7 @@
 // Rules about who may do what live in the packages that call it. Text columns use the
 // pg_c_utf8 collation: they sort by code point, as Go compares strings, and casefold() folds
 // every letter. A lookup that ignores case compares casefold(col) with
-// casefold(? COLLATE pg_c_utf8), since a bare parameter takes the database's own locale.
+// casefold($1 COLLATE pg_c_utf8), since a bare parameter takes the database's own locale.
 package db
 
 import (
@@ -42,7 +42,7 @@ func Open(ctx context.Context, url string) (*DB, error) {
 		return nil, errors.New("the PostgreSQL address can't be read") // its text may hold the password
 	}
 	where := cfg.Host + "/" + cfg.Database
-	sqldb := sql.OpenDB(pgConnector{stdlib.GetConnector(*cfg, stdlib.OptionAfterConnect(utcTimes))})
+	sqldb := sql.OpenDB(stdlib.GetConnector(*cfg, stdlib.OptionAfterConnect(utcTimes)))
 	sqldb.SetMaxOpenConns(8)
 	sqldb.SetMaxIdleConns(4)
 	// A database host may close idle connections, Neon when it pauses after 5 minutes.
@@ -150,7 +150,7 @@ func (d *DB) Migrate(ctx context.Context) error {
 			if _, err := tx.ExecContext(ctx, m.sql); err != nil {
 				return err
 			}
-			_, err := tx.ExecContext(ctx, `INSERT INTO meta (key, value) VALUES ('schema_version', ?)
+			_, err := tx.ExecContext(ctx, `INSERT INTO meta (key, value) VALUES ('schema_version', $1)
 				ON CONFLICT (key) DO UPDATE SET value = excluded.value`, strconv.Itoa(m.version))
 			return err
 		})
@@ -234,6 +234,14 @@ func BadValue(err error) bool {
 func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+}
+
+// params collects a query's arguments while its text is built: add gives the placeholder of v.
+type params []any
+
+func (p *params) add(v any) string {
+	*p = append(*p, v)
+	return "$" + strconv.Itoa(len(*p))
 }
 
 // nullString stores an optional string; "" becomes NULL.

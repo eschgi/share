@@ -53,7 +53,7 @@ func (d *DB) KeysOf(ctx context.Context, userID, deviceID string) (Keys, error) 
 	var k Keys
 	err := d.QueryRowContext(ctx, `SELECT u.public_key, u.password_lock, dv.public_key, pk.sealed
 		FROM users u JOIN devices dv ON dv.user_id = u.id LEFT JOIN person_keys pk ON pk.device_id = dv.id
-		WHERE u.id = ? AND dv.id = ?`, userID, deviceID).Scan(&k.PersonPublic, &k.PasswordLock, &k.DevicePublic, &k.PersonSealed)
+		WHERE u.id = $1 AND dv.id = $2`, userID, deviceID).Scan(&k.PersonPublic, &k.PasswordLock, &k.DevicePublic, &k.PersonSealed)
 	if noRow(err) {
 		return k, ErrNotFound
 	}
@@ -61,7 +61,7 @@ func (d *DB) KeysOf(ctx context.Context, userID, deviceID string) (Keys, error) 
 		return k, err
 	}
 	rows, err := d.QueryContext(ctx, `SELECT k.folder_id, k.version, k.public_key, k.recovery_sealed, k.created_by, k.created_at, g.sealed
-		FROM folder_keys k JOIN users u ON u.id = ?
+		FROM folder_keys k JOIN users u ON u.id = $1
 		LEFT JOIN folder_grants g ON g.folder_id = k.folder_id AND g.version = k.version AND g.user_id = u.id
 		WHERE `+sees("k.folder_id")+` ORDER BY k.folder_id, k.version`, userID)
 	if err != nil {
@@ -118,7 +118,7 @@ type PinNeed struct {
 // for them: only those can they seal on. recovery says whether there is a recovery key.
 func (d *DB) TodoOf(ctx context.Context, userID string, recovery bool, now time.Time) (Todo, error) {
 	var t Todo
-	err := d.each(ctx, `SELECT id, public_key FROM devices WHERE user_id = ? AND revoked_at IS NULL AND public_key IS NOT NULL
+	err := d.each(ctx, `SELECT id, public_key FROM devices WHERE user_id = $1 AND revoked_at IS NULL AND public_key IS NOT NULL
 		AND id NOT IN (SELECT device_id FROM person_keys) ORDER BY created_at, id`, []any{userID}, func(rows *sql.Rows) error {
 		var dk DeviceKey
 		if err := rows.Scan(&dk.ID, &dk.PublicKey); err != nil {
@@ -132,7 +132,7 @@ func (d *DB) TodoOf(ctx context.Context, userID string, recovery bool, now time.
 	}
 	err = d.each(ctx, `SELECT g.folder_id, g.version, u.id, u.public_key
 		FROM folder_grants g JOIN users u ON u.public_key IS NOT NULL AND `+sees("g.folder_id")+`
-		WHERE g.user_id = ? AND NOT EXISTS (SELECT 1 FROM folder_grants o
+		WHERE g.user_id = $1 AND NOT EXISTS (SELECT 1 FROM folder_grants o
 			WHERE o.folder_id = g.folder_id AND o.version = g.version AND o.user_id = u.id)
 		ORDER BY g.folder_id, g.version, u.id`, []any{userID}, func(rows *sql.Rows) error {
 		var n PersonNeed
@@ -147,7 +147,7 @@ func (d *DB) TodoOf(ctx context.Context, userID string, recovery bool, now time.
 	}
 	if recovery {
 		err = d.each(ctx, `SELECT k.folder_id, k.version FROM folder_keys k
-			JOIN folder_grants g ON g.folder_id = k.folder_id AND g.version = k.version AND g.user_id = ?
+			JOIN folder_grants g ON g.folder_id = k.folder_id AND g.version = k.version AND g.user_id = $1
 			WHERE k.recovery_sealed IS NULL ORDER BY k.folder_id, k.version`, []any{userID}, func(rows *sql.Rows) error {
 			var v FolderVersion
 			if err := rows.Scan(&v.FolderID, &v.Version); err != nil {
@@ -160,8 +160,8 @@ func (d *DB) TodoOf(ctx context.Context, userID string, recovery bool, now time.
 			return t, err
 		}
 	}
-	err = d.each(ctx, `SELECT f.id FROM folders f WHERE f.rekey = ? AND f.deleted_at IS NULL AND EXISTS (
-			SELECT 1 FROM folder_grants g WHERE g.folder_id = f.id AND g.user_id = ?
+	err = d.each(ctx, `SELECT f.id FROM folders f WHERE f.rekey = $1 AND f.deleted_at IS NULL AND EXISTS (
+			SELECT 1 FROM folder_grants g WHERE g.folder_id = f.id AND g.user_id = $2
 			AND g.version = (SELECT MAX(version) FROM folder_keys WHERE folder_id = f.id))
 		ORDER BY f.created_at, f.id`, []any{true, userID}, func(rows *sql.Rows) error {
 		var id string
@@ -175,8 +175,8 @@ func (d *DB) TodoOf(ctx context.Context, userID string, recovery bool, now time.
 		return t, err
 	}
 	err = d.each(ctx, `SELECT p.id, p.folder_id, g.version, p.secret_version, p.secret_sealed
-		FROM pins p JOIN folder_grants g ON g.folder_id = p.folder_id AND g.user_id = ?
-		WHERE p.secret_sealed IS NOT NULL AND p.ended_at IS NULL AND (p.expires_at IS NULL OR p.expires_at > ?)
+		FROM pins p JOIN folder_grants g ON g.folder_id = p.folder_id AND g.user_id = $1
+		WHERE p.secret_sealed IS NOT NULL AND p.ended_at IS NULL AND (p.expires_at IS NULL OR p.expires_at > $2)
 		AND NOT EXISTS (SELECT 1 FROM pin_keys k WHERE k.pin_id = p.id AND k.version = g.version)
 		AND EXISTS (SELECT 1 FROM folder_grants s WHERE s.folder_id = p.folder_id AND s.version = p.secret_version AND s.user_id = g.user_id)
 		ORDER BY p.id, g.version`, []any{userID, now}, func(rows *sql.Rows) error {
@@ -209,17 +209,17 @@ func (d *DB) each(ctx context.Context, query string, args []any, row func(*sql.R
 func (d *DB) SetDeviceKey(ctx context.Context, deviceID string, public []byte) error {
 	return d.Tx(ctx, func(tx *sql.Tx) error {
 		var old []byte
-		err := tx.QueryRowContext(ctx, "SELECT public_key FROM devices WHERE id = ? AND revoked_at IS NULL", deviceID).Scan(&old)
+		err := tx.QueryRowContext(ctx, "SELECT public_key FROM devices WHERE id = $1 AND revoked_at IS NULL", deviceID).Scan(&old)
 		if noRow(err) {
 			return ErrNotFound
 		}
 		if err != nil || string(old) == string(public) {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, "DELETE FROM person_keys WHERE device_id = ?", deviceID); err != nil {
+		if _, err := tx.ExecContext(ctx, "DELETE FROM person_keys WHERE device_id = $1", deviceID); err != nil {
 			return err
 		}
-		_, err = tx.ExecContext(ctx, "UPDATE devices SET public_key = ? WHERE id = ?", public, deviceID)
+		_, err = tx.ExecContext(ctx, "UPDATE devices SET public_key = $1 WHERE id = $2", public, deviceID)
 		return err
 	})
 }
@@ -231,7 +231,7 @@ func (d *DB) SetPersonKey(ctx context.Context, userID, deviceID string, public, 
 	return d.Tx(ctx, func(tx *sql.Tx) error {
 		var old, device []byte
 		err := tx.QueryRowContext(ctx, `SELECT u.public_key, dv.public_key FROM users u JOIN devices dv ON dv.user_id = u.id
-			WHERE u.id = ? AND dv.id = ? AND dv.revoked_at IS NULL`, userID, deviceID).Scan(&old, &device)
+			WHERE u.id = $1 AND dv.id = $2 AND dv.revoked_at IS NULL`, userID, deviceID).Scan(&old, &device)
 		if noRow(err) {
 			return ErrNotFound
 		}
@@ -245,18 +245,18 @@ func (d *DB) SetPersonKey(ctx context.Context, userID, deviceID string, public, 
 			return ErrConflict
 		}
 		for _, q := range []string{
-			"DELETE FROM folder_grants WHERE user_id = ?",
-			"DELETE FROM person_keys WHERE device_id IN (SELECT id FROM devices WHERE user_id = ?)",
-			"UPDATE users SET password_lock = NULL WHERE id = ?",
+			"DELETE FROM folder_grants WHERE user_id = $1",
+			"DELETE FROM person_keys WHERE device_id IN (SELECT id FROM devices WHERE user_id = $1)",
+			"UPDATE users SET password_lock = NULL WHERE id = $1",
 		} {
 			if _, err := tx.ExecContext(ctx, q, userID); err != nil {
 				return err
 			}
 		}
-		if _, err := tx.ExecContext(ctx, "UPDATE users SET public_key = ? WHERE id = ?", public, userID); err != nil {
+		if _, err := tx.ExecContext(ctx, "UPDATE users SET public_key = $1 WHERE id = $2", public, userID); err != nil {
 			return err
 		}
-		_, err = tx.ExecContext(ctx, "INSERT INTO person_keys (device_id, sealed, created_at) VALUES (?, ?, ?)", deviceID, sealed, now)
+		_, err = tx.ExecContext(ctx, "INSERT INTO person_keys (device_id, sealed, created_at) VALUES ($1, $2, $3)", deviceID, sealed, now)
 		return err
 	})
 }
@@ -265,10 +265,10 @@ func (d *DB) SetPersonKey(ctx context.Context, userID, deviceID string, public, 
 // password changes without a new lock. ErrNoKey for a person without a key.
 func (d *DB) SetPasswordLock(ctx context.Context, userID string, lock []byte) error {
 	if lock == nil {
-		_, err := d.ExecContext(ctx, "UPDATE users SET password_lock = NULL WHERE id = ?", userID)
+		_, err := d.ExecContext(ctx, "UPDATE users SET password_lock = NULL WHERE id = $1", userID)
 		return err
 	}
-	res, err := d.ExecContext(ctx, "UPDATE users SET password_lock = ? WHERE id = ? AND public_key IS NOT NULL", lock, userID)
+	res, err := d.ExecContext(ctx, "UPDATE users SET password_lock = $1 WHERE id = $2 AND public_key IS NOT NULL", lock, userID)
 	if err != nil {
 		return err
 	}
@@ -296,28 +296,28 @@ func (d *DB) grant(ctx context.Context, check string, checkArgs []any, insert st
 // GrantDevice keeps the person's key sealed for one of their devices that lacks it. It
 // returns ErrNotFound for a device that isn't the person's, is signed out, or has no key.
 func (d *DB) GrantDevice(ctx context.Context, userID, deviceID string, sealed []byte, now time.Time) error {
-	return d.grant(ctx, `SELECT COUNT(*) FROM devices WHERE id = ? AND user_id = ? AND revoked_at IS NULL AND public_key IS NOT NULL`,
+	return d.grant(ctx, `SELECT COUNT(*) FROM devices WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL AND public_key IS NOT NULL`,
 		[]any{deviceID, userID},
-		"INSERT INTO person_keys (device_id, sealed, created_at) VALUES (?, ?, ?)", deviceID, sealed, now)
+		"INSERT INTO person_keys (device_id, sealed, created_at) VALUES ($1, $2, $3)", deviceID, sealed, now)
 }
 
 // GrantFolder keeps a version of a folder's key sealed for a person, given by someone. Both
 // must see the folder, and the person must have a key; else ErrNotFound. A key already sealed
 // for them stays.
 func (d *DB) GrantFolder(ctx context.Context, giverID, folderID string, version int, userID string, sealed []byte, now time.Time) error {
-	return d.grant(ctx, `SELECT COUNT(*) FROM folder_keys k WHERE k.folder_id = ? AND k.version = ?
-		AND EXISTS (SELECT 1 FROM users u WHERE u.id = ? AND u.public_key IS NOT NULL AND `+sees("k.folder_id")+`)
-		AND EXISTS (SELECT 1 FROM users u WHERE u.id = ? AND `+sees("k.folder_id")+`)`,
+	return d.grant(ctx, `SELECT COUNT(*) FROM folder_keys k WHERE k.folder_id = $1 AND k.version = $2
+		AND EXISTS (SELECT 1 FROM users u WHERE u.id = $3 AND u.public_key IS NOT NULL AND `+sees("k.folder_id")+`)
+		AND EXISTS (SELECT 1 FROM users u WHERE u.id = $4 AND `+sees("k.folder_id")+`)`,
 		[]any{folderID, version, userID, giverID},
-		"INSERT INTO folder_grants (folder_id, version, user_id, sealed, created_at) VALUES (?, ?, ?, ?, ?)",
+		"INSERT INTO folder_grants (folder_id, version, user_id, sealed, created_at) VALUES ($1, $2, $3, $4, $5)",
 		folderID, version, userID, sealed, now)
 }
 
 // GrantRecovery keeps a version of a folder's key sealed for the recovery key, if it isn't
 // yet, given by someone who holds that version; else ErrNotFound.
 func (d *DB) GrantRecovery(ctx context.Context, giverID, folderID string, version int, sealed []byte) error {
-	res, err := d.ExecContext(ctx, `UPDATE folder_keys SET recovery_sealed = COALESCE(recovery_sealed, ?) WHERE folder_id = ? AND version = ?
-		AND EXISTS (SELECT 1 FROM folder_grants g WHERE g.folder_id = folder_keys.folder_id AND g.version = folder_keys.version AND g.user_id = ?)`,
+	res, err := d.ExecContext(ctx, `UPDATE folder_keys SET recovery_sealed = COALESCE(recovery_sealed, $1) WHERE folder_id = $2 AND version = $3
+		AND EXISTS (SELECT 1 FROM folder_grants g WHERE g.folder_id = folder_keys.folder_id AND g.version = folder_keys.version AND g.user_id = $4)`,
 		sealed, folderID, version, giverID)
 	if err != nil {
 		return err
@@ -331,7 +331,7 @@ func (d *DB) GrantRecovery(ctx context.Context, giverID, folderID string, versio
 // HoldsFolderKey reports whether a version of a folder's key is sealed for a person.
 func (d *DB) HoldsFolderKey(ctx context.Context, userID, folderID string, version int) (bool, error) {
 	var n int
-	err := d.QueryRowContext(ctx, "SELECT COUNT(*) FROM folder_grants WHERE folder_id = ? AND version = ? AND user_id = ?",
+	err := d.QueryRowContext(ctx, "SELECT COUNT(*) FROM folder_grants WHERE folder_id = $1 AND version = $2 AND user_id = $3",
 		folderID, version, userID).Scan(&n)
 	return n > 0, err
 }
@@ -340,9 +340,9 @@ func (d *DB) HoldsFolderKey(ctx context.Context, userID, folderID string, versio
 // isn't yet, given by someone who holds that version. It returns ErrNotFound unless the PIN
 // has a secret and the giver holds the version.
 func (d *DB) GrantPin(ctx context.Context, giverID, pinID string, version int, locked []byte) error {
-	return d.grant(ctx, `SELECT COUNT(*) FROM pins p JOIN folder_grants g ON g.folder_id = p.folder_id AND g.version = ? AND g.user_id = ?
-		WHERE p.id = ? AND p.secret_sealed IS NOT NULL`, []any{version, giverID, pinID},
-		"INSERT INTO pin_keys (pin_id, version, locked) VALUES (?, ?, ?)", pinID, version, locked)
+	return d.grant(ctx, `SELECT COUNT(*) FROM pins p JOIN folder_grants g ON g.folder_id = p.folder_id AND g.version = $1 AND g.user_id = $2
+		WHERE p.id = $3 AND p.secret_sealed IS NOT NULL`, []any{version, giverID, pinID},
+		"INSERT INTO pin_keys (pin_id, version, locked) VALUES ($1, $2, $3)", pinID, version, locked)
 }
 
 // NewFolderKey is a new version of a folder's key, made on someone's device, with its private
@@ -358,21 +358,21 @@ type NewFolderKey struct {
 
 func insertFolderKey(ctx context.Context, tx *sql.Tx, k NewFolderKey, now time.Time) error {
 	var newest int
-	if err := tx.QueryRowContext(ctx, "SELECT COALESCE(MAX(version), 0) FROM folder_keys WHERE folder_id = ?", k.FolderID).Scan(&newest); err != nil {
+	if err := tx.QueryRowContext(ctx, "SELECT COALESCE(MAX(version), 0) FROM folder_keys WHERE folder_id = $1", k.FolderID).Scan(&newest); err != nil {
 		return err
 	}
 	if k.Version != newest+1 {
 		return ErrConflict
 	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO folder_keys (folder_id, version, public_key, recovery_sealed, created_by, created_at)
-		VALUES (?, ?, ?, ?, ?, ?)`, k.FolderID, k.Version, k.PublicKey, k.RecoverySealed, k.By, now); err != nil {
+		VALUES ($1, $2, $3, $4, $5, $6)`, k.FolderID, k.Version, k.PublicKey, k.RecoverySealed, k.By, now); err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, "INSERT INTO folder_grants (folder_id, version, user_id, sealed, created_at) VALUES (?, ?, ?, ?, ?)",
+	if _, err := tx.ExecContext(ctx, "INSERT INTO folder_grants (folder_id, version, user_id, sealed, created_at) VALUES ($1, $2, $3, $4, $5)",
 		k.FolderID, k.Version, k.By, k.Sealed, now); err != nil {
 		return err
 	}
-	_, err := tx.ExecContext(ctx, "UPDATE folders SET rekey = ? WHERE id = ?", false, k.FolderID)
+	_, err := tx.ExecContext(ctx, "UPDATE folders SET rekey = $1 WHERE id = $2", false, k.FolderID)
 	return err
 }
 
@@ -383,7 +383,7 @@ func (d *DB) EncryptFolder(ctx context.Context, folderID string, on bool, key *N
 	return d.Tx(ctx, func(tx *sql.Tx) error {
 		var newest int
 		err := tx.QueryRowContext(ctx, `SELECT COALESCE((SELECT MAX(version) FROM folder_keys WHERE folder_id = f.id), 0)
-			FROM folders f WHERE f.id = ? AND f.deleted_at IS NULL`, folderID).Scan(&newest)
+			FROM folders f WHERE f.id = $1 AND f.deleted_at IS NULL`, folderID).Scan(&newest)
 		if noRow(err) {
 			return ErrNotFound
 		}
@@ -398,7 +398,7 @@ func (d *DB) EncryptFolder(ctx context.Context, folderID string, on bool, key *N
 				return err
 			}
 		}
-		_, err = tx.ExecContext(ctx, "UPDATE folders SET encrypted = ? WHERE id = ?", on, folderID)
+		_, err = tx.ExecContext(ctx, "UPDATE folders SET encrypted = $1 WHERE id = $2", on, folderID)
 		return err
 	})
 }
@@ -412,7 +412,7 @@ func (d *DB) AddFolderKey(ctx context.Context, key NewFolderKey, now time.Time) 
 // FolderKeyOf returns a version of a folder's key.
 func (d *DB) FolderKeyOf(ctx context.Context, folderID string, version int) (FolderKey, error) {
 	k := FolderKey{FolderID: folderID, Version: version}
-	err := d.QueryRowContext(ctx, "SELECT public_key, recovery_sealed, created_by, created_at FROM folder_keys WHERE folder_id = ? AND version = ?",
+	err := d.QueryRowContext(ctx, "SELECT public_key, recovery_sealed, created_by, created_at FROM folder_keys WHERE folder_id = $1 AND version = $2",
 		folderID, version).Scan(&k.PublicKey, &k.RecoverySealed, &k.CreatedBy, &k.CreatedAt)
 	if noRow(err) {
 		return k, ErrNoKey
@@ -506,7 +506,7 @@ type PinKey struct {
 // PinKeys lists the folder keys locked for a PIN's link.
 func (d *DB) PinKeys(ctx context.Context, pinID string) ([]PinKey, error) {
 	var out []PinKey
-	err := d.each(ctx, "SELECT version, locked FROM pin_keys WHERE pin_id = ? ORDER BY version", []any{pinID}, func(rows *sql.Rows) error {
+	err := d.each(ctx, "SELECT version, locked FROM pin_keys WHERE pin_id = $1 ORDER BY version", []any{pinID}, func(rows *sql.Rows) error {
 		var k PinKey
 		if err := rows.Scan(&k.Version, &k.Locked); err != nil {
 			return err
@@ -521,7 +521,7 @@ func (d *DB) PinKeys(ctx context.Context, pinID string) ([]PinKey, error) {
 func (d *DB) PinSecretOf(ctx context.Context, pinID string) (*PinSecret, error) {
 	var s PinSecret
 	var version sql.NullInt64
-	err := d.QueryRowContext(ctx, "SELECT secret_sealed, secret_version FROM pins WHERE id = ?", pinID).Scan(&s.Sealed, &version)
+	err := d.QueryRowContext(ctx, "SELECT secret_sealed, secret_version FROM pins WHERE id = $1", pinID).Scan(&s.Sealed, &version)
 	if noRow(err) {
 		return nil, ErrNotFound
 	}

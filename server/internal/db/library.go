@@ -14,35 +14,28 @@ type LibraryFilter struct {
 	Day     string   // YYYY-MM-DD; empty for all days
 }
 
-func (f LibraryFilter) where() (string, []any) {
+// where is the condition of the filter, with its arguments in p.
+func (f LibraryFilter) where(p *params) string {
 	w := "state = 'ready'"
-	var args []any
 	switch len(f.Folders) {
 	case 0:
 		w += " AND FALSE"
 	case 1:
-		w += " AND folder_id = ?"
-		args = append(args, f.Folders[0])
+		w += " AND folder_id = " + p.add(f.Folders[0])
 	default:
-		w += " AND folder_id IN (?" + strings.Repeat(", ?", len(f.Folders)-1) + ")"
-		for _, id := range f.Folders {
-			args = append(args, id)
-		}
+		w += " AND folder_id = ANY(" + p.add(f.Folders) + ")"
 	}
 	if f.Kind != "" {
-		w += " AND kind = ?"
-		args = append(args, f.Kind)
+		w += " AND kind = " + p.add(f.Kind)
 	}
 	if f.Query != "" {
 		// ILIKE lowers both sides by the column's collation: every letter.
-		w += ` AND name ILIKE ? ESCAPE '\'`
-		args = append(args, "%"+likeEscaper.Replace(f.Query)+"%")
+		w += " AND name ILIKE " + p.add("%"+likeEscaper.Replace(f.Query)+"%") + ` ESCAPE '\'`
 	}
 	if f.Day != "" {
-		w += " AND upload_day = ?"
-		args = append(args, f.Day)
+		w += " AND upload_day = " + p.add(f.Day)
 	}
-	return w, args
+	return w
 }
 
 var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
@@ -56,9 +49,9 @@ type DaySummary struct {
 
 // LibraryDays lists the upload days that have files, newest first.
 func (d *DB) LibraryDays(ctx context.Context, f LibraryFilter) ([]DaySummary, error) {
-	w, args := f.where()
-	rows, err := d.QueryContext(ctx, "SELECT upload_day, COUNT(*), SUM(size) FROM files WHERE "+w+
-		" GROUP BY upload_day ORDER BY upload_day DESC", args...)
+	var p params
+	rows, err := d.QueryContext(ctx, "SELECT upload_day, COUNT(*), SUM(size) FROM files WHERE "+f.where(&p)+
+		" GROUP BY upload_day ORDER BY upload_day DESC", p...)
 	if err != nil {
 		return nil, err
 	}
@@ -84,20 +77,20 @@ type Position struct {
 
 // LibraryFiles lists files newest first, at most limit, after the given position.
 func (d *DB) LibraryFiles(ctx context.Context, f LibraryFilter, after *Position, limit int) ([]File, error) {
-	w, args := f.where()
+	var p params
+	w := f.where(&p)
 	if after != nil {
 		// The same order as the files_ready_by_time index: newest first, then by id.
-		w += " AND (uploaded_at < ? OR (uploaded_at = ? AND id > ?))"
-		args = append(args, after.UploadedAt, after.UploadedAt, after.ID)
+		at := p.add(after.UploadedAt)
+		w += " AND (uploaded_at < " + at + " OR (uploaded_at = " + at + " AND id > " + p.add(after.ID) + "))"
 	}
-	args = append(args, limit)
-	return queryFiles(ctx, d, "SELECT "+fileColumns+" FROM files WHERE "+w+" ORDER BY uploaded_at DESC, id LIMIT ?", args...)
+	return queryFiles(ctx, d, "SELECT "+fileColumns+" FROM files WHERE "+w+" ORDER BY uploaded_at DESC, id LIMIT "+p.add(limit), p...)
 }
 
 // LibraryIDs returns the ids of all matching files, newest first, and their total size.
 func (d *DB) LibraryIDs(ctx context.Context, f LibraryFilter) ([]string, int64, error) {
-	w, args := f.where()
-	rows, err := d.QueryContext(ctx, "SELECT id, size FROM files WHERE "+w+" ORDER BY uploaded_at DESC, id", args...)
+	var p params
+	rows, err := d.QueryContext(ctx, "SELECT id, size FROM files WHERE "+f.where(&p)+" ORDER BY uploaded_at DESC, id", p...)
 	if err != nil {
 		return nil, 0, err
 	}

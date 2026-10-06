@@ -33,7 +33,7 @@ func oldFiles(t *testing.T, files map[string]string, ids map[string]string) func
 			ids[rel] = id
 			day, name, _ := strings.Cut(rel, "/")
 			if _, err := d.Exec(`INSERT INTO files (id, state, name, size, received, mime, kind, rel_path, upload_day,
-				created_at, updated_at, uploaded_at) VALUES (?, 'ready', ?, ?, ?, 'text/plain', 'document', ?, ?, 'epoch', 'epoch', 'epoch')`,
+				created_at, updated_at, uploaded_at) VALUES ($1, 'ready', $2, $3, $4, 'text/plain', 'document', $5, $6, 'epoch', 'epoch', 'epoch')`,
 				id, name, len(content), len(content), rel, day); err != nil {
 				t.Fatal(err)
 			}
@@ -197,7 +197,7 @@ func TestATrashedFileStillAtTheOldPlaceIsNotForgotten(t *testing.T) {
 	fx := newFixtureWith(t, oldFiles(t, map[string]string{"2026-09-26/old.jpg": "old"}, ids))
 	ctx := context.Background()
 	// Deleted just before the upgrade: the row says trashed, the bytes didn't move yet.
-	if _, err := fx.db.Exec("UPDATE files SET state = 'trashed', deleted_at = 'epoch' WHERE id = ?", ids["2026-09-26/old.jpg"]); err != nil {
+	if _, err := fx.db.Exec("UPDATE files SET state = 'trashed', deleted_at = 'epoch' WHERE id = $1", ids["2026-09-26/old.jpg"]); err != nil {
 		t.Fatal(err)
 	}
 	if err := fx.lib.reconcileTrash(ctx); err != nil {
@@ -332,7 +332,7 @@ func TestDeletingAFolderTrashesItsFiles(t *testing.T) {
 	wedding, _ := fx.lib.CreateFolder(ctx, "Wedding", "admin")
 	a := fx.readyIn(t, wedding, "IMG_1.jpg", "one")
 	arriving := fx.receiving(t, "IMG_2.jpg", "two", 1)
-	if _, err := fx.db.Exec("UPDATE files SET folder_id = ? WHERE id = ?", wedding.ID, arriving); err != nil {
+	if _, err := fx.db.Exec("UPDATE files SET folder_id = $1 WHERE id = $2", wedding.ID, arriving); err != nil {
 		t.Fatal(err)
 	}
 
@@ -382,7 +382,7 @@ func TestReconcileFinishesADeletedFolder(t *testing.T) {
 	a := fx.readyIn(t, wedding, "IMG_1.jpg", "one")
 	// An upload that was finishing while the folder went.
 	late := fx.receiving(t, "IMG_2.jpg", "two", 3)
-	if _, err := fx.db.Exec("UPDATE files SET folder_id = ? WHERE id = ?", wedding.ID, late); err != nil {
+	if _, err := fx.db.Exec("UPDATE files SET folder_id = $1 WHERE id = $2", wedding.ID, late); err != nil {
 		t.Fatal(err)
 	}
 	// The server stopped right after the folder was deleted in the database.

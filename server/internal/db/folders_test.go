@@ -130,8 +130,8 @@ func TestQueriesUseTheirIndexes(t *testing.T) {
 		return strings.Join(plan, "\n")
 	}
 	page := func(folders ...string) (string, []any) {
-		w, args := LibraryFilter{Folders: folders}.where()
-		return "SELECT id FROM files WHERE " + w + " ORDER BY uploaded_at DESC, id LIMIT 10", args
+		var p params
+		return "SELECT id FROM files WHERE " + LibraryFilter{Folders: folders}.where(&p) + " ORDER BY uploaded_at DESC, id LIMIT 10", p
 	}
 	one, oneArgs := page(ids.New())
 	several, severalArgs := page(ids.New(), ids.New(), ids.New())
