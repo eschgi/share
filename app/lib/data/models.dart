@@ -131,18 +131,18 @@ enum FileKind {
 }
 
 /// How an encrypted file is stored (docs/e2ee-plan.md): its key sealed for version [version]
-/// of its folder's key, and the header its bytes start with; [plainSize] is what it is decrypted.
+/// of its folder's key, and the header its bytes start with. The file's size is what it is
+/// decrypted (contract/api/file_encrypted.json).
 class FileEnc {
-  const FileEnc({required this.version, required this.key, required this.header, required this.plainSize});
+  const FileEnc({required this.version, required this.key, required this.header});
 
-  factory FileEnc.fromJson(Json j) => FileEnc(version: _int(j['version']), key: _str(j['key']), header: _str(j['header']), plainSize: _int(j['plain_size']));
+  factory FileEnc.fromJson(Json j) => FileEnc(version: _int(j['version']), key: _str(j['key']), header: _str(j['header']));
 
   final int version;
   final String key;
   final String header;
-  final int plainSize;
 
-  Json toJson() => {'version': version, 'key': key, 'header': header, 'plain_size': plainSize};
+  Json toJson() => {'version': version, 'key': key, 'header': header};
 }
 
 class FileInfo {
@@ -209,8 +209,18 @@ class FileInfo {
   static const _audioExt = {'MP3', 'M4A', 'AAC', 'WAV', 'OGG', 'OGA', 'OPUS', 'FLAC'};
 
   /// What the Kotlin side gets (contract/app/platform.json files): with the folder and enc, so
-  /// that an encrypted file is decrypted on the way.
-  Json toJson() => {'id': id, 'name': name, 'size': size, 'mime': mime, 'kind': kind.name, 'day': day, 'folder': folder, 'enc': enc?.toJson()};
+  /// that an encrypted file is decrypted on the way; enc's plain_size is the file's size, which
+  /// decryption needs to know where the file ends.
+  Json toJson() => {
+        'id': id,
+        'name': name,
+        'size': size,
+        'mime': mime,
+        'kind': kind.name,
+        'day': day,
+        'folder': folder,
+        'enc': enc == null ? null : {...enc!.toJson(), 'plain_size': size},
+      };
 }
 
 /// A folder of the library: what it holds and how many see it.

@@ -42,7 +42,8 @@ void main() {
     final f = FileInfo.fromJson(contractResponse('api/file_encrypted.json'));
     expect(f.enc, isNotNull);
     expect(f.enc!.version, 1);
-    expect(f.toJson()['enc'], f.enc!.toJson());
+    // The API says the plain size as the file's size; Kotlin decrypts with it (contract/app/platform.json).
+    expect(f.toJson()['enc'], {...f.enc!.toJson(), 'plain_size': 3145728});
     expect(f.toJson()['folder'], f.folder);
     final plain = FileInfo.fromJson({'id': 'x', 'size': 1});
     expect(plain.enc, isNull);
@@ -144,7 +145,7 @@ void main() {
     final server = adminFolders()..thumb = Uint8List.fromList([1, 2, 3]);
     for (final f in server.files.where((f) => f['folder'] == family)) {
       f['has_thumb'] = true;
-      f['enc'] = {'version': 1, 'key': 'sealed-key', 'header': 'U0hFMQABAAA9p6lLxQCBAA', 'plain_size': f['size']};
+      f['enc'] = {'version': 1, 'key': 'sealed-key', 'header': 'U0hFMQABAAA9p6lLxQCBAA'};
     }
     final platform = signedInPhone()
       ..secrets['folder'] = family
@@ -220,7 +221,7 @@ void main() {
   testWidgets('encrypted files move with their keys, sealed for where they go', (tester) async {
     final server = adminFolders();
     final first = server.files.firstWhere((f) => f['folder'] == family);
-    first['enc'] = {'version': 1, 'key': 'sealed-key', 'header': 'U0hFMQABAAA9p6lLxQCBAA', 'plain_size': first['size']};
+    first['enc'] = {'version': 1, 'key': 'sealed-key', 'header': 'U0hFMQABAAA9p6lLxQCBAA'};
     final platform = signedInPhone()..secrets['folder'] = family;
     await startApp(tester, platform, server);
     await tester.tap(find.bySemanticsLabel('Select the day').first);
