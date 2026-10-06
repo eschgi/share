@@ -19,7 +19,7 @@ const (
 // ThumbCandidates lists plain photos in the library without a thumbnail that arrived before
 // before, oldest first: the server can't read encrypted ones.
 func (d *DB) ThumbCandidates(ctx context.Context, before time.Time, limit int) ([]File, error) {
-	return queryFiles(ctx, d, "SELECT "+fileColumns+` FROM files
+	return queryAll(ctx, d.pool, scanFile, "SELECT "+fileColumns+` FROM files
 		WHERE state = 'ready' AND thumb = 'none' AND kind = 'photo' AND enc_version IS NULL AND uploaded_at <= $1
 		ORDER BY uploaded_at, id LIMIT $2`, before, limit)
 }
@@ -37,7 +37,7 @@ func (d *DB) SetClientThumb(ctx context.Context, id string, width, height, durat
 // ClaimThumb marks a photo as tried before the worker decodes it (see ThumbFailed). It
 // returns false if the photo has a thumbnail by now.
 func (d *DB) ClaimThumb(ctx context.Context, id string, at time.Time) (bool, error) {
-	res, err := d.ExecContext(ctx, "UPDATE files SET thumb = 'failed', updated_at = $1 WHERE id = $2 AND thumb = 'none'",
+	res, err := d.pool.ExecContext(ctx, "UPDATE files SET thumb = 'failed', updated_at = $1 WHERE id = $2 AND thumb = 'none'",
 		at, id)
 	if err != nil {
 		return false, err
@@ -48,7 +48,7 @@ func (d *DB) ClaimThumb(ctx context.Context, id string, at time.Time) (bool, err
 
 // ReleaseThumb hands a claimed photo back, to be tried again later.
 func (d *DB) ReleaseThumb(ctx context.Context, id string, at time.Time) error {
-	_, err := d.ExecContext(ctx, "UPDATE files SET thumb = 'none', updated_at = $1 WHERE id = $2 AND thumb = 'failed'",
+	_, err := d.pool.ExecContext(ctx, "UPDATE files SET thumb = 'none', updated_at = $1 WHERE id = $2 AND thumb = 'failed'",
 		at, id)
 	return err
 }
@@ -67,7 +67,7 @@ func (d *DB) SetServerThumb(ctx context.Context, id string, width, height int64,
 // the app knows to fetch the new picture.
 func (d *DB) setThumb(ctx context.Context, query string, args ...any) (bool, error) {
 	changed := false
-	err := d.Tx(ctx, func(tx *sql.Tx) error {
+	err := d.inTx(ctx, func(tx *sql.Tx) error {
 		res, err := tx.ExecContext(ctx, query, args...)
 		if err != nil {
 			return err

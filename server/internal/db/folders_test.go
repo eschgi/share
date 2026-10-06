@@ -102,7 +102,7 @@ func TestQueriesUseTheirIndexes(t *testing.T) {
 	explain := func(query string, args ...any) string {
 		t.Helper()
 		var plan []string
-		err := d.Tx(ctx, func(tx *sql.Tx) error {
+		err := d.inTx(ctx, func(tx *sql.Tx) error {
 			// Empty tables are cheapest to read whole and to sort, unless that is ruled out.
 			if _, err := tx.ExecContext(ctx, "SET LOCAL enable_seqscan = off"); err != nil {
 				return err

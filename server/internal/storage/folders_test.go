@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/eschgi/share/server/internal/db"
+	"github.com/eschgi/share/server/internal/db/dbtest"
 	"github.com/eschgi/share/server/internal/ids"
 )
 
@@ -32,11 +33,9 @@ func oldFiles(t *testing.T, files map[string]string, ids map[string]string) func
 			id := newID()
 			ids[rel] = id
 			day, name, _ := strings.Cut(rel, "/")
-			if _, err := d.Exec(`INSERT INTO files (id, state, name, size, received, mime, kind, rel_path, upload_day,
+			dbtest.Exec(t, d, `INSERT INTO files (id, state, name, size, received, mime, kind, rel_path, upload_day,
 				created_at, updated_at, uploaded_at) VALUES ($1, 'ready', $2, $3, $4, 'text/plain', 'document', $5, $6, 'epoch', 'epoch', 'epoch')`,
-				id, name, len(content), len(content), rel, day); err != nil {
-				t.Fatal(err)
-			}
+				id, name, len(content), len(content), rel, day)
 		}
 	}
 }
@@ -169,9 +168,7 @@ func TestUploadsWhileOldDaysWaitAvoidTheirNames(t *testing.T) {
 		"2026-09-27/IMG_9.jpg": "by hand", // put there by hand: not in the database
 	}, map[string]string{}))
 	ctx := context.Background()
-	if _, err := fx.db.Exec("DELETE FROM files WHERE name = 'IMG_9.jpg'"); err != nil {
-		t.Fatal(err)
-	}
+	dbtest.Exec(t, fx.db, "DELETE FROM files WHERE name = 'IMG_9.jpg'")
 	var got []string
 	for _, name := range []string{"IMG_1.jpg", "IMG_9.jpg"} {
 		id := fx.receiving(t, name, "new", 3)
@@ -197,9 +194,7 @@ func TestATrashedFileStillAtTheOldPlaceIsNotForgotten(t *testing.T) {
 	fx := newFixtureWith(t, oldFiles(t, map[string]string{"2026-09-26/old.jpg": "old"}, ids))
 	ctx := context.Background()
 	// Deleted just before the upgrade: the row says trashed, the bytes didn't move yet.
-	if _, err := fx.db.Exec("UPDATE files SET state = 'trashed', deleted_at = 'epoch' WHERE id = $1", ids["2026-09-26/old.jpg"]); err != nil {
-		t.Fatal(err)
-	}
+	dbtest.Exec(t, fx.db, "UPDATE files SET state = 'trashed', deleted_at = 'epoch' WHERE id = $1", ids["2026-09-26/old.jpg"])
 	if err := fx.lib.reconcileTrash(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -332,9 +327,7 @@ func TestDeletingAFolderTrashesItsFiles(t *testing.T) {
 	wedding, _ := fx.lib.CreateFolder(ctx, "Wedding", "admin")
 	a := fx.readyIn(t, wedding, "IMG_1.jpg", "one")
 	arriving := fx.receiving(t, "IMG_2.jpg", "two", 1)
-	if _, err := fx.db.Exec("UPDATE files SET folder_id = $1 WHERE id = $2", wedding.ID, arriving); err != nil {
-		t.Fatal(err)
-	}
+	dbtest.Exec(t, fx.db, "UPDATE files SET folder_id = $1 WHERE id = $2", wedding.ID, arriving)
 
 	trashed, err := fx.lib.DeleteFolder(ctx, wedding.ID, "admin")
 	if err != nil || len(trashed) != 1 {
@@ -382,9 +375,7 @@ func TestReconcileFinishesADeletedFolder(t *testing.T) {
 	a := fx.readyIn(t, wedding, "IMG_1.jpg", "one")
 	// An upload that was finishing while the folder went.
 	late := fx.receiving(t, "IMG_2.jpg", "two", 3)
-	if _, err := fx.db.Exec("UPDATE files SET folder_id = $1 WHERE id = $2", wedding.ID, late); err != nil {
-		t.Fatal(err)
-	}
+	dbtest.Exec(t, fx.db, "UPDATE files SET folder_id = $1 WHERE id = $2", wedding.ID, late)
 	// The server stopped right after the folder was deleted in the database.
 	if _, err := fx.db.DeleteFolder(ctx, wedding.ID, "admin", t0); err != nil {
 		t.Fatal(err)

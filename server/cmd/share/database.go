@@ -20,8 +20,8 @@ func checkDatabase(cfg *config.Config) error {
 		return errors.New("fix the problems above")
 	}
 	defer d.Close()
-	var version string
-	if err := d.QueryRowContext(ctx, "SHOW server_version").Scan(&version); err != nil {
+	version, err := d.ServerVersion(ctx)
+	if err != nil {
 		fmt.Printf("Database:      %s\nProblem: %v\n", cfg.Database, err)
 		return errors.New("fix the problems above")
 	}

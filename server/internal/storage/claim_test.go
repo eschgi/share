@@ -54,9 +54,7 @@ func TestClaimStorage(t *testing.T) {
 		if err := ClaimStorage(ctx, d, "disk"); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := d.ExecContext(ctx, "INSERT INTO s3_garbage (key, created_at) VALUES ('files/x', 'epoch')"); err != nil {
-			t.Fatal(err)
-		}
+		dbtest.Exec(t, d, "INSERT INTO s3_garbage (key, created_at) VALUES ('files/x', 'epoch')")
 		if err := ClaimStorage(ctx, d, "s3:family/"); err != nil || stored(d) != "s3:family/" {
 			t.Errorf("to a bucket: %v, %q", err, stored(d))
 		}

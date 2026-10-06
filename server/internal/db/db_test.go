@@ -34,7 +34,7 @@ func openTest(t *testing.T) *DB {
 func testFolder(t *testing.T, d *DB, name string) string {
 	t.Helper()
 	f := Folder{ID: ids.New(), Name: name, Dir: name, CreatedBy: "cli", CreatedAt: t0}
-	if err := d.Tx(context.Background(), func(tx *sql.Tx) error { return insertFolder(context.Background(), tx, f) }); err != nil {
+	if err := d.inTx(context.Background(), func(tx *sql.Tx) error { return insertFolder(context.Background(), tx, f) }); err != nil {
 		t.Fatal(err)
 	}
 	return f.ID

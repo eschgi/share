@@ -82,7 +82,7 @@ func TestInviteKeysGoOutOnce(t *testing.T) {
 		t.Fatalf("UseInvite = %+v, %v", keys, err)
 	}
 	var left int
-	if err := d.QueryRowContext(ctx, "SELECT (SELECT COUNT(*) FROM invite_keys) + (SELECT COUNT(*) FROM invites WHERE person_key IS NOT NULL)").Scan(&left); err != nil || left != 0 {
+	if err := d.pool.QueryRowContext(ctx, "SELECT (SELECT COUNT(*) FROM invite_keys) + (SELECT COUNT(*) FROM invites WHERE person_key IS NOT NULL)").Scan(&left); err != nil || left != 0 {
 		t.Errorf("%d keys left after the invite was used, %v", left, err)
 	}
 }

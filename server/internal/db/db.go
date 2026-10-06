@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/eschgi/share/server/internal/db/internal/rawsql"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -29,9 +30,9 @@ var migrationFiles embed.FS
 // ErrNotFound is returned when a looked-up row doesn't exist.
 var ErrNotFound = errors.New("not found")
 
-// DB wraps the connection pool.
+// DB is the database. Only this package runs SQL: every query is a method of DB.
 type DB struct {
-	*sql.DB
+	pool *sql.DB
 }
 
 // Open opens a PostgreSQL database, e.g. postgres://share:…@host/share, and checks that it can
@@ -57,7 +58,20 @@ func Open(ctx context.Context, url string) (*DB, error) {
 		sqldb.Close()
 		return nil, fmt.Errorf("PostgreSQL at %s: %w", where, err)
 	}
-	return &DB{DB: sqldb}, nil
+	return &DB{pool: sqldb}, nil
+}
+
+// The tests' own helpers (dbtest) may run SQL of their own.
+func init() { rawsql.Pool = func(d any) *sql.DB { return d.(*DB).pool } }
+
+// Close closes the connections.
+func (d *DB) Close() error { return d.pool.Close() }
+
+// ServerVersion is PostgreSQL's version, for share check.
+func (d *DB) ServerVersion(ctx context.Context) (string, error) {
+	var v string
+	err := d.pool.QueryRowContext(ctx, "SHOW server_version").Scan(&v)
+	return v, err
 }
 
 // utcTimes has a connection read times in UTC, as Share keeps and sends them, rather than in
@@ -146,7 +160,7 @@ func (d *DB) Migrate(ctx context.Context) error {
 		return fmt.Errorf("the database is at version %d, but this Share knows only up to %d", current, latest)
 	}
 	for _, m := range migrations[current:] {
-		err := d.Tx(ctx, func(tx *sql.Tx) error {
+		err := d.inTx(ctx, func(tx *sql.Tx) error {
 			if _, err := tx.ExecContext(ctx, m.sql); err != nil {
 				return err
 			}
@@ -165,7 +179,7 @@ func (d *DB) Migrate(ctx context.Context) error {
 // one. It is kept in the meta table.
 func (d *DB) SchemaVersion(ctx context.Context) (int, error) {
 	var tables int
-	if err := d.QueryRowContext(ctx, `SELECT COUNT(*) FROM information_schema.tables
+	if err := d.pool.QueryRowContext(ctx, `SELECT COUNT(*) FROM information_schema.tables
 		WHERE table_schema = current_schema() AND table_name = 'meta'`).Scan(&tables); err != nil {
 		return 0, err
 	}
@@ -179,12 +193,12 @@ func (d *DB) SchemaVersion(ctx context.Context) (int, error) {
 	return strconv.Atoi(v)
 }
 
-// Tx runs fn in one transaction and commits it if fn returns nil. When another transaction
+// inTx runs fn in one transaction and commits it if fn returns nil. When another transaction
 // was in the way, fn runs again, a few times, so it must change nothing outside the
 // transaction.
-func (d *DB) Tx(ctx context.Context, fn func(*sql.Tx) error) error {
+func (d *DB) inTx(ctx context.Context, fn func(*sql.Tx) error) error {
 	for attempt := 1; ; attempt++ {
-		err := d.tx(ctx, fn)
+		err := d.tryTx(ctx, fn)
 		if err == nil || attempt == 5 || !retryable(err) {
 			return err
 		}
@@ -196,10 +210,11 @@ func (d *DB) Tx(ctx context.Context, fn func(*sql.Tx) error) error {
 	}
 }
 
-// tx runs fn once, in a serializable transaction: the transactions that read and then write
-// get the guarantee a single writer would give, and Tx runs them again when they collide.
-func (d *DB) tx(ctx context.Context, fn func(*sql.Tx) error) error {
-	tx, err := d.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
+// tryTx runs fn once, in a serializable transaction: the transactions that read and then
+// write get the guarantee a single writer would give, and inTx runs them again when they
+// collide.
+func (d *DB) tryTx(ctx context.Context, fn func(*sql.Tx) error) error {
+	tx, err := d.pool.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
 	if err != nil {
 		return err
 	}

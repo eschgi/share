@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/eschgi/share/server/internal/db"
+	"github.com/eschgi/share/server/internal/db/dbtest"
 	"github.com/eschgi/share/server/internal/e2ee"
 	"github.com/eschgi/share/server/internal/upload"
 )
@@ -612,9 +613,7 @@ func TestInvitesAndPinsWithSecrets(t *testing.T) {
 	if err != nil || !bytes.Equal(got, ak.folders[family.ID+":1"]) || k["public_key"] != b64u.EncodeToString(ak.folderPubs[family.ID+":1"]) {
 		t.Fatalf("unlocking the invite's key: %v", err)
 	}
-	var left int
-	e.app.DB.QueryRowContext(context.Background(), "SELECT COUNT(*) FROM invite_keys").Scan(&left)
-	if left != 0 {
+	if left := dbtest.Count(t, e.app.DB, "SELECT (SELECT COUNT(*) FROM invite_keys) + (SELECT COUNT(*) FROM invites WHERE person_key IS NOT NULL)"); left != 0 {
 		t.Errorf("%d invite keys left after accepting", left)
 	}
 

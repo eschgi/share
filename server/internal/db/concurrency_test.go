@@ -40,7 +40,7 @@ func TestTheLastAdminStaysUnderConcurrency(t *testing.T) {
 			}
 		}
 		var admins int
-		if err := d.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE role = 'admin'").Scan(&admins); err != nil {
+		if err := d.pool.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE role = 'admin'").Scan(&admins); err != nil {
 			t.Fatal(err)
 		}
 		if demoted != 1 || refused != 1 || admins != 1 {
@@ -84,7 +84,7 @@ func TestTxRunsAgainAfterAConflict(t *testing.T) {
 		t.Fatal(err)
 	}
 	attempts := 0
-	err := d.Tx(ctx, func(tx *sql.Tx) error {
+	err := d.inTx(ctx, func(tx *sql.Tx) error {
 		attempts++
 		var v string
 		if err := tx.QueryRowContext(ctx, "SELECT value FROM meta WHERE key = 'library_version'").Scan(&v); err != nil {

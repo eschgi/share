@@ -50,23 +50,13 @@ type DaySummary struct {
 // LibraryDays lists the upload days that have files, newest first.
 func (d *DB) LibraryDays(ctx context.Context, f LibraryFilter) ([]DaySummary, error) {
 	var p params
-	rows, err := d.QueryContext(ctx, "SELECT upload_day, COUNT(*), SUM(size) FROM files WHERE "+f.where(&p)+
-		" GROUP BY upload_day ORDER BY upload_day DESC", p...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []DaySummary
-	for rows.Next() {
+	return queryAll(ctx, d.pool, func(row scanner) (DaySummary, error) {
 		var s DaySummary
 		var day time.Time
-		if err := rows.Scan(&day, &s.Count, &s.Bytes); err != nil {
-			return nil, err
-		}
+		err := row.Scan(&day, &s.Count, &s.Bytes)
 		s.Day = day.Format(time.DateOnly)
-		out = append(out, s)
-	}
-	return out, rows.Err()
+		return s, err
+	}, "SELECT upload_day, COUNT(*), SUM(size) FROM files WHERE "+f.where(&p)+" GROUP BY upload_day ORDER BY upload_day DESC", p...)
 }
 
 // Position is where a page of the library ends, to continue after it.
@@ -84,27 +74,23 @@ func (d *DB) LibraryFiles(ctx context.Context, f LibraryFilter, after *Position,
 		at := p.add(after.UploadedAt)
 		w += " AND (uploaded_at < " + at + " OR (uploaded_at = " + at + " AND id > " + p.add(after.ID) + "))"
 	}
-	return queryFiles(ctx, d, "SELECT "+fileColumns+" FROM files WHERE "+w+" ORDER BY uploaded_at DESC, id LIMIT "+p.add(limit), p...)
+	return queryAll(ctx, d.pool, scanFile, "SELECT "+fileColumns+" FROM files WHERE "+w+" ORDER BY uploaded_at DESC, id LIMIT "+p.add(limit), p...)
 }
 
 // LibraryIDs returns the ids of all matching files, newest first, and their total size.
 func (d *DB) LibraryIDs(ctx context.Context, f LibraryFilter) ([]string, int64, error) {
 	var p params
-	rows, err := d.QueryContext(ctx, "SELECT id, size FROM files WHERE "+f.where(&p)+" ORDER BY uploaded_at DESC, id", p...)
+	ids := []string{} // so that the JSON says [] for none
+	var total int64
+	err := eachRow(ctx, d.pool, "SELECT id, size FROM files WHERE "+f.where(&p)+" ORDER BY uploaded_at DESC, id", p, func(row scanner) error {
+		var id string
+		var size int64
+		err := row.Scan(&id, &size)
+		ids, total = append(ids, id), total+size
+		return err
+	})
 	if err != nil {
 		return nil, 0, err
 	}
-	defer rows.Close()
-	ids := []string{}
-	var total int64
-	for rows.Next() {
-		var id string
-		var size int64
-		if err := rows.Scan(&id, &size); err != nil {
-			return nil, 0, err
-		}
-		ids = append(ids, id)
-		total += size
-	}
-	return ids, total, rows.Err()
+	return ids, total, nil
 }

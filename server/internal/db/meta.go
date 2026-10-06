@@ -16,7 +16,7 @@ var ErrConflict = errors.New("already exists")
 // Meta returns a value from the meta table.
 func (d *DB) Meta(ctx context.Context, key string) (string, error) {
 	var v string
-	err := d.QueryRowContext(ctx, "SELECT value FROM meta WHERE key = $1", key).Scan(&v)
+	err := d.pool.QueryRowContext(ctx, "SELECT value FROM meta WHERE key = $1", key).Scan(&v)
 	if noRow(err) {
 		return "", ErrNotFound
 	}
@@ -25,7 +25,7 @@ func (d *DB) Meta(ctx context.Context, key string) (string, error) {
 
 // SetMeta stores a value in the meta table.
 func (d *DB) SetMeta(ctx context.Context, key, value string) error {
-	_, err := d.ExecContext(ctx,
+	_, err := d.pool.ExecContext(ctx,
 		"INSERT INTO meta (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
 		key, value)
 	return err
@@ -42,7 +42,7 @@ func setMeta(ctx context.Context, tx *sql.Tx, key, value string) error {
 // it never did.
 func (d *DB) JobRun(ctx context.Context, name string) (time.Time, error) {
 	var at time.Time
-	err := d.QueryRowContext(ctx, "SELECT ran_at FROM job_runs WHERE name = $1", name).Scan(&at)
+	err := d.pool.QueryRowContext(ctx, "SELECT ran_at FROM job_runs WHERE name = $1", name).Scan(&at)
 	if noRow(err) {
 		return time.Time{}, nil
 	}
@@ -51,7 +51,7 @@ func (d *DB) JobRun(ctx context.Context, name string) (time.Time, error) {
 
 // SetJobRun records a run of the periodic job of that name.
 func (d *DB) SetJobRun(ctx context.Context, name string, at time.Time) error {
-	_, err := d.ExecContext(ctx, `INSERT INTO job_runs (name, ran_at) VALUES ($1, $2)
+	_, err := d.pool.ExecContext(ctx, `INSERT INTO job_runs (name, ran_at) VALUES ($1, $2)
 		ON CONFLICT (name) DO UPDATE SET ran_at = excluded.ran_at`, name, at)
 	return err
 }
@@ -59,7 +59,7 @@ func (d *DB) SetJobRun(ctx context.Context, name string, at time.Time) error {
 // ServerID returns this server's permanent random id, creating it on first use. Apps compare
 // it to make sure the local address reaches the same server as the public one.
 func (d *DB) ServerID(ctx context.Context) (string, error) {
-	if _, err := d.ExecContext(ctx, "INSERT INTO meta (key, value) VALUES ('server_id', $1) ON CONFLICT DO NOTHING", ids.New()); err != nil {
+	if _, err := d.pool.ExecContext(ctx, "INSERT INTO meta (key, value) VALUES ('server_id', $1) ON CONFLICT DO NOTHING", ids.New()); err != nil {
 		return "", err
 	}
 	return d.Meta(ctx, "server_id")

@@ -83,7 +83,7 @@ func TestPurgeToS3Garbage(t *testing.T) {
 		t.Errorf("garbage after forgetting: %v", keys)
 	}
 	for i := range 3 {
-		if _, err := d.ExecContext(ctx, "INSERT INTO s3_garbage (key, created_at) VALUES ($1, $2)", "k"+string(rune('a'+i)), t0.Add(time.Duration(-i)*time.Hour)); err != nil {
+		if _, err := d.pool.ExecContext(ctx, "INSERT INTO s3_garbage (key, created_at) VALUES ($1, $2)", "k"+string(rune('a'+i)), t0.Add(time.Duration(-i)*time.Hour)); err != nil {
 			t.Fatal(err)
 		}
 	}

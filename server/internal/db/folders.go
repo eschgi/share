@@ -49,25 +49,6 @@ func scanFolder(row interface{ Scan(...any) error }) (Folder, error) {
 	return f, nil
 }
 
-func queryFolders(ctx context.Context, q interface {
-	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
-}, query string, args ...any) ([]Folder, error) {
-	rows, err := q.QueryContext(ctx, query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []Folder
-	for rows.Next() {
-		f, err := scanFolder(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, f)
-	}
-	return out, rows.Err()
-}
-
 // EnsureFirstFolder makes the first folder if there is none yet, in one transaction: f gets
 // every file and PIN there is, every member and every open invite for a new member, and dates
 // from the oldest file. With files, it notes that their day folders still lie in storage_dir
@@ -76,7 +57,7 @@ func queryFolders(ctx context.Context, q interface {
 // command line can both call it.
 func (d *DB) EnsureFirstFolder(ctx context.Context, f Folder, now time.Time) (Folder, bool, error) {
 	made := false
-	err := d.Tx(ctx, func(tx *sql.Tx) error {
+	err := d.inTx(ctx, func(tx *sql.Tx) error {
 		var n int
 		if err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM folders").Scan(&n); err != nil {
 			return err
@@ -130,7 +111,7 @@ func (d *DB) EnsureFirstFolder(ctx context.Context, f Folder, now time.Time) (Fo
 // InsertFolder stores a new folder. It returns ErrConflict if a live folder has its name, or
 // any folder its directory.
 func (d *DB) InsertFolder(ctx context.Context, f Folder) error {
-	return d.Tx(ctx, func(tx *sql.Tx) error {
+	return d.inTx(ctx, func(tx *sql.Tx) error {
 		if err := insertFolder(ctx, tx, f); err != nil {
 			return err
 		}
@@ -149,19 +130,19 @@ func insertFolder(ctx context.Context, tx *sql.Tx, f Folder) error {
 
 // FolderByID returns one folder, deleted or not.
 func (d *DB) FolderByID(ctx context.Context, id string) (Folder, error) {
-	return scanFolder(d.QueryRowContext(ctx, "SELECT "+folderSelect+" FROM folders WHERE id = $1", id))
+	return scanFolder(d.pool.QueryRowContext(ctx, "SELECT "+folderSelect+" FROM folders WHERE id = $1", id))
 }
 
 // LiveFolders lists the folders that aren't deleted, the oldest first: the first one is where
 // things go when nobody says.
 func (d *DB) LiveFolders(ctx context.Context) ([]Folder, error) {
-	return queryFolders(ctx, d, "SELECT "+folderSelect+" FROM folders WHERE deleted_at IS NULL ORDER BY created_at, seq")
+	return queryAll(ctx, d.pool, scanFolder, "SELECT "+folderSelect+" FROM folders WHERE deleted_at IS NULL ORDER BY created_at, seq")
 }
 
 // FoldersOf lists the live folders a member was given, the oldest first. Admins see every
 // folder whatever this says.
 func (d *DB) FoldersOf(ctx context.Context, userID string) ([]Folder, error) {
-	return queryFolders(ctx, d, "SELECT "+folderSelect+` FROM folders
+	return queryAll(ctx, d.pool, scanFolder, "SELECT "+folderSelect+` FROM folders
 		WHERE deleted_at IS NULL AND id IN (SELECT folder_id FROM folder_people WHERE user_id = $1) ORDER BY created_at, seq`, userID)
 }
 
@@ -173,7 +154,7 @@ func (d *DB) SetFolderPerson(ctx context.Context, folderID, userID string, sees 
 	if !sees {
 		q = "DELETE FROM folder_people WHERE folder_id = $1 AND user_id = $2"
 	}
-	return d.Tx(ctx, func(tx *sql.Tx) error {
+	return d.inTx(ctx, func(tx *sql.Tx) error {
 		res, err := tx.ExecContext(ctx, q, folderID, userID)
 		if err != nil {
 			return err
@@ -206,7 +187,7 @@ func loseFolders(ctx context.Context, tx *sql.Tx, userID, folderID string) error
 // ErrNotFound for any other invite.
 func (d *DB) SetFolderInvite(ctx context.Context, folderID, inviteID string, gets bool, now time.Time) error {
 	var n int
-	if err := d.QueryRowContext(ctx, `SELECT COUNT(*) FROM invites WHERE id = $1 AND user_id IS NULL AND role = 'member'
+	if err := d.pool.QueryRowContext(ctx, `SELECT COUNT(*) FROM invites WHERE id = $1 AND user_id IS NULL AND role = 'member'
 		AND used_at IS NULL AND revoked_at IS NULL AND expires_at > $2`, inviteID, now).Scan(&n); err != nil {
 		return err
 	}
@@ -217,7 +198,7 @@ func (d *DB) SetFolderInvite(ctx context.Context, folderID, inviteID string, get
 	if !gets {
 		q = "DELETE FROM invite_folders WHERE folder_id = $1 AND invite_id = $2"
 	}
-	_, err := d.ExecContext(ctx, q, folderID, inviteID)
+	_, err := d.pool.ExecContext(ctx, q, folderID, inviteID)
 	return err
 }
 
@@ -234,20 +215,14 @@ func (d *DB) InviteFolders(ctx context.Context) (map[string][]string, error) {
 }
 
 func (d *DB) folderLists(ctx context.Context, query string) (map[string][]string, error) {
-	rows, err := d.QueryContext(ctx, query)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
 	out := map[string][]string{}
-	for rows.Next() {
+	err := eachRow(ctx, d.pool, query, nil, func(row scanner) error {
 		var key, folder string
-		if err := rows.Scan(&key, &folder); err != nil {
-			return nil, err
-		}
+		err := row.Scan(&key, &folder)
 		out[key] = append(out[key], folder)
-	}
-	return out, rows.Err()
+		return err
+	})
+	return out, err
 }
 
 // dirTaken counts the folders with a directory on folders_dir.
@@ -256,18 +231,18 @@ const dirTaken = "SELECT COUNT(*) FROM folders WHERE casefold(dir) = casefold($1
 // DirTaken reports whether a folder, deleted or not, has a directory, ignoring case.
 func (d *DB) DirTaken(ctx context.Context, dir string) (bool, error) {
 	var n int
-	err := d.QueryRowContext(ctx, dirTaken, dir).Scan(&n)
+	err := d.pool.QueryRowContext(ctx, dirTaken, dir).Scan(&n)
 	return n > 0, err
 }
 
 // Relocating lists the folders whose files may still lie under an older directory.
 func (d *DB) Relocating(ctx context.Context) ([]Folder, error) {
-	return queryFolders(ctx, d, "SELECT "+folderSelect+" FROM folders WHERE renaming_from IS NOT NULL ORDER BY created_at, seq")
+	return queryAll(ctx, d.pool, scanFolder, "SELECT "+folderSelect+" FROM folders WHERE renaming_from IS NOT NULL ORDER BY created_at, seq")
 }
 
 // FinishRelocation notes that nothing is left under a folder's older directory from.
 func (d *DB) FinishRelocation(ctx context.Context, id, from string) error {
-	_, err := d.ExecContext(ctx, "UPDATE folders SET renaming_from = NULL WHERE id = $1 AND renaming_from = $2", id, from)
+	_, err := d.pool.ExecContext(ctx, "UPDATE folders SET renaming_from = NULL WHERE id = $1 AND renaming_from = $2", id, from)
 	return err
 }
 
@@ -281,28 +256,22 @@ type FolderStat struct {
 
 // FolderStats counts the library's files by folder.
 func (d *DB) FolderStats(ctx context.Context) (map[string]FolderStat, error) {
-	rows, err := d.QueryContext(ctx, `SELECT folder_id, COUNT(*), SUM(size), COUNT(DISTINCT COALESCE(user_id::text, 'pin:' || pin_session_id))
-		FROM files WHERE state = 'ready' GROUP BY folder_id`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
 	out := map[string]FolderStat{}
-	for rows.Next() {
+	err := eachRow(ctx, d.pool, `SELECT folder_id, COUNT(*), SUM(size), COUNT(DISTINCT COALESCE(user_id::text, 'pin:' || pin_session_id))
+		FROM files WHERE state = 'ready' GROUP BY folder_id`, nil, func(row scanner) error {
 		var id sql.NullString
 		var s FolderStat
-		if err := rows.Scan(&id, &s.Files, &s.Bytes, &s.Senders); err != nil {
-			return nil, err
-		}
+		err := row.Scan(&id, &s.Files, &s.Bytes, &s.Senders)
 		out[id.String] = s
-	}
-	return out, rows.Err()
+		return err
+	})
+	return out, err
 }
 
 // FolderCover is a folder's newest photo or video that has a thumbnail; ErrNotFound if it has
 // none.
 func (d *DB) FolderCover(ctx context.Context, folderID string) (File, error) {
-	return scanFile(d.QueryRowContext(ctx, "SELECT "+fileColumns+` FROM files
+	return scanFile(d.pool.QueryRowContext(ctx, "SELECT "+fileColumns+` FROM files
 		WHERE folder_id = $1 AND state = 'ready' AND kind IN ('photo', 'video') AND thumb IN ('client', 'server')
 		ORDER BY uploaded_at DESC, id LIMIT 1`, folderID))
 }
@@ -328,25 +297,18 @@ func (d *DB) CountFolderPeople(ctx context.Context, now time.Time) (FolderPeople
 			WHERE v.user_id IS NULL AND v.role = 'member' AND v.used_at IS NULL AND v.revoked_at IS NULL AND v.expires_at > $1
 			GROUP BY i.folder_id`, []any{now}},
 	} {
-		rows, err := d.QueryContext(ctx, q.sql, q.args...)
+		err := eachRow(ctx, d.pool, q.sql, q.args, func(row scanner) error {
+			var id string
+			var n int
+			err := row.Scan(&id, &n)
+			out.Members[id] += n
+			return err
+		})
 		if err != nil {
 			return out, err
 		}
-		for rows.Next() {
-			var id string
-			var n int
-			if err := rows.Scan(&id, &n); err != nil {
-				rows.Close()
-				return out, err
-			}
-			out.Members[id] += n
-		}
-		rows.Close()
-		if err := rows.Err(); err != nil {
-			return out, err
-		}
 	}
-	err := d.QueryRowContext(ctx, `SELECT (SELECT COUNT(*) FROM users WHERE role = 'admin') +
+	err := d.pool.QueryRowContext(ctx, `SELECT (SELECT COUNT(*) FROM users WHERE role = 'admin') +
 		(SELECT COUNT(*) FROM invites WHERE user_id IS NULL AND role = 'admin' AND used_at IS NULL AND revoked_at IS NULL AND expires_at > $1)`,
 		now).Scan(&out.Admins)
 	return out, err
@@ -364,7 +326,7 @@ var ErrBusy = errors.New("the folder's files are still being moved")
 // any folder the directory, and ErrBusy while an earlier move isn't finished.
 func (d *DB) RenameFolder(ctx context.Context, id, name, dir string) (Folder, error) {
 	var out Folder
-	err := d.Tx(ctx, func(tx *sql.Tx) error {
+	err := d.inTx(ctx, func(tx *sql.Tx) error {
 		f, err := scanFolder(tx.QueryRowContext(ctx, "SELECT "+folderSelect+" FROM folders WHERE id = $1 AND deleted_at IS NULL", id))
 		if err != nil {
 			return err
@@ -396,7 +358,7 @@ func (d *DB) RenameFolder(ctx context.Context, id, name, dir string) (Folder, er
 // ErrLastFolder for the last live folder, ErrNotFound for no such live folder.
 func (d *DB) DeleteFolder(ctx context.Context, id, by string, at time.Time) ([]File, error) {
 	var out []File
-	err := d.Tx(ctx, func(tx *sql.Tx) error {
+	err := d.inTx(ctx, func(tx *sql.Tx) error {
 		var live int
 		if err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM folders WHERE deleted_at IS NULL").Scan(&live); err != nil {
 			return err
@@ -412,7 +374,7 @@ func (d *DB) DeleteFolder(ctx context.Context, id, by string, at time.Time) ([]F
 		if live <= 1 {
 			return ErrLastFolder
 		}
-		files, err := queryFiles(ctx, tx, "SELECT "+fileColumns+" FROM files WHERE folder_id = $1 AND state = 'ready'", id)
+		files, err := queryAll(ctx, tx, scanFile, "SELECT "+fileColumns+" FROM files WHERE folder_id = $1 AND state = 'ready'", id)
 		if err != nil {
 			return err
 		}
@@ -436,7 +398,7 @@ func (d *DB) DeleteFolder(ctx context.Context, id, by string, at time.Time) ([]F
 // restored. If a live folder has its name now, it gets a number: "Wedding (2)".
 func (d *DB) ReviveFolder(ctx context.Context, id string) (Folder, error) {
 	var out Folder
-	err := d.Tx(ctx, func(tx *sql.Tx) error {
+	err := d.inTx(ctx, func(tx *sql.Tx) error {
 		f, err := scanFolder(tx.QueryRowContext(ctx, "SELECT "+folderSelect+" FROM folders WHERE id = $1", id))
 		if err != nil || f.DeletedAt == nil {
 			out = f
@@ -487,7 +449,7 @@ func numberedName(name string, n int) string {
 // ReadyInDeletedFolders lists files in the library whose folder is deleted: uploads that
 // finished after their folder went.
 func (d *DB) ReadyInDeletedFolders(ctx context.Context) ([]File, error) {
-	return queryFiles(ctx, d, "SELECT "+fileColumns+` FROM files
+	return queryAll(ctx, d.pool, scanFile, "SELECT "+fileColumns+` FROM files
 		WHERE state = 'ready' AND folder_id IN (SELECT id FROM folders WHERE deleted_at IS NOT NULL)`)
 }
 
@@ -495,9 +457,9 @@ func (d *DB) ReadyInDeletedFolders(ctx context.Context) ([]File, error) {
 // trash, and returns them.
 func (d *DB) DropEmptyDeletedFolders(ctx context.Context) ([]Folder, error) {
 	var out []Folder
-	err := d.Tx(ctx, func(tx *sql.Tx) error {
+	err := d.inTx(ctx, func(tx *sql.Tx) error {
 		var err error
-		out, err = queryFolders(ctx, tx, "SELECT "+folderSelect+` FROM folders f WHERE deleted_at IS NOT NULL
+		out, err = queryAll(ctx, tx, scanFolder, "SELECT "+folderSelect+` FROM folders f WHERE deleted_at IS NOT NULL
 			AND NOT EXISTS (SELECT 1 FROM files WHERE folder_id = f.id)
 			AND NOT EXISTS (SELECT 1 FROM files WHERE moved_from LIKE f.id || '/%')`)
 		if err != nil {
@@ -518,5 +480,5 @@ func (d *DB) FoldersByID(ctx context.Context, ids []string) ([]Folder, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
-	return queryFolders(ctx, d, "SELECT "+folderSelect+" FROM folders WHERE id = ANY($1) ORDER BY created_at, seq", ids)
+	return queryAll(ctx, d.pool, scanFolder, "SELECT "+folderSelect+" FROM folders WHERE id = ANY($1) ORDER BY created_at, seq", ids)
 }

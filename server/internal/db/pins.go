@@ -72,7 +72,7 @@ func (d *DB) InsertPin(ctx context.Context, p Pin) error {
 	if p.FolderID == "" {
 		return errors.New("db: a PIN needs a folder")
 	}
-	err := d.Tx(ctx, func(tx *sql.Tx) error {
+	err := d.inTx(ctx, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, "INSERT INTO pins ("+pinColumns+") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
 			p.ID, p.Code, p.Kind, p.CreatedBy, p.CreatedAt, p.ExpiresAt, p.EndedAt, p.FolderID, p.ShowsFolder)
 		if err != nil || p.Secret == nil {
@@ -96,36 +96,23 @@ func (d *DB) InsertPin(ctx context.Context, p Pin) error {
 
 // PinByCode looks up a PIN by its code, live or not.
 func (d *DB) PinByCode(ctx context.Context, code string) (Pin, error) {
-	return scanPin(d.QueryRowContext(ctx, "SELECT "+pinSelect+" FROM pins WHERE code = $1", code))
+	return scanPin(d.pool.QueryRowContext(ctx, "SELECT "+pinSelect+" FROM pins WHERE code = $1", code))
 }
 
 // PinByID looks up a PIN by id.
 func (d *DB) PinByID(ctx context.Context, id string) (Pin, error) {
-	return scanPin(d.QueryRowContext(ctx, "SELECT "+pinSelect+" FROM pins WHERE id = $1", id))
+	return scanPin(d.pool.QueryRowContext(ctx, "SELECT "+pinSelect+" FROM pins WHERE id = $1", id))
 }
 
 // Pins lists every PIN, newest first.
 func (d *DB) Pins(ctx context.Context) ([]Pin, error) {
-	rows, err := d.QueryContext(ctx, "SELECT "+pinSelect+" FROM pins ORDER BY created_at DESC, id")
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []Pin
-	for rows.Next() {
-		p, err := scanPin(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, p)
-	}
-	return out, rows.Err()
+	return queryAll(ctx, d.pool, scanPin, "SELECT "+pinSelect+" FROM pins ORDER BY created_at DESC, id")
 }
 
 // EndPin ends a PIN. Its sessions stop working at once, because a session is only valid
 // while its PIN is live. Ending an already ended PIN changes nothing.
 func (d *DB) EndPin(ctx context.Context, id string, at time.Time) error {
-	res, err := d.ExecContext(ctx, "UPDATE pins SET ended_at = $1 WHERE id = $2 AND ended_at IS NULL", at, id)
+	res, err := d.pool.ExecContext(ctx, "UPDATE pins SET ended_at = $1 WHERE id = $2 AND ended_at IS NULL", at, id)
 	if err != nil {
 		return err
 	}
@@ -140,7 +127,7 @@ func (d *DB) EndPin(ctx context.Context, id string, at time.Time) error {
 // EndExpiredPins marks 24-hour PINs whose time is up as ended, so lists show them as such.
 // They stopped working at expires_at already; this only records it.
 func (d *DB) EndExpiredPins(ctx context.Context, now time.Time) (int64, error) {
-	res, err := d.ExecContext(ctx,
+	res, err := d.pool.ExecContext(ctx,
 		"UPDATE pins SET ended_at = expires_at WHERE ended_at IS NULL AND expires_at IS NOT NULL AND expires_at <= $1", now)
 	if err != nil {
 		return 0, err
