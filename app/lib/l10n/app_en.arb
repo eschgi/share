@@ -1220,12 +1220,85 @@
   "encryptionNewFoldersSub": "New folders encrypt their files from the start",
   "encryptionNewFolder": "Encrypt its files end to end",
   "encryptionMoveIntoPlain": "Encrypted files only move into an encrypted folder. Turn encryption on there first.",
-  "keysWaitingTitle": "Waiting for another phone or browser",
-  "keysWaiting": "Encrypted files open here once one of your other phones or browsers is online, or after signing in again with your password.",
   "keysStartOver": "Start over",
   "keysStartOverTitle": "Start over with new keys?",
-  "keysStartOverBody": "Only if none of your other phones or browsers will come back. This phone gets new keys, and encrypted folders open here once someone else who sees them is online, or with the recovery code.",
+  "keysStartOverBody": "Only if none of your other phones or browsers will come back. This phone gets new keys, and encrypted folders open here once someone else who sees them allows it, or with the recovery code.",
   "keysCantOpen": "This phone can't open encrypted files yet.",
+  "keysWaitingTitle": "Waiting for approval",
+  "keysWaiting": "Allow this phone on one of your other phones or browsers: open Share there and choose Show.",
+  "keysSameCode": "It shows this code there too:",
+  "keysAdminTitle": "Waiting for an admin",
+  "keysAdmin": "Encrypted folders open here once an admin allows it.",
+  "keysAdminCode": "Your key is new. An admin opens your folders for it: tell them this code.",
+  "keysAskPhone": "A new phone wants your keys",
+  "keysAskBrowser": "A new browser wants your keys",
+  "keysSignedInMinutes": "{minutes, plural, =0{Signed in just now} =1{Signed in 1 minute ago} other{Signed in {minutes} minutes ago}}",
+  "@keysSignedInMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "keysSignedInHours": "{hours, plural, =1{Signed in 1 hour ago} other{Signed in {hours} hours ago}}",
+  "@keysSignedInHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "keysSignedInDays": "{days, plural, =1{Signed in 1 day ago} other{Signed in {days} days ago}}",
+  "@keysSignedInDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "keysShowsPhone": "Does it show this code?",
+  "keysShowsBrowser": "Does it show this code?",
+  "keysWaitCode": "Waiting for the code…",
+  "keysNotMePhone": "Another code, or you didn't just sign in? Tap <b>Not me</b>: that phone is signed out and gets nothing.",
+  "keysNotMeBrowser": "Another code, or you didn't just sign in? Tap <b>Not me</b>: that browser is signed out and gets nothing.",
+  "keysNotMe": "Not me",
+  "keysAllow": "Allow",
+  "keysPersonTitle": "{name} is waiting for folders",
+  "@keysPersonTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "keysPersonFirst": "Once you allow it, these folders open for {name}:",
+  "@keysPersonFirst": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "keysPersonNew": "{name}'s key is new: the old one was lost. Once you allow it, these folders open for {name} again:",
+  "@keysPersonNew": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "keysPersonCode": "Ask {name} for the code on their screen:",
+  "@keysPersonCode": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "keysPersonHelp": "Another code? Tap <b>Not now</b>, and nothing is passed on.",
+  "keysNotNow": "Not now",
+  "keysLaterTitle": "Waiting for your OK",
+  "keysShow": "Show",
   "recoveryTitle": "Recovery code",
   "recoveryLead": "With this code an admin opens every encrypted folder again, should all phones and browsers be lost. It is shown only now: write it down, and keep it somewhere safe, away from this phone.",
   "recoveryCopy": "Copy",

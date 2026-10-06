@@ -6,16 +6,20 @@ package api
 // open any of them.
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/eschgi/share/server/internal/auth"
 	"github.com/eschgi/share/server/internal/db"
 	"github.com/eschgi/share/server/internal/e2ee"
 	"github.com/eschgi/share/server/internal/httpx"
+	"github.com/eschgi/share/server/internal/ids"
 )
 
 // B64 is binary data in JSON: base64url without padding, null when there is none.
@@ -58,6 +62,10 @@ func (a *API) registerKeys(mux routes) {
 	mux.HandleFunc("PUT /api/keys/person", a.putPersonKey)
 	mux.HandleFunc("PUT /api/keys/password-lock", a.putPasswordLock)
 	mux.HandleFunc("POST /api/keys/grants", a.grants)
+	mux.HandleFunc("POST /api/keys/checks", a.newCheck)
+	mux.HandleFunc("PUT /api/keys/checks/{id}/answer", a.answerCheck)
+	mux.HandleFunc("PUT /api/keys/checks/{id}/reveal", a.revealCheck)
+	mux.HandleFunc("DELETE /api/keys/checks/{id}", a.deleteCheck)
 	mux.HandleFunc("PUT /api/folders/{id}/encryption", a.folderEncryption)
 	mux.HandleFunc("POST /api/folders/{id}/keys", a.newFolderKey)
 	mux.HandleFunc("GET /api/recovery", a.recovery)
@@ -74,6 +82,21 @@ type Keys struct {
 	Folders     []FolderKey `json:"folders"`      // every version of the keys of the folders the person sees
 	RecoveryKey B64         `json:"recovery_key"` // the recovery key's public key, once there is one
 	Todo        KeysTodo    `json:"todo"`
+	Checks      []CheckInfo `json:"checks"` // the open checks this device takes part in
+}
+
+// CheckInfo is an open check this device takes part in (docs/e2ee-plan.md): one it asks, or
+// one for it or its person. The server relays the commitment and the two nonces, in order.
+type CheckInfo struct {
+	ID         string  `json:"id"`
+	Asking     bool    `json:"asking"`     // this device asks
+	Device     *string `json:"device"`     // the device it is for; null for a person
+	User       *string `json:"user"`       // the person it is for; null for a device
+	From       string  `json:"from"`       // the asking device's name
+	Commitment B64     `json:"commitment"` // to the asking device's nonce
+	Answer     B64     `json:"answer"`     // the waiting side's nonce; null until it answers
+	Answered   bool    `json:"answered"`   // this device answered
+	Reveal     B64     `json:"reveal"`     // the asking device's nonce; null until it reveals it
 }
 
 // PersonKey is the person's key: public, sealed for this device, locked with the password, and
@@ -104,16 +127,23 @@ type KeysTodo struct {
 	Pins     []PinTodo    `json:"pins"`     // PIN links that show a folder and lack a version of its key
 }
 
+// DeviceTodo is a device of the person that lacks their key: whoever passes it on checks first.
 type DeviceTodo struct {
-	ID        string `json:"id"`
-	PublicKey B64    `json:"public_key"`
+	ID        string    `json:"id"`
+	PublicKey B64       `json:"public_key"`
+	Name      string    `json:"name"`
+	Client    string    `json:"client"`     // "app" or "web"
+	CreatedAt time.Time `json:"created_at"` // when it signed in
+	Active    bool      `json:"active"`     // seen lately, so it can answer a check
 }
 
 type PersonTodo struct {
 	Folder    string `json:"folder"`
 	Version   int    `json:"version"`
 	User      string `json:"user"`
+	Name      string `json:"name"`
 	PublicKey B64    `json:"public_key"`
+	Active    bool   `json:"active"` // a device of theirs with their key was seen lately, so it can answer a check
 }
 
 type VersionRef struct {
@@ -158,15 +188,24 @@ func (a *API) keys(w http.ResponseWriter, r *http.Request) {
 		Folders:     []FolderKey{},
 		RecoveryKey: recovery,
 		Todo:        KeysTodo{Devices: []DeviceTodo{}, People: []PersonTodo{}, Recovery: []VersionRef{}, Rekey: []string{}, Pins: []PinTodo{}},
+		Checks:      []CheckInfo{},
 	}
 	for _, f := range k.Folders {
 		out.Folders = append(out.Folders, FolderKey{Folder: f.FolderID, Version: f.Version, PublicKey: f.PublicKey, Sealed: f.Sealed})
 	}
 	for _, d := range todo.Devices {
-		out.Todo.Devices = append(out.Todo.Devices, DeviceTodo{ID: d.ID, PublicKey: d.PublicKey})
+		out.Todo.Devices = append(out.Todo.Devices, DeviceTodo{ID: d.ID, PublicKey: d.PublicKey, Name: d.Name, Client: d.Client, CreatedAt: d.CreatedAt, Active: d.Active})
 	}
 	for _, n := range todo.People {
-		out.Todo.People = append(out.Todo.People, PersonTodo{Folder: n.FolderID, Version: n.Version, User: n.UserID, PublicKey: n.PublicKey})
+		out.Todo.People = append(out.Todo.People, PersonTodo{Folder: n.FolderID, Version: n.Version, User: n.UserID, Name: n.Name, PublicKey: n.PublicKey, Active: n.Active})
+	}
+	checks, err := a.Auth.DB.ChecksOf(ctx, p.DeviceID, p.UserID, a.Now())
+	if err != nil {
+		internal(w, "keys", err)
+		return
+	}
+	for _, c := range checks {
+		out.Checks = append(out.Checks, checkInfo(c, p.DeviceID))
 	}
 	for _, v := range todo.Recovery {
 		out.Todo.Recovery = append(out.Todo.Recovery, VersionRef{Folder: v.FolderID, Version: v.Version})
@@ -176,6 +215,177 @@ func (a *API) keys(w http.ResponseWriter, r *http.Request) {
 		out.Todo.Pins = append(out.Todo.Pins, PinTodo{Pin: n.PinID, Folder: n.FolderID, Version: n.Version, SecretVersion: n.SecretVersion, SecretSealed: n.SecretSealed})
 	}
 	httpx.WriteJSON(w, http.StatusOK, out)
+}
+
+func checkInfo(c db.Check, device string) CheckInfo {
+	ref := func(s string) *string {
+		if s == "" {
+			return nil
+		}
+		return &s
+	}
+	return CheckInfo{
+		ID: c.ID, Asking: c.Asker == device, Device: ref(c.DeviceID), User: ref(c.UserID), From: c.AskerName,
+		Commitment: c.Commitment, Answer: c.Answer, Answered: c.AnsweredBy == device, Reveal: c.Reveal,
+	}
+}
+
+type checkRequest struct {
+	Device     string `json:"device,omitempty"` // a device of this person that waits for their key
+	User       string `json:"user,omitempty"`   // a person who waits for folder keys this device holds
+	Commitment B64    `json:"commitment"`
+}
+
+// newCheck opens a check before this device passes keys on: its person's key to another of
+// their devices, or folder keys to another person. It replaces this device's earlier check for
+// the same one.
+func (a *API) newCheck(w http.ResponseWriter, r *http.Request) {
+	p, ok := a.device(w, r)
+	if !ok {
+		return
+	}
+	var req checkRequest
+	if !httpx.DecodeJSON(w, r, &req) {
+		return
+	}
+	if (req.Device == "") == (req.User == "") {
+		httpx.WriteError(w, http.StatusBadRequest, "bad_request", "Name a device or a person.")
+		return
+	}
+	if (req.Device != "" && !ids.Valid(req.Device)) || (req.User != "" && !ids.Valid(req.User)) {
+		httpx.WriteError(w, http.StatusNotFound, "not_found", "Nothing has that id.")
+		return
+	}
+	if len(req.Commitment) != sha256.Size {
+		badKey(w, "commitment")
+		return
+	}
+	id := ids.New()
+	switch err := a.Auth.DB.NewCheck(r.Context(), id, p.DeviceID, p.UserID, req.Device, req.User, req.Commitment, a.Now()); {
+	case errors.Is(err, db.ErrNotFound):
+		httpx.WriteError(w, http.StatusNotFound, "not_found", "Nobody there waits for keys this device holds.")
+		return
+	case err != nil:
+		internal(w, "check", err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusCreated, map[string]string{"id": id})
+}
+
+type nonceRequest struct {
+	Nonce B64 `json:"nonce"`
+}
+
+func goodNonce(w http.ResponseWriter, nonce []byte, field string) bool {
+	if len(nonce) != e2ee.NonceSize {
+		badKey(w, field)
+		return false
+	}
+	return true
+}
+
+// checkID is the check named in the path; an id no check can have finds none.
+func checkID(w http.ResponseWriter, r *http.Request) (string, bool) {
+	id := r.PathValue("id")
+	if !ids.Valid(id) {
+		noCheck(w)
+		return "", false
+	}
+	return id, true
+}
+
+func noCheck(w http.ResponseWriter) {
+	httpx.WriteError(w, http.StatusNotFound, "not_found", "No such check is open for this device.")
+}
+
+// answerCheck keeps the waiting side's nonce, from the device a check is for, or from a device
+// of the person it is for that holds their key.
+func (a *API) answerCheck(w http.ResponseWriter, r *http.Request) {
+	p, ok := a.device(w, r)
+	if !ok {
+		return
+	}
+	id, ok := checkID(w, r)
+	if !ok {
+		return
+	}
+	var req nonceRequest
+	if !httpx.DecodeJSON(w, r, &req) || !goodNonce(w, req.Nonce, "nonce") {
+		return
+	}
+	switch err := a.Auth.DB.AnswerCheck(r.Context(), id, p.DeviceID, p.UserID, req.Nonce, a.Now()); {
+	case errors.Is(err, db.ErrNotFound):
+		noCheck(w)
+	case err != nil:
+		internal(w, "check", err)
+	default:
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+type revealRequest struct {
+	Nonce  B64 `json:"nonce"`
+	Answer B64 `json:"answer"` // the answer the asking device saw, which its code is made from
+}
+
+// revealCheck keeps the asking device's nonce, after the answer, if it matches the commitment
+// and the answer is still the one the asking device saw.
+func (a *API) revealCheck(w http.ResponseWriter, r *http.Request) {
+	p, ok := a.device(w, r)
+	if !ok {
+		return
+	}
+	id, ok := checkID(w, r)
+	if !ok {
+		return
+	}
+	var req revealRequest
+	if !httpx.DecodeJSON(w, r, &req) || !goodNonce(w, req.Nonce, "nonce") || !goodNonce(w, req.Answer, "answer") {
+		return
+	}
+	nonce := req.Nonce
+	ctx := r.Context()
+	c, err := a.Auth.DB.CheckByID(ctx, id, a.Now())
+	if errors.Is(err, db.ErrNotFound) || (err == nil && c.Asker != p.DeviceID) {
+		noCheck(w)
+		return
+	}
+	if err != nil {
+		internal(w, "check", err)
+		return
+	}
+	if !bytes.Equal(e2ee.Commitment(nonce), c.Commitment) {
+		httpx.WriteError(w, http.StatusBadRequest, "bad_request", "The nonce isn't the one committed to.")
+		return
+	}
+	switch err := a.Auth.DB.RevealCheck(ctx, c.ID, p.DeviceID, nonce, req.Answer, a.Now()); {
+	case errors.Is(err, db.ErrNotFound):
+		httpx.WriteError(w, http.StatusConflict, "not_answered", "The check has no answer to reveal for, another one by now, or was revealed.")
+	case err != nil:
+		internal(w, "check", err)
+	default:
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// deleteCheck closes a check, for the device that asks or the side it is for.
+func (a *API) deleteCheck(w http.ResponseWriter, r *http.Request) {
+	p, ok := a.device(w, r)
+	if !ok {
+		return
+	}
+	id, ok := checkID(w, r)
+	if !ok {
+		return
+	}
+	switch err := a.Auth.DB.DeleteCheck(r.Context(), id, p.DeviceID, p.UserID); {
+	case errors.Is(err, db.ErrNotFound):
+		noCheck(w)
+	case err != nil:
+		internal(w, "check", err)
+	default:
+		w.WriteHeader(http.StatusNoContent)
+	}
 }
 
 func badKey(w http.ResponseWriter, field string) {

@@ -39,6 +39,15 @@ void main() {
     expect(k.encryptedFolders, 1);
     expect(k.hasFolderKey('f4mily5x2k7mbqz4bwdbyj6qsq', 1), isTrue);
     expect(k.hasFolderKey('f4mily5x2k7mbqz4bwdbyj6qsq', 2), isFalse);
+    expect([for (final a in k.asks) (a.kind, a.name, a.isBrowser, a.code, a.keyChanged)], [
+      ('device', 'Chrome · Windows', true, '735041', false),
+      ('person', 'Maria', false, null, true),
+    ]);
+    expect(k.asks.first.since, DateTime.utc(2026, 10, 6, 17, 11, 11, 191));
+    expect(k.asks.last.folders, ['f4mily5x2k7mbqz4bwdbyj6qsq']);
+    expect([for (final c in k.codes) (c.kind, c.from, c.code)], [('person', 'Chrome · Windows', '813552')]);
+    expect(k.waitsForFolders, isFalse);
+    expect(k.pace, const Duration(seconds: 5));
     expect(KeysState.fromMap(const {'status': 'something new'}).status, KeysStatus.off);
   });
 

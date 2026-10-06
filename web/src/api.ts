@@ -592,13 +592,40 @@ export interface KeysAnswer {
   folders: { folder: string; version: number; public_key: string; sealed: string | null }[];
   recovery_key: string | null;
   todo: {
-    devices: { id: string; public_key: string }[];
-    people: { folder: string; version: number; user: string; public_key: string }[];
+    /** The person's devices that lack their key: passed on only after a check, which needs the
+     * device active (seen in the last 15 minutes) to answer it. */
+    devices: { id: string; public_key: string; name: string; client: 'app' | 'web'; created_at: string; active: boolean }[];
+    /** People who lack a version of a folder's key: passed on after a check, which needs one of
+     * their devices active, or at once for a key checked here before. */
+    people: { folder: string; version: number; user: string; name: string; public_key: string; active: boolean }[];
     recovery: { folder: string; version: number }[];
     rekey: string[];
     pins: { pin: string; folder: string; version: number; secret_version: number; secret_sealed: string }[];
   };
+  checks: KeyCheck[];
 }
+
+/** An open check this browser takes part in (contract/api/keys_check.json): one it asks, or
+ * one for it or its person. */
+export interface KeyCheck {
+  id: string;
+  asking: boolean;
+  device: string | null;
+  user: string | null;
+  from: string;
+  commitment: string;
+  answer: string | null;
+  answered: boolean;
+  reveal: string | null;
+}
+
+export const openCheck = (target: { device: string } | { user: string }, commitment: string) =>
+  request<{ id: string }>('POST', '/api/keys/checks', { ...target, commitment });
+export const answerCheck = (id: string, nonce: string) => request<void>('PUT', `/api/keys/checks/${encodeURIComponent(id)}/answer`, { nonce });
+/** Reveals the nonce committed to, for the answer seen, which the code is made from. */
+export const revealCheck = (id: string, nonce: string, answer: string) =>
+  request<void>('PUT', `/api/keys/checks/${encodeURIComponent(id)}/reveal`, { nonce, answer });
+export const closeCheck = (id: string) => request<void>('DELETE', `/api/keys/checks/${encodeURIComponent(id)}`);
 
 export const getKeys = () => request<KeysAnswer>('GET', '/api/keys');
 export const putDeviceKey = (public_key: string) => request<void>('PUT', '/api/keys/device', { public_key });

@@ -1,11 +1,15 @@
 // This browser's keys for end-to-end encryption (docs/e2ee-plan.md). Its device key stays in
 // IndexedDB and is never exported. At every page load the person's key and the folder keys are
 // opened again from what the server keeps sealed for this browser, and the to-do list is worked
-// through with them: whoever is online with a key seals it for those who lack it.
+// through with them: whoever is online with a key seals it for those who lack it, after a check
+// whose code the person here compares, unless it is a person whose key was checked here before.
 import * as api from '../api';
 import { ApiError, type FileEnc, type KeysAnswer, type Me } from '../api';
-import { b64u, fromB64u, randomBytes, type Bytes } from './bytes';
+import { b64u, equalBytes, fromB64u, randomBytes, type Bytes } from './bytes';
 import {
+  checkCode,
+  checkNonceSize,
+  commitment,
   folderContext,
   generateKeyPair,
   keyPairOf,
@@ -24,7 +28,7 @@ import {
   unlock,
   type KeyPair,
 } from './formats';
-import { keepOnly, loadDeviceKey, saveDeviceKey, type DeviceKey } from './store';
+import { keepOnly, loadDeviceKey, saveDeviceKey, saveTrusted, type DeviceKey } from './store';
 
 /**
  * Where this browser stands: 'off' before it knows anyone; 'ready' with the person's key
@@ -42,6 +46,49 @@ export interface FolderPublicKey {
 }
 
 const slot = (folder: string, version: number) => `${folder}:${version}`;
+
+/**
+ * Someone this browser would pass keys on to once the person here allows it, after both screens
+ * showed the same code (docs/e2ee-plan.md): a device of the person that waits for their key, or
+ * another person who waits for folder keys and whose key wasn't checked here before. Only those
+ * seen lately, who can answer. The library lists them; Show opens one, which starts its check:
+ * code is null until the other side answered.
+ */
+export interface Ask {
+  kind: 'device' | 'person';
+  /** The device's id, or the person's. */
+  id: string;
+  name: string;
+  /** A device: a phone (app) or a browser (web), and when it signed in. */
+  client?: 'app' | 'web';
+  since?: string;
+  /** A person: the folders they wait for. */
+  folders?: string[];
+  code: string | null;
+}
+
+/** A code this browser shows for a check another device asks: who asks, and the code. */
+export interface ShownCode {
+  kind: 'device' | 'person';
+  from: string;
+  code: string;
+}
+
+/** A check this browser asks: its id, the nonce it reveals after the answer, the key it checks,
+ * and the answer it revealed the nonce for, which the code is made from; null before. */
+interface Asking {
+  check: string;
+  nonce: Bytes;
+  key: Bytes;
+  answer: Bytes | null;
+}
+
+/** A check this browser answers: its nonce, and the commitment it saw before answering, which
+ * the revealed nonce must match. */
+interface Answering {
+  nonce: Bytes;
+  commitment: Bytes;
+}
 
 /** The device key of this browser for a device id: from IndexedDB, or a new one. */
 export async function deviceKeyFor(deviceId: string): Promise<DeviceKey> {
@@ -81,6 +128,18 @@ export class Keyring {
   private syncing = 0;
   /** The person's key was just opened with the password, which so needs no new lock. */
   private openedWithPassword = false;
+  /** Who this browser would pass keys on to, after a check: listed, until the person here opens
+   * one with Show. */
+  asks: Ask[] = [];
+  /** The codes this browser shows for checks other devices ask. */
+  codes: ShownCode[] = [];
+  private asking = new Map<string, Asking>();
+  /** The checks this browser answers, by check id. */
+  private answering = new Map<string, Answering>();
+  /** The asks the person here opened with Show, kind:id: only those get a check. */
+  private shown = new Set<string>();
+  /** The people's keys checked here: user id to key. */
+  private trusted: Record<string, string> = {};
   /** A password typed on this page while the person's key wasn't open here: it locks the key once
    * the key opens (another device sealed it, or this one made a new one), so that the next device
    * opens it with the password. Only ever in memory. */
@@ -175,6 +234,7 @@ export class Keyring {
     if (!me) return;
     if (!quiet) this.changed('loading');
     this.device = await deviceKeyFor(me.device.id);
+    this.trusted = this.device.trusted ?? {};
     const device = this.device;
     // Keys of what this browser was before signing in again open nothing any more.
     void keepOnly(me.device.id).catch(() => {});
@@ -224,8 +284,12 @@ export class Keyring {
     }
     this.folders = opened;
     this.answer = a;
+    await this.answerChecks(a);
     this.changed(this.person ? 'ready' : 'waiting');
-    if (this.person && (await this.work(a))) {
+    if (!this.person) return;
+    const asked = JSON.stringify(this.asks);
+    const did = await this.work(a);
+    if (did) {
       // What was done may have brought new versions to open and seal for others.
       const again = await api.getKeys();
       this.answer = again;
@@ -239,8 +303,8 @@ export class Keyring {
         }
       }
       await this.work(again);
-      this.changed();
     }
+    if (did || JSON.stringify(this.asks) !== asked) this.changed();
   }
 
   /** The person's key: sealed for this device, or locked with the password just typed, which
@@ -253,7 +317,8 @@ export class Keyring {
     if (a.person.sealed) {
       try {
         const raw = await openKey(this.device!, purposes.person, personContext(me.user.id), fromB64u(a.person.sealed));
-        return await keyPairOf(raw, pub);
+        // Checks show codes made from this key, so the key the server names must be this one's.
+        if (await belongs(raw, pub)) return await keyPairOf(raw, pub);
       } catch {
         // sealed for a key this browser lost: wait, or use the password
       }
@@ -293,22 +358,36 @@ export class Keyring {
     return passwordLock(password, personContext(this.me!.user.id), this.person.raw);
   }
 
-  /** Seals and locks what the to-do list asks for; true if it did anything. */
+  /** Seals and locks what the to-do list asks for, and asks first where a check is due; true if
+   * it did anything. */
   private async work(a: KeysAnswer): Promise<boolean> {
-    const me = this.me!;
-    const person = this.person!;
     const g: api.Grants = { devices: [], people: [], recovery: [], pins: [] };
     const raw = (folder: string, version: number) => this.folders.get(slot(folder, version))?.raw;
-    for (const d of a.todo.devices) {
-      g.devices.push({ device: d.id, sealed: b64u(await sealKey(fromB64u(d.public_key), purposes.person, personContext(me.user.id), person.raw!)) });
-    }
-    // Each grant carries just its own fields: the server refuses any other (contract/api/keys_grants.json).
+    // The person's other devices get their key only after a check, once the person sees an
+    // encrypted folder: where none is, nobody is asked. So do people whose key wasn't checked
+    // here before. A check needs someone to answer it: only those seen lately are asked. This
+    // browser isn't, when it opened the key with the password after the list was made. Each
+    // grant carries just its own fields: the server refuses any other
+    // (contract/api/keys_grants.json).
+    const asks: Ask[] = a.todo.devices
+      .filter((d) => a.folders.length && d.active && d.id !== this.me!.device.id)
+      .map((d) => ({ kind: 'device', id: d.id, name: d.name, client: d.client, since: d.created_at, code: null }));
+    const people = new Map<string, Ask>();
     for (const n of a.todo.people) {
       const k = raw(n.folder, n.version);
       if (!k) continue;
-      const sealed = await sealKey(fromB64u(n.public_key), purposes.folder, folderContext(n.folder, n.version), k);
-      g.people.push({ folder: n.folder, version: n.version, user: n.user, sealed: b64u(sealed) });
+      if (this.trusted[n.user] === n.public_key) {
+        const sealed = await sealKey(fromB64u(n.public_key), purposes.folder, folderContext(n.folder, n.version), k);
+        g.people.push({ folder: n.folder, version: n.version, user: n.user, sealed: b64u(sealed) });
+        continue;
+      }
+      if (!n.active) continue;
+      const ask = people.get(n.user) ?? { kind: 'person', id: n.user, name: n.name, folders: [], code: null };
+      if (!ask.folders!.includes(n.folder)) ask.folders!.push(n.folder);
+      people.set(n.user, ask);
     }
+    asks.push(...people.values());
+    this.asks = await this.askChecks(a, asks);
     if (a.recovery_key) {
       const recovery = fromB64u(a.recovery_key);
       for (const v of a.todo.recovery) {
@@ -345,6 +424,179 @@ export class Keyring {
       }
     }
     return did;
+  }
+
+  /** The checks this browser asks: one is opened for every ask the person opened with Show, its
+   * nonce revealed once the other side answered, and the code made then, from that answer: one
+   * the server shows later can't change it. Checks of asks closed or gone are closed too. Returns
+   * the asks still due. */
+  private async askChecks(a: KeysAnswer, asks: Ask[]): Promise<Ask[]> {
+    const keyOf = (ask: Ask) =>
+      fromB64u(ask.kind === 'device' ? a.todo.devices.find((d) => d.id === ask.id)!.public_key : a.todo.people.find((n) => n.user === ask.id)!.public_key);
+    const due = new Set(asks.map((x) => `${x.kind}:${x.id}`));
+    for (const k of [...this.shown]) if (!due.has(k)) this.shown.delete(k);
+    for (const [k, c] of this.asking) {
+      if (this.shown.has(k)) continue;
+      this.asking.delete(k);
+      void api.closeCheck(c.check).catch(() => {});
+    }
+    const out: Ask[] = [];
+    for (const ask of asks) {
+      const k = `${ask.kind}:${ask.id}`;
+      if (!this.shown.has(k)) {
+        out.push(ask);
+        continue;
+      }
+      const key = keyOf(ask);
+      let c = this.asking.get(k);
+      const open = c && a.checks.find((x) => x.asking && x.id === c!.check);
+      if (c && (!open || !equalBytes(c.key, key))) {
+        // closed, out of time, or another key now: a new check
+        if (open) void api.closeCheck(c.check).catch(() => {});
+        this.asking.delete(k);
+        c = undefined;
+      }
+      try {
+        if (!c) {
+          const nonce = randomBytes(checkNonceSize);
+          const { id } = await api.openCheck(ask.kind === 'device' ? { device: ask.id } : { user: ask.id }, b64u(await commitment(nonce)));
+          this.asking.set(k, { check: id, nonce, key, answer: null });
+        } else if (!c.answer && open?.answer) {
+          await api.revealCheck(c.check, b64u(c.nonce), open.answer);
+          c.answer = fromB64u(open.answer);
+        }
+      } catch (e) {
+        if (!(e instanceof ApiError)) throw e;
+        if (!c && e.status === 404) {
+          this.shown.delete(k); // nobody waits there any more
+          continue;
+        }
+        if (e.status === 404) this.asking.delete(k); // the check is gone: a new one next time
+        else if (e.status !== 409) throw e; // 409: answered anew meanwhile; revealed for that next time
+      }
+      if (c?.answer) ask.code = await checkCode(c.nonce, c.answer, c.key);
+      out.push(ask);
+    }
+    return out;
+  }
+
+  /** The checks other devices ask of this one: answered with a nonce of its own, and the code
+   * shown once the asking device revealed the nonce it committed to before this answer. A device
+   * check is made from this browser's own key; a person's from the person's key, which must be
+   * open here. */
+  private async answerChecks(a: KeysAnswer): Promise<void> {
+    const codes: ShownCode[] = [];
+    const listed = new Set<string>();
+    for (const c of a.checks) {
+      if (c.asking) continue;
+      const kind = c.device ? 'device' : 'person';
+      const key = kind === 'device' ? this.device?.publicKey : this.person?.publicKey;
+      if (!key) continue;
+      listed.add(c.id);
+      const mine = this.answering.get(c.id);
+      if (!mine || !c.answered) {
+        try {
+          if (c.reveal) {
+            // revealed for a nonce this page no longer has: closed, so that a new check starts
+            await api.closeCheck(c.id);
+          } else {
+            const nonce = randomBytes(checkNonceSize);
+            await api.answerCheck(c.id, b64u(nonce));
+            this.answering.set(c.id, { nonce, commitment: fromB64u(c.commitment) });
+          }
+        } catch (e) {
+          if (!(e instanceof ApiError && e.status === 404)) throw e; // closed, or another device of the person answered
+        }
+        continue;
+      }
+      if (!c.reveal) continue;
+      const revealed = fromB64u(c.reveal);
+      if (!equalBytes(await commitment(revealed), mine.commitment)) continue; // not the nonce committed to
+      codes.push({ kind, from: c.from, code: await checkCode(revealed, mine.nonce, key) });
+    }
+    for (const id of [...this.answering.keys()]) if (!listed.has(id)) this.answering.delete(id);
+    this.codes = codes;
+  }
+
+  /** Allows an ask after the person here compared the code: the person's key sealed for the
+   * device, or the folder keys for the person, whose key counts as checked here from now on. */
+  async allow(ask: Ask): Promise<void> {
+    const me = this.me!;
+    const c = this.asking.get(`${ask.kind}:${ask.id}`);
+    if (!c?.answer || !this.person?.raw || !this.answer) throw new SealError('no code to compare yet');
+    const g: api.Grants = { devices: [], people: [], recovery: [], pins: [] };
+    if (ask.kind === 'device') {
+      g.devices.push({ device: ask.id, sealed: b64u(await sealKey(c.key, purposes.person, personContext(me.user.id), this.person.raw)) });
+    } else {
+      for (const n of this.answer.todo.people) {
+        const k = this.folders.get(slot(n.folder, n.version))?.raw;
+        if (n.user !== ask.id || !k || !equalBytes(fromB64u(n.public_key), c.key)) continue;
+        const sealed = await sealKey(c.key, purposes.folder, folderContext(n.folder, n.version), k);
+        g.people.push({ folder: n.folder, version: n.version, user: n.user, sealed: b64u(sealed) });
+      }
+      this.trusted = { ...this.trusted, [ask.id]: b64u(c.key) };
+      await saveTrusted(me.device.id, this.trusted);
+    }
+    await api.postGrants(g);
+    this.shown.delete(`${ask.kind}:${ask.id}`);
+    this.asking.delete(`${ask.kind}:${ask.id}`);
+    await api.closeCheck(c.check).catch(() => {});
+    this.asks = this.asks.filter((x) => !(x.kind === ask.kind && x.id === ask.id));
+    this.changed();
+    await this.checkIn();
+  }
+
+  /** Opens an ask (Show): its check starts with the check-in this returns, and its code comes
+   * once the other side answered. */
+  show(ask: Ask): Promise<void> {
+    this.shown.add(`${ask.kind}:${ask.id}`);
+    this.changed();
+    return this.checkIn();
+  }
+
+  /** The ask whose dialog is open: the one the person opened with Show, while it is due. */
+  get opened(): Ask | null {
+    return this.asks.find((x) => this.shown.has(`${x.kind}:${x.id}`)) ?? null;
+  }
+
+  /** Closes an ask's dialog ("Not now"): its check ends, and the ask stays listed. */
+  async hide(ask: Ask): Promise<void> {
+    const k = `${ask.kind}:${ask.id}`;
+    const c = this.asking.get(k);
+    this.shown.delete(k);
+    this.asking.delete(k);
+    this.asks = this.asks.map((x) => (`${x.kind}:${x.id}` === k ? { ...x, code: null } : x));
+    this.changed();
+    if (c) await api.closeCheck(c.check).catch(() => {});
+  }
+
+  /** Not me: a phone or browser that asked for the person's key, and isn't theirs, is signed out. */
+  async deny(ask: Ask): Promise<void> {
+    await api.signOutDevice(ask.id);
+    await this.hide(ask);
+    this.asks = this.asks.filter((x) => !(x.kind === ask.kind && x.id === ask.id));
+    this.changed();
+  }
+
+  /** Whether an ask is for someone whose key was checked here before, and changed since: a person
+   * whose key was lost. */
+  keyChanged(ask: Ask): boolean {
+    return ask.kind === 'person' && ask.id in this.trusted;
+  }
+
+  /** Whether the person here waits for folder keys: a version of an encrypted folder they see
+   * isn't sealed for them yet, so someone who has it seals it after a check. */
+  get waitsForFolders(): boolean {
+    return this.status === 'ready' && (this.answer?.folders ?? []).some((f) => !f.sealed);
+  }
+
+  /** How long until the next check-in: soon while a check runs, opened here with Show or
+   * answered here, as the code and then the keys come right after the other side's turn; a little
+   * later while this browser waits for keys; otherwise half a minute. */
+  pace(): number {
+    if (this.shown.size || this.answering.size) return 2_000;
+    if (this.status === 'waiting' || this.waitsForFolders) return 5_000;
+    return 30_000;
   }
 
   private encryptForIn(a: KeysAnswer, folder: string): FolderPublicKey | null {

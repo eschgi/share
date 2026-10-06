@@ -112,25 +112,40 @@ class _ShareAppState extends State<ShareApp> {
   StreamSubscription<String>? _links;
   StreamSubscription<SharedFiles>? _shared;
 
-  /// The keys may have news: someone to seal for, a key sealed for this phone, a new version. So
-  /// the app checks in when it comes back, and every half minute while it is in front, which
-  /// lets a phone or browser that waits for the person's key get it within a minute.
-  late final _lifecycle = AppLifecycleListener(onResume: _checkInKeys);
-  late final _keysTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-    if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) _checkInKeys();
-  });
+  /// The keys may have news: someone to seal for or to ask about, a key sealed for this phone, a
+  /// check to answer, a new version. So the app checks in when it comes back, and while it is in
+  /// front: every half minute, and every few seconds while a check runs or this phone waits for
+  /// keys (KeysState.pace).
+  late final _lifecycle = AppLifecycleListener(onResume: () => unawaited(_checkInKeys()));
+  Timer? _keysTimer;
+  Duration _keysWait = Duration.zero;
 
-  void _checkInKeys() {
+  void _scheduleKeys() {
+    _keysTimer?.cancel();
+    _keysWait = widget.services.keys.state.pace;
+    _keysTimer = Timer(_keysWait, () async {
+      if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) await _checkInKeys();
+      if (mounted) _scheduleKeys();
+    });
+  }
+
+  /// Sooner when the keys say so, e.g. once this phone turns out to wait for them.
+  void _keysChanged() {
+    if (widget.services.keys.state.pace < _keysWait) _scheduleKeys();
+  }
+
+  Future<void> _checkInKeys() async {
     final s = widget.services;
-    if (s.session.current is SignedInState) unawaited(s.keys.checkIn());
+    if (s.session.current is SignedInState) await s.keys.checkIn();
   }
 
   @override
   void initState() {
     super.initState();
     _lifecycle;
-    _keysTimer;
     final s = widget.services;
+    _scheduleKeys();
+    s.keys.addListener(_keysChanged);
     unawaited(s.start());
     _links = s.platform.links.listen(_open);
     _shared = s.platform.sharedChanges.listen(_sharedChanged);
@@ -142,7 +157,8 @@ class _ShareAppState extends State<ShareApp> {
     _links?.cancel();
     _shared?.cancel();
     _lifecycle.dispose();
-    _keysTimer.cancel();
+    _keysTimer?.cancel();
+    widget.services.keys.removeListener(_keysChanged);
     super.dispose();
   }
 

@@ -23,6 +23,17 @@ class E2eeTest {
     private val fileKey = content.bytes("file_key")
     private val header = content.bytes("header")
 
+    // Checks (check.json).
+
+    @Test
+    fun checksCommitAndMakeCodesAsTheVectorsDo() {
+        for (c in contract("crypto/check.json").cases("cases")) {
+            val name = c.getString("name")
+            assertEquals(name, c.getString("commitment"), E2ee.b64u(E2ee.commitment(c.bytes("asker_nonce"))))
+            assertEquals(name, c.getString("code"), E2ee.checkCode(c.bytes("asker_nonce"), c.bytes("answer_nonce"), c.bytes("public_key")))
+        }
+    }
+
     // Sealed keys (seal.json).
 
     @Test

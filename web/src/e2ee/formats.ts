@@ -14,6 +14,8 @@ export const purposes = {
   invite: 'share-e2ee-v1/invite',
   pin: 'share-e2ee-v1/pin',
   recovery: 'share-e2ee-v1/recovery',
+  check: 'share-e2ee-v1/check',
+  code: 'share-e2ee-v1/code',
 } as const;
 
 /** What a folder key, and a file key sealed for it, are bound to. */
@@ -173,4 +175,21 @@ export function parseRecoveryCode(code: string): Bytes | null {
 export function newRecoveryCode(): { secret: Bytes; code: string } {
   const secret = randomBytes(20);
   return { secret, code: formatRecoveryCode(secret) };
+}
+
+// A check before keys are passed on (contract/crypto/check.json): the asking device commits to
+// a nonce, the waiting side answers with its own, then the nonce is revealed, and both screens
+// show the code.
+
+export const checkNonceSize = 32;
+
+/** What the asking device sends before its nonce. */
+export async function commitment(nonce: Bytes): Promise<Bytes> {
+  return new Uint8Array(await crypto.subtle.digest('SHA-256', concat(utf8(purposes.check), nonce)));
+}
+
+/** The 6 digits both screens show, from both nonces and the public key that gets the keys. */
+export async function checkCode(askerNonce: Bytes, answerNonce: Bytes, publicKey: Bytes): Promise<string> {
+  const h = new Uint8Array(await crypto.subtle.digest('SHA-256', concat(utf8(purposes.code), askerNonce, answerNonce, publicKey)));
+  return String(new DataView(h.buffer).getUint32(0) % 1_000_000).padStart(6, '0');
 }

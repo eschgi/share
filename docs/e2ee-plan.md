@@ -34,12 +34,19 @@ code (`server/internal/e2ee`), the website and the app are tested against.
 
 It protects the contents and thumbnails of encrypted folders from the bucket's provider, the
 database's host, leaked bucket keys or links, and anyone who copies the server's disk or database.
+Keys go to a new phone, browser or person only after a check whose code the person compares on
+both screens (below), so someone who can change the database can't slip in a device or a person of
+their own either.
 
 It doesn't protect:
 - names and the other readable data above;
 - against a server that has been taken over and sends the browsers changed website code, since the
   website comes from the server (the Android app's code doesn't);
 - a PIN link that shows its folder: whoever has the link can read the folder, by design;
+- two things that still get folder keys without a check, decided to come later: the recovery key
+  (a database changed to name another recovery key gets every folder key sealed for it) and PIN
+  links that show a folder (a secret sealed for the folder key by someone else gets each new
+  version locked for it);
 - files a removed person already downloaded;
 - a password backup better than the password: the server sees passwords at sign-in.
 
@@ -94,6 +101,10 @@ scalar, everything binary in JSON as base64url without padding.
   around it.
 - **Thumbnails:** the JPEG locked with a key from the file key (HKDF, `share-e2ee-v1/thumb`).
 - **Recovery code:** 20 random bytes as 32 characters of Crockford's base32, in groups of four.
+- **Checks** (check.json): the commitment is SHA-256 of `share-e2ee-v1/check` and the asking
+  device's 32-byte nonce; the code is the first 4 bytes of SHA-256 of `share-e2ee-v1/code`, both
+  nonces and the public key that gets the keys, as a big-endian number modulo a million, in 6
+  digits.
 
 ## How it works
 
@@ -105,19 +116,50 @@ the status doesn't pass through loading, and stays as it is without an answer):
   storage was cleared);
 - makes the person key if the person has none yet, sealed for this device;
 - opens the person key sealed for this device, then the folder keys sealed for the person;
-- then works through the server's to-do list, with the keys it holds: seals the person key for the
-  person's other devices that lack it, seals folder keys for people who see the folder and lack
-  them, seals folder keys for the recovery key, makes a folder's next key version when one is due,
-  and locks new versions for PIN links that show the folder.
+- answers the checks other devices ask of it (below);
+- then works through the server's to-do list, with the keys it holds: asks before passing the
+  person key on to the person's other devices that lack it, and folder keys to people who see the
+  folder and lack them, unless their key was checked on this device before; seals folder keys for
+  the recovery key, makes a folder's next key version when one is due, and locks new versions for
+  PIN links that show the folder.
 
-So sealing for others always happens the same way: whoever has Share open with the key does it,
-within half a minute, and the device that waits opens it at its own next check-in. Turning
-on encryption only seals the new folder key for the admin who does it and for the recovery key; the
-admin's device then finds everyone else on its to-do list at once.
+So passing keys on always happens the same way: whoever has Share open with the key lists who
+waits, the person opens one with Show, compares the code and allows it, and the device that waits
+opens the key at its own next check-in. Turning on encryption only seals the new folder key for the admin who does it and for the
+recovery key; the admin's device then finds everyone else on its to-do list at once.
+
+**Checks** (decided on 2026-10-06, screens 50 to 55 of the mockup): before a device passes keys on,
+both screens show the same code of 6 digits, made from the key that would get them. The server only
+relays it, and can't show the code of a key of its own:
+- the asking device opens a check with a commitment to a random nonce (`POST /api/keys/checks`);
+- the device it is for, or a device of the person it is for that holds their key, answers with a
+  nonce of its own, and keeps the commitment it saw;
+- the asking device reveals its nonce for the answer it saw, which the server takes only while it
+  is still the answer; from then on the answer can't change;
+- both make the code from both nonces and the key: the waiting device from its own key, or its
+  person's, after checking the nonce against the commitment it kept; the asking device from the
+  key on its to-do list and the answer it revealed for. Neither nonce can be chosen after seeing the
+  other, so whoever relays them has one chance in a million to make two keys show the same code.
+
+Nothing opens by itself (the user's choice): the asking device lists who waits over the library,
+under "Waiting for your OK": a new phone or browser of the person, with its name, or a person whose
+folders wait. Show opens a dialog (a sheet in the app) with when the phone or browser signed in, or
+the person's folders, and only then starts the check, so the code comes on both screens a few
+seconds later. Allow seals the keys for the key that was checked; Not me signs that phone or browser
+out; Not now, or closing the dialog, ends the check, and the ask stays listed. Several are listed
+together, each opened on its own, with its own check and code. A person's key, once allowed, is
+remembered on that device (in the device's IndexedDB record, or the app's `SecretStore`), so new
+versions and new folders reach them at once, until their key changes. Only those seen in the last
+15 minutes are listed (`active`), as a check needs someone to answer it, and nobody is listed while
+the person sees no encrypted folder. While a check runs, opened with Show or answered, devices
+check in every 2 seconds; a device that waits for keys every 5 seconds; otherwise every half
+minute. Signing in with the password and joining with an invite link ask nothing: they bring their
+keys with them.
 
 **A device that has no person key yet** (a new browser after a sign-in, a phone whose key was lost)
-shows encrypted files as locked and says it waits for another phone or browser of the person. A
-password sign-in opens the person key from its password lock at once. Without a lock (the person
+shows encrypted files as locked and says it waits for approval on another phone or browser of the
+person, where Share lists it under Show, with the code that one shows too once it is opened. A person whose folder keys wait for an admin sees the code
+to tell them. A password sign-in opens the person key from its password lock at once. Without a lock (the person
 joined with an invite, or an admin gave them a new password), the password typed stays in the
 device's memory until the key comes, and then locks it, so the next device opens it at once.
 Admins can also use the recovery code. If no other device will come, "start over" makes a new person
@@ -188,6 +230,11 @@ New:
   sealed for it.
 - `GET` and `PUT /api/admin/settings` `{new_folders_encrypted}`.
 - `GET /api/pin/keys`: for a PIN session that shows its folder, the folder keys locked for its link.
+- Checks: `POST /api/keys/checks` `{device | user, commitment}`, `PUT /api/keys/checks/{id}/answer`
+  `{nonce}`, `PUT /api/keys/checks/{id}/reveal` `{nonce, answer}`, `DELETE /api/keys/checks/{id}`;
+  `GET /api/keys` lists the open checks a device takes part in, and its to-do list names the
+  devices and people that wait, and whether they were seen lately (`active`). A check lives 15
+  minutes.
 
 Changed:
 - `FileInfo` gets `enc` (`{version, key, header, plain_size}` or null); `size` is the plain size.
@@ -207,7 +254,8 @@ Changed:
 - New error codes: `encryption_required` (409, an upload into an encrypted folder came plain),
   `key_outdated` (409, sealed for a key version that isn't the newest), `not_encrypted` (409, moving
   encrypted files into a folder without keys, or an encrypted upload into one), `key_exists` (409,
-  a person key that is there already), `no_key` (409, what needs a key that isn't there yet). The
+  a person key that is there already), `no_key` (409, what needs a key that isn't there yet),
+  `not_answered` (409, a check revealed before its answer, for an answer that changed, or twice). The
   command line refuses what would give access to an encrypted folder by itself.
 
 ## Server (`server/`)
@@ -232,6 +280,10 @@ Changed:
 - Who loses a folder, from `SetFolderPerson`, `DeleteUser` and folder deletion, drops their grants
   and marks the folder for a new version.
 - An admin's password reset drops the person's password lock.
+- Migration 0002, `key_checks`: the asking device, the device or person it is for, the commitment,
+  the answer with the device that gave it, and the reveal. The server checks who may ask whom, that
+  the reveal matches the commitment and comes for the answer that is there, and forgets checks after
+  15 minutes.
 
 ## Website (`web/`, no new packages, hand-formatted)
 
@@ -288,6 +340,13 @@ Changed:
   seeking video show them; a download and "save into a folder" give the original bytes; a second
   browser waits until the first grants it, or opens with the password; the recovery code restores an
   admin; a PIN guest sends but can't read back; turning encryption off makes new files plain.
+- Checks in the browser (`approve.mjs` next to `e2e.mjs`): nothing opens by itself; after Show, a
+  browser that lost its keys and the one that asks show the same code, and Allow opens its folder
+  within seconds; Not now ends the check and keeps the ask listed; Not me signs a browser
+  out; a member who joined without the link's secret waits for an admin with the code, and once
+  allowed, a later folder reaches them without asking. The keyring tests on both sides fake a server
+  that swaps a key, and one that changes what it relayed after the fact: the codes differ, or stay
+  as they were.
 - Kotlin tests: the keyring's flows against a fake keys API, as the website's test; downloads that
   decrypt, resume at a chunk and refuse a changed chunk; the local stream's ranges; a tus upload of
   the encrypted stream with its `enc`. Dart tests: links with secrets, the screens and what they

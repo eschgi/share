@@ -1,0 +1,29 @@
+{
+  "description": "A check, before a device passes keys on (docs/e2ee-plan.md): the asking device sends commitment = SHA-256(\"share-e2ee-v1/check\" || asker_nonce); the other side answers with answer_nonce; then the asking device reveals asker_nonce, for the answer it saw, which the other side checks against the commitment it saw before answering. Each side keeps what it saw then: the asking device makes its code from the answer it revealed for, so values relayed later change neither code. Both show code: the first 4 bytes of SHA-256(\"share-e2ee-v1/code\" || asker_nonce || answer_nonce || public_key), read as a big-endian number, modulo 1000000, in 6 digits with leading zeros. public_key is the key that gets the keys: the waiting device's key, or the waiting person's key (65 bytes, uncompressed). Nonces are 32 random bytes. Binary values are base64url without padding.",
+  "cases": [
+    {
+      "name": "a new device's key",
+      "asker_nonce": "eA5oflDFsncsxgttx2rCwfy556X8TllKF4BByvcp0S0",
+      "answer_nonce": "fKuQ6SQrmvowkR4hYNV1-HHNVugpf4r-lywDUv1RZZI",
+      "public_key": "BNrT9mbGLhraoEPPN-dx--Y0FBklr9jIyboftCKjiB_IUUy6KChnIRcQ-d29Pf-1lqntJzqdeVM2FSKZHI0DE3c",
+      "commitment": "pHDuVhsSybVXXH6FX5t0wMMwmMp8NbVjwIXNf47SEDI",
+      "code": "095668"
+    },
+    {
+      "name": "another key, same nonces",
+      "asker_nonce": "eA5oflDFsncsxgttx2rCwfy556X8TllKF4BByvcp0S0",
+      "answer_nonce": "fKuQ6SQrmvowkR4hYNV1-HHNVugpf4r-lywDUv1RZZI",
+      "public_key": "BBsur1lQkLWmRYn2s8ifgGXNwtnXlGoqSNFKYm7bPQ4huSZpvHWbJ7BXfDws0UkX9Vm1tvEkN29hmwmcQtik8aU",
+      "commitment": "pHDuVhsSybVXXH6FX5t0wMMwmMp8NbVjwIXNf47SEDI",
+      "code": "527816"
+    },
+    {
+      "name": "another answer",
+      "asker_nonce": "eA5oflDFsncsxgttx2rCwfy556X8TllKF4BByvcp0S0",
+      "answer_nonce": "I_renlADhN1vEGL1y5zRsv6xGT11CR71H1_Ab9xaZyw",
+      "public_key": "BNrT9mbGLhraoEPPN-dx--Y0FBklr9jIyboftCKjiB_IUUy6KChnIRcQ-d29Pf-1lqntJzqdeVM2FSKZHI0DE3c",
+      "commitment": "pHDuVhsSybVXXH6FX5t0wMMwmMp8NbVjwIXNf47SEDI",
+      "code": "067050"
+    }
+  ]
+}

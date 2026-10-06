@@ -302,6 +302,39 @@ type recoveryVectors struct {
 	Lock        map[string]string `json:"lock"`
 }
 
+// checkVectors are contract/crypto/check.json: a check's commitment and code.
+type checkVectors struct {
+	Description string `json:"description"`
+	Cases       []struct {
+		Name        string `json:"name"`
+		AskerNonce  string `json:"asker_nonce"`
+		AnswerNonce string `json:"answer_nonce"`
+		PublicKey   string `json:"public_key"`
+		Commitment  string `json:"commitment"`
+		Code        string `json:"code"`
+	} `json:"cases"`
+}
+
+func TestCheckVectors(t *testing.T) {
+	var cv checkVectors
+	readVectors(t, "check.json", &cv)
+	if len(cv.Cases) == 0 {
+		t.Fatal("no cases")
+	}
+	for _, c := range cv.Cases {
+		na, nw, pub := unb64(t, c.AskerNonce), unb64(t, c.AnswerNonce), unb64(t, c.PublicKey)
+		if len(na) != NonceSize || len(nw) != NonceSize || CheckPublicKey(pub) != nil {
+			t.Errorf("%s: not a nonce or a key", c.Name)
+		}
+		if b64.EncodeToString(Commitment(na)) != c.Commitment {
+			t.Errorf("%s: commitment", c.Name)
+		}
+		if got := CheckCode(na, nw, pub); got != c.Code {
+			t.Errorf("%s: code %s, not %s", c.Name, got, c.Code)
+		}
+	}
+}
+
 func TestVectors(t *testing.T) {
 	if *update {
 		writeNewVectors(t)

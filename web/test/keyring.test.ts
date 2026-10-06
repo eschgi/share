@@ -30,6 +30,13 @@ const fake = vi.hoisted(() => ({
   rekey: new Set<string>(),
   /** No answer at all. */
   offline: false,
+  /** The open checks, by id. */
+  checks: new Map<string, { asker: string; device: string | null; user: string | null; commitment: string; answer: string | null; answeredBy: string | null; reveal: string | null }>(),
+  nextCheck: 0,
+  /** A server that names another key for a device that waits, as the asking browser sees it. */
+  swapped: new Map<string, string>(),
+  /** Devices not seen lately, which can't answer a check. */
+  away: new Set<string>(),
 }));
 
 vi.mock('../src/e2ee/store', () => {
@@ -38,6 +45,10 @@ vi.mock('../src/e2ee/store', () => {
     loadDeviceKey: async (id: string) => kept.get(id) ?? null,
     saveDeviceKey: async (k: { deviceId: string }) => void kept.set(k.deviceId, k),
     keepOnly: async () => {},
+    saveTrusted: async (id: string, trusted: Record<string, string>) => {
+      const k = kept.get(id) as object | undefined;
+      if (k) kept.set(id, { ...k, trusted });
+    },
   };
 });
 
@@ -73,14 +84,23 @@ vi.mock('../src/api', async (importOriginal) => {
         recovery_key: p.admin ? (fake.recovery?.public_key ?? null) : null,
         todo: {
           devices: p.publicKey
-            ? [...fake.devices].filter(([id, d]) => d.user === c.user && d.publicKey && !p.sealed.has(id)).map(([id, d]) => ({ id, public_key: d.publicKey! }))
+            ? [...fake.devices]
+                .filter(([id, d]) => d.user === c.user && d.publicKey && !p.sealed.has(id))
+                .map(([id, d]) => ({ id, public_key: fake.swapped.get(id) ?? d.publicKey!, name: id, client: 'web' as const, created_at: '2026-10-06T10:00:00Z', active: !fake.away.has(id) }))
             : [],
           people: mine
             .filter((v) => held(v.folder, v.version))
             .flatMap((v) =>
               [...fake.people]
                 .filter(([u, q]) => u !== c.user && q.publicKey && sees(q, v.folder) && !held(v.folder, v.version, u))
-                .map(([u, q]) => ({ folder: v.folder, version: v.version, user: u, public_key: q.publicKey! })),
+                .map(([u, q]) => ({
+                  folder: v.folder,
+                  version: v.version,
+                  user: u,
+                  name: u,
+                  public_key: q.publicKey!,
+                  active: [...q.sealed.keys()].some((d) => fake.devices.has(d) && !fake.away.has(d)),
+                })),
             ),
           recovery:
             p.admin && fake.recovery
@@ -95,7 +115,62 @@ vi.mock('../src/api', async (importOriginal) => {
               .map((version) => ({ pin, folder: x.folder, version, secret_version: x.secret_version, secret_sealed: x.secret_sealed })),
           ),
         },
+        checks: [...fake.checks]
+          .filter(([, x]) => x.asker === c.device || x.device === c.device || (x.user === c.user && (!x.answeredBy || x.answeredBy === c.device) && p.sealed.has(c.device)))
+          .map(([id, x]) => ({
+            id,
+            asking: x.asker === c.device,
+            device: x.device,
+            user: x.user,
+            from: x.asker,
+            commitment: x.commitment,
+            answer: x.answer,
+            answered: x.answeredBy === c.device,
+            reveal: x.reveal,
+          })),
       };
+    },
+    openCheck: async (target: { device: string } | { user: string }, commitment: string) => {
+      const { c, p } = member();
+      const device = 'device' in target ? target.device : null;
+      const user = 'user' in target ? target.user : null;
+      const d = device ? fake.devices.get(device) : null;
+      const ok = p.sealed.has(c.device) && (device ? !!d && d.user === c.user && !!d.publicKey && !p.sealed.has(device) : user !== c.user && !!fake.people.get(user!)?.publicKey);
+      if (!ok) throw new real.ApiError(404, 'not_found', 'nobody waits there');
+      for (const [id, x] of fake.checks) if (x.asker === c.device && x.device === device && x.user === user) fake.checks.delete(id);
+      const id = `check${++fake.nextCheck}`;
+      fake.checks.set(id, { asker: c.device, device, user, commitment, answer: null, answeredBy: null, reveal: null });
+      return { id };
+    },
+    answerCheck: async (id: string, nonce: string) => {
+      const { c, p } = member();
+      const x = fake.checks.get(id);
+      if (!x || x.reveal || !(x.device === c.device || (x.user === c.user && (!x.answeredBy || x.answeredBy === c.device) && p.sealed.has(c.device)))) {
+        throw new real.ApiError(404, 'not_found', 'no such check');
+      }
+      x.answer = nonce;
+      x.answeredBy = c.device;
+    },
+    revealCheck: async (id: string, nonce: string, answer: string) => {
+      const { c } = member();
+      const x = fake.checks.get(id);
+      if (!x || x.asker !== c.device) throw new real.ApiError(404, 'not_found', 'no such check');
+      if (x.answer !== answer || x.reveal) throw new real.ApiError(409, 'not_answered', 'nothing to reveal for');
+      const { b64u, concat, fromB64u, utf8 } = await import('../src/e2ee/bytes');
+      const sum = new Uint8Array(await crypto.subtle.digest('SHA-256', concat(utf8('share-e2ee-v1/check'), fromB64u(nonce))));
+      if (b64u(sum) !== x.commitment) throw new real.ApiError(400, 'bad_request', 'not the nonce committed to');
+      x.reveal = nonce;
+    },
+    closeCheck: async (id: string) => {
+      member();
+      fake.checks.delete(id);
+    },
+    signOutDevice: async (id: string) => {
+      const { c, p } = member();
+      if (fake.devices.get(id)?.user !== c.user) throw new real.ApiError(404, 'not_found', 'not theirs');
+      fake.devices.delete(id);
+      p.sealed.delete(id);
+      for (const [cid, x] of fake.checks) if (x.device === id || x.asker === id) fake.checks.delete(cid);
     },
     putDeviceKey: async (publicKey: string) => {
       const { c, p } = member();
@@ -191,6 +266,29 @@ function as(b: { me: Api.Me }) {
   fake.caller = { user: b.me.user.id, device: b.me.device.id };
 }
 
+type Browser = { ring: Keyring; me: Api.Me };
+
+/** A check to its end: the asking browser lists the ask, the person opens it with Show, which
+ * opens the check, the other side answers, the asking browser reveals its nonce, both show the
+ * same code, and the person at the asking browser allows it. */
+async function approve(asker: Browser, other: Browser, kind: 'device' | 'person', id: string) {
+  as(asker);
+  await asker.ring.checkIn();
+  await asker.ring.show(asker.ring.asks.find((x) => x.kind === kind && x.id === id)!);
+  expect(asker.ring.opened).toEqual(expect.objectContaining({ kind, id }));
+  for (const b of [other, asker, other]) {
+    as(b);
+    await b.ring.checkIn();
+  }
+  const ask = asker.ring.asks.find((x) => x.kind === kind && x.id === id)!;
+  expect(ask.code).toMatch(/^\d{6}$/);
+  expect(other.ring.codes.map((c) => c.code)).toContain(ask.code);
+  as(asker);
+  await asker.ring.allow(ask);
+  as(other);
+  await other.ring.checkIn();
+}
+
 const folderInfo = (id: string) => ({ id, encrypted: false, key_version: fake.folders.get(id)!.versions.length || null }) as unknown as Api.FolderInfo;
 
 describe('keyring', { timeout: 60_000 }, () => {
@@ -214,6 +312,15 @@ describe('keyring', { timeout: 60_000 }, () => {
     expect(fake.people.get('ada')!.publicKey).not.toBeNull();
     expect(fake.people.get('ada')!.sealed.has('a1')).toBe(true);
     expect(a1.ring.hasRecovery()).toBe(false);
+
+    // Nobody is asked about while no folder is encrypted.
+    const a0 = browser('ada', 'a0');
+    as(a0);
+    await a0.ring.start(a0.me);
+    as(a1);
+    await a1.ring.checkIn();
+    expect(a1.ring.asks).toEqual([]);
+    fake.devices.delete('a0');
   });
 
   it('makes the recovery key, then the first folder key, which seals files', async () => {
@@ -236,19 +343,63 @@ describe('keyring', { timeout: 60_000 }, () => {
     expect(await a1.ring.fileKey({ id: file.id, folder: 'f1', enc: file.enc })).toEqual(fileKey);
   });
 
-  it("lets another browser wait until one with the key seals it the person's key", async () => {
+  it("lets another browser wait until one with the key passes it on, after a check", async () => {
     as(a2);
     await a2.ring.start(a2.me);
     expect(a2.ring.status).toBe('waiting');
     expect(a2.ring.hasFolderKey('f1', 1)).toBe(false);
     await expect(a2.ring.fileKey({ id: file.id, folder: 'f1', enc: file.enc! })).rejects.toBeInstanceOf(SealError);
 
+    // The browser with the key lists it, and opens nothing by itself: no check before Show, and
+    // nothing sealed until the person compared the codes.
     as(a1);
-    await a1.ring.refresh();
+    await a1.ring.checkIn();
+    expect(a1.ring.asks).toEqual([expect.objectContaining({ kind: 'device', id: 'a2', name: 'a2', client: 'web', code: null })]);
+    expect(a1.ring.opened).toBeNull();
+    expect(fake.checks.size).toBe(0);
+    expect(a1.ring.pace()).toBe(30_000);
+    await expect(a1.ring.allow(a1.ring.asks[0])).rejects.toBeInstanceOf(SealError);
     as(a2);
-    await a2.ring.refresh();
+    await a2.ring.checkIn();
+    expect(a2.ring.codes).toEqual([]);
+    expect(fake.people.get('ada')!.sealed.has('a2')).toBe(false);
+
+    await approve(a1, a2, 'device', 'a2');
     expect(a2.ring.status).toBe('ready');
     expect(await a2.ring.fileKey({ id: file.id, folder: 'f1', enc: file.enc! })).toEqual(fileKey);
+    expect(a1.ring.asks).toEqual([]);
+  });
+
+  it("signs out a device the person here doesn't know, and shows two codes when the server swaps a key", async () => {
+    const x1 = browser('ada', 'x1');
+    as(x1);
+    await x1.ring.start(x1.me);
+    as(a1);
+    await a1.ring.checkIn();
+    await a1.ring.deny(a1.ring.asks.find((k) => k.id === 'x1')!);
+    expect(fake.devices.has('x1')).toBe(false);
+    await a1.ring.checkIn();
+    expect(a1.ring.asks.some((k) => k.id === 'x1')).toBe(false);
+
+    // A server that names its own key for a device that waits can't make the codes match.
+    const y1 = browser('ada', 'y1');
+    as(y1);
+    await y1.ring.start(y1.me);
+    fake.swapped.set('y1', fake.people.get('max')!.publicKey ?? fake.people.get('ada')!.publicKey!);
+    as(a1);
+    await a1.ring.checkIn();
+    await a1.ring.show(a1.ring.asks.find((k) => k.id === 'y1')!);
+    for (const b of [y1, a1, y1]) {
+      as(b);
+      await b.ring.checkIn();
+    }
+    const ask = a1.ring.asks.find((k) => k.id === 'y1')!;
+    expect(ask.code).toMatch(/^\d{6}$/);
+    expect(y1.ring.codes).toHaveLength(1);
+    expect(y1.ring.codes[0].code).not.toBe(ask.code);
+    fake.swapped.delete('y1');
+    as(a1);
+    await a1.ring.deny(ask);
   });
 
   it('checks in quietly: seals for a browser that waits, which then opens it, never showing loading', async () => {
@@ -258,10 +409,7 @@ describe('keyring', { timeout: 60_000 }, () => {
     expect(aw.ring.status).toBe('waiting');
     const seen: string[] = [];
     aw.ring.watch(() => seen.push(aw.ring.status));
-    as(a1);
-    await a1.ring.checkIn();
-    as(aw);
-    await aw.ring.checkIn();
+    await approve(a1, aw, 'device', 'aw');
     expect(aw.ring.status).toBe('ready');
     expect(seen).not.toContain('loading');
     expect(await aw.ring.fileKey({ id: file.id, folder: 'f1', enc: file.enc! })).toEqual(fileKey);
@@ -276,6 +424,83 @@ describe('keyring', { timeout: 60_000 }, () => {
     expect(aw.ring.status).toBe('ready');
     expect(seen).not.toContain('failed');
     expect(await aw.ring.fileKey({ id: file.id, folder: 'f1', enc: file.enc! })).toEqual(fileKey);
+  });
+
+  it('lists only phones and browsers seen lately, and checks in sooner while a check runs', async () => {
+    const az = browser('ada', 'az');
+    as(az);
+    await az.ring.start(az.me);
+    expect(az.ring.pace()).toBe(5_000);
+    fake.away.add('az');
+    as(a1);
+    await a1.ring.checkIn();
+    expect(a1.ring.asks).toEqual([]);
+    expect(a1.ring.pace()).toBe(30_000);
+
+    fake.away.delete('az');
+    await a1.ring.checkIn();
+    expect(a1.ring.asks.map((k) => k.id)).toEqual(['az']);
+    expect(a1.ring.pace()).toBe(30_000);
+    await a1.ring.show(a1.ring.asks[0]);
+    expect(a1.ring.pace()).toBe(2_000);
+    as(az);
+    await az.ring.checkIn();
+    expect(az.ring.pace()).toBe(2_000);
+
+    // Not now: the check ends, on both sides, and the ask stays listed.
+    as(a1);
+    await a1.ring.hide(a1.ring.asks[0]);
+    expect(a1.ring.opened).toBeNull();
+    expect(a1.ring.pace()).toBe(30_000);
+    expect([...fake.checks.values()].some((x) => x.device === 'az')).toBe(false);
+    await a1.ring.checkIn();
+    expect(a1.ring.asks.map((k) => k.id)).toEqual(['az']);
+    as(az);
+    await az.ring.checkIn();
+    expect(az.ring.pace()).toBe(5_000);
+    as(a1);
+    await a1.ring.deny(a1.ring.asks[0]);
+    expect(a1.ring.asks).toEqual([]);
+  });
+
+  it("can't be made to show the same code by a server that changes what it relays afterwards", async () => {
+    const at = browser('ada', 'at');
+    as(at);
+    await at.ring.start(at.me);
+    as(a1);
+    await a1.ring.checkIn();
+    await a1.ring.show(a1.ring.asks.find((k) => k.id === 'at')!);
+    as(at);
+    await at.ring.checkIn();
+    const [id, x] = [...fake.checks].find(([, c]) => c.device === 'at')!;
+    // A commitment and a nonce of the server's own, after the browser answered: no code.
+    const { b64u, concat, utf8 } = await import('../src/e2ee/bytes');
+    const own = new Uint8Array(32).fill(7);
+    const real = x.commitment;
+    x.commitment = b64u(new Uint8Array(await crypto.subtle.digest('SHA-256', concat(utf8('share-e2ee-v1/check'), own))));
+    x.reveal = b64u(own);
+    as(at);
+    await at.ring.checkIn();
+    expect(at.ring.codes).toEqual([]);
+
+    // The asking browser's code stays the one made from the answer it revealed for.
+    x.commitment = real;
+    x.reveal = null;
+    as(at);
+    await at.ring.checkIn(); // the page has its nonce: it doesn't answer again
+    as(a1);
+    await a1.ring.checkIn();
+    const code = a1.ring.asks.find((k) => k.id === 'at')!.code;
+    expect(code).toMatch(/^\d{6}$/);
+    expect(fake.checks.get(id)!.reveal).not.toBeNull();
+    fake.checks.get(id)!.answer = b64u(new Uint8Array(32).fill(9));
+    await a1.ring.checkIn();
+    expect(a1.ring.asks.find((k) => k.id === 'at')!.code).toBe(code);
+    as(at);
+    await at.ring.checkIn();
+    expect(at.ring.codes).toEqual([{ kind: 'device', from: 'a1', code }]);
+    as(a1);
+    await a1.ring.deny(a1.ring.asks.find((k) => k.id === 'at')!);
   });
 
   it('opens the keys in a new browser with the password, and not with a wrong one', async () => {
@@ -294,19 +519,28 @@ describe('keyring', { timeout: 60_000 }, () => {
     expect(a4.ring.status).toBe('ready');
     expect(a4.ring.hasFolderKey('f1', 1)).toBe(true);
     expect(fake.people.get('ada')!.sealed.has('a4')).toBe(true);
+    // It doesn't ask about itself, although the list it got before the password opened the key named it.
+    expect(a4.ring.asks.map((k) => k.id)).toEqual(['a3']);
+
+    // The browser with the wrong password waits for a check like any new one.
+    await approve(a4, wrong, 'device', 'a3');
+    expect(wrong.ring.status).toBe('ready');
   });
 
-  it('seals a folder key for someone who sees the folder, from an admin', async () => {
+  it('seals a folder key for someone who sees the folder, from an admin, after a check', async () => {
     const m1 = browser('max', 'm1');
     as(m1);
     await m1.ring.start(m1.me);
     expect(m1.ring.status).toBe('ready');
     expect(m1.ring.hasFolderKey('f1', 1)).toBe(false);
+    expect(m1.ring.waitsForFolders).toBe(true);
     as(a1);
-    await a1.ring.refresh();
-    as(m1);
-    await m1.ring.refresh();
+    await a1.ring.checkIn();
+    expect(a1.ring.asks).toEqual([expect.objectContaining({ kind: 'person', id: 'max', name: 'max', folders: ['f1'] })]);
+    expect(a1.ring.keyChanged(a1.ring.asks[0])).toBe(false);
+    await approve(a1, m1, 'person', 'max');
     expect(await m1.ring.fileKey({ id: file.id, folder: 'f1', enc: file.enc! })).toEqual(fileKey);
+    expect(m1.ring.waitsForFolders).toBe(false);
     // Max doesn't see f2, and gets nothing of it.
     as(a1);
     await a1.ring.encryptFolder(folderInfo('f2'));
@@ -319,10 +553,7 @@ describe('keyring', { timeout: 60_000 }, () => {
     const e1 = browser('eve', 'e1');
     as(e1);
     await e1.ring.start(e1.me); // her first browser makes her key, without a password
-    as(a1);
-    await a1.ring.checkIn(); // the admin seals f1 for her
-    as(e1);
-    await e1.ring.checkIn();
+    await approve(a1, e1, 'person', 'eve'); // the admin seals f1 for her
     expect(e1.ring.hasFolderKey('f1', 1)).toBe(true);
     expect(fake.people.get('eve')!.lock).toBeNull();
 
@@ -331,10 +562,7 @@ describe('keyring', { timeout: 60_000 }, () => {
     as(e2);
     await e2.ring.signedIn(e2.me, 'eve password');
     expect(e2.ring.status).toBe('waiting');
-    as(e1);
-    await e1.ring.checkIn();
-    as(e2);
-    await e2.ring.checkIn();
+    await approve(e1, e2, 'device', 'e2');
     expect(e2.ring.status).toBe('ready');
     expect(fake.people.get('eve')!.lock).not.toBeNull();
 
@@ -360,10 +588,11 @@ describe('keyring', { timeout: 60_000 }, () => {
     expect(e4.ring.status).toBe('ready');
     expect(e4.ring.hasFolderKey('f1', 1)).toBe(false);
     expect(eve.lock).not.toBeNull();
+    // Her key is new, so the admin's browser checks it again.
     as(a1);
     await a1.ring.checkIn();
-    as(e4);
-    await e4.ring.checkIn();
+    expect(a1.ring.keyChanged(a1.ring.asks.find((k) => k.kind === 'person' && k.id === 'eve')!)).toBe(true);
+    await approve(a1, e4, 'person', 'eve');
     expect(await e4.ring.fileKey({ id: file.id, folder: 'f1', enc: file.enc! })).toEqual(fileKey);
 
     // An admin's browser asks instead, as the recovery code opens every folder again.
@@ -408,6 +637,19 @@ describe('keyring', { timeout: 60_000 }, () => {
     await l1.ring.start(l1.me);
     expect(l1.ring.status).toBe('ready');
     expect(l1.ring.hasFolderKey('f1', 1)).toBe(false);
+
+    // Leo is listed; Show opens his check, and Not now ends it, while he stays listed.
+    as(a1);
+    await a1.ring.checkIn();
+    const leo = a1.ring.asks.find((k) => k.id === 'leo')!;
+    expect([...fake.checks.values()].some((x) => x.user === 'leo')).toBe(false);
+    await a1.ring.show(leo);
+    expect([...fake.checks.values()].some((x) => x.user === 'leo')).toBe(true);
+    await a1.ring.hide(leo);
+    await a1.ring.checkIn();
+    expect(a1.ring.asks.some((k) => k.id === 'leo')).toBe(true);
+    expect([...fake.checks.values()].some((x) => x.user === 'leo')).toBe(false);
+    expect(fake.people.has('leo') && fake.devices.has('l1')).toBe(true);
   });
 
   it("brings the person's own key to their new phone through an invite link's secret", async () => {
@@ -466,10 +708,9 @@ describe('keyring', { timeout: 60_000 }, () => {
     expect(await a6.ring.useRecoveryCode(code.toLowerCase())).toBe(3); // f1 twice, f2
     expect(a6.ring.status).toBe('ready');
     expect(await a6.ring.fileKey({ id: file.id, folder: 'f1', enc: file.enc! })).toEqual(fileKey);
-    // It started over with a new person key, which it sealed for the person's other browsers.
-    expect(fake.people.get('ada')!.sealed.has('a1')).toBe(true);
-    as(a1);
-    await a1.ring.refresh();
+    // It started over with a new person key, which reaches the person's other browsers after a check.
+    expect(fake.people.get('ada')!.sealed.has('a1')).toBe(false);
+    await approve(a6, a1, 'device', 'a1');
     expect(a1.ring.status).toBe('ready');
     expect(a1.ring.hasFolderKey('f1', 2)).toBe(true);
   });

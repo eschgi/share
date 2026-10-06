@@ -24,7 +24,11 @@
       "devices": [
         {
           "id": "d4ld5x2k7mbqz4bwdbyj6qsqxa",
-          "public_key": "BMmYyu1hjVZiPGtw6To8VR7ubX_Uhpt5oHzlpQJ6NKVwvSHzARYhSsXNAOzpVNhD1gUWGMdgfNMNb-29G98okLw"
+          "public_key": "BMmYyu1hjVZiPGtw6To8VR7ubX_Uhpt5oHzlpQJ6NKVwvSHzARYhSsXNAOzpVNhD1gUWGMdgfNMNb-29G98okLw",
+          "name": "Chrome · Windows",
+          "client": "web",
+          "created_at": "2026-10-06T17:11:11.191Z",
+          "active": true
         }
       ],
       "people": [
@@ -32,7 +36,9 @@
           "folder": "f4mily5x2k7mbqz4bwdbyj6qsq",
           "version": 1,
           "user": "u7ld5x2k7mbqz4bwdbyj6qsqxa",
-          "public_key": "BO_wgxnd_ogCHgijEQLzuGO9oADVgaVEb7b7LTJNaTaicF7BZ3w8Q03QaUui70Y2kmOJrKNBSa2leYx42d7kwi0"
+          "name": "Maria",
+          "public_key": "BO_wgxnd_ogCHgijEQLzuGO9oADVgaVEb7b7LTJNaTaicF7BZ3w8Q03QaUui70Y2kmOJrKNBSa2leYx42d7kwi0",
+          "active": true
         }
       ],
       "recovery": [
@@ -53,7 +59,31 @@
           "secret_sealed": "iQsHNbK-pPkifhtea0oIKb4tCl-yEo6JaqpP8QsyZvZIUN6RV9LB_YSoScYEmNtRd0DauOYp5e6IPGpPd3hR2dHRWjylJRdrlV3Yb4mLVbvP9h9b_y-hDldi9t3XCzay_TnWlynu9gWKkTkm3ZW1c78"
         }
       ]
-    }
+    },
+    "checks": [
+      {
+        "id": "c1ld5x2k7mbqz4bwdbyj6qsqxa",
+        "asking": true,
+        "device": "d4ld5x2k7mbqz4bwdbyj6qsqxa",
+        "user": null,
+        "from": "Pixel 8",
+        "commitment": "pHDuVhsSybVXXH6FX5t0wMMwmMp8NbVjwIXNf47SEDI",
+        "answer": "fKuQ6SQrmvowkR4hYNV1-HHNVugpf4r-lywDUv1RZZI",
+        "answered": false,
+        "reveal": "eA5oflDFsncsxgttx2rCwfy556X8TllKF4BByvcp0S0"
+      },
+      {
+        "id": "c2ld5x2k7mbqz4bwdbyj6qsqxa",
+        "asking": false,
+        "device": null,
+        "user": "u7ld5x2k7mbqz4bwdbyj6qsqxa",
+        "from": "Chrome · Windows",
+        "commitment": "pHDuVhsSybVXXH6FX5t0wMMwmMp8NbVjwIXNf47SEDI",
+        "answer": null,
+        "answered": false,
+        "reveal": null
+      }
+    ]
   },
-  "notes": "End-to-end encryption (docs/e2ee-plan.md); binary values are base64url without padding, keys P-256 (65 bytes public, 32 private), sealing and locking as in contract/crypto. What a phone or browser needs at every start: device_key is the public key it sent (null before PUT /api/keys/device; a different one means its own was lost: send a new one). person: the person's public key (null until a device makes it with PUT /api/keys/person), their private key sealed for this device (null while no device sealed it for this one), and locked with their password (null without); held_by, how many of the person's phones and browsers hold it (with none and no password lock it is lost, and a device that waits for it makes a new one with start_over). folders: every version of the keys of the folders the person sees, sealed for the person, or null while nobody did yet. recovery_key: null until an admin makes it. todo is what this device can do with the keys its person holds, and sends with POST /api/keys/grants: seal the person key for their devices that lack it, seal folder keys for people who see the folder and lack a version, seal folder keys for the recovery key, make the next version of a folder's key (rekey, with POST /api/folders/{id}/keys), and lock versions for PIN links that show a folder (the PIN's secret is sealed for version secret_version). Only devices: a PIN gets 403 forbidden."
+  "notes": "End-to-end encryption (docs/e2ee-plan.md); binary values are base64url without padding, keys P-256 (65 bytes public, 32 private), sealing and locking as in contract/crypto. What a phone or browser needs at every start: device_key is the public key it sent (null before PUT /api/keys/device; a different one means its own was lost: send a new one). person: the person's public key (null until a device makes it with PUT /api/keys/person), their private key sealed for this device (null while no device sealed it for this one), and locked with their password (null without); held_by, how many of the person's phones and browsers hold it (with none and no password lock it is lost, and a device that waits for it makes a new one with start_over). folders: every version of the keys of the folders the person sees, sealed for the person, or null while nobody did yet. recovery_key: null until an admin makes it. todo is what this device can do with the keys its person holds, and sends with POST /api/keys/grants: seal the person key for their devices that lack it, seal folder keys for people who see the folder and lack a version, seal folder keys for the recovery key, make the next version of a folder's key (rekey, with POST /api/folders/{id}/keys), and lock versions for PIN links that show a folder (the PIN's secret is sealed for version secret_version). Only devices: a PIN gets 403 forbidden. todo.devices name the devices that wait (name, client app or web, created_at when they signed in), and todo.people the people (name); active, when the device, or a device of the person that holds their key, was seen in the last 15 minutes, so it can answer a check (the server notes a visit at most every 10 minutes). A device only passes keys on to them after a check (contract/api/keys_check.json), or, for a person whose key it checked before, at once. checks are the open checks this device takes part in: asking, one it opened; otherwise one for this device (device) or for its person (user), listed to the device that answered it, or while none did to every device of the person that holds their key. from is the asking device's name; commitment, answer (the waiting side's nonce, with answered when this device gave it) and reveal (the asking device's nonce) come in that order."
 }

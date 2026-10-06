@@ -4,6 +4,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
 import java.security.SecureRandom
+import java.util.concurrent.ConcurrentHashMap
 
 /** The server's keys API, as the keyring asks it. */
 fun interface KeysApi {
@@ -22,6 +23,11 @@ interface DeviceKeyStore {
     fun load(deviceId: String): KeyPair?
 
     fun save(deviceId: String, pair: KeyPair)
+
+    /** The people's keys checked on this phone, signed in as [deviceId]: user id to public key, in base64url. A store without them asks every time. */
+    fun trusted(deviceId: String): Map<String, String> = emptyMap()
+
+    fun trust(deviceId: String, trusted: Map<String, String>) {}
 }
 
 /** Who this phone is signed in as: the person, the phone's id on the server, and whether the person is an admin. */
@@ -47,6 +53,27 @@ data class SealedFile(val id: String, val folder: String, val version: Int, val 
 
 /** The newest version of a folder's key, which new files are encrypted for. */
 data class FolderPublicKey(val folder: String, val version: Int, val publicKey: ByteArray)
+
+/**
+ * Someone this phone would pass keys on to once the person allows it, after both screens showed
+ * the same code (docs/e2ee-plan.md): a phone or browser of the person that waits for their key
+ * ([kind] device, with its [client], app or web, and when it signed in), or another person who
+ * waits for the keys of [folders] and whose key wasn't checked here before ([kind] person). Only
+ * those seen lately, who can answer. The library lists them; Show opens one, which starts its
+ * check: [code] is null until the other side answered.
+ */
+data class Ask(
+    val kind: String,
+    val id: String,
+    val name: String,
+    val client: String? = null,
+    val since: String? = null,
+    val folders: List<String> = emptyList(),
+    val code: String? = null,
+)
+
+/** A code this phone shows for a check another device asks: who asks ([from], its name), and the code. */
+data class ShownCode(val kind: String, val from: String, val code: String)
 
 /**
  * This phone's keys for end-to-end encryption (docs/e2ee-plan.md), as the website's keyring
@@ -79,6 +106,29 @@ class Keyring(private val api: KeysApi, private val store: DeviceKeyStore) {
 
     /** The person's key was just opened with the password, which so needs no new lock. */
     private var openedWithPassword = false
+
+    /** Who this phone would pass keys on to, after a check: listed, until the person opens one with Show. */
+    @Volatile var asks: List<Ask> = emptyList()
+        private set
+
+    /** The codes this phone shows for checks other devices ask. */
+    @Volatile var codes: List<ShownCode> = emptyList()
+        private set
+
+    /** The checks this phone asks, by kind:id: the check, the nonce it reveals after the answer, the key it checks, and the answer it revealed the nonce for, which the code is made from. */
+    private class Asking(val check: String, val nonce: ByteArray, val key: ByteArray, var answer: ByteArray? = null)
+
+    /** A check this phone answers: its nonce, and the commitment it saw before answering, which the revealed nonce must match. */
+    private class Answering(val nonce: ByteArray, val commitment: ByteArray)
+
+    private val asking = ConcurrentHashMap<String, Asking>()
+    private val answering = ConcurrentHashMap<String, Answering>()
+
+    /** The asks the person opened with Show, kind:id: only those get a check. */
+    private val shown: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
+    /** The people's keys checked on this phone: user id to key. */
+    @Volatile private var trusted: Map<String, String> = emptyMap()
 
     /**
      * A password typed on this phone while the person's key wasn't open here: it locks the key
@@ -129,12 +179,19 @@ class Keyring(private val api: KeysApi, private val store: DeviceKeyStore) {
         person = null
         typedPassword = null
         folders = emptyMap()
+        asks = emptyList()
+        codes = emptyList()
+        asking.clear()
+        answering.clear()
+        shown.clear()
+        trusted = emptyMap()
         synchronized(fileKeys) { fileKeys.clear() }
         changed(Status.OFF)
     }
 
     private fun load(me: Account, password: String?) {
         val dev = deviceKey(me)
+        trusted = store.trusted(me.deviceId)
         var a = api.call("GET", "/api/keys", null)
         if (a.str("device_key") != b64u(dev.publicKey)) {
             api.call("PUT", "/api/keys/device", JSONObject().put("public_key", b64u(dev.publicKey)))
@@ -162,15 +219,19 @@ class Keyring(private val api: KeysApi, private val store: DeviceKeyStore) {
         if (person != null) typedPassword = null
         folders = openFolders(a)
         answer = a
+        answerChecks(a)
         changed(if (person != null) Status.READY else Status.WAITING)
-        if (person != null && work(me, a)) {
+        if (person == null) return
+        val asked = asks
+        val did = work(me, a)
+        if (did) {
             // What was done may have brought new versions to open and seal for others.
             val again = api.call("GET", "/api/keys", null)
             answer = again
             folders = openFolders(again)
             work(me, again)
-            changed()
         }
+        if (did || asks != asked) changed()
     }
 
     /** This phone's device key: kept, or a new one. */
@@ -189,7 +250,9 @@ class Keyring(private val api: KeysApi, private val store: DeviceKeyStore) {
         val context = E2ee.personContext(me.userId)
         p.str("sealed")?.let { sealed ->
             try {
-                return KeyPair(E2ee.openKey(dev.privateKey, dev.publicKey, E2ee.PURPOSE_PERSON, context, E2ee.fromB64u(sealed)), pub)
+                val raw = E2ee.openKey(dev.privateKey, dev.publicKey, E2ee.PURPOSE_PERSON, context, E2ee.fromB64u(sealed))
+                // Checks show codes made from this key, so the key the server names must be this one's.
+                if (Hpke.publicKey(raw).contentEquals(pub)) return KeyPair(raw, pub)
             } catch (e: E2eeException) {
                 // sealed for a key this phone lost: wait, or use the password
             }
@@ -245,25 +308,41 @@ class Keyring(private val api: KeysApi, private val store: DeviceKeyStore) {
         return out
     }
 
-    /** Seals and locks what the to-do list asks for; true if it did anything. */
+    /** Seals and locks what the to-do list asks for, and asks first where a check is due; true if it did anything. */
     private fun work(me: Account, a: JSONObject): Boolean {
-        val p = person ?: return false
+        if (person == null) return false
         val todo = a.getJSONObject("todo")
-        val devices = ArrayList<JSONObject>()
         val people = ArrayList<JSONObject>()
         val recovery = ArrayList<JSONObject>()
         val pins = ArrayList<JSONObject>()
+        // The person's other devices get their key only after a check, once the person sees an
+        // encrypted folder: where none is, nobody is asked. So do people whose key wasn't checked
+        // here before. A check needs someone to answer it: only those seen lately are asked. This
+        // phone isn't, when it opened the key with the password after the list was made.
+        val due = ArrayList<Ask>()
+        val encrypted = a.getJSONArray("folders").length() > 0
         for (d in todo.getJSONArray("devices").objects()) {
-            val sealed = E2ee.sealKey(E2ee.fromB64u(d.getString("public_key")), E2ee.PURPOSE_PERSON, E2ee.personContext(me.userId), p.privateKey)
-            devices += JSONObject().put("device", d.getString("id")).put("sealed", b64u(sealed))
+            val id = d.getString("id")
+            if (!encrypted || !d.getBoolean("active") || id == me.deviceId) continue
+            due += Ask("device", id, d.getString("name"), d.getString("client"), d.getString("created_at"))
         }
+        val waiting = LinkedHashMap<String, Ask>()
         for (n in todo.getJSONArray("people").objects()) {
             val folder = n.getString("folder")
             val version = n.getInt("version")
             val k = folders[slot(folder, version)] ?: continue
-            val sealed = E2ee.sealKey(E2ee.fromB64u(n.getString("public_key")), E2ee.PURPOSE_FOLDER, E2ee.folderContext(folder, version), k.privateKey)
-            people += JSONObject().put("folder", folder).put("version", version).put("user", n.getString("user")).put("sealed", b64u(sealed))
+            val user = n.getString("user")
+            if (trusted[user] == n.getString("public_key")) {
+                val sealed = E2ee.sealKey(E2ee.fromB64u(n.getString("public_key")), E2ee.PURPOSE_FOLDER, E2ee.folderContext(folder, version), k.privateKey)
+                people += JSONObject().put("folder", folder).put("version", version).put("user", user).put("sealed", b64u(sealed))
+                continue
+            }
+            if (!n.getBoolean("active")) continue
+            val ask = waiting[user] ?: Ask("person", user, n.getString("name"))
+            waiting[user] = if (folder in ask.folders) ask else ask.copy(folders = ask.folders + folder)
         }
+        due += waiting.values
+        asks = askChecks(a, due)
         a.str("recovery_key")?.let { key ->
             val recoveryKey = E2ee.fromB64u(key)
             for (v in todo.getJSONArray("recovery").objects()) {
@@ -289,8 +368,8 @@ class Keyring(private val api: KeysApi, private val store: DeviceKeyStore) {
             }
         }
         var did = false
-        if (devices.isNotEmpty() || people.isNotEmpty() || recovery.isNotEmpty() || pins.isNotEmpty()) {
-            api.call("POST", "/api/keys/grants", grants(devices, people, recovery, pins))
+        if (people.isNotEmpty() || recovery.isNotEmpty() || pins.isNotEmpty()) {
+            api.call("POST", "/api/keys/grants", grants(people = people, recovery = recovery, pins = pins))
             did = true
         }
         val recoveryKey = a.str("recovery_key")?.let(E2ee::fromB64u)
@@ -306,6 +385,199 @@ class Keyring(private val api: KeysApi, private val store: DeviceKeyStore) {
             }
         }
         return did
+    }
+
+    /**
+     * The checks this phone asks: one is opened for every ask the person opened with Show, its
+     * nonce revealed once the other side answered, and the code made then, from that answer: one
+     * the server shows later can't change it. Checks of asks closed or gone are closed too. The
+     * asks still due.
+     */
+    private fun askChecks(a: JSONObject, due: List<Ask>): List<Ask> {
+        val todo = a.getJSONObject("todo")
+        fun keyOf(ask: Ask): ByteArray = E2ee.fromB64u(
+            if (ask.kind == "device") todo.getJSONArray("devices").objects().first { it.getString("id") == ask.id }.getString("public_key")
+            else todo.getJSONArray("people").objects().first { it.getString("user") == ask.id }.getString("public_key"),
+        )
+        val checks = a.getJSONArray("checks").objects()
+        val keys = due.map { "${it.kind}:${it.id}" }.toSet()
+        shown.retainAll(keys)
+        for ((k, c) in asking.entries.toList()) {
+            if (k in shown) continue
+            asking.remove(k)
+            closeQuietly(c.check)
+        }
+        val out = ArrayList<Ask>()
+        for (ask in due) {
+            val k = "${ask.kind}:${ask.id}"
+            if (k !in shown) {
+                out += ask
+                continue
+            }
+            val key = keyOf(ask)
+            var c = asking[k]
+            val open = c?.let { mine -> checks.firstOrNull { it.getBoolean("asking") && it.getString("id") == mine.check } }
+            if (c != null && (open == null || !c.key.contentEquals(key))) {
+                // closed, out of time, or another key now: a new check
+                if (open != null) closeQuietly(c.check)
+                asking.remove(k)
+                c = null
+            }
+            try {
+                if (c == null) {
+                    val nonce = randomBytes(E2ee.CHECK_NONCE_SIZE)
+                    val body = JSONObject().put(if (ask.kind == "device") "device" else "user", ask.id).put("commitment", b64u(E2ee.commitment(nonce)))
+                    asking[k] = Asking(api.call("POST", "/api/keys/checks", body).getString("id"), nonce, key)
+                } else if (c.answer == null) {
+                    val answer = open?.str("answer")
+                    if (answer != null) {
+                        api.call("PUT", "/api/keys/checks/${c.check}/reveal", JSONObject().put("nonce", b64u(c.nonce)).put("answer", answer))
+                        c.answer = E2ee.fromB64u(answer)
+                    }
+                }
+            } catch (e: KeysApiError) {
+                if (c == null && e.status == 404) {
+                    shown -= k // nobody waits there any more
+                    continue
+                }
+                if (e.status == 404) asking.remove(k) // the check is gone: a new one next time
+                else if (e.status != 409) throw e // 409: answered anew meanwhile; revealed for that next time
+            }
+            val revealed = c?.answer
+            out += if (c != null && revealed != null) ask.copy(code = E2ee.checkCode(c.nonce, revealed, c.key)) else ask
+        }
+        return out
+    }
+
+    /**
+     * The checks other devices ask of this one: answered with a nonce of its own, and the code
+     * shown once the asking device revealed the nonce it committed to before this answer. A device
+     * check is made from this phone's own key; a person's from the person's key, which must be
+     * open here.
+     */
+    private fun answerChecks(a: JSONObject) {
+        val shown = ArrayList<ShownCode>()
+        val listed = HashSet<String>()
+        for (c in a.getJSONArray("checks").objects()) {
+            if (c.getBoolean("asking")) continue
+            val kind = if (c.isNull("device")) "person" else "device"
+            val key = (if (kind == "device") device else person)?.publicKey ?: continue
+            val id = c.getString("id")
+            listed += id
+            val mine = answering[id]
+            if (mine == null || !c.getBoolean("answered")) {
+                try {
+                    if (c.str("reveal") != null) {
+                        // revealed for a nonce this phone no longer has: closed, so that a new check starts
+                        api.call("DELETE", "/api/keys/checks/$id", null)
+                    } else {
+                        val nonce = randomBytes(E2ee.CHECK_NONCE_SIZE)
+                        api.call("PUT", "/api/keys/checks/$id/answer", JSONObject().put("nonce", b64u(nonce)))
+                        answering[id] = Answering(nonce, E2ee.fromB64u(c.getString("commitment")))
+                    }
+                } catch (e: KeysApiError) {
+                    if (e.status != 404) throw e // closed, or another device of the person answered
+                }
+                continue
+            }
+            val revealed = E2ee.fromB64u(c.str("reveal") ?: continue)
+            if (!E2ee.commitment(revealed).contentEquals(mine.commitment)) continue // not the nonce committed to
+            shown += ShownCode(kind, c.getString("from"), E2ee.checkCode(revealed, mine.nonce, key))
+        }
+        answering.keys.retainAll(listed)
+        codes = shown
+    }
+
+    private fun closeQuietly(check: String) {
+        try {
+            api.call("DELETE", "/api/keys/checks/$check", null)
+        } catch (e: IOException) {
+            // gone already, or no answer: it ends by itself
+        }
+    }
+
+    /**
+     * Allows an ask after the person compared the code: the person's key sealed for the device, or
+     * the folder keys for the person, whose key counts as checked here from now on. Then checks
+     * in. Throws an [E2eeException] while there is no code to compare.
+     */
+    @Synchronized
+    fun allow(kind: String, id: String) {
+        val me = account ?: throw E2eeException("nobody signed in")
+        val k = "$kind:$id"
+        val c = asking[k]
+        val revealed = c?.answer
+        val p = person
+        val a = answer
+        if (c == null || revealed == null || p == null || a == null) throw E2eeException("no code to compare yet")
+        if (kind == "device") {
+            val sealed = E2ee.sealKey(c.key, E2ee.PURPOSE_PERSON, E2ee.personContext(me.userId), p.privateKey)
+            api.call("POST", "/api/keys/grants", grants(devices = listOf(JSONObject().put("device", id).put("sealed", b64u(sealed)))))
+        } else {
+            val people = ArrayList<JSONObject>()
+            for (n in a.getJSONObject("todo").getJSONArray("people").objects()) {
+                val folder = n.getString("folder")
+                val version = n.getInt("version")
+                val key = folders[slot(folder, version)] ?: continue
+                if (n.getString("user") != id || !E2ee.fromB64u(n.getString("public_key")).contentEquals(c.key)) continue
+                val sealed = E2ee.sealKey(c.key, E2ee.PURPOSE_FOLDER, E2ee.folderContext(folder, version), key.privateKey)
+                people += JSONObject().put("folder", folder).put("version", version).put("user", id).put("sealed", b64u(sealed))
+            }
+            trusted = trusted + (id to b64u(c.key))
+            store.trust(me.deviceId, trusted)
+            api.call("POST", "/api/keys/grants", grants(people = people))
+        }
+        shown -= k
+        asking.remove(k)
+        closeQuietly(c.check)
+        asks = asks.filter { !(it.kind == kind && it.id == id) }
+        changed()
+        sync(me, quiet = true)
+    }
+
+    /** Opens an ask (Show): a check-in starts its check, and its code comes once the other side answered. */
+    @Synchronized
+    fun show(kind: String, id: String) {
+        val me = account ?: throw E2eeException("nobody signed in")
+        shown += "$kind:$id"
+        changed()
+        sync(me, quiet = true)
+    }
+
+    /** Closes an ask's sheet ("Not now"): its check ends, and the ask stays listed. */
+    @Synchronized
+    fun hide(kind: String, id: String) {
+        val k = "$kind:$id"
+        shown -= k
+        asking.remove(k)?.let { closeQuietly(it.check) }
+        asks = asks.map { if (it.kind == kind && it.id == id) it.copy(code = null) else it }
+        changed()
+    }
+
+    /** Not me: a phone or browser that asked for the person's key, and isn't theirs, is signed out. */
+    @Synchronized
+    fun deny(kind: String, id: String) {
+        api.call("DELETE", "/api/devices/$id", null)
+        hide(kind, id)
+        asks = asks.filter { !(it.kind == kind && it.id == id) }
+        changed()
+    }
+
+    /** Whether an ask is for a person whose key was checked here before, and changed since: their key was lost. */
+    fun keyChanged(ask: Ask): Boolean = ask.kind == "person" && trusted.containsKey(ask.id)
+
+    /** Whether the person waits for folder keys: a version of an encrypted folder they see isn't sealed for them yet, so someone who has it seals it after a check. */
+    fun waitsForFolders(): Boolean = status == Status.READY && (answer?.getJSONArray("folders")?.objects()?.any { it.isNull("sealed") } ?: false)
+
+    /**
+     * How long until the next check-in, in milliseconds: soon while a check runs, opened here with
+     * Show or answered here, as the code and then the keys come right after the other side's turn;
+     * a little later while this phone waits for keys; otherwise half a minute.
+     */
+    fun pace(): Long = when {
+        shown.isNotEmpty() || answering.isNotEmpty() -> 2_000
+        status == Status.WAITING || waitsForFolders() -> 5_000
+        else -> 30_000
     }
 
     /** A new version of a folder's key, sealed for this person and the recovery key; it is open here from now on. */
@@ -555,6 +827,15 @@ class Keyring(private val api: KeysApi, private val store: DeviceKeyStore) {
         "has_recovery" to hasRecovery(),
         "encrypted_folders" to (answer?.getJSONArray("folders")?.objects()?.map { it.getString("folder") }?.distinct()?.size ?: 0),
         "open" to (folders.keys + pinFolders.keys).sorted(),
+        "asks" to asks.map { askMap(it) },
+        "codes" to codes.map { mapOf("kind" to it.kind, "from" to it.from, "code" to it.code) },
+        "waits_for_folders" to waitsForFolders(),
+        "pace" to pace(),
+    )
+
+    private fun askMap(it: Ask) = mapOf(
+        "kind" to it.kind, "id" to it.id, "name" to it.name, "client" to it.client, "since" to it.since,
+        "folders" to it.folders, "code" to it.code, "key_changed" to keyChanged(it),
     )
 
     companion object {

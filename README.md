@@ -175,14 +175,17 @@ The design and the formats are in [docs/e2ee-plan.md](docs/e2ee-plan.md).
   folder stay as they are. Turning it off makes new files plain again, and the encrypted ones still
   open. Names, days, sizes and who sees which folder stay readable to the server, so the library,
   search and sorting work as before.
-- **The keys come by themselves.** Every phone and browser has a key of its own, which never leaves
-  it. Whoever has Share open with a key seals it for those who lack it, checking every half
-  minute: someone given a folder, a new phone of someone, the recovery key. A new phone or browser
-  shows encrypted files as locked and waits for another one of the person, which takes a minute
-  while that one has Share open; signing in with the password opens them at once, and an
-  invite carries the keys in its link, after the token, where the server never sees them. A
+- **Keys pass on with an OK.** Every phone and browser has a key of its own, which never leaves it.
+  Signing in with the password opens the keys at once, and an invite carries them in its link,
+  after the token, where the server never sees them. A new phone or browser that has neither
+  shows encrypted files as locked, and waits: the person's other phones and browsers list it under
+  "Waiting for your OK". Show opens it, and both screens show the same code of 6 digits; Allow
+  passes the keys on, and Not me signs the new one out. Nothing opens by itself. Someone given a
+  folder gets its keys the same way, once an admin compared the code on their screen: once per
+  person and phone or browser, and again only when their key changes. So
+  someone who can change the server's database can't slip in a phone or a person of their own. A
   member whose key is lost, with no phone or browser left that holds it and no password that opens
-  it, gets a new one by itself, and the folders come again from whoever has Share open.
+  it, gets a new one by itself, which an admin then allows.
 - **The recovery code.** The first encrypted folder shows its admin a recovery code, once: written
   down or printed, it opens every encrypted folder again should all phones and browsers be lost.
   A new one can be made in the settings, which ends the old one.
@@ -197,7 +200,9 @@ The design and the formats are in [docs/e2ee-plan.md](docs/e2ee-plan.md).
 - **What it doesn't protect:** the names and other details above; files someone already downloaded;
   a server that was taken over and sends browsers changed website code, since the website comes
   from the server (the app's code doesn't); anyone holding the whole link of a PIN that shows an
-  encrypted folder, by design. A password opens the keys, so they are as safe as the password, which
+  encrypted folder, by design. The recovery key and the links of PINs that show a folder still get
+  its keys without a check, so a database someone changed could name a recovery key or a PIN
+  secret of their own; checks for those come later. A password opens the keys, so they are as safe as the password, which
   the server sees at sign-in.
 
 ## Security

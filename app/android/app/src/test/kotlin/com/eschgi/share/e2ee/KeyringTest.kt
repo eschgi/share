@@ -5,6 +5,7 @@ import org.json.JSONObject
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
@@ -29,6 +30,13 @@ class KeyringTest {
 
     private class Pin(val folder: String, val secretSealed: String, val secretVersion: Int, val locked: MutableMap<Int, String>)
 
+    /** A check: the device that asks, the device or person it is for, and what it relays. */
+    private class Check(val asker: String, val device: String?, val user: String?, var commitment: String) {
+        var answer: String? = null
+        var answeredBy: String? = null
+        var reveal: String? = null
+    }
+
     /** The server: what it keeps, and who asks. */
     private object Fake {
         var caller: Pair<String, String>? = null // user, device
@@ -43,6 +51,10 @@ class KeyringTest {
         val pins = HashMap<String, Pin>()
         val rekey = HashSet<String>()
         var offline = false // no answer at all
+        val checks = LinkedHashMap<String, Check>()
+        var nextCheck = 0
+        val swapped = HashMap<String, String>() // a server that names another key for a device that waits
+        val away = HashSet<String>() // devices not seen lately, which can't answer a check
     }
 
     private fun conflict(code: String) = KeysApiError(409, code, code)
@@ -73,12 +85,20 @@ class KeyringTest {
                 mine.forEach { (f, v, k) -> folders.put(JSONObject().put("folder", f).put("version", v).put("public_key", k).put("sealed", Fake.sealed["$f:$v:$user"] ?: JSONObject.NULL)) }
                 val todoDevices = JSONArray()
                 if (p.publicKey != null) {
-                    Fake.devices.filter { (id, d) -> d.first == user && d.second != null && id !in p.sealed }.forEach { (id, d) -> todoDevices.put(JSONObject().put("id", id).put("public_key", d.second)) }
+                    Fake.devices.filter { (id, d) -> d.first == user && d.second != null && id !in p.sealed }.forEach { (id, d) ->
+                        todoDevices.put(
+                            JSONObject().put("id", id).put("public_key", Fake.swapped[id] ?: d.second).put("name", id).put("client", "app")
+                                .put("created_at", "2026-10-06T10:00:00Z").put("active", id !in Fake.away),
+                        )
+                    }
                 }
                 val todoPeople = JSONArray()
                 for ((f, v, _) in mine.filter { held(it.first, it.second) }) {
                     Fake.people.filter { (u, q) -> u != user && q.publicKey != null && sees(q, f) && !held(f, v, u) }
-                        .forEach { (u, q) -> todoPeople.put(JSONObject().put("folder", f).put("version", v).put("user", u).put("public_key", q.publicKey)) }
+                        .forEach { (u, q) ->
+                            val active = q.sealed.keys.any { Fake.devices.containsKey(it) && it !in Fake.away }
+                            todoPeople.put(JSONObject().put("folder", f).put("version", v).put("user", u).put("name", u).put("public_key", q.publicKey).put("active", active))
+                        }
                 }
                 val todoRecovery = JSONArray()
                 if (p.admin && Fake.recovery != null) {
@@ -95,7 +115,17 @@ class KeyringTest {
                 }
                 val todo = JSONObject().put("devices", todoDevices).put("people", todoPeople).put("recovery", todoRecovery)
                     .put("rekey", JSONArray(if (p.admin) Fake.rekey.toList() else emptyList())).put("pins", todoPins)
+                val checks = JSONArray()
+                for ((id, c) in Fake.checks) {
+                    if (c.asker != device && c.device != device && !(c.user == user && (c.answeredBy == null || c.answeredBy == device) && device in p.sealed)) continue
+                    checks.put(
+                        JSONObject().put("id", id).put("asking", c.asker == device).put("device", c.device ?: JSONObject.NULL).put("user", c.user ?: JSONObject.NULL)
+                            .put("from", c.asker).put("commitment", c.commitment).put("answer", c.answer ?: JSONObject.NULL)
+                            .put("answered", c.answeredBy == device).put("reveal", c.reveal ?: JSONObject.NULL),
+                    )
+                }
                 return JSONObject()
+                    .put("checks", checks)
                     .put("device_key", Fake.devices[device]!!.second ?: JSONObject.NULL)
                     .put("person", JSONObject().put("public_key", p.publicKey ?: JSONObject.NULL).put("sealed", p.sealed[device] ?: JSONObject.NULL).put("password_lock", p.lock ?: JSONObject.NULL).put("held_by", p.sealed.keys.count { Fake.devices.containsKey(it) }))
                     .put("folders", folders)
@@ -131,6 +161,17 @@ class KeyringTest {
                 g.getJSONArray("recovery").objects().forEach { Fake.recoverySealed["${it.getString("folder")}:${it.getInt("version")}"] = it.getString("sealed") }
                 g.getJSONArray("pins").objects().forEach { Fake.pins[it.getString("pin")]!!.locked[it.getInt("version")] = it.getString("locked") }
             }
+            "POST /api/keys/checks" -> {
+                val target = body!!.optString("device").ifEmpty { null }
+                val other = body.optString("user").ifEmpty { null }
+                val d = target?.let { Fake.devices[it] }
+                val ok = device in p.sealed && if (target != null) d != null && d.first == user && d.second != null && target !in p.sealed else other != user && Fake.people[other]?.publicKey != null
+                if (!ok) throw KeysApiError(404, "not_found", "nobody waits there")
+                Fake.checks.entries.removeIf { it.value.asker == device && it.value.device == target && it.value.user == other }
+                val id = "check${++Fake.nextCheck}"
+                Fake.checks[id] = Check(device, target, other, body.getString("commitment"))
+                return JSONObject().put("id", id)
+            }
             "PUT /api/recovery" -> {
                 Fake.recovery = body!!.getString("public_key") to body.getString("locked")
                 Fake.recoverySealed.clear()
@@ -144,6 +185,37 @@ class KeyringTest {
                 return JSONObject().put("public_key", Fake.recovery?.first ?: JSONObject.NULL).put("locked", Fake.recovery?.second ?: JSONObject.NULL).put("folders", folders)
             }
             else -> {
+                Regex("/api/keys/checks/([^/]+)(/answer|/reveal)?").matchEntire(path)?.let { m ->
+                    val c = Fake.checks[m.groupValues[1]] ?: throw KeysApiError(404, "not_found", "no such check")
+                    when ("$method ${m.groupValues[2]}") {
+                        "PUT /answer" -> {
+                            if (c.reveal != null || !(c.device == device || (c.user == user && (c.answeredBy == null || c.answeredBy == device) && device in p.sealed))) {
+                                throw KeysApiError(404, "not_found", "no such check")
+                            }
+                            c.answer = body!!.getString("nonce")
+                            c.answeredBy = device
+                        }
+                        "PUT /reveal" -> {
+                            if (c.asker != device) throw KeysApiError(404, "not_found", "no such check")
+                            if (c.answer != body!!.getString("answer") || c.reveal != null) throw KeysApiError(409, "not_answered", "nothing to reveal for")
+                            val nonce = body.getString("nonce")
+                            require(E2ee.b64u(E2ee.commitment(E2ee.fromB64u(nonce))) == c.commitment) { "not the nonce committed to" }
+                            c.reveal = nonce
+                        }
+                        "DELETE " -> Fake.checks.remove(m.groupValues[1])
+                        else -> error("no $method $path")
+                    }
+                    return JSONObject()
+                }
+                Regex("/api/devices/([^/]+)").matchEntire(path)?.let { m ->
+                    require(method == "DELETE")
+                    val id = m.groupValues[1]
+                    if (Fake.devices[id]?.first != user) throw KeysApiError(404, "not_found", "not theirs")
+                    Fake.devices.remove(id)
+                    p.sealed.remove(id)
+                    Fake.checks.entries.removeIf { it.value.device == id || it.value.asker == id }
+                    return JSONObject()
+                }
                 val m = Regex("/api/folders/([^/]+)/(encryption|keys)").matchEntire(path) ?: error("no $method $path")
                 val folder = m.groupValues[1]
                 val keys = Fake.folders.getValue(folder)
@@ -175,11 +247,18 @@ class KeyringTest {
     private fun phone(user: String, device: String): Phone {
         Fake.devices[device] = user to null
         val keys = HashMap<String, KeyPair>()
+        val checked = HashMap<String, Map<String, String>>()
         val store = object : DeviceKeyStore {
             override fun load(deviceId: String) = keys[deviceId]
 
             override fun save(deviceId: String, pair: KeyPair) {
                 keys[deviceId] = pair
+            }
+
+            override fun trusted(deviceId: String) = checked[deviceId] ?: emptyMap()
+
+            override fun trust(deviceId: String, trusted: Map<String, String>) {
+                checked[deviceId] = trusted
             }
         }
         return Phone(Account(user, device, admin = Fake.people[user]!!.admin), Keyring(api, store))
@@ -199,6 +278,18 @@ class KeyringTest {
     private fun <T> Phone.call(f: Keyring.() -> T): T {
         Fake.caller = account.userId to account.deviceId
         return ring.f()
+    }
+
+    /** A check to its end: the asking phone lists the ask, the person opens it with Show, which opens the check, the other side answers, the asking phone reveals its nonce, both show the same code, and the person at the asking phone allows it. */
+    private fun approve(asker: Phone, other: Phone, kind: String, id: String) {
+        asker.checkIn()
+        asker.call { show(kind, id) }
+        for (p in listOf(other, asker, other)) p.checkIn()
+        val ask = asker.ring.asks.first { it.kind == kind && it.id == id }
+        assertTrue("a code: $ask", ask.code?.matches(Regex("\\d{6}")) == true)
+        assertTrue(other.ring.codes.any { it.code == ask.code })
+        asker.call { allow(kind, id) }
+        other.checkIn()
     }
 
     private fun file(folder: String, seal: Pair<ByteArray, JSONObject>) =
@@ -236,6 +327,12 @@ class KeyringTest {
         assertNotNull(Fake.people["ada"]!!.publicKey)
         assertTrue("a1" in Fake.people["ada"]!!.sealed)
         assertFalse(a.ring.hasRecovery())
+
+        // Nobody is asked about while no folder is encrypted.
+        phone("ada", "a0").sync()
+        a.checkIn()
+        assertEquals(emptyList<Ask>(), a.ring.asks)
+        Fake.devices.remove("a0")
     }
 
     @Test
@@ -258,39 +355,140 @@ class KeyringTest {
     }
 
     @Test
-    fun c_anotherPhoneWaitsUntilOneWithTheKeySealsIt() {
+    fun c_anotherPhoneWaitsUntilOneWithTheKeyPassesItOnAfterACheck() {
         val a2 = phone("ada", "a2")
         a2.sync()
         assertEquals(Keyring.Status.WAITING, a2.ring.status)
         assertThrows(E2eeException::class.java) { a2.ring.fileKey(file("f1", seal!!)) }
-        a1!!.sync()
-        a2.sync()
+
+        // The phone with the key lists it, and opens nothing by itself: no check before Show, and
+        // nothing sealed until the person compared the codes.
+        val a = a1!!
+        a.checkIn()
+        assertEquals(listOf(Ask("device", "a2", "a2", "app", "2026-10-06T10:00:00Z")), a.ring.asks)
+        assertTrue(Fake.checks.isEmpty())
+        assertEquals(30_000L, a.ring.pace())
+        assertThrows(E2eeException::class.java) { a.call { allow("device", "a2") } }
+        a2.checkIn()
+        assertEquals(emptyList<ShownCode>(), a2.ring.codes)
+        assertFalse("a2" in Fake.people["ada"]!!.sealed)
+
+        approve(a, a2, "device", "a2")
         assertEquals(Keyring.Status.READY, a2.ring.status)
         assertArrayEquals(fileKey, a2.ring.fileKey(file("f1", seal!!)))
+        assertEquals(emptyList<Ask>(), a.ring.asks)
     }
 
     @Test
-    fun ca_checkInsSealForAWaitingPhoneAndOpenItWithoutLoading() {
-        val a3 = phone("ada", "a3")
-        a3.sync()
-        assertEquals(Keyring.Status.WAITING, a3.ring.status)
+    fun ca_checkInsPassTheKeyOnToAWaitingPhoneWhichOpensItWithoutLoading() {
+        val aw = phone("ada", "aw")
+        aw.sync()
+        assertEquals(Keyring.Status.WAITING, aw.ring.status)
         val seen = ArrayList<Keyring.Status>()
-        a3.ring.onChange = { seen += a3.ring.status }
-        a1!!.checkIn()
-        a3.checkIn()
-        assertEquals(Keyring.Status.READY, a3.ring.status)
+        aw.ring.onChange = { seen += aw.ring.status }
+        approve(a1!!, aw, "device", "aw")
+        assertEquals(Keyring.Status.READY, aw.ring.status)
         assertFalse("a check-in never shows loading: $seen", Keyring.Status.LOADING in seen)
-        assertArrayEquals(fileKey, a3.ring.fileKey(file("f1", seal!!)))
+        assertArrayEquals(fileKey, aw.ring.fileKey(file("f1", seal!!)))
 
         // Without an answer, a check-in keeps what is open, and the status.
         Fake.offline = true
         try {
-            assertThrows(IOException::class.java) { a3.checkIn() }
+            assertThrows(IOException::class.java) { aw.checkIn() }
         } finally {
             Fake.offline = false
         }
-        assertEquals(Keyring.Status.READY, a3.ring.status)
-        assertArrayEquals(fileKey, a3.ring.fileKey(file("f1", seal!!)))
+        assertEquals(Keyring.Status.READY, aw.ring.status)
+        assertArrayEquals(fileKey, aw.ring.fileKey(file("f1", seal!!)))
+    }
+
+    @Test
+    fun cb_notMeSignsAPhoneOutAndASwappedKeyShowsTwoCodes() {
+        val a = a1!!
+        phone("ada", "x1").sync()
+        a.checkIn()
+        a.call { deny("device", "x1") }
+        assertFalse(Fake.devices.containsKey("x1"))
+        a.checkIn()
+        assertTrue(a.ring.asks.none { it.id == "x1" })
+
+        // A server that names its own key for a phone that waits can't make the codes match.
+        val y1 = phone("ada", "y1")
+        y1.sync()
+        Fake.swapped["y1"] = Fake.people["ada"]!!.publicKey!!
+        a.checkIn()
+        a.call { show("device", "y1") }
+        for (p in listOf(y1, a, y1)) p.checkIn()
+        val ask = a.ring.asks.first { it.id == "y1" }
+        assertNotNull(ask.code)
+        assertEquals(1, y1.ring.codes.size)
+        assertNotEquals(ask.code, y1.ring.codes[0].code)
+        Fake.swapped.remove("y1")
+        a.call { deny("device", "y1") }
+    }
+
+    @Test
+    fun cc_listsOnlyPhonesSeenLatelyAndChecksInSoonerWhileACheckRuns() {
+        val a = a1!!
+        val az = phone("ada", "az")
+        az.sync()
+        assertEquals(5_000L, az.ring.pace())
+        Fake.away += "az"
+        a.checkIn()
+        assertEquals(emptyList<Ask>(), a.ring.asks)
+        assertEquals(30_000L, a.ring.pace())
+
+        Fake.away -= "az"
+        a.checkIn()
+        assertEquals(listOf("az"), a.ring.asks.map { it.id })
+        assertEquals(30_000L, a.ring.pace())
+        a.call { show("device", "az") }
+        assertEquals(2_000L, a.ring.pace())
+        az.checkIn()
+        assertEquals(2_000L, az.ring.pace())
+
+        // Not now: the check ends, on both sides, and the ask stays listed.
+        a.call { hide("device", "az") }
+        assertEquals(30_000L, a.ring.pace())
+        assertTrue(Fake.checks.values.none { it.device == "az" })
+        a.checkIn()
+        assertEquals(listOf("az"), a.ring.asks.map { it.id })
+        az.checkIn()
+        assertEquals(5_000L, az.ring.pace())
+        a.call { deny("device", "az") }
+        assertEquals(emptyList<Ask>(), a.ring.asks)
+    }
+
+    @Test
+    fun cd_aServerCantFitTheCodesByChangingWhatItRelaysAfterwards() {
+        val a = a1!!
+        val at = phone("ada", "at")
+        at.sync()
+        a.checkIn()
+        a.call { show("device", "at") }
+        at.checkIn()
+        val (id, x) = Fake.checks.entries.first { it.value.device == "at" }.toPair()
+        // A commitment and a nonce of the server's own, after the phone answered: no code.
+        val own = ByteArray(32) { 7 }
+        val real = x.commitment
+        x.commitment = E2ee.b64u(E2ee.commitment(own))
+        x.reveal = E2ee.b64u(own)
+        at.checkIn()
+        assertEquals(emptyList<ShownCode>(), at.ring.codes)
+
+        // The asking phone's code stays the one made from the answer it revealed for.
+        x.commitment = real
+        x.reveal = null
+        at.checkIn() // the phone has its nonce: it doesn't answer again
+        a.checkIn()
+        val code = a.ring.asks.first { it.id == "at" }.code!!
+        assertNotNull(Fake.checks[id]!!.reveal)
+        Fake.checks[id]!!.answer = E2ee.b64u(ByteArray(32) { 9 })
+        a.checkIn()
+        assertEquals(code, a.ring.asks.first { it.id == "at" }.code)
+        at.checkIn()
+        assertEquals(listOf(ShownCode("device", "a1", code)), at.ring.codes)
+        a.call { deny("device", "at") }
     }
 
     @Test
@@ -305,20 +503,29 @@ class KeyringTest {
         assertEquals(Keyring.Status.READY, a4.ring.status)
         assertTrue(a4.ring.hasFolderKey("f1", 1))
         assertTrue("a4" in Fake.people["ada"]!!.sealed)
+        // It doesn't ask about itself, although the list it got before the password opened the key named it.
+        assertEquals(listOf("a3"), a4.ring.asks.map { it.id })
+        // The phone with the wrong password waits for a check like any new one.
+        approve(a4, wrong, "device", "a3")
+        assertEquals(Keyring.Status.READY, wrong.ring.status)
         // A new password, locked anew.
         val lock = a4.call { passwordLock("staple") }
         assertArrayEquals(Hpke.publicKey(E2ee.passwordUnlock("staple", E2ee.personContext("ada"), lock)), E2ee.fromB64u(Fake.people["ada"]!!.publicKey!!))
     }
 
     @Test
-    fun e_anAdminSealsTheFolderKeyForSomeoneWhoSeesIt() {
+    fun e_anAdminSealsTheFolderKeyForSomeoneWhoSeesItAfterACheck() {
         val m1 = phone("max", "m1")
         m1.sync()
         assertEquals(Keyring.Status.READY, m1.ring.status)
         assertFalse(m1.ring.hasFolderKey("f1", 1))
-        a1!!.sync()
-        m1.sync()
+        assertTrue(m1.ring.waitsForFolders())
+        a1!!.checkIn()
+        assertEquals(listOf(Ask("person", "max", "max", folders = listOf("f1"))), a1!!.ring.asks)
+        assertFalse(a1!!.ring.keyChanged(a1!!.ring.asks[0]))
+        approve(a1!!, m1, "person", "max")
         assertArrayEquals(fileKey, m1.ring.fileKey(file("f1", seal!!)))
+        assertFalse(m1.ring.waitsForFolders())
         a1!!.call { encryptFolder("f2", null) }
         m1.sync()
         assertNull(m1.ring.encryptFor("f2"))
@@ -328,8 +535,7 @@ class KeyringTest {
     fun ea_aPasswordTypedWhileWaitingLocksTheKeyOnceItArrives() {
         val e1 = phone("eve", "e1")
         e1.sync() // her first phone makes her key, without a password
-        a1!!.checkIn() // the admin seals f1 for her
-        e1.checkIn()
+        approve(a1!!, e1, "person", "eve") // the admin seals f1 for her
         assertTrue(e1.ring.hasFolderKey("f1", 1))
         assertNull(Fake.people["eve"]!!.lock)
 
@@ -337,8 +543,7 @@ class KeyringTest {
         val e2 = phone("eve", "e2")
         e2.sync("eve password")
         assertEquals(Keyring.Status.WAITING, e2.ring.status)
-        e1.checkIn()
-        e2.checkIn()
+        approve(e1, e2, "device", "e2")
         assertEquals(Keyring.Status.READY, e2.ring.status)
         assertNotNull(Fake.people["eve"]!!.lock)
 
@@ -363,8 +568,10 @@ class KeyringTest {
         assertEquals(Keyring.Status.READY, e4.ring.status)
         assertFalse(e4.ring.hasFolderKey("f1", 1))
         assertNotNull(eve.lock)
+        // Her key is new, so the admin's phone checks it again.
         a1!!.checkIn()
-        e4.checkIn()
+        assertTrue(a1!!.ring.keyChanged(a1!!.ring.asks.first { it.kind == "person" && it.id == "eve" }))
+        approve(a1!!, e4, "person", "eve")
         assertArrayEquals(fileKey, e4.ring.fileKey(file("f1", seal!!)))
 
         // An admin's phone asks instead, as the recovery code opens every folder again.
@@ -407,6 +614,18 @@ class KeyringTest {
         l1.sync()
         assertEquals(Keyring.Status.READY, l1.ring.status)
         assertFalse(l1.ring.hasFolderKey("f1", 1))
+
+        // Leo is listed; Show opens his check, and Not now ends it, while he stays listed.
+        val a = a1!!
+        a.checkIn()
+        assertTrue(Fake.checks.values.none { it.user == "leo" })
+        a.call { show("person", "leo") }
+        assertTrue(Fake.checks.values.any { it.user == "leo" })
+        a.call { hide("person", "leo") }
+        a.checkIn()
+        assertTrue(a.ring.asks.any { it.id == "leo" })
+        assertTrue(Fake.checks.values.none { it.user == "leo" })
+        assertTrue(Fake.devices.containsKey("l1"))
     }
 
     @Test
@@ -460,9 +679,9 @@ class KeyringTest {
         assertEquals(3, a6.call { useRecoveryCode(code.lowercase()) }) // f1 twice, f2
         assertEquals(Keyring.Status.READY, a6.ring.status)
         assertArrayEquals(fileKey, a6.ring.fileKey(file("f1", seal!!)))
-        // It started over with a new person key, which it sealed for the person's other phones.
-        assertTrue("a1" in Fake.people["ada"]!!.sealed)
-        a1!!.sync()
+        // It started over with a new person key, which reaches the person's other phones after a check.
+        assertFalse("a1" in Fake.people["ada"]!!.sealed)
+        approve(a6, a1!!, "device", "a1")
         assertEquals(Keyring.Status.READY, a1!!.ring.status)
         assertTrue(a1!!.ring.hasFolderKey("f1", 2))
     }
@@ -486,5 +705,9 @@ class KeyringTest {
         assertEquals(true, s["has_recovery"])
         assertEquals(2, s["encrypted_folders"])
         assertEquals(listOf("f1:1", "f1:2", "f2:1"), s["open"])
+        assertEquals(false, s["waits_for_folders"])
+        assertEquals(a1!!.ring.pace(), s["pace"])
+        assertEquals(a1!!.ring.asks.map { it.id }, (s["asks"] as List<*>).map { (it as Map<*, *>)["id"] })
+        assertEquals(emptyList<Any>(), s["codes"])
     }
 }

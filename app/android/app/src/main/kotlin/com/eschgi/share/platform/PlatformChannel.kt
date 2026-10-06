@@ -293,6 +293,22 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
                         Keys.account(app)?.let { ring.fromInvite(it, call.argument<String>("secret"), List(keys.length()) { i -> keys.getJSONObject(i) }) }
                         Keys.sync(app)
                     }
+                    "keys.allow" -> {
+                        ring.allow(call.argument<String>("kind")!!, call.argument<String>("id")!!)
+                        ring.state()
+                    }
+                    "keys.deny" -> {
+                        ring.deny(call.argument<String>("kind")!!, call.argument<String>("id")!!)
+                        ring.state()
+                    }
+                    "keys.show" -> {
+                        ring.show(call.argument<String>("kind")!!, call.argument<String>("id")!!)
+                        ring.state()
+                    }
+                    "keys.hide" -> {
+                        ring.hide(call.argument<String>("kind")!!, call.argument<String>("id")!!)
+                        ring.state()
+                    }
                     "keys.open_pin" -> Keys.openPin(app, call.argument<String>("secret")!!)
                     "keys.forget_pin" -> {
                         Keys.forgetPin(app)

@@ -6,6 +6,8 @@ export interface DeviceKey {
   deviceId: string;
   privateKey: CryptoKey;
   publicKey: Bytes;
+  /** The people's keys this browser checked before passing folder keys on: user id to key. */
+  trusted?: Record<string, string>;
 }
 
 const dbName = 'share-keys';
@@ -40,6 +42,14 @@ function run<T>(mode: IDBTransactionMode, f: (s: IDBObjectStore) => IDBRequest<T
 export const loadDeviceKey = (deviceId: string) => run<DeviceKey | undefined>('readonly', (s) => s.get(deviceId));
 
 export const saveDeviceKey = (k: DeviceKey) => run('readwrite', (s) => s.put(k));
+
+/** The people's keys this browser checked, kept with its device key. */
+export const loadTrusted = async (deviceId: string) => (await loadDeviceKey(deviceId))?.trusted ?? {};
+
+export async function saveTrusted(deviceId: string, trusted: Record<string, string>): Promise<void> {
+  const k = await loadDeviceKey(deviceId);
+  if (k) await saveDeviceKey({ ...k, trusted });
+}
 
 /** Forgets the keys of other devices this browser was before, e.g. after signing out. */
 export async function keepOnly(deviceId: string): Promise<void> {

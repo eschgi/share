@@ -214,13 +214,26 @@ class SharedFiles {
 enum KeysStatus { off, loading, ready, waiting, failed }
 
 class KeysState {
-  const KeysState({this.status = KeysStatus.off, this.hasRecovery = false, this.encryptedFolders = 0, this.open = const {}});
+  const KeysState({
+    this.status = KeysStatus.off,
+    this.hasRecovery = false,
+    this.encryptedFolders = 0,
+    this.open = const {},
+    this.asks = const [],
+    this.codes = const [],
+    this.waitsForFolders = false,
+    this.pace = const Duration(seconds: 30),
+  });
 
   factory KeysState.fromMap(Map<Object?, Object?> m) => KeysState(
         status: KeysStatus.values.asNameMap()[m['status']] ?? KeysStatus.off,
         hasRecovery: m['has_recovery'] == true,
         encryptedFolders: (m['encrypted_folders'] as num?)?.toInt() ?? 0,
         open: {for (final o in (m['open'] as List? ?? const [])) if (o is String) o},
+        asks: [for (final a in (m['asks'] as List? ?? const [])) if (a is Map) KeyAsk.fromMap(a)],
+        codes: [for (final c in (m['codes'] as List? ?? const [])) if (c is Map) ShownCode.fromMap(c)],
+        waitsForFolders: m['waits_for_folders'] == true,
+        pace: Duration(milliseconds: (m['pace'] as num?)?.toInt() ?? 30000),
       );
 
   final KeysStatus status;
@@ -234,9 +247,74 @@ class KeysState {
   /// The folders' keys open here, as "folder:version".
   final Set<String> open;
 
+  /// Whom this phone would pass keys on to, after a check: listed in the library, where Show
+  /// opens one.
+  final List<KeyAsk> asks;
+
+  /// The codes this phone shows for checks other phones and browsers ask.
+  final List<ShownCode> codes;
+
+  /// The person waits for the keys of folders they see, which someone allows after a check.
+  final bool waitsForFolders;
+
+  /// How long until the next check-in: a few seconds while a check runs or this phone waits for
+  /// keys, otherwise half a minute.
+  final Duration pace;
+
   bool get ready => status == KeysStatus.ready;
 
   bool hasFolderKey(String folder, int version) => open.contains('$folder:$version');
+}
+
+/// Someone this phone would pass keys on to once the person allows it, after both screens showed
+/// the same code (docs/e2ee-plan.md): a phone or browser of the person that waits for their key,
+/// or another person who waits for folder keys. [code] is null until the other side answered.
+class KeyAsk {
+  const KeyAsk({required this.kind, required this.id, required this.name, this.client, this.since, this.folders = const [], this.code, this.keyChanged = false});
+
+  factory KeyAsk.fromMap(Map<Object?, Object?> m) => KeyAsk(
+        kind: m['kind'] as String? ?? '',
+        id: m['id'] as String? ?? '',
+        name: m['name'] as String? ?? '',
+        client: m['client'] as String?,
+        since: DateTime.tryParse(m['since'] as String? ?? ''),
+        folders: [for (final f in (m['folders'] as List? ?? const [])) if (f is String) f],
+        code: m['code'] as String?,
+        keyChanged: m['key_changed'] == true,
+      );
+
+  /// device: a phone or browser of the person; person: another person.
+  final String kind;
+  final String id;
+  final String name;
+
+  /// A phone or browser: app or web, and when it signed in.
+  final String? client;
+  final DateTime? since;
+
+  /// A person: the folders they wait for.
+  final List<String> folders;
+  final String? code;
+
+  /// A person whose key was checked on this phone before, and is new now: the old one was lost.
+  final bool keyChanged;
+
+  bool get isPerson => kind == 'person';
+  bool get isBrowser => client == 'web';
+}
+
+/// A code this phone shows for a check another phone or browser asks: who asks ([from], its
+/// name), and the code.
+class ShownCode {
+  const ShownCode({required this.kind, required this.from, required this.code});
+
+  factory ShownCode.fromMap(Map<Object?, Object?> m) =>
+      ShownCode(kind: m['kind'] as String? ?? '', from: m['from'] as String? ?? '', code: m['code'] as String? ?? '');
+
+  /// device: for this phone's own key; person: for the person's.
+  final String kind;
+  final String from;
+  final String code;
 }
 
 /// A call about keys failed: [code] is sealed (a key isn't open on this phone), offline, or the
@@ -361,6 +439,19 @@ abstract class Platform {
 
   /// A new person key on this phone, when no other phone or browser of the person will come.
   Future<KeysState> startOver();
+
+  /// Passes keys on after the person compared the code: their key to a phone or browser of
+  /// theirs, or folder keys to another person.
+  Future<KeysState> allowAsk(KeyAsk ask);
+
+  /// Not me: signs a phone or browser out that asked for the person's key.
+  Future<KeysState> denyAsk(KeyAsk ask);
+
+  /// Show: opens an ask, which starts its check.
+  Future<KeysState> showAsk(KeyAsk ask);
+
+  /// Not now, or the sheet closed: the check ends, and the ask stays listed.
+  Future<KeysState> hideAsk(KeyAsk ask);
 
   /// The person's key locked with a new password; null while it isn't open here.
   Future<String?> passwordLock(String password);
@@ -626,6 +717,21 @@ class ChannelPlatform implements Platform {
 
   @override
   Future<KeysState> startOver() async => KeysState.fromMap(await _keysCall<Map<Object?, Object?>>('keys.start_over') ?? const {});
+
+  Future<KeysState> _ask(String method, KeyAsk ask) async =>
+      KeysState.fromMap(await _keysCall<Map<Object?, Object?>>(method, {'kind': ask.kind, 'id': ask.id}) ?? const {});
+
+  @override
+  Future<KeysState> allowAsk(KeyAsk ask) => _ask('keys.allow', ask);
+
+  @override
+  Future<KeysState> denyAsk(KeyAsk ask) => _ask('keys.deny', ask);
+
+  @override
+  Future<KeysState> showAsk(KeyAsk ask) => _ask('keys.show', ask);
+
+  @override
+  Future<KeysState> hideAsk(KeyAsk ask) => _ask('keys.hide', ask);
 
   @override
   Future<String?> passwordLock(String password) => _keysCall<String>('keys.password_lock', {'password': password});

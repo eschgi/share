@@ -29,6 +29,9 @@ object Keys {
     /** The secret of the link of a PIN that shows an encrypted folder, while the PIN works here. */
     private const val PIN_SECRET = "e2ee_pin_secret"
 
+    /** The people's keys checked on this phone, as JSON: the device's id, and user id to public key. */
+    private const val TRUSTED = "e2ee_trusted"
+
     /** Who is signed in, as lib/data/session.dart stores it. */
     private const val USER = "user"
 
@@ -179,7 +182,7 @@ object Keys {
         }
     }
 
-    /** The device key in the [SecretStore]: one, for the device id the phone has now. */
+    /** The device key in the [SecretStore]: one, for the device id the phone has now; so are the people's keys checked here. */
     private class SecretKeyStore(private val app: Context) : DeviceKeyStore {
         override fun load(deviceId: String): KeyPair? {
             val raw = SecretStore(app).read(DEVICE_KEY) ?: return null
@@ -196,6 +199,22 @@ object Keys {
         override fun save(deviceId: String, pair: KeyPair) {
             val j = JSONObject().put("device", deviceId).put("private", E2ee.b64u(pair.privateKey)).put("public", E2ee.b64u(pair.publicKey))
             SecretStore(app).write(DEVICE_KEY, j.toString())
+        }
+
+        override fun trusted(deviceId: String): Map<String, String> {
+            val raw = SecretStore(app).read(TRUSTED) ?: return emptyMap()
+            return try {
+                val j = JSONObject(raw)
+                if (j.optString("device") != deviceId) return emptyMap()
+                val keys = j.getJSONObject("keys")
+                keys.keys().asSequence().associateWith { keys.getString(it) }
+            } catch (e: JSONException) {
+                emptyMap()
+            }
+        }
+
+        override fun trust(deviceId: String, trusted: Map<String, String>) {
+            SecretStore(app).write(TRUSTED, JSONObject().put("device", deviceId).put("keys", JSONObject(trusted)).toString())
         }
     }
 }

@@ -96,6 +96,133 @@ void main() {
     expect(platform.keyCheckIns, first + 2, reason: 'one at once on coming back');
   });
 
+  testWidgets('a phone checks in sooner while a check runs or it waits for keys', (tester) async {
+    final platform = signedInPhone();
+    await startApp(tester, platform, adminFolders());
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    final first = platform.keyCheckIns;
+    platform.setKeys(const KeysState(status: KeysStatus.waiting, encryptedFolders: 1, pace: Duration(seconds: 5)));
+    await tester.pump(const Duration(seconds: 5));
+    expect(platform.keyCheckIns, first + 1);
+    await tester.pump(const Duration(seconds: 5));
+    expect(platform.keyCheckIns, first + 2);
+    // The keys came: the check-in already due comes, then every half minute again.
+    platform.setKeys(const KeysState(status: KeysStatus.ready, encryptedFolders: 1));
+    await tester.pump(const Duration(seconds: 5));
+    final settled = platform.keyCheckIns;
+    await tester.pump(const Duration(seconds: 20));
+    expect(platform.keyCheckIns, settled);
+    await tester.pump(const Duration(seconds: 10));
+    expect(platform.keyCheckIns, settled + 1);
+  });
+
+  testWidgets('a phone that waits shows the code its other phone or browser shows, or tells an admin', (tester) async {
+    const asking = ShownCode(kind: 'device', from: "Stefan's phone", code: '482197');
+    final platform = signedInPhone()..keysState = const KeysState(status: KeysStatus.waiting, encryptedFolders: 1, codes: [asking]);
+    await startApp(tester, platform, adminFolders());
+    expect(find.text('Waiting for approval'), findsOneWidget);
+    expect(find.text('Allow this phone on one of your other phones or browsers: open Share there and choose Show. It shows this code there too:'), findsOneWidget);
+    expect(find.bySemanticsLabel('482 197'), findsOneWidget);
+    // Two of them ask: each code with its name.
+    platform.setKeys(const KeysState(status: KeysStatus.waiting, encryptedFolders: 1, codes: [asking, ShownCode(kind: 'device', from: 'Chrome · Windows', code: '735041')]));
+    await tester.pumpAndSettle();
+    expect(find.text('Chrome · Windows'), findsOneWidget);
+    expect(find.bySemanticsLabel('735 041'), findsOneWidget);
+
+    // A person whose new key waits for an admin: the code to tell them, once one asks.
+    platform.setKeys(const KeysState(status: KeysStatus.ready, encryptedFolders: 1, waitsForFolders: true));
+    await tester.pumpAndSettle();
+    expect(find.text('Waiting for an admin'), findsOneWidget);
+    expect(find.text('Encrypted folders open here once an admin allows it.'), findsOneWidget);
+    platform.setKeys(const KeysState(
+      status: KeysStatus.ready,
+      encryptedFolders: 1,
+      waitsForFolders: true,
+      codes: [ShownCode(kind: 'person', from: 'Chrome · Windows', code: '813552')],
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('Your key is new. An admin opens your folders for it: tell them this code.'), findsOneWidget);
+    expect(find.bySemanticsLabel('813 552'), findsOneWidget);
+  });
+
+  testWidgets('who waits is listed, and Show opens the sheet, whose Allow waits for the code', (tester) async {
+    final since = DateTime.now().subtract(const Duration(seconds: 90));
+    KeysState asking(String? code) => KeysState(status: KeysStatus.ready, encryptedFolders: 1, asks: [
+          KeyAsk(kind: 'device', id: 'd1', name: 'Chrome · Windows', client: 'web', since: since, code: code),
+        ]);
+    final platform = signedInPhone()..keysState = asking(null);
+    await startApp(tester, platform, adminFolders());
+    await tester.pumpAndSettle();
+    // Nothing opens by itself.
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(find.text('Waiting for your OK'), findsOneWidget);
+    expect(find.text('A new browser wants your keys: Chrome · Windows'), findsOneWidget);
+    expect(platform.keyCalls, isEmpty);
+
+    await tester.tap(find.widgetWithText(TextButton, 'Show'));
+    await tester.pumpAndSettle();
+    expect(platform.keyCalls, ['show device d1']);
+    final sheet = find.byType(BottomSheet);
+    expect(find.descendant(of: sheet, matching: find.text('A new browser wants your keys')), findsOneWidget);
+    expect(find.descendant(of: sheet, matching: find.text('Chrome · Windows')), findsOneWidget);
+    expect(find.text('Signed in 1 minute ago'), findsOneWidget);
+    expect(find.text('Waiting for the code…'), findsOneWidget);
+    final allow = find.widgetWithText(FilledButton, 'Allow');
+    expect(tester.widget<FilledButton>(allow).onPressed, isNull);
+
+    // The browser answered: the code shows, and Allow passes the key on.
+    platform.setKeys(asking('735041'));
+    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('735 041'), findsOneWidget);
+    await tester.tap(allow);
+    await tester.pumpAndSettle();
+    expect(platform.keyCalls, ['show device d1', 'allow device d1']);
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(find.text('Waiting for your OK'), findsNothing);
+  });
+
+  testWidgets('Not me signs a phone out; Not now, or closing the sheet, keeps a person listed', (tester) async {
+    final platform = signedInPhone()
+      ..keysState = const KeysState(status: KeysStatus.ready, encryptedFolders: 1, asks: [
+        KeyAsk(kind: 'device', id: 'd1', name: 'Pixel 8', client: 'app', code: '482197'),
+        KeyAsk(kind: 'person', id: 'u1', name: 'Maria', folders: [family], code: '813552', keyChanged: true),
+      ]);
+    await startApp(tester, platform, adminFolders());
+    await tester.pumpAndSettle();
+    expect(find.text('A new phone wants your keys: Pixel 8'), findsOneWidget);
+    expect(find.text('Maria is waiting for folders'), findsOneWidget);
+    await tester.tap(find.widgetWithText(TextButton, 'Show').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Not me'));
+    await tester.pumpAndSettle();
+    expect(platform.keyCalls, ['show device d1', 'deny device d1']);
+    expect(find.text('A new phone wants your keys: Pixel 8'), findsNothing);
+
+    // Maria's new key, for the folder she sees.
+    await tester.tap(find.widgetWithText(TextButton, 'Show'));
+    await tester.pumpAndSettle();
+    final sheet = find.byType(BottomSheet);
+    expect(find.descendant(of: sheet, matching: find.text('Maria is waiting for folders')), findsOneWidget);
+    expect(find.text("Maria's key is new: the old one was lost. Once you allow it, these folders open for Maria again:"), findsOneWidget);
+    expect(find.descendant(of: sheet, matching: find.text('Family')), findsOneWidget);
+    expect(find.text('Ask Maria for the code on their screen:'), findsOneWidget);
+    expect(find.bySemanticsLabel('813 552'), findsOneWidget);
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Not now'));
+    await tester.pumpAndSettle();
+    expect(platform.keyCalls.last, 'hide person u1');
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(find.text('Maria is waiting for folders'), findsOneWidget, reason: 'still listed');
+
+    // Closed without an answer, the check ends the same way.
+    await tester.tap(find.widgetWithText(TextButton, 'Show'));
+    await tester.pumpAndSettle();
+    await tester.tapAt(const Offset(20, 20));
+    await tester.pumpAndSettle();
+    expect(platform.keyCalls.sublist(platform.keyCalls.length - 2), ['show person u1', 'hide person u1']);
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(find.text('Maria is waiting for folders'), findsOneWidget);
+  });
+
   testWidgets('joining with an invite link opens the keys its secret brings', (tester) async {
     final platform = FakePlatform();
     await startApp(tester, platform, FakeServer());
@@ -172,7 +299,7 @@ void main() {
       ..sealedFolders = {family}
       ..keysState = const KeysState(status: KeysStatus.waiting, hasRecovery: true, encryptedFolders: 1);
     await startApp(tester, platform, server);
-    expect(find.text('Waiting for another phone or browser'), findsOneWidget);
+    expect(find.text('Waiting for approval'), findsOneWidget);
     expect(find.descendant(of: find.byType(LibraryTile).first, matching: find.byIcon(AppIcons.lock)), findsOneWidget);
 
     await tester.tap(find.text('Use the recovery code'));
@@ -193,7 +320,7 @@ void main() {
     platform.sealedFolders = {};
     platform.setKeys(const KeysState(status: KeysStatus.ready, hasRecovery: true, encryptedFolders: 1, open: {'$family:1'}));
     await tester.pumpAndSettle();
-    expect(find.text('Waiting for another phone or browser'), findsNothing);
+    expect(find.text('Waiting for approval'), findsNothing);
     expect(find.descendant(of: find.byType(LibraryTile).first, matching: find.byIcon(AppIcons.lock)), findsNothing);
     expect(find.descendant(of: find.byType(LibraryTile).first, matching: find.byType(Image)), findsOneWidget);
   });

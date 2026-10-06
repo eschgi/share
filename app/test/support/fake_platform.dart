@@ -288,6 +288,35 @@ class FakePlatform implements Platform {
     return keysState;
   }
 
+  /// As Kotlin: an ask that is settled leaves the state; one shown or hidden stays.
+  KeysState _ask(String call, KeyAsk ask, {bool settled = false}) {
+    keyCalls.add('$call ${ask.kind} ${ask.id}');
+    final s = keysState;
+    setKeys(KeysState(
+      status: s.status,
+      hasRecovery: s.hasRecovery,
+      encryptedFolders: s.encryptedFolders,
+      open: s.open,
+      asks: [for (final a in s.asks) if (!settled || a.kind != ask.kind || a.id != ask.id) a],
+      codes: s.codes,
+      waitsForFolders: s.waitsForFolders,
+      pace: s.pace,
+    ));
+    return keysState;
+  }
+
+  @override
+  Future<KeysState> allowAsk(KeyAsk ask) async => _ask('allow', ask, settled: true);
+
+  @override
+  Future<KeysState> denyAsk(KeyAsk ask) async => _ask('deny', ask, settled: true);
+
+  @override
+  Future<KeysState> showAsk(KeyAsk ask) async => _ask('show', ask);
+
+  @override
+  Future<KeysState> hideAsk(KeyAsk ask) async => _ask('hide', ask);
+
   @override
   Future<String?> passwordLock(String password) async => keysState.ready ? 'lock-$password' : null;
 

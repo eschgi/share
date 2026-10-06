@@ -1,0 +1,11 @@
+{
+  "method": "PUT",
+  "path": "/api/keys/checks/{id}/reveal",
+  "auth": "device",
+  "status": 204,
+  "request": {
+    "nonce": "eA5oflDFsncsxgttx2rCwfy556X8TllKF4BByvcp0S0",
+    "answer": "fKuQ6SQrmvowkR4hYNV1-HHNVugpf4r-lywDUv1RZZI"
+  },
+  "notes": "The asking device's nonce, once the waiting side answered, and that answer as it saw it, which its code is made from; only from the device that asks. 400 bad_request when the nonce isn't the one the commitment was made for; 409 not_answered before an answer, when the answer changed meanwhile (the waiting side answered again: reveal for the new one), or when it was revealed already; 404 not_found for another device."
+}

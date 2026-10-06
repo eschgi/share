@@ -63,22 +63,37 @@ export function Account({ me: first, notice }: AccountProps) {
       startSender(signedOut);
       void keyring.start(first);
     }
-    // The keys may have news: someone to seal for, a key sealed for this browser, a new version.
-    // So the page checks in every half minute while it is open, also in a tab behind others or a
-    // window that is covered (where the browser makes it once a minute), and at once when it comes
-    // back; a phone or browser that waits for a key gets it within a minute or two.
-    const checkIn = () => {
-      if (keyring.me) void keyring.checkIn();
+    // The keys may have news: someone to seal for or to ask about, a key sealed for this browser,
+    // a check to answer, a new version. So the page checks in while it is open, also in a tab
+    // behind others or a window that is covered (where the browser makes it once a minute at
+    // most), and at once when it comes back: every half minute, and every few seconds while a
+    // check runs or this browser waits for keys (keyring.pace).
+    let timer = 0;
+    let due = Infinity;
+    const next = () => {
+      clearTimeout(timer);
+      const wait = keyring.pace();
+      due = Date.now() + wait;
+      timer = window.setTimeout(() => void checkIn(), wait);
     };
+    const checkIn = async () => {
+      if (keyring.me) await keyring.checkIn();
+      next();
+    };
+    // Sooner when the keys say so, e.g. once this browser turns out to wait for them.
+    const sooner = keyring.watch(() => {
+      if (Date.now() + keyring.pace() < due) next();
+    });
     const back = () => {
-      if (document.visibilityState === 'visible') checkIn();
+      if (document.visibilityState === 'visible') void checkIn();
     };
     document.addEventListener('visibilitychange', back);
-    const every = setInterval(checkIn, 30_000);
+    next();
     return () => {
       onSignedOut(null);
       document.removeEventListener('visibilitychange', back);
-      clearInterval(every);
+      sooner();
+      clearTimeout(timer);
     };
   }, []);
 

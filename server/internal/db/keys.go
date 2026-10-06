@@ -82,16 +82,23 @@ type Todo struct {
 	Pins     []PinNeed       // PIN links that show a folder and lack a version of its key
 }
 
+// DeviceKey is a device of the person that waits for their key: what a check asks about.
 type DeviceKey struct {
 	ID        string
 	PublicKey []byte
+	Name      string
+	Client    string
+	CreatedAt time.Time // when it signed in
+	Active    bool      // it was seen within CheckLife, so it can answer a check
 }
 
 type PersonNeed struct {
 	FolderID  string
 	Version   int
 	UserID    string
+	Name      string
 	PublicKey []byte
+	Active    bool // a device of theirs that holds their key was seen within CheckLife
 }
 
 type FolderVersion struct {
@@ -113,10 +120,13 @@ type PinNeed struct {
 // for them: only those can they seal on. recovery says whether there is a recovery key.
 func (d *DB) TodoOf(ctx context.Context, userID string, recovery bool, now time.Time) (Todo, error) {
 	var t Todo
-	err := eachRow(ctx, d.pool, `SELECT id, public_key FROM devices WHERE user_id = $1 AND revoked_at IS NULL AND public_key IS NOT NULL
-		AND id NOT IN (SELECT device_id FROM person_keys) ORDER BY created_at, id`, []any{userID}, func(row scanner) error {
+	// Seen lately: a device is touched every 10 minutes while it is used (auth's touchEvery).
+	seen := now.Add(-CheckLife)
+	err := eachRow(ctx, d.pool, `SELECT id, public_key, name, client, created_at, last_seen_at > $2 FROM devices WHERE user_id = $1
+		AND revoked_at IS NULL AND public_key IS NOT NULL AND id NOT IN (SELECT device_id FROM person_keys)
+		ORDER BY created_at, id`, []any{userID, seen}, func(row scanner) error {
 		var dk DeviceKey
-		if err := row.Scan(&dk.ID, &dk.PublicKey); err != nil {
+		if err := row.Scan(&dk.ID, &dk.PublicKey, &dk.Name, &dk.Client, &dk.CreatedAt, &dk.Active); err != nil {
 			return err
 		}
 		t.Devices = append(t.Devices, dk)
@@ -125,13 +135,14 @@ func (d *DB) TodoOf(ctx context.Context, userID string, recovery bool, now time.
 	if err != nil {
 		return t, err
 	}
-	err = eachRow(ctx, d.pool, `SELECT g.folder_id, g.version, u.id, u.public_key
+	err = eachRow(ctx, d.pool, `SELECT g.folder_id, g.version, u.id, u.name, u.public_key, EXISTS (SELECT 1 FROM devices v
+			JOIN person_keys k ON k.device_id = v.id WHERE v.user_id = u.id AND v.revoked_at IS NULL AND v.last_seen_at > $2)
 		FROM folder_grants g JOIN users u ON u.public_key IS NOT NULL AND `+sees("g.folder_id")+`
 		WHERE g.user_id = $1 AND NOT EXISTS (SELECT 1 FROM folder_grants o
 			WHERE o.folder_id = g.folder_id AND o.version = g.version AND o.user_id = u.id)
-		ORDER BY g.folder_id, g.version, u.id`, []any{userID}, func(row scanner) error {
+		ORDER BY g.folder_id, g.version, u.id`, []any{userID, seen}, func(row scanner) error {
 		var n PersonNeed
-		if err := row.Scan(&n.FolderID, &n.Version, &n.UserID, &n.PublicKey); err != nil {
+		if err := row.Scan(&n.FolderID, &n.Version, &n.UserID, &n.Name, &n.PublicKey, &n.Active); err != nil {
 			return err
 		}
 		t.People = append(t.People, n)

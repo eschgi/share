@@ -4,6 +4,7 @@ import java.io.ByteArrayInputStream
 import java.io.EOFException
 import java.io.IOException
 import java.io.InputStream
+import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
 
@@ -47,6 +48,15 @@ object E2ee {
     /** The recovery key, locked with the recovery code. */
     const val PURPOSE_RECOVERY = "share-e2ee-v1/recovery"
 
+    /** A check's commitment to the asking device's nonce (contract/crypto/check.json). */
+    const val PURPOSE_CHECK = "share-e2ee-v1/check"
+
+    /** A check's code, from both nonces and the public key that gets the keys. */
+    const val PURPOSE_CODE = "share-e2ee-v1/code"
+
+    /** The size of a check's nonces. */
+    const val CHECK_NONCE_SIZE = 32
+
     const val FILE_KEY_SIZE = 32
 
     /** PBKDF2's work for a password lock, as OWASP recommends for HMAC-SHA256. */
@@ -72,6 +82,27 @@ object E2ee {
 
     /** What a person's private key is bound to. */
     fun personContext(userId: String): ByteArray = "person:$userId".toByteArray()
+
+    /**
+     * A check comes before a device passes keys on (docs/e2ee-plan.md): the asking device sends
+     * this commitment to a random nonce, the other side answers with a nonce of its own, and only
+     * then is the first nonce revealed. So neither can be chosen after seeing the other, and
+     * whoever relays them can't try out keys until the codes match.
+     */
+    fun commitment(nonce: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").run {
+        update(PURPOSE_CHECK.toByteArray())
+        digest(nonce)
+    }
+
+    /** The code both screens show: the first 4 bytes of SHA-256 of the purpose, both nonces and the public key that gets the keys, as a big-endian number, modulo a million, in 6 digits. */
+    fun checkCode(askerNonce: ByteArray, answerNonce: ByteArray, publicKey: ByteArray): String {
+        val h = MessageDigest.getInstance("SHA-256")
+        h.update(PURPOSE_CODE.toByteArray())
+        h.update(askerNonce)
+        h.update(answerNonce)
+        h.update(publicKey)
+        return (u32(h.digest(), 0) % 1_000_000).toString().padStart(6, '0')
+    }
 
     /** What the recovery key is bound to. */
     val recoveryContext: ByteArray get() = "recovery".toByteArray()

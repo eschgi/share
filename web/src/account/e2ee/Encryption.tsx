@@ -1,18 +1,19 @@
 // End-to-end encryption on the account's pages (docs/e2ee-plan.md): a folder's switch, the
-// recovery code, and what a browser without its keys can do.
+// recovery code, what a browser without its keys can do, and the checks before keys are passed on.
 import './e2ee.css';
 import { useEffect, useState } from 'preact/hooks';
 import { ApiError, getSettings, putSettings, setFolderEncryption, type FolderInfo } from '../../api';
+import { Bold } from '../../components/Bits';
 import { Icon } from '../../components/Icon';
 import { QrCode } from '../../components/QrCode';
 import { SealError } from '../../e2ee/formats';
 import { useKeyring } from '../../e2ee/hooks';
-import { keyring } from '../../e2ee/keyring';
-import { useI18n } from '../../i18n';
+import { keyring, type Ask, type ShownCode } from '../../e2ee/keyring';
+import { useI18n, type I18n } from '../../i18n';
 import { Row, Switch } from '../components/Bits';
 import { Confirm, Modal } from '../components/Modal';
 import { useAccount } from '../context';
-import { refreshFolders } from '../folders/store';
+import { refreshFolders, useFolders } from '../folders/store';
 
 /** The recovery code, shown once: to write down, copy or print, with its QR code for the app. */
 export function RecoveryCodeDialog({ code, onDone }: { code: string; onDone: () => void }) {
@@ -220,8 +221,36 @@ export function EncryptionSwitch({ folder, start, onChanged }: { folder: FolderI
   );
 }
 
-/** What a browser without its keys says, over the library: it waits for another phone or
- * browser of the person; admins can use the recovery code; and anyone can start over. */
+/** A check's code, in two groups of three, as the other screen shows it. */
+function CheckCode({ code }: { code: string }) {
+  const digits = (from: number) => [...code.slice(from, from + 3)].map((d, i) => <b key={from + i}>{d}</b>);
+  return (
+    <span class="kcode" role="img" aria-label={`${code.slice(0, 3)} ${code.slice(3)}`}>
+      {digits(0)}
+      <i />
+      {digits(3)}
+    </span>
+  );
+}
+
+/** The codes this browser shows: one, or one per device that asks, with its name. */
+function ShownCodes({ codes }: { codes: ShownCode[] }) {
+  if (codes.length === 1) return <CheckCode code={codes[0].code} />;
+  return (
+    <span class="kcodes">
+      {codes.map((c) => (
+        <span key={c.from + c.code} class="kfrom">
+          <span>{c.from}</span>
+          <CheckCode code={c.code} />
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** What a browser without its keys says, over the library: it waits until one of the person's
+ * phones or browsers allows it, with the code that one shows too, or for an admin to allow its
+ * person's new key; admins can use the recovery code; and anyone can start over. */
 export function KeysBanner() {
   const { t } = useI18n();
   const { me } = useAccount();
@@ -229,43 +258,176 @@ export function KeysBanner() {
   const [dialog, setDialog] = useState<'recovery' | 'startOver' | null>(null);
   const [busy, setBusy] = useState(false);
   const encryptedFolders = (keys.answer?.folders ?? []).length > 0;
-  if (keys.status !== 'waiting' || !encryptedFolders) return null;
+  const waiting = keys.status === 'waiting' && encryptedFolders;
+  if (!waiting && !keys.waitsForFolders) return <KeysWaitingList />;
+  const codes = keys.codes.filter((c) => c.kind === (waiting ? 'device' : 'person'));
+  return (
+    <>
+      <div class="keysbanner" role="status">
+        <Icon name="lock" />
+        <span>
+          <b>{t(waiting ? 'keys.waitingTitle' : 'keys.adminTitle')}</b>
+          <span>
+            {waiting ? `${t('keys.waiting')}${codes.length ? ` ${t('keys.sameCode')}` : ''}` : t(codes.length ? 'keys.adminCode' : 'keys.admin')}
+          </span>
+          {codes.length > 0 && <ShownCodes codes={codes} />}
+        </span>
+        <span class="keysbanner-actions">
+          {me.user.role === 'admin' && (
+            <button type="button" class="btn xs outline" onClick={() => setDialog('recovery')}>
+              {t('recovery.use')}
+            </button>
+          )}
+          {waiting && (
+            <button type="button" class="btn xs link" onClick={() => setDialog('startOver')}>
+              {t('keys.startOver')}
+            </button>
+          )}
+        </span>
+        {dialog === 'recovery' && <UseRecoveryDialog onClose={() => setDialog(null)} />}
+        {dialog === 'startOver' && (
+          <Confirm
+            icon="key"
+            title={t('keys.startOverTitle')}
+            body={t('keys.startOverBody')}
+            confirm={t('keys.startOver')}
+            busy={busy}
+            onConfirm={() => {
+              setBusy(true);
+              void keyring.startOver().finally(() => {
+                setBusy(false);
+                setDialog(null);
+              });
+            }}
+            onClose={() => setDialog(null)}
+          />
+        )}
+      </div>
+      <KeysWaitingList />
+    </>
+  );
+}
+
+/** Who waits for this browser's OK (screens 51 and 52): a new phone or browser of the person, or
+ * another person and their folders. Nothing opens by itself: Show opens the dialog, which starts
+ * the check, and Not now closes it again; the ask stays listed while it is due. */
+function KeysWaitingList() {
+  const { t } = useI18n();
+  const keys = useKeyring();
+  if (!keys.asks.length) return null;
+  const opened = keys.opened;
   return (
     <div class="keysbanner" role="status">
-      <Icon name="lock" />
+      <Icon name="key" />
       <span>
-        <b>{t('keys.waitingTitle')}</b>
-        <span>{t('keys.waiting')}</span>
+        <b>{t('keys.laterTitle')}</b>
+        {keys.asks.map((x) => (
+          <span key={`${x.kind}:${x.id}`} class="klater">
+            <span>{x.kind === 'person' ? t('keys.personTitle', { name: x.name }) : `${t(x.client === 'app' ? 'keys.askPhone' : 'keys.askBrowser')}: ${x.name}`}</span>
+            <button type="button" class="btn xs outline" onClick={() => void keyring.show(x)}>
+              {t('keys.show')}
+            </button>
+          </span>
+        ))}
       </span>
-      <span class="keysbanner-actions">
-        {me.user.role === 'admin' && (
-          <button type="button" class="btn xs outline" onClick={() => setDialog('recovery')}>
-            {t('recovery.use')}
-          </button>
-        )}
-        <button type="button" class="btn xs link" onClick={() => setDialog('startOver')}>
-          {t('keys.startOver')}
-        </button>
-      </span>
-      {dialog === 'recovery' && <UseRecoveryDialog onClose={() => setDialog(null)} />}
-      {dialog === 'startOver' && (
-        <Confirm
-          icon="key"
-          title={t('keys.startOverTitle')}
-          body={t('keys.startOverBody')}
-          confirm={t('keys.startOver')}
-          busy={busy}
-          onConfirm={() => {
-            setBusy(true);
-            void keyring.startOver().finally(() => {
-              setBusy(false);
-              setDialog(null);
-            });
-          }}
-          onClose={() => setDialog(null)}
-        />
-      )}
+      {opened && <KeysAsk key={`${opened.kind}:${opened.id}`} ask={opened} />}
     </div>
+  );
+}
+
+/** "Signed in just now", "… 5 minutes ago", "… 2 hours ago", "… 3 days ago". */
+function signedIn(i18n: I18n, since: string): string {
+  const minutes = Math.max(0, Math.floor((Date.now() - new Date(since).getTime()) / 60_000));
+  if (minutes < 1) return i18n.t('keys.signedInNow');
+  if (minutes < 60) return i18n.tn('keys.signedInMinutes', minutes);
+  if (minutes < 24 * 60) return i18n.tn('keys.signedInHours', Math.floor(minutes / 60));
+  return i18n.tn('keys.signedInDays', Math.floor(minutes / (24 * 60)));
+}
+
+/** The dialog Show opens before this browser passes keys on (docs/e2ee-plan.md): to another phone
+ * or browser of the person, or folder keys to another person. Both screens show the same code;
+ * Allow passes the keys on, Not me signs that phone or browser out, Not now (or closing) ends the
+ * check, and the ask stays listed. */
+function KeysAsk({ ask }: { ask: Ask }) {
+  const i18n = useI18n();
+  const { t } = i18n;
+  useKeyring();
+  const folders = useFolders();
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const phone = ask.client === 'app';
+  const act = (run: () => Promise<void>) => {
+    setBusy(true);
+    setProblem(null);
+    run()
+      .catch((e: unknown) => setProblem(t(e instanceof ApiError && e.status > 0 ? 'common.failed' : 'common.offline')))
+      .finally(() => setBusy(false));
+  };
+  const code = ask.code ? <CheckCode code={ask.code} /> : <p class="kwait">{t('keys.waitCode')}</p>;
+  return (
+    <Modal
+      key={`${ask.kind}:${ask.id}`}
+      title={ask.kind === 'device' ? t(phone ? 'keys.askPhone' : 'keys.askBrowser') : t('keys.personTitle', { name: ask.name })}
+      icon="key"
+      onClose={() => void keyring.hide(ask)}
+    >
+      {ask.kind === 'device' ? (
+        <>
+          <div class="group">
+            <div class="row">
+              <span class="ri acc">
+                <Icon name={phone ? 'smartphone' : 'monitor'} />
+              </span>
+              <span class="rt">
+                <b>{ask.name}</b>
+                {ask.since && <span>{signedIn(i18n, ask.since)}</span>}
+              </span>
+            </div>
+          </div>
+          <p class="label">{t(phone ? 'keys.showsPhone' : 'keys.showsBrowser')}</p>
+          {code}
+          <p class="help">
+            <span>
+              <Bold text={t(phone ? 'keys.notMePhone' : 'keys.notMeBrowser')} />
+            </span>
+          </p>
+        </>
+      ) : (
+        <>
+          <p class="modal-text">{t(keyring.keyChanged(ask) ? 'keys.personNew' : 'keys.personFirst', { name: ask.name })}</p>
+          <div class="kfolders">
+            {(ask.folders ?? []).map((id) => (
+              <span key={id} class="ftag">
+                <Icon name="folder" />
+                {folders.byId(id)?.name ?? '…'}
+              </span>
+            ))}
+          </div>
+          <p class="label">{t('keys.personCode', { name: ask.name })}</p>
+          {code}
+          <p class="help">
+            <span>
+              <Bold text={t('keys.personHelp')} />
+            </span>
+          </p>
+        </>
+      )}
+      {problem && (
+        <p class="help err" role="alert">
+          <Icon name="alert" />
+          {problem}
+        </p>
+      )}
+      <div class="dbtns">
+        <button type="button" class="tbtn" disabled={busy} onClick={() => act(() => (ask.kind === 'device' ? keyring.deny(ask) : keyring.hide(ask)))}>
+          {t(ask.kind === 'device' ? 'keys.notMe' : 'keys.notNow')}
+        </button>
+        <button type="button" class="btn sm primary" disabled={busy || !ask.code} onClick={() => act(() => keyring.allow(ask))}>
+          <Icon name="check" />
+          {t('keys.allow')}
+        </button>
+      </div>
+    </Modal>
   );
 }
 

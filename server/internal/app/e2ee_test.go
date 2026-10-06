@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/eschgi/share/server/internal/auth"
 	"github.com/eschgi/share/server/internal/db"
 	"github.com/eschgi/share/server/internal/db/dbtest"
 	"github.com/eschgi/share/server/internal/e2ee"
@@ -79,12 +81,17 @@ type keysAnswer struct {
 		Devices []struct {
 			ID        string `json:"id"`
 			PublicKey string `json:"public_key"`
+			Name      string `json:"name"`
+			Client    string `json:"client"`
+			Active    bool   `json:"active"`
 		} `json:"devices"`
 		People []struct {
 			Folder    string `json:"folder"`
 			Version   int    `json:"version"`
 			User      string `json:"user"`
+			Name      string `json:"name"`
 			PublicKey string `json:"public_key"`
+			Active    bool   `json:"active"`
 		} `json:"people"`
 		Recovery []struct {
 			Folder  string `json:"folder"`
@@ -99,6 +106,17 @@ type keysAnswer struct {
 			SecretSealed  string `json:"secret_sealed"`
 		} `json:"pins"`
 	} `json:"todo"`
+	Checks []struct {
+		ID         string  `json:"id"`
+		Asking     bool    `json:"asking"`
+		Device     *string `json:"device"`
+		User       *string `json:"user"`
+		From       string  `json:"from"`
+		Commitment string  `json:"commitment"`
+		Answer     *string `json:"answer"`
+		Answered   bool    `json:"answered"`
+		Reveal     *string `json:"reveal"`
+	} `json:"checks"`
 }
 
 func (k *keyring) unb64(s string) []byte {
@@ -738,6 +756,181 @@ func TestHeldBy(t *testing.T) {
 	}
 	if a := laptop.sync(); a.Person.HeldBy != 0 || a.Person.PasswordLock != nil {
 		t.Errorf("with the phone signed out, the key is lost: %+v", a.Person)
+	}
+}
+
+// A check before keys are passed on: the asking device commits to a nonce, the waiting side
+// answers with its own, the asking device reveals, and both get the same code from the key that
+// would get the keys. The server relays that in order, to these two only, for 15 minutes.
+func TestKeyChecks(t *testing.T) {
+	e := newEnv(t)
+	admin := e.admin()
+	family := e.firstFolder()
+	ak := e.keyring(admin)
+	ak.makePersonKey()
+	_, _, recoveryPub := e.recoveryKey(admin)
+	if r := ak.encrypt(family.ID, recoveryPub); r.status != http.StatusOK {
+		t.Fatalf("encrypting: %d %s", r.status, r.body)
+	}
+	ak.sync()
+	token, _, err := e.app.Auth.CreateInvite(context.Background(), "Admin", db.RoleAdmin, admin.userID, "cli", nil, auth.InviteLifetime)
+	if err != nil {
+		t.Fatal(err)
+	}
+	laptop := e.accept(token, "Laptop")
+	laptopID := laptop.body["device"].(map[string]any)["id"].(string)
+	lk := e.keyring(laptop)
+	a := ak.sync()
+	if len(a.Todo.Devices) != 1 || a.Todo.Devices[0].ID != laptopID || a.Todo.Devices[0].Name != "Laptop" || a.Todo.Devices[0].Client != "app" || !a.Todo.Devices[0].Active {
+		t.Fatalf("the laptop waits: %+v", a.Todo.Devices)
+	}
+
+	nonce := func() []byte {
+		b := make([]byte, e2ee.NonceSize)
+		rand.Read(b)
+		return b
+	}
+	na, nw := nonce(), nonce()
+	open := func(who signedIn, body map[string]any) response {
+		return e.postJSON(nil, "/api/keys/checks", who.token, body, nil)
+	}
+	if r := open(laptop, map[string]any{"device": laptopID, "commitment": b64u.EncodeToString(e2ee.Commitment(na))}); r.status != http.StatusNotFound {
+		t.Errorf("a device without the person's key asks: %d %s", r.status, r.body)
+	}
+	if r := open(admin, map[string]any{"device": laptopID, "user": admin.userID, "commitment": b64u.EncodeToString(e2ee.Commitment(na))}); r.status != http.StatusBadRequest {
+		t.Errorf("a device and a person: %d %s", r.status, r.body)
+	}
+	r := open(admin, map[string]any{"device": laptopID, "commitment": b64u.EncodeToString(e2ee.Commitment(na))})
+	if r.status != http.StatusCreated {
+		t.Fatalf("check: %d %s", r.status, r.body)
+	}
+	assertShape(t, "check", readFixture(t, "api/keys_check.json")["response"], r.json(t))
+	id := r.json(t)["id"].(string)
+
+	l := lk.sync()
+	if len(l.Checks) != 1 || l.Checks[0].ID != id || l.Checks[0].Asking || l.Checks[0].From != "Stefan's phone" || l.Checks[0].Answer != nil || l.Checks[0].Reveal != nil {
+		t.Fatalf("the laptop sees the check: %+v", l.Checks)
+	}
+	answer := func(who signedIn, n []byte) response {
+		return e.sendJSON("PUT", "/api/keys/checks/"+id+"/answer", who.token, map[string]string{"nonce": b64u.EncodeToString(n)})
+	}
+	reveal := func(n, answer []byte) response {
+		return e.sendJSON("PUT", "/api/keys/checks/"+id+"/reveal", admin.token, map[string]string{"nonce": b64u.EncodeToString(n), "answer": b64u.EncodeToString(answer)})
+	}
+	if r := reveal(na, nw); r.status != http.StatusConflict || r.errorCode() != "not_answered" {
+		t.Errorf("revealing before the answer: %d %s", r.status, r.body)
+	}
+	if r := answer(admin, nw); r.status != http.StatusNotFound {
+		t.Errorf("the asker answers itself: %d %s", r.status, r.body)
+	}
+	if r := answer(laptop, nw[:16]); r.status != http.StatusBadRequest {
+		t.Errorf("a short nonce: %d %s", r.status, r.body)
+	}
+	if r := answer(laptop, nw); r.status != http.StatusNoContent {
+		t.Fatalf("answer: %d %s", r.status, r.body)
+	}
+	a = ak.sync()
+	assertShape(t, "keys with a check", readFixture(t, "api/keys.json")["response"], e.get("/api/keys", admin.token).json(t))
+	if len(a.Checks) != 1 || !a.Checks[0].Asking || a.Checks[0].Answer == nil || *a.Checks[0].Answer != b64u.EncodeToString(nw) {
+		t.Fatalf("the asker sees the answer: %+v", a.Checks)
+	}
+	// The laptop answers again, e.g. after a reload: a reveal for the answer seen before finds none,
+	// as the code would be made from another one.
+	nw2 := nonce()
+	if r := answer(laptop, nw2); r.status != http.StatusNoContent {
+		t.Fatalf("answering again: %d %s", r.status, r.body)
+	}
+	if r := reveal(na, nw); r.status != http.StatusConflict || r.errorCode() != "not_answered" {
+		t.Errorf("revealing for an answer that changed: %d %s", r.status, r.body)
+	}
+	nw = nw2
+	if r := reveal(nonce(), nw); r.status != http.StatusBadRequest {
+		t.Errorf("another nonce: %d %s", r.status, r.body)
+	}
+	if r := reveal(na, nw[:16]); r.status != http.StatusBadRequest {
+		t.Errorf("a short answer: %d %s", r.status, r.body)
+	}
+	if r := reveal(na, nw); r.status != http.StatusNoContent {
+		t.Fatalf("reveal: %d %s", r.status, r.body)
+	}
+	if r := reveal(na, nw); r.status != http.StatusConflict {
+		t.Errorf("revealing twice: %d %s", r.status, r.body)
+	}
+	if r := answer(laptop, nonce()); r.status != http.StatusNotFound {
+		t.Errorf("answering after the reveal: %d %s", r.status, r.body)
+	}
+	l = lk.sync()
+	if len(l.Checks) != 1 || l.Checks[0].Reveal == nil || !l.Checks[0].Answered {
+		t.Fatalf("the laptop sees the reveal: %+v", l.Checks)
+	}
+	revealed := lk.unb64(*l.Checks[0].Reveal)
+	if !bytes.Equal(e2ee.Commitment(revealed), lk.unb64(l.Checks[0].Commitment)) {
+		t.Fatal("the reveal doesn't match the commitment")
+	}
+	if e2ee.CheckCode(revealed, nw, lk.devicePub) != e2ee.CheckCode(na, nw, lk.unb64(a.Todo.Devices[0].PublicKey)) {
+		t.Error("the two screens show different codes")
+	}
+	if r := e.do(nil, "DELETE", "/api/keys/checks/"+id, laptop.token, nil, nil); r.status != http.StatusNoContent {
+		t.Errorf("closing: %d %s", r.status, r.body)
+	}
+	if a := ak.sync(); len(a.Checks) != 0 {
+		t.Errorf("a closed check stays: %+v", a.Checks)
+	}
+
+	// A person who lacks a folder's key: only devices of theirs that hold their key answer.
+	maria := e.accept(e.invite(admin, "Maria", db.RoleMember), "Maria's phone")
+	mk := e.keyring(maria)
+	mk.makePersonKey()
+	a = ak.sync()
+	if len(a.Todo.People) != 1 || a.Todo.People[0].User != maria.userID || a.Todo.People[0].Name != "Maria" || !a.Todo.People[0].Active {
+		t.Fatalf("Maria waits: %+v", a.Todo.People)
+	}
+	r = open(admin, map[string]any{"user": maria.userID, "commitment": b64u.EncodeToString(e2ee.Commitment(na))})
+	if r.status != http.StatusCreated {
+		t.Fatalf("check for Maria: %d %s", r.status, r.body)
+	}
+	id = r.json(t)["id"].(string)
+	if m := mk.sync(); len(m.Checks) != 1 || m.Checks[0].User == nil || *m.Checks[0].User != maria.userID {
+		t.Fatalf("Maria's phone sees the check: %+v", m.Checks)
+	}
+	token, _, err = e.app.Auth.CreateInvite(context.Background(), "Maria", db.RoleMember, maria.userID, "cli", nil, auth.InviteLifetime)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tablet := e.accept(token, "Maria's tablet")
+	tk := e.keyring(tablet)
+	if s := tk.sync(); len(s.Checks) != 0 {
+		t.Errorf("a device without Maria's key sees her check: %+v", s.Checks)
+	}
+	if r := answer(tablet, nw); r.status != http.StatusNotFound {
+		t.Errorf("a device without Maria's key answers: %d %s", r.status, r.body)
+	}
+	if r := answer(maria, nw); r.status != http.StatusNoContent {
+		t.Fatalf("Maria answers: %d %s", r.status, r.body)
+	}
+	if r := open(admin, map[string]any{"user": admin.userID, "commitment": b64u.EncodeToString(e2ee.Commitment(na))}); r.status != http.StatusNotFound {
+		t.Errorf("a check for oneself: %d %s", r.status, r.body)
+	}
+
+	if r := e.do(nil, "DELETE", "/api/keys/checks/not-an-id", admin.token, nil, nil); r.status != http.StatusNotFound {
+		t.Errorf("closing a check without an id: %d %s", r.status, r.body)
+	}
+
+	// After 15 minutes a check is gone, and those who weren't seen meanwhile are no longer asked.
+	e.clock.Add(16 * time.Minute)
+	a = ak.sync()
+	if len(a.Checks) != 0 {
+		t.Errorf("an old check stays: %+v", a.Checks)
+	}
+	if len(a.Todo.Devices) != 1 || a.Todo.Devices[0].Active || len(a.Todo.People) != 1 || a.Todo.People[0].Active {
+		t.Errorf("the laptop and Maria were seen lately: %+v", a.Todo)
+	}
+	if r := reveal(na, nw); r.status != http.StatusNotFound {
+		t.Errorf("revealing an old check: %d %s", r.status, r.body)
+	}
+	mk.sync()
+	if a := ak.sync(); len(a.Todo.People) != 1 || !a.Todo.People[0].Active {
+		t.Errorf("Maria's phone is back: %+v", a.Todo.People)
 	}
 }
 

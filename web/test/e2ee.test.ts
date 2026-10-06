@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import checkVectors from '../../contract/crypto/check.json';
 import contentVectors from '../../contract/crypto/content.json';
 import rfc from '../../contract/crypto/hpke_rfc9180.json';
 import lockVectors from '../../contract/crypto/lock.json';
@@ -7,6 +8,8 @@ import sealVectors from '../../contract/crypto/seal.json';
 import { b64u, concat, fromB64u, utf8, type Bytes } from '../src/e2ee/bytes';
 import { chunkSize, cipherRange, ContentCipher, decryptChunks, decryptFile, decryptStream, encryptedSize, encryptedSlice, headerSize, newHeader } from '../src/e2ee/content';
 import {
+  checkCode,
+  commitment,
   formatRecoveryCode,
   generateKeyPair,
   importPrivateKey,
@@ -206,5 +209,14 @@ describe('the recovery code', () => {
     const { secret, code } = newRecoveryCode();
     expect(code).toMatch(/^([0-9A-HJKMNP-TV-Z]{4}-){7}[0-9A-HJKMNP-TV-Z]{4}$/);
     expect(parseRecoveryCode(code)).toEqual(secret);
+  });
+});
+
+describe('checks', () => {
+  it('commit and make codes as the vectors do', async () => {
+    for (const c of checkVectors.cases) {
+      expect(b64u(await commitment(fromB64u(c.asker_nonce))), c.name).toBe(c.commitment);
+      expect(await checkCode(fromB64u(c.asker_nonce), fromB64u(c.answer_nonce), fromB64u(c.public_key)), c.name).toBe(c.code);
+    }
   });
 });
