@@ -97,7 +97,10 @@ scalar, everything binary in JSON as base64url without padding.
 
 ## How it works
 
-**Every start of the website or the app, signed in,** asks `GET /api/keys` and does what is due:
+**Every start of the website or the app, signed in,** asks `GET /api/keys` and does what is due,
+and so does a check-in every half minute while the page is shown or the app is in front, and when
+it comes back (quietly: the status doesn't pass through loading, and stays as it is without an
+answer):
 - sends this device's public key, if the server doesn't have it (new device, or a browser whose
   storage was cleared);
 - makes the person key if the person has none yet, sealed for this device;
@@ -107,7 +110,8 @@ scalar, everything binary in JSON as base64url without padding.
   them, seals folder keys for the recovery key, makes a folder's next key version when one is due,
   and locks new versions for PIN links that show the folder.
 
-So sealing for others always happens the same way: whoever is online with the key does it. Turning
+So sealing for others always happens the same way: whoever has Share open with the key does it,
+within half a minute, and the device that waits opens it at its own next check-in. Turning
 on encryption only seals the new folder key for the admin who does it and for the recovery key; the
 admin's device then finds everyone else on its to-do list at once.
 

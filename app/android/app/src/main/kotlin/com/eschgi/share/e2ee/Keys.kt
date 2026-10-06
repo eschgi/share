@@ -72,8 +72,8 @@ object Keys {
         return Account(id, device)
     }
 
-    /** Opens the keys, or opens them again and does what is due; with [password] right after signing in with it. The state. */
-    fun sync(context: Context, password: String? = null): Map<String, Any?> {
+    /** Opens the keys, or opens them again and does what is due; with [password] right after signing in with it, [quiet] for a check-in (Keyring.sync). The state. */
+    fun sync(context: Context, password: String? = null, quiet: Boolean = false): Map<String, Any?> {
         val r = ring(context)
         val me = account(context)
         if (me == null) {
@@ -81,7 +81,7 @@ object Keys {
             return r.state()
         }
         try {
-            r.sync(me, password)
+            r.sync(me, password, quiet)
         } catch (e: IOException) {
             Log.i(TAG, "keys: $e")
         } catch (e: JSONException) {
@@ -103,7 +103,7 @@ object Keys {
             if (auth == Credentials.PIN) {
                 SecretStore(context).read(PIN_SECRET)?.let { secret -> runCatching { r.openPinKeys(ServerKeysApi(context.applicationContext, Credentials.PIN), secret) } }
             } else {
-                account(context)?.let { me -> runCatching { r.sync(me) } }
+                account(context)?.let { me -> runCatching { r.sync(me, quiet = true) } }
             }
         }
         return r.fileKey(file)

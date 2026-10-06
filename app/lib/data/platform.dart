@@ -339,8 +339,9 @@ abstract class Platform {
   // uploads use them without Flutter. These throw [KeysException].
 
   /// Opens the keys, or opens them again and does what is due; with [password] right after
-  /// signing in with it. Signed out, the keys are forgotten.
-  Future<KeysState> syncKeys({String? password});
+  /// signing in with it. Signed out, the keys are forgotten. [quiet]: a check-in, which neither
+  /// passes through loading nor changes the status when it fails.
+  Future<KeysState> syncKeys({String? password, bool quiet = false});
   Stream<KeysState> get keyChanges;
 
   /// An encrypted file's thumbnail, opened and checked to be a small JPEG.
@@ -599,8 +600,8 @@ class ChannelPlatform implements Platform {
   static Map<String, Object?> _file(FileInfo f, SendAuth auth) => {'file': jsonEncode(f.toJson()), 'auth': auth.name};
 
   @override
-  Future<KeysState> syncKeys({String? password}) async =>
-      KeysState.fromMap(await _keysCall<Map<Object?, Object?>>('keys.sync', {'password': ?password}) ?? const {});
+  Future<KeysState> syncKeys({String? password, bool quiet = false}) async =>
+      KeysState.fromMap(await _keysCall<Map<Object?, Object?>>('keys.sync', {'password': ?password, if (quiet) 'quiet': true}) ?? const {});
 
   @override
   Stream<KeysState> get keyChanges => _keys.stream;

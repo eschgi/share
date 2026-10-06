@@ -76,6 +76,26 @@ void main() {
     expect(platform.keySyncs, contains('correct horse'));
   });
 
+  testWidgets('a phone checks in with the keys every half minute while in front, and on coming back', (tester) async {
+    final platform = signedInPhone();
+    await startApp(tester, platform, adminFolders());
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    final first = platform.keyCheckIns;
+    await tester.pump(const Duration(seconds: 30));
+    expect(platform.keyCheckIns, first + 1);
+    // Into the background and back, the way Android goes.
+    for (final s in [AppLifecycleState.inactive, AppLifecycleState.hidden, AppLifecycleState.paused]) {
+      tester.binding.handleAppLifecycleStateChanged(s);
+    }
+    await tester.pump(const Duration(minutes: 2));
+    expect(platform.keyCheckIns, first + 1, reason: 'none in the background');
+    for (final s in [AppLifecycleState.hidden, AppLifecycleState.inactive, AppLifecycleState.resumed]) {
+      tester.binding.handleAppLifecycleStateChanged(s);
+    }
+    await tester.pump();
+    expect(platform.keyCheckIns, first + 2, reason: 'one at once on coming back');
+  });
+
   testWidgets('joining with an invite link opens the keys its secret brings', (tester) async {
     final platform = FakePlatform();
     await startApp(tester, platform, FakeServer());

@@ -63,14 +63,18 @@ export function Account({ me: first, notice }: AccountProps) {
       startSender(signedOut);
       void keyring.start(first);
     }
-    // Coming back to the page, the keys may have news: someone to seal for, a new version.
-    const back = () => {
-      if (document.visibilityState === 'visible' && keyring.me) void keyring.refresh();
+    // The keys may have news: someone to seal for, a key sealed for this browser, a new version.
+    // So the page checks in when it comes back, and every half minute while it is shown, which
+    // lets a phone or browser that waits for the person's key get it within a minute.
+    const checkIn = () => {
+      if (document.visibilityState === 'visible' && keyring.me) void keyring.checkIn();
     };
-    document.addEventListener('visibilitychange', back);
+    document.addEventListener('visibilitychange', checkIn);
+    const every = setInterval(checkIn, 30_000);
     return () => {
       onSignedOut(null);
-      document.removeEventListener('visibilitychange', back);
+      document.removeEventListener('visibilitychange', checkIn);
+      clearInterval(every);
     };
   }, []);
 

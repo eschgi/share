@@ -12,6 +12,7 @@ import org.junit.Assert.assertTrue
 import org.junit.FixMethodOrder
 import org.junit.Test
 import org.junit.runners.MethodSorters
+import java.io.IOException
 
 /**
  * The keyring's flows against a small fake of the server's keys API (docs/e2ee-plan.md), as
@@ -41,6 +42,7 @@ class KeyringTest {
         val recoverySealed = HashMap<String, String>() // folder:version
         val pins = HashMap<String, Pin>()
         val rekey = HashSet<String>()
+        var offline = false // no answer at all
     }
 
     private fun conflict(code: String) = KeysApiError(409, code, code)
@@ -60,6 +62,7 @@ class KeyringTest {
     private fun versions() = Fake.folders.flatMap { (f, keys) -> keys.mapIndexed { i, k -> Triple(f, i + 1, k) } }
 
     private fun serve(method: String, path: String, body: JSONObject?): JSONObject {
+        if (Fake.offline) throw IOException("no answer")
         val (user, device) = Fake.caller ?: throw KeysApiError(401, "unauthorized", "")
         val p = Fake.people[user]!!
         fun held(folder: String, version: Int, who: String = user) = Fake.sealed.containsKey("$folder:$version:$who")
@@ -187,6 +190,12 @@ class KeyringTest {
         ring.sync(account, password)
     }
 
+    /** A check-in, as the app makes every half minute while it is in front. */
+    private fun Phone.checkIn() {
+        Fake.caller = account.userId to account.deviceId
+        ring.sync(account, quiet = true)
+    }
+
     private fun <T> Phone.call(f: Keyring.() -> T): T {
         Fake.caller = account.userId to account.deviceId
         return ring.f()
@@ -256,6 +265,30 @@ class KeyringTest {
         a2.sync()
         assertEquals(Keyring.Status.READY, a2.ring.status)
         assertArrayEquals(fileKey, a2.ring.fileKey(file("f1", seal!!)))
+    }
+
+    @Test
+    fun ca_checkInsSealForAWaitingPhoneAndOpenItWithoutLoading() {
+        val a3 = phone("ada", "a3")
+        a3.sync()
+        assertEquals(Keyring.Status.WAITING, a3.ring.status)
+        val seen = ArrayList<Keyring.Status>()
+        a3.ring.onChange = { seen += a3.ring.status }
+        a1!!.checkIn()
+        a3.checkIn()
+        assertEquals(Keyring.Status.READY, a3.ring.status)
+        assertFalse("a check-in never shows loading: $seen", Keyring.Status.LOADING in seen)
+        assertArrayEquals(fileKey, a3.ring.fileKey(file("f1", seal!!)))
+
+        // Without an answer, a check-in keeps what is open, and the status.
+        Fake.offline = true
+        try {
+            assertThrows(IOException::class.java) { a3.checkIn() }
+        } finally {
+            Fake.offline = false
+        }
+        assertEquals(Keyring.Status.READY, a3.ring.status)
+        assertArrayEquals(fileKey, a3.ring.fileKey(file("f1", seal!!)))
     }
 
     @Test

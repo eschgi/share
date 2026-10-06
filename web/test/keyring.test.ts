@@ -28,6 +28,8 @@ const fake = vi.hoisted(() => ({
   recoverySealed: new Map<string, string>(),
   pins: new Map<string, { folder: string; secret_sealed: string; secret_version: number; locked: Map<number, string> }>(),
   rekey: new Set<string>(),
+  /** No answer at all. */
+  offline: false,
 }));
 
 vi.mock('../src/e2ee/store', () => {
@@ -52,6 +54,7 @@ vi.mock('../src/api', async (importOriginal) => {
   return {
     ...real,
     getKeys: async (): Promise<Api.KeysAnswer> => {
+      if (fake.offline) throw new real.ApiError(0, 'network', 'no answer');
       const { c, p } = member();
       const held = (folder: string, version: number, user = c.user) => fake.sealed.has(`${folder}:${version}:${user}`);
       const mine = versions().filter((v) => sees(p, v.folder));
@@ -217,7 +220,7 @@ describe('keyring', { timeout: 60_000 }, () => {
     expect(a1.ring.encryptFor('plain')).toBeNull();
 
     const seal = await newSeal(target, 1000, '1');
-    file.enc = { version: 1, key: seal.sealed, header: seal.header, plain_size: 1000 } as Api.FileEnc;
+    file.enc = { version: 1, key: seal.sealed, header: seal.header };
     fileKey = fromB64u(seal.key);
     expect(await a1.ring.fileKey({ id: file.id, folder: 'f1', enc: file.enc })).toEqual(fileKey);
   });
@@ -235,6 +238,33 @@ describe('keyring', { timeout: 60_000 }, () => {
     await a2.ring.refresh();
     expect(a2.ring.status).toBe('ready');
     expect(await a2.ring.fileKey({ id: file.id, folder: 'f1', enc: file.enc! })).toEqual(fileKey);
+  });
+
+  it('checks in quietly: seals for a browser that waits, which then opens it, never showing loading', async () => {
+    const a4 = browser('ada', 'a4');
+    as(a4);
+    await a4.ring.start(a4.me);
+    expect(a4.ring.status).toBe('waiting');
+    const seen: string[] = [];
+    a4.ring.watch(() => seen.push(a4.ring.status));
+    as(a1);
+    await a1.ring.checkIn();
+    as(a4);
+    await a4.ring.checkIn();
+    expect(a4.ring.status).toBe('ready');
+    expect(seen).not.toContain('loading');
+    expect(await a4.ring.fileKey({ id: file.id, folder: 'f1', enc: file.enc! })).toEqual(fileKey);
+
+    // Without an answer, a check-in keeps what is open, and the status.
+    fake.offline = true;
+    try {
+      await a4.ring.checkIn();
+    } finally {
+      fake.offline = false;
+    }
+    expect(a4.ring.status).toBe('ready');
+    expect(seen).not.toContain('failed');
+    expect(await a4.ring.fileKey({ id: file.id, folder: 'f1', enc: file.enc! })).toEqual(fileKey);
   });
 
   it('opens the keys in a new browser with the password, and not with a wrong one', async () => {

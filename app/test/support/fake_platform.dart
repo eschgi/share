@@ -222,8 +222,10 @@ class FakePlatform implements Platform {
   /// The folders that have a key: encrypted now, or before.
   Set<String> encryptedFolders = {};
 
-  /// The passwords syncKeys got (null for none), and what else was asked.
+  /// The passwords syncKeys got (null for none), how often it checked in quietly, and what else
+  /// was asked.
   final keySyncs = <String?>[];
+  int keyCheckIns = 0;
   final keyCalls = <String>[];
   String recoveryCode = '7SEN-4M38-3QV2-Z38M-JEGM-QXC8-FHPD-HJ4M';
   final linkSecret = 'S' * 43;
@@ -235,8 +237,12 @@ class FakePlatform implements Platform {
 
   /// As Kotlin, every sync says where the keys stand.
   @override
-  Future<KeysState> syncKeys({String? password}) async {
-    keySyncs.add(password);
+  Future<KeysState> syncKeys({String? password, bool quiet = false}) async {
+    if (quiet) {
+      keyCheckIns++;
+    } else {
+      keySyncs.add(password);
+    }
     keysEvents.add(keysState);
     return keysState;
   }

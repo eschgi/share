@@ -77,6 +77,8 @@ export class Keyring {
   private fileKeys = new Map<string, Promise<Bytes>>();
   private listeners = new Set<() => void>();
   private running: Promise<void> | null = null;
+  /** How many syncs run now; a check-in skips its turn while one does. */
+  private syncing = 0;
   /** The person's key was just opened with the password, which so needs no new lock. */
   private openedWithPassword = false;
 
@@ -115,6 +117,16 @@ export class Keyring {
     return this.running;
   }
 
+  /** Checks in with the server: seals the person's key for a phone or browser that waits, and
+   * opens what was sealed for this one. Every half minute while the page is shown, and when it
+   * comes back; quietly, so the page doesn't flicker through loading, and a check-in without an
+   * answer keeps the status. Skipped while another sync runs. */
+  checkIn(): Promise<void> {
+    if (!this.me || this.syncing > 0) return Promise.resolve();
+    this.running = this.sync(undefined, true).catch(() => {});
+    return this.running;
+  }
+
   /** Whether the folder's key of that version is open here. */
   hasFolderKey(folder: string, version: number): boolean {
     return this.folders.has(slot(folder, version));
@@ -144,10 +156,19 @@ export class Keyring {
     return k;
   }
 
-  private async sync(password?: string): Promise<void> {
+  private async sync(password?: string, quiet = false): Promise<void> {
+    this.syncing++;
+    try {
+      await this.load(password, quiet);
+    } finally {
+      this.syncing--;
+    }
+  }
+
+  private async load(password: string | undefined, quiet: boolean): Promise<void> {
     const me = this.me;
     if (!me) return;
-    this.changed('loading');
+    if (!quiet) this.changed('loading');
     this.device = await deviceKeyFor(me.device.id);
     const device = this.device;
     // Keys of what this browser was before signing in again open nothing any more.

@@ -95,16 +95,20 @@ class Keyring(private val api: KeysApi, private val store: DeviceKeyStore) {
     /** Who the keys are for; null before [sync]. */
     val who: Account? get() = account
 
-    /** Opens the keys of [account] on this phone and does what is due; with [password], right after signing in with it. */
+    /**
+     * Opens the keys of [account] on this phone and does what is due; with [password], right
+     * after signing in with it. [quiet]: a check-in, which the app makes every half minute while
+     * it is in front; it doesn't pass through [Status.LOADING], and keeps the status if it fails.
+     */
     @Synchronized
-    fun sync(account: Account, password: String? = null) {
+    fun sync(account: Account, password: String? = null, quiet: Boolean = false) {
         if (this.account != account) forget()
         this.account = account
-        changed(Status.LOADING)
+        if (!quiet) changed(Status.LOADING)
         try {
             load(account, password)
         } catch (e: Exception) {
-            changed(Status.FAILED)
+            if (!quiet) changed(Status.FAILED)
             throw e
         }
     }

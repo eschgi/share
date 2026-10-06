@@ -268,7 +268,7 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
         io.execute {
             val value: Any? = try {
                 when (call.method) {
-                    "keys.sync" -> Keys.sync(app, call.argument<String>("password"))
+                    "keys.sync" -> Keys.sync(app, call.argument<String>("password"), call.argument<Boolean>("quiet") == true)
                     "keys.state" -> ring.state()
                     "keys.thumb" -> Keys.thumb(app, auth(call), file(), call.argument<ByteArray>("data")!!)
                     "keys.decrypt" -> Keys.decrypt(app, auth(call), file(), call.argument<ByteArray>("data")!!)

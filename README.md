@@ -176,9 +176,10 @@ The design and the formats are in [docs/e2ee-plan.md](docs/e2ee-plan.md).
   open. Names, days, sizes and who sees which folder stay readable to the server, so the library,
   search and sorting work as before.
 - **The keys come by themselves.** Every phone and browser has a key of its own, which never leaves
-  it. Whoever is online with a key seals it for those who lack it: someone given a folder, a new
-  phone of someone, the recovery key. A new phone or browser shows encrypted files as locked and
-  waits for another one of the person; signing in with the password opens them at once, and an
+  it. Whoever has Share open with a key seals it for those who lack it, checking every half
+  minute: someone given a folder, a new phone of someone, the recovery key. A new phone or browser
+  shows encrypted files as locked and waits for another one of the person, which takes a minute
+  while that one has Share open; signing in with the password opens them at once, and an
   invite carries the keys in its link, after the token, where the server never sees them.
 - **The recovery code.** The first encrypted folder shows its admin a recovery code, once: written
   down or printed, it opens every encrypted folder again should all phones and browsers be lost.

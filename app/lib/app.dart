@@ -112,16 +112,24 @@ class _ShareAppState extends State<ShareApp> {
   StreamSubscription<String>? _links;
   StreamSubscription<SharedFiles>? _shared;
 
-  /// Coming back to the app, the keys may have news: someone to seal for, a new version.
-  late final _lifecycle = AppLifecycleListener(onResume: () {
-    final s = widget.services;
-    if (s.session.current is SignedInState) unawaited(s.keys.sync());
+  /// The keys may have news: someone to seal for, a key sealed for this phone, a new version. So
+  /// the app checks in when it comes back, and every half minute while it is in front, which
+  /// lets a phone or browser that waits for the person's key get it within a minute.
+  late final _lifecycle = AppLifecycleListener(onResume: _checkInKeys);
+  late final _keysTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+    if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) _checkInKeys();
   });
+
+  void _checkInKeys() {
+    final s = widget.services;
+    if (s.session.current is SignedInState) unawaited(s.keys.checkIn());
+  }
 
   @override
   void initState() {
     super.initState();
     _lifecycle;
+    _keysTimer;
     final s = widget.services;
     unawaited(s.start());
     _links = s.platform.links.listen(_open);
@@ -134,6 +142,7 @@ class _ShareAppState extends State<ShareApp> {
     _links?.cancel();
     _shared?.cancel();
     _lifecycle.dispose();
+    _keysTimer.cancel();
     super.dispose();
   }
 

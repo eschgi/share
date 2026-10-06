@@ -37,6 +37,17 @@ class KeysRepository extends ChangeNotifier {
     }
   }
 
+  /// Checks in with the server: seals the person's key for a phone or browser that waits, and
+  /// opens what was sealed for this phone. Every half minute while the app is in front, and when
+  /// it comes back; quietly, so the screens don't flicker through loading. Never throws.
+  Future<void> checkIn() async {
+    try {
+      _set(await platform.syncKeys(quiet: true));
+    } on KeysException {
+      // no answer this time: the next check-in asks again
+    }
+  }
+
   /// A phone without its keys that waits for another one, while there are encrypted folders.
   bool get waiting => _state.status == KeysStatus.waiting && _state.encryptedFolders > 0;
 
