@@ -66,9 +66,11 @@ func (d *DB) LibraryDays(ctx context.Context, f LibraryFilter) ([]DaySummary, er
 	var out []DaySummary
 	for rows.Next() {
 		var s DaySummary
-		if err := rows.Scan(&s.Day, &s.Count, &s.Bytes); err != nil {
+		var day time.Time
+		if err := rows.Scan(&day, &s.Count, &s.Bytes); err != nil {
 			return nil, err
 		}
+		s.Day = day.Format(time.DateOnly)
 		out = append(out, s)
 	}
 	return out, rows.Err()
@@ -86,7 +88,7 @@ func (d *DB) LibraryFiles(ctx context.Context, f LibraryFilter, after *Position,
 	if after != nil {
 		// The same order as the files_ready_by_time index: newest first, then by id.
 		w += " AND (uploaded_at < ? OR (uploaded_at = ? AND id > ?))"
-		args = append(args, ms(after.UploadedAt), ms(after.UploadedAt), after.ID)
+		args = append(args, after.UploadedAt, after.UploadedAt, after.ID)
 	}
 	args = append(args, limit)
 	return queryFiles(ctx, d, "SELECT "+fileColumns+" FROM files WHERE "+w+" ORDER BY uploaded_at DESC, id LIMIT ?", args...)

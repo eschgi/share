@@ -33,7 +33,7 @@ func oldFiles(t *testing.T, files map[string]string, ids map[string]string) func
 			ids[rel] = id
 			day, name, _ := strings.Cut(rel, "/")
 			if _, err := d.Exec(`INSERT INTO files (id, state, name, size, received, mime, kind, rel_path, upload_day,
-				created_at, updated_at, uploaded_at) VALUES (?, 'ready', ?, ?, ?, 'text/plain', 'document', ?, ?, 1, 1, 1)`,
+				created_at, updated_at, uploaded_at) VALUES (?, 'ready', ?, ?, ?, 'text/plain', 'document', ?, ?, 'epoch', 'epoch', 'epoch')`,
 				id, name, len(content), len(content), rel, day); err != nil {
 				t.Fatal(err)
 			}
@@ -197,7 +197,7 @@ func TestATrashedFileStillAtTheOldPlaceIsNotForgotten(t *testing.T) {
 	fx := newFixtureWith(t, oldFiles(t, map[string]string{"2026-09-26/old.jpg": "old"}, ids))
 	ctx := context.Background()
 	// Deleted just before the upgrade: the row says trashed, the bytes didn't move yet.
-	if _, err := fx.db.Exec("UPDATE files SET state = 'trashed', deleted_at = 1 WHERE id = ?", ids["2026-09-26/old.jpg"]); err != nil {
+	if _, err := fx.db.Exec("UPDATE files SET state = 'trashed', deleted_at = 'epoch' WHERE id = ?", ids["2026-09-26/old.jpg"]); err != nil {
 		t.Fatal(err)
 	}
 	if err := fx.lib.reconcileTrash(ctx); err != nil {

@@ -19,6 +19,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/stdlib"
 )
 
@@ -41,7 +42,7 @@ func Open(ctx context.Context, url string) (*DB, error) {
 		return nil, errors.New("the PostgreSQL address can't be read") // its text may hold the password
 	}
 	where := cfg.Host + "/" + cfg.Database
-	sqldb := sql.OpenDB(pgConnector{stdlib.GetConnector(*cfg)})
+	sqldb := sql.OpenDB(pgConnector{stdlib.GetConnector(*cfg, stdlib.OptionAfterConnect(utcTimes))})
 	sqldb.SetMaxOpenConns(8)
 	sqldb.SetMaxIdleConns(4)
 	// A database host may close idle connections, Neon when it pauses after 5 minutes.
@@ -57,6 +58,13 @@ func Open(ctx context.Context, url string) (*DB, error) {
 		return nil, fmt.Errorf("PostgreSQL at %s: %w", where, err)
 	}
 	return &DB{DB: sqldb}, nil
+}
+
+// utcTimes has a connection read times in UTC, as Share keeps and sends them, rather than in
+// this machine's time zone.
+func utcTimes(_ context.Context, conn *pgx.Conn) error {
+	conn.TypeMap().RegisterType(&pgtype.Type{Name: "timestamptz", OID: pgtype.TimestamptzOID, Codec: &pgtype.TimestamptzCodec{ScanLocation: time.UTC}})
+	return nil
 }
 
 // unusable is a server that answers but can't hold Share's schema.
@@ -209,33 +217,23 @@ func retryable(err error) bool {
 	return errors.As(err, &pgErr) && (pgErr.Code == "40001" || pgErr.Code == "40P01")
 }
 
+// noRow reports whether a lookup found nothing: no row matched, or the id it was given isn't a
+// UUID, which no row's id is.
+func noRow(err error) bool {
+	return errors.Is(err, sql.ErrNoRows) || BadValue(err)
+}
+
+// BadValue reports whether err is PostgreSQL refusing a value as its column's type, such as an
+// id that isn't a UUID: the mistake of whoever sent it, not the server's.
+func BadValue(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "22P02"
+}
+
 // isUniqueViolation reports whether err comes from a UNIQUE constraint.
 func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
-}
-
-// ms converts a time to the Unix milliseconds stored in the database.
-func ms(t time.Time) int64 { return t.UnixMilli() }
-
-// fromMS converts stored Unix milliseconds back to a UTC time.
-func fromMS(v int64) time.Time { return time.UnixMilli(v).UTC() }
-
-// nullMS stores an optional time; nil becomes NULL.
-func nullMS(t *time.Time) any {
-	if t == nil {
-		return nil
-	}
-	return t.UnixMilli()
-}
-
-// optTime reads an optional time.
-func optTime(v sql.NullInt64) *time.Time {
-	if !v.Valid {
-		return nil
-	}
-	t := fromMS(v.Int64)
-	return &t
 }
 
 // nullString stores an optional string; "" becomes NULL.

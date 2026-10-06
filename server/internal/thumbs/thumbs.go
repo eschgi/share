@@ -79,8 +79,8 @@ type Bucket interface {
 	Remove(ctx context.Context, key string) error
 }
 
-// Store saves thumbnails as <Dir>/ab/<id>.jpg, or in the bucket next to the files, and
-// records them in the database.
+// Store saves thumbnails as <Dir>/<the id's last two characters>/<id>.jpg, or in the bucket
+// next to the files, and records them in the database.
 type Store struct {
 	DB   *db.DB
 	Dir  string
@@ -95,8 +95,9 @@ type Store struct {
 	failed map[string]int // read errors per photo, for giving up after a few
 }
 
-// Path is where the thumbnail of file id is kept on a drive.
-func (s *Store) Path(id string) string { return filepath.Join(s.Dir, id[:2], id+".jpg") }
+// Path is where the thumbnail of file id is kept on a drive: in a folder named after the id's
+// last two characters, which are random, where its first ones are the time it was made.
+func (s *Store) Path(id string) string { return filepath.Join(s.Dir, id[len(id)-2:], id+".jpg") }
 
 // Read returns the thumbnail of file id; fs.ErrNotExist if there is none.
 func (s *Store) Read(ctx context.Context, id string) ([]byte, error) {

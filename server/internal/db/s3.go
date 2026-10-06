@@ -22,7 +22,7 @@ func (d *DB) PurgeToS3Garbage(ctx context.Context, id string, at time.Time, keys
 		purged = true
 		for _, key := range keys {
 			if _, err := tx.ExecContext(ctx, `INSERT INTO s3_garbage (key, created_at) VALUES (?, ?)
-				ON CONFLICT (key) DO UPDATE SET created_at = excluded.created_at`, key, ms(at)); err != nil {
+				ON CONFLICT (key) DO UPDATE SET created_at = excluded.created_at`, key, at); err != nil {
 				return err
 			}
 		}

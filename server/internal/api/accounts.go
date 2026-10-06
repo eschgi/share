@@ -433,6 +433,10 @@ func (a *API) about(w http.ResponseWriter, r *http.Request) {
 }
 
 func internal(w http.ResponseWriter, what string, err error) {
+	if db.BadValue(err) {
+		httpx.WriteError(w, http.StatusBadRequest, "bad_request", "An id in the request isn't one.")
+		return
+	}
 	log.Printf("api: %s: %v", what, err)
 	httpx.WriteError(w, http.StatusInternalServerError, "internal", "Something went wrong on the server.")
 }

@@ -50,8 +50,9 @@ type API struct {
 	folderCache folderCache
 }
 
-// Register adds the API routes to mux.
-func (a *API) Register(mux *http.ServeMux) {
+// Register adds the API routes to sm.
+func (a *API) Register(sm *http.ServeMux) {
+	mux := routes{sm}
 	mux.HandleFunc("GET /api/info", a.info)
 	mux.HandleFunc("GET /api/app", a.appInfo)
 	mux.HandleFunc("GET /download/share.apk", a.downloadAPK)

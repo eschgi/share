@@ -52,7 +52,7 @@ const (
 	lockedKeySize = e2ee.PrivateKeySize + e2ee.LockOverhead
 )
 
-func (a *API) registerKeys(mux *http.ServeMux) {
+func (a *API) registerKeys(mux routes) {
 	mux.HandleFunc("GET /api/keys", a.keys)
 	mux.HandleFunc("PUT /api/keys/device", a.putDeviceKey)
 	mux.HandleFunc("PUT /api/keys/person", a.putPersonKey)

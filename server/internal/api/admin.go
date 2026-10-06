@@ -20,7 +20,7 @@ import (
 // The admin API: PINs, people and their phones and browsers, deleting files and the trash,
 // storage. Everything here needs an admin, except signing out one's own phone or browser.
 
-func (a *API) registerAdmin(mux *http.ServeMux) {
+func (a *API) registerAdmin(mux routes) {
 	mux.HandleFunc("GET /api/pins", a.pins)
 	mux.HandleFunc("GET /api/pins/suggest", a.suggestPin)
 	mux.HandleFunc("POST /api/pins", a.createPin)

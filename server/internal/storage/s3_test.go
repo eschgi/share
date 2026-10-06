@@ -419,7 +419,7 @@ func TestReconcileS3(t *testing.T) {
 	}
 
 	fx.now = fx.now.Add(ttl + time.Hour)
-	if _, err := fx.db.ExecContext(ctx, "UPDATE files SET updated_at = ? WHERE id = ?", fx.now.UnixMilli(), young.ID); err != nil {
+	if _, err := fx.db.ExecContext(ctx, "UPDATE files SET updated_at = ? WHERE id = ?", fx.now, young.ID); err != nil {
 		t.Fatal(err)
 	}
 	if err := fx.lib.Reconcile(ctx, ttl); err != nil {

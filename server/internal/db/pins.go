@@ -50,21 +50,16 @@ const pinSelect = pinColumns + ", secret_sealed, secret_version"
 
 func scanPin(row interface{ Scan(...any) error }) (Pin, error) {
 	var p Pin
-	var created int64
-	var expires, ended sql.NullInt64
 	var folderID sql.NullString
 	var secretSealed []byte
 	var secretVersion sql.NullInt64
-	err := row.Scan(&p.ID, &p.Code, &p.Kind, &p.CreatedBy, &created, &expires, &ended, &folderID, &p.ShowsFolder, &secretSealed, &secretVersion)
-	if errors.Is(err, sql.ErrNoRows) {
+	err := row.Scan(&p.ID, &p.Code, &p.Kind, &p.CreatedBy, &p.CreatedAt, &p.ExpiresAt, &p.EndedAt, &folderID, &p.ShowsFolder, &secretSealed, &secretVersion)
+	if noRow(err) {
 		return p, ErrNotFound
 	}
 	if err != nil {
 		return p, err
 	}
-	p.CreatedAt = fromMS(created)
-	p.ExpiresAt = optTime(expires)
-	p.EndedAt = optTime(ended)
 	p.FolderID = folderID.String
 	if secretSealed != nil {
 		p.Secret = &PinSecret{Sealed: secretSealed, Version: int(secretVersion.Int64)}
@@ -79,7 +74,7 @@ func (d *DB) InsertPin(ctx context.Context, p Pin) error {
 	}
 	err := d.Tx(ctx, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, "INSERT INTO pins ("+pinColumns+") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-			p.ID, p.Code, p.Kind, p.CreatedBy, ms(p.CreatedAt), nullMS(p.ExpiresAt), nullMS(p.EndedAt), p.FolderID, p.ShowsFolder)
+			p.ID, p.Code, p.Kind, p.CreatedBy, p.CreatedAt, p.ExpiresAt, p.EndedAt, p.FolderID, p.ShowsFolder)
 		if err != nil || p.Secret == nil {
 			return err
 		}
@@ -130,7 +125,7 @@ func (d *DB) Pins(ctx context.Context) ([]Pin, error) {
 // EndPin ends a PIN. Its sessions stop working at once, because a session is only valid
 // while its PIN is live. Ending an already ended PIN changes nothing.
 func (d *DB) EndPin(ctx context.Context, id string, at time.Time) error {
-	res, err := d.ExecContext(ctx, "UPDATE pins SET ended_at = ? WHERE id = ? AND ended_at IS NULL", ms(at), id)
+	res, err := d.ExecContext(ctx, "UPDATE pins SET ended_at = ? WHERE id = ? AND ended_at IS NULL", at, id)
 	if err != nil {
 		return err
 	}
@@ -146,7 +141,7 @@ func (d *DB) EndPin(ctx context.Context, id string, at time.Time) error {
 // They stopped working at expires_at already; this only records it.
 func (d *DB) EndExpiredPins(ctx context.Context, now time.Time) (int64, error) {
 	res, err := d.ExecContext(ctx,
-		"UPDATE pins SET ended_at = expires_at WHERE ended_at IS NULL AND expires_at IS NOT NULL AND expires_at <= ?", ms(now))
+		"UPDATE pins SET ended_at = expires_at WHERE ended_at IS NULL AND expires_at IS NOT NULL AND expires_at <= ?", now)
 	if err != nil {
 		return 0, err
 	}

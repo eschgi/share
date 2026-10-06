@@ -35,10 +35,8 @@ const folderSelect = folderColumns + ", encrypted, rekey, (SELECT COALESCE(MAX(v
 func scanFolder(row interface{ Scan(...any) error }) (Folder, error) {
 	var f Folder
 	var renaming, deletedBy sql.NullString
-	var created int64
-	var deleted sql.NullInt64
-	err := row.Scan(&f.ID, &f.Name, &f.Dir, &renaming, &f.CreatedBy, &created, &deleted, &deletedBy, &f.Encrypted, &f.Rekey, &f.KeyVersion)
-	if errors.Is(err, sql.ErrNoRows) {
+	err := row.Scan(&f.ID, &f.Name, &f.Dir, &renaming, &f.CreatedBy, &f.CreatedAt, &f.DeletedAt, &deletedBy, &f.Encrypted, &f.Rekey, &f.KeyVersion)
+	if noRow(err) {
 		return f, ErrNotFound
 	}
 	if err != nil {
@@ -47,7 +45,7 @@ func scanFolder(row interface{ Scan(...any) error }) (Folder, error) {
 	if renaming.Valid {
 		f.RenamingFrom = &renaming.String
 	}
-	f.CreatedAt, f.DeletedAt, f.DeletedBy = fromMS(created), optTime(deleted), deletedBy.String
+	f.DeletedBy = deletedBy.String
 	return f, nil
 }
 
@@ -86,14 +84,14 @@ func (d *DB) EnsureFirstFolder(ctx context.Context, f Folder, now time.Time) (Fo
 		if n > 0 {
 			return nil
 		}
-		var oldest sql.NullInt64
+		var oldest sql.NullTime
 		if err := tx.QueryRowContext(ctx, "SELECT MIN(created_at) FROM files").Scan(&oldest); err != nil {
 			return err
 		}
 		f.CreatedAt, f.RenamingFrom = now, nil
 		if oldest.Valid {
 			root := ""
-			f.CreatedAt, f.RenamingFrom = fromMS(oldest.Int64), &root
+			f.CreatedAt, f.RenamingFrom = oldest.Time, &root
 		}
 		if err := insertFolder(ctx, tx, f); err != nil {
 			return err
@@ -107,7 +105,7 @@ func (d *DB) EnsureFirstFolder(ctx context.Context, f Folder, now time.Time) (Fo
 			{"INSERT INTO folder_people (folder_id, user_id) SELECT ?, id FROM users WHERE role = 'member'", []any{f.ID}},
 			{`INSERT INTO invite_folders (invite_id, folder_id) SELECT id, ? FROM invites
 				WHERE user_id IS NULL AND role = 'member' AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ?`,
-				[]any{f.ID, ms(now)}},
+				[]any{f.ID, now}},
 		} {
 			if _, err := tx.ExecContext(ctx, q.sql, q.args...); err != nil {
 				return err
@@ -142,7 +140,7 @@ func (d *DB) InsertFolder(ctx context.Context, f Folder) error {
 
 func insertFolder(ctx context.Context, tx *sql.Tx, f Folder) error {
 	_, err := tx.ExecContext(ctx, "INSERT INTO folders ("+folderColumns+") VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-		f.ID, f.Name, f.Dir, f.RenamingFrom, f.CreatedBy, ms(f.CreatedAt), nullMS(f.DeletedAt), nullString(f.DeletedBy))
+		f.ID, f.Name, f.Dir, f.RenamingFrom, f.CreatedBy, f.CreatedAt, f.DeletedAt, nullString(f.DeletedBy))
 	if isUniqueViolation(err) {
 		return ErrConflict
 	}
@@ -208,7 +206,7 @@ func loseFolders(ctx context.Context, tx *sql.Tx, userID, where string, args ...
 func (d *DB) SetFolderInvite(ctx context.Context, folderID, inviteID string, gets bool, now time.Time) error {
 	var n int
 	if err := d.QueryRowContext(ctx, `SELECT COUNT(*) FROM invites WHERE id = ? AND user_id IS NULL AND role = 'member'
-		AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ?`, inviteID, ms(now)).Scan(&n); err != nil {
+		AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ?`, inviteID, now).Scan(&n); err != nil {
 		return err
 	}
 	if n == 0 {
@@ -282,7 +280,7 @@ type FolderStat struct {
 
 // FolderStats counts the library's files by folder.
 func (d *DB) FolderStats(ctx context.Context) (map[string]FolderStat, error) {
-	rows, err := d.QueryContext(ctx, `SELECT folder_id, COUNT(*), SUM(size), COUNT(DISTINCT COALESCE(user_id, 'pin:' || pin_session_id))
+	rows, err := d.QueryContext(ctx, `SELECT folder_id, COUNT(*), SUM(size), COUNT(DISTINCT COALESCE(user_id::text, 'pin:' || pin_session_id))
 		FROM files WHERE state = 'ready' GROUP BY folder_id`)
 	if err != nil {
 		return nil, err
@@ -327,7 +325,7 @@ func (d *DB) CountFolderPeople(ctx context.Context, now time.Time) (FolderPeople
 			WHERE u.role = 'member' GROUP BY fp.folder_id`, nil},
 		{`SELECT i.folder_id, COUNT(*) FROM invite_folders i JOIN invites v ON v.id = i.invite_id
 			WHERE v.user_id IS NULL AND v.role = 'member' AND v.used_at IS NULL AND v.revoked_at IS NULL AND v.expires_at > ?
-			GROUP BY i.folder_id`, []any{ms(now)}},
+			GROUP BY i.folder_id`, []any{now}},
 	} {
 		rows, err := d.QueryContext(ctx, q.sql, q.args...)
 		if err != nil {
@@ -349,7 +347,7 @@ func (d *DB) CountFolderPeople(ctx context.Context, now time.Time) (FolderPeople
 	}
 	err := d.QueryRowContext(ctx, `SELECT (SELECT COUNT(*) FROM users WHERE role = 'admin') +
 		(SELECT COUNT(*) FROM invites WHERE user_id IS NULL AND role = 'admin' AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ?)`,
-		ms(now)).Scan(&out.Admins)
+		now).Scan(&out.Admins)
 	return out, err
 }
 
@@ -403,7 +401,7 @@ func (d *DB) DeleteFolder(ctx context.Context, id, by string, at time.Time) ([]F
 			return err
 		}
 		res, err := tx.ExecContext(ctx, "UPDATE folders SET deleted_at = ?, deleted_by = ? WHERE id = ? AND deleted_at IS NULL",
-			ms(at), nullString(by), id)
+			at, nullString(by), id)
 		if err != nil {
 			return err
 		}
@@ -418,10 +416,10 @@ func (d *DB) DeleteFolder(ctx context.Context, id, by string, at time.Time) ([]F
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE files SET state = 'trashed', deleted_at = ?, deleted_by = ?, updated_at = ?
-			WHERE folder_id = ? AND state = 'ready'`, ms(at), nullString(by), ms(at), id); err != nil {
+			WHERE folder_id = ? AND state = 'ready'`, at, nullString(by), at, id); err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, "UPDATE pins SET ended_at = ? WHERE folder_id = ? AND ended_at IS NULL", ms(at), id); err != nil {
+		if _, err := tx.ExecContext(ctx, "UPDATE pins SET ended_at = ? WHERE folder_id = ? AND ended_at IS NULL", at, id); err != nil {
 			return err
 		}
 		for i := range files {

@@ -54,7 +54,7 @@ func (d *DB) KeysOf(ctx context.Context, userID, deviceID string) (Keys, error) 
 	err := d.QueryRowContext(ctx, `SELECT u.public_key, u.password_lock, dv.public_key, pk.sealed
 		FROM users u JOIN devices dv ON dv.user_id = u.id LEFT JOIN person_keys pk ON pk.device_id = dv.id
 		WHERE u.id = ? AND dv.id = ?`, userID, deviceID).Scan(&k.PersonPublic, &k.PasswordLock, &k.DevicePublic, &k.PersonSealed)
-	if errors.Is(err, sql.ErrNoRows) {
+	if noRow(err) {
 		return k, ErrNotFound
 	}
 	if err != nil {
@@ -70,11 +70,9 @@ func (d *DB) KeysOf(ctx context.Context, userID, deviceID string) (Keys, error) 
 	defer rows.Close()
 	for rows.Next() {
 		var f SealedFolderKey
-		var created int64
-		if err := rows.Scan(&f.FolderID, &f.Version, &f.PublicKey, &f.RecoverySealed, &f.CreatedBy, &created, &f.Sealed); err != nil {
+		if err := rows.Scan(&f.FolderID, &f.Version, &f.PublicKey, &f.RecoverySealed, &f.CreatedBy, &f.CreatedAt, &f.Sealed); err != nil {
 			return k, err
 		}
-		f.CreatedAt = fromMS(created)
 		k.Folders = append(k.Folders, f)
 	}
 	return k, rows.Err()
@@ -181,7 +179,7 @@ func (d *DB) TodoOf(ctx context.Context, userID string, recovery bool, now time.
 		WHERE p.secret_sealed IS NOT NULL AND p.ended_at IS NULL AND (p.expires_at IS NULL OR p.expires_at > ?)
 		AND NOT EXISTS (SELECT 1 FROM pin_keys k WHERE k.pin_id = p.id AND k.version = g.version)
 		AND EXISTS (SELECT 1 FROM folder_grants s WHERE s.folder_id = p.folder_id AND s.version = p.secret_version AND s.user_id = g.user_id)
-		ORDER BY p.id, g.version`, []any{userID, ms(now)}, func(rows *sql.Rows) error {
+		ORDER BY p.id, g.version`, []any{userID, now}, func(rows *sql.Rows) error {
 		var n PinNeed
 		if err := rows.Scan(&n.PinID, &n.FolderID, &n.Version, &n.SecretVersion, &n.SecretSealed); err != nil {
 			return err
@@ -212,7 +210,7 @@ func (d *DB) SetDeviceKey(ctx context.Context, deviceID string, public []byte) e
 	return d.Tx(ctx, func(tx *sql.Tx) error {
 		var old []byte
 		err := tx.QueryRowContext(ctx, "SELECT public_key FROM devices WHERE id = ? AND revoked_at IS NULL", deviceID).Scan(&old)
-		if errors.Is(err, sql.ErrNoRows) {
+		if noRow(err) {
 			return ErrNotFound
 		}
 		if err != nil || string(old) == string(public) {
@@ -234,7 +232,7 @@ func (d *DB) SetPersonKey(ctx context.Context, userID, deviceID string, public, 
 		var old, device []byte
 		err := tx.QueryRowContext(ctx, `SELECT u.public_key, dv.public_key FROM users u JOIN devices dv ON dv.user_id = u.id
 			WHERE u.id = ? AND dv.id = ? AND dv.revoked_at IS NULL`, userID, deviceID).Scan(&old, &device)
-		if errors.Is(err, sql.ErrNoRows) {
+		if noRow(err) {
 			return ErrNotFound
 		}
 		if err != nil {
@@ -258,7 +256,7 @@ func (d *DB) SetPersonKey(ctx context.Context, userID, deviceID string, public, 
 		if _, err := tx.ExecContext(ctx, "UPDATE users SET public_key = ? WHERE id = ?", public, userID); err != nil {
 			return err
 		}
-		_, err = tx.ExecContext(ctx, "INSERT INTO person_keys (device_id, sealed, created_at) VALUES (?, ?, ?)", deviceID, sealed, ms(now))
+		_, err = tx.ExecContext(ctx, "INSERT INTO person_keys (device_id, sealed, created_at) VALUES (?, ?, ?)", deviceID, sealed, now)
 		return err
 	})
 }
@@ -300,7 +298,7 @@ func (d *DB) grant(ctx context.Context, check string, checkArgs []any, insert st
 func (d *DB) GrantDevice(ctx context.Context, userID, deviceID string, sealed []byte, now time.Time) error {
 	return d.grant(ctx, `SELECT COUNT(*) FROM devices WHERE id = ? AND user_id = ? AND revoked_at IS NULL AND public_key IS NOT NULL`,
 		[]any{deviceID, userID},
-		"INSERT INTO person_keys (device_id, sealed, created_at) VALUES (?, ?, ?)", deviceID, sealed, ms(now))
+		"INSERT INTO person_keys (device_id, sealed, created_at) VALUES (?, ?, ?)", deviceID, sealed, now)
 }
 
 // GrantFolder keeps a version of a folder's key sealed for a person, given by someone. Both
@@ -312,7 +310,7 @@ func (d *DB) GrantFolder(ctx context.Context, giverID, folderID string, version 
 		AND EXISTS (SELECT 1 FROM users u WHERE u.id = ? AND `+sees("k.folder_id")+`)`,
 		[]any{folderID, version, userID, giverID},
 		"INSERT INTO folder_grants (folder_id, version, user_id, sealed, created_at) VALUES (?, ?, ?, ?, ?)",
-		folderID, version, userID, sealed, ms(now))
+		folderID, version, userID, sealed, now)
 }
 
 // GrantRecovery keeps a version of a folder's key sealed for the recovery key, if it isn't
@@ -367,11 +365,11 @@ func insertFolderKey(ctx context.Context, tx *sql.Tx, k NewFolderKey, now time.T
 		return ErrConflict
 	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO folder_keys (folder_id, version, public_key, recovery_sealed, created_by, created_at)
-		VALUES (?, ?, ?, ?, ?, ?)`, k.FolderID, k.Version, k.PublicKey, k.RecoverySealed, k.By, ms(now)); err != nil {
+		VALUES (?, ?, ?, ?, ?, ?)`, k.FolderID, k.Version, k.PublicKey, k.RecoverySealed, k.By, now); err != nil {
 		return err
 	}
 	if _, err := tx.ExecContext(ctx, "INSERT INTO folder_grants (folder_id, version, user_id, sealed, created_at) VALUES (?, ?, ?, ?, ?)",
-		k.FolderID, k.Version, k.By, k.Sealed, ms(now)); err != nil {
+		k.FolderID, k.Version, k.By, k.Sealed, now); err != nil {
 		return err
 	}
 	_, err := tx.ExecContext(ctx, "UPDATE folders SET rekey = ? WHERE id = ?", false, k.FolderID)
@@ -386,7 +384,7 @@ func (d *DB) EncryptFolder(ctx context.Context, folderID string, on bool, key *N
 		var newest int
 		err := tx.QueryRowContext(ctx, `SELECT COALESCE((SELECT MAX(version) FROM folder_keys WHERE folder_id = f.id), 0)
 			FROM folders f WHERE f.id = ? AND f.deleted_at IS NULL`, folderID).Scan(&newest)
-		if errors.Is(err, sql.ErrNoRows) {
+		if noRow(err) {
 			return ErrNotFound
 		}
 		if err != nil {
@@ -414,13 +412,11 @@ func (d *DB) AddFolderKey(ctx context.Context, key NewFolderKey, now time.Time) 
 // FolderKeyOf returns a version of a folder's key.
 func (d *DB) FolderKeyOf(ctx context.Context, folderID string, version int) (FolderKey, error) {
 	k := FolderKey{FolderID: folderID, Version: version}
-	var created int64
 	err := d.QueryRowContext(ctx, "SELECT public_key, recovery_sealed, created_by, created_at FROM folder_keys WHERE folder_id = ? AND version = ?",
-		folderID, version).Scan(&k.PublicKey, &k.RecoverySealed, &k.CreatedBy, &created)
-	if errors.Is(err, sql.ErrNoRows) {
+		folderID, version).Scan(&k.PublicKey, &k.RecoverySealed, &k.CreatedBy, &k.CreatedAt)
+	if noRow(err) {
 		return k, ErrNoKey
 	}
-	k.CreatedAt = fromMS(created)
 	return k, err
 }
 
@@ -431,11 +427,9 @@ func (d *DB) RecoverableKeys(ctx context.Context) ([]FolderKey, error) {
 	err := d.each(ctx, `SELECT folder_id, version, public_key, recovery_sealed, created_by, created_at FROM folder_keys
 		WHERE recovery_sealed IS NOT NULL ORDER BY folder_id, version`, nil, func(rows *sql.Rows) error {
 		var k FolderKey
-		var created int64
-		if err := rows.Scan(&k.FolderID, &k.Version, &k.PublicKey, &k.RecoverySealed, &k.CreatedBy, &created); err != nil {
+		if err := rows.Scan(&k.FolderID, &k.Version, &k.PublicKey, &k.RecoverySealed, &k.CreatedBy, &k.CreatedAt); err != nil {
 			return err
 		}
-		k.CreatedAt = fromMS(created)
 		out = append(out, k)
 		return nil
 	})
@@ -528,7 +522,7 @@ func (d *DB) PinSecretOf(ctx context.Context, pinID string) (*PinSecret, error) 
 	var s PinSecret
 	var version sql.NullInt64
 	err := d.QueryRowContext(ctx, "SELECT secret_sealed, secret_version FROM pins WHERE id = ?", pinID).Scan(&s.Sealed, &version)
-	if errors.Is(err, sql.ErrNoRows) {
+	if noRow(err) {
 		return nil, ErrNotFound
 	}
 	if err != nil || s.Sealed == nil {

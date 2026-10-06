@@ -6,6 +6,7 @@ import (
 	"image"
 	"image/color"
 	"image/jpeg"
+	"path/filepath"
 	"testing"
 )
 
@@ -196,5 +197,15 @@ func TestDecodeBytes(t *testing.T) {
 	}
 	if _, err := readJPEGHeader(bytes.NewReader(append(frameOnly(false, 8, 8, 0x11)[:2], 0xFF, 0xC3, 0, 2))); err == nil {
 		t.Error("a lossless JPEG passed; Go can't decode those")
+	}
+}
+
+// A thumbnail's folder is named after the id's last two characters: an id starts with the time
+// it was made, so its first ones would put years of thumbnails into one folder.
+func TestPathUsesTheRandomEndOfTheID(t *testing.T) {
+	s := &Store{Dir: filepath.Join("data", "thumbs")}
+	id := "0199b3a4-6f2e-7c41-9d3a-5e8f0b2c4d6e"
+	if got, want := s.Path(id), filepath.Join("data", "thumbs", "6e", id+".jpg"); got != want {
+		t.Errorf("Path = %s, want %s", got, want)
 	}
 }

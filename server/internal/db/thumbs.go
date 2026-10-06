@@ -21,7 +21,7 @@ const (
 func (d *DB) ThumbCandidates(ctx context.Context, before time.Time, limit int) ([]File, error) {
 	return queryFiles(ctx, d, "SELECT "+fileColumns+` FROM files
 		WHERE state = 'ready' AND thumb = 'none' AND kind = 'photo' AND enc_version IS NULL AND uploaded_at <= ?
-		ORDER BY uploaded_at, id LIMIT ?`, ms(before), limit)
+		ORDER BY uploaded_at, id LIMIT ?`, before, limit)
 }
 
 // SetClientThumb records a thumbnail from the uploader, which replaces any other, together
@@ -31,14 +31,14 @@ func (d *DB) SetClientThumb(ctx context.Context, id string, width, height, durat
 	return d.setThumb(ctx, `UPDATE files SET thumb = 'client', width = COALESCE(?, width), height = COALESCE(?, height),
 			duration_ms = COALESCE(?, duration_ms), updated_at = ?
 		WHERE id = ? AND state = 'ready'`,
-		nullInt(width), nullInt(height), nullInt(durationMS), ms(at), id)
+		nullInt(width), nullInt(height), nullInt(durationMS), at, id)
 }
 
 // ClaimThumb marks a photo as tried before the worker decodes it (see ThumbFailed). It
 // returns false if the photo has a thumbnail by now.
 func (d *DB) ClaimThumb(ctx context.Context, id string, at time.Time) (bool, error) {
 	res, err := d.ExecContext(ctx, "UPDATE files SET thumb = 'failed', updated_at = ? WHERE id = ? AND thumb = 'none'",
-		ms(at), id)
+		at, id)
 	if err != nil {
 		return false, err
 	}
@@ -49,7 +49,7 @@ func (d *DB) ClaimThumb(ctx context.Context, id string, at time.Time) (bool, err
 // ReleaseThumb hands a claimed photo back, to be tried again later.
 func (d *DB) ReleaseThumb(ctx context.Context, id string, at time.Time) error {
 	_, err := d.ExecContext(ctx, "UPDATE files SET thumb = 'none', updated_at = ? WHERE id = ? AND thumb = 'failed'",
-		ms(at), id)
+		at, id)
 	return err
 }
 
@@ -60,7 +60,7 @@ func (d *DB) SetServerThumb(ctx context.Context, id string, width, height int64,
 	return d.setThumb(ctx, `UPDATE files SET thumb = 'server', width = COALESCE(width, ?), height = COALESCE(height, ?),
 			updated_at = ?
 		WHERE id = ? AND state = 'ready' AND thumb = 'failed'`,
-		width, height, ms(at), id)
+		width, height, at, id)
 }
 
 // setThumb runs a thumbnail update and bumps the library version if it changed a row, so

@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/eschgi/share/server/internal/db"
+	"github.com/eschgi/share/server/internal/e2ee"
+	"github.com/eschgi/share/server/internal/ids"
 	"github.com/eschgi/share/server/internal/storage"
 )
 
@@ -195,7 +197,8 @@ func TestAdminsSetNewPasswords(t *testing.T) {
 
 	wantStatus(t, "a member", reset(maria, admin.userID, map[string]string{}), http.StatusForbidden, "forbidden")
 	wantStatus(t, "for oneself", reset(admin, admin.userID, map[string]string{}), http.StatusForbidden, "forbidden")
-	wantStatus(t, "nobody", reset(admin, "u7ld5x2k7mbqz4bwdbyj6qsqxa", map[string]string{"username": "nobody"}), http.StatusNotFound, "not_found")
+	wantStatus(t, "nobody", reset(admin, ids.New(), map[string]string{"username": "nobody"}), http.StatusNotFound, "not_found")
+	wantStatus(t, "not an id", reset(admin, "u7ld5x2k7mbqz4bwdbyj6qsqxa", map[string]string{"username": "nobody"}), http.StatusNotFound, "not_found")
 	wantStatus(t, "Maria has no username yet", reset(admin, maria.userID, map[string]string{}), http.StatusBadRequest, "bad_request")
 	wantStatus(t, "a username with a space", reset(admin, maria.userID, map[string]string{"username": "maria rossi"}), http.StatusBadRequest, "bad_request")
 	wantStatus(t, "Stefan's username", reset(admin, maria.userID, map[string]string{"username": "Stefan"}), http.StatusConflict, "username_taken")
@@ -337,4 +340,16 @@ func TestStorageInfo(t *testing.T) {
 		got[1].(map[string]any)["code"] != "fat32" || got[1].(map[string]any)["level"] != "warning" {
 		t.Errorf("warnings: %v", got)
 	}
+}
+
+// An id that isn't one never makes the database fail: in the path it is an id nothing has, in a
+// lookup the same, and anywhere else a bad request.
+func TestIDsThatArentOne(t *testing.T) {
+	e := newEnv(t)
+	admin := e.admin()
+	const notAnID = "u7ld5x2k7mbqz4bwdbyj6qsqxa" // an id of before, in base32
+	wantStatus(t, "in the path", e.do(nil, "DELETE", "/api/users/"+notAnID, admin.token, nil, nil), http.StatusNotFound, "not_found")
+	wantStatus(t, "a folder to move into", e.postJSON(nil, "/api/files/move", admin.token, map[string]any{"ids": []string{ids.New()}, "folder": notAnID}, nil), http.StatusNotFound, "not_found")
+	sealed := b64u.EncodeToString(make([]byte, e2ee.PrivateKeySize+e2ee.SealOverhead))
+	wantStatus(t, "a key for a phone", e.postJSON(nil, "/api/keys/grants", admin.token, map[string]any{"devices": []map[string]any{{"device": notAnID, "sealed": sealed}}}, nil), http.StatusBadRequest, "bad_request")
 }

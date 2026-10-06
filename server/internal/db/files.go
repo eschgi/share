@@ -71,24 +71,25 @@ const fileColumns = `id, state, name, size, received, mime, kind, rel_path, uplo
 
 func scanFile(row interface{ Scan(...any) error }) (File, error) {
 	var f File
-	var relPath, day, pinID, sessionID, userID, deviceID, deletedBy, folderID, movedFrom, s3Upload sql.NullString
-	var created, updated int64
-	var uploaded, clientModified, deleted, width, height, duration, crc, s3PartSize, encVersion, plainSize sql.NullInt64
+	var relPath, pinID, sessionID, userID, deviceID, deletedBy, folderID, movedFrom, s3Upload sql.NullString
+	var day sql.NullTime
+	var width, height, duration, crc, s3PartSize, encVersion, plainSize sql.NullInt64
 	var encKey, encHeader []byte
 	err := row.Scan(&f.ID, &f.State, &f.Name, &f.Size, &f.Received, &f.Mime, &f.Kind, &relPath, &day,
-		&created, &updated, &uploaded, &clientModified, &width, &height, &duration, &f.Thumb,
-		&pinID, &sessionID, &userID, &deviceID, &deleted, &deletedBy, &crc, &folderID, &movedFrom, &s3Upload, &s3PartSize,
+		&f.CreatedAt, &f.UpdatedAt, &f.UploadedAt, &f.ClientModifiedAt, &width, &height, &duration, &f.Thumb,
+		&pinID, &sessionID, &userID, &deviceID, &f.DeletedAt, &deletedBy, &crc, &folderID, &movedFrom, &s3Upload, &s3PartSize,
 		&encVersion, &encKey, &encHeader, &plainSize)
-	if errors.Is(err, sql.ErrNoRows) {
+	if noRow(err) {
 		return f, ErrNotFound
 	}
 	if err != nil {
 		return f, err
 	}
-	f.FolderID, f.RelPath, f.UploadDay, f.MovedFrom = folderID.String, relPath.String, day.String, movedFrom.String
+	f.FolderID, f.RelPath, f.MovedFrom = folderID.String, relPath.String, movedFrom.String
+	if day.Valid {
+		f.UploadDay = day.Time.Format(time.DateOnly)
+	}
 	f.S3UploadID, f.S3PartSize = s3Upload.String, s3PartSize.Int64
-	f.CreatedAt, f.UpdatedAt = fromMS(created), fromMS(updated)
-	f.UploadedAt, f.ClientModifiedAt, f.DeletedAt = optTime(uploaded), optTime(clientModified), optTime(deleted)
 	f.Width, f.Height, f.DurationMS = optInt(width), optInt(height), optInt(duration)
 	f.PinID, f.PinSessionID, f.UserID, f.DeviceID, f.DeletedBy =
 		pinID.String, sessionID.String, userID.String, deviceID.String, deletedBy.String
@@ -151,7 +152,7 @@ func (d *DB) InsertReceiving(ctx context.Context, f File) error {
 			client_modified_at, pin_id, pin_session_id, user_id, device_id, folder_id, s3_upload_id, s3_part_size,
 			enc_version, enc_key, enc_header, plain_size)
 		VALUES (?, 'receiving', ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		f.ID, f.Name, f.Size, f.Mime, f.Kind, ms(f.CreatedAt), ms(f.UpdatedAt), nullMS(f.ClientModifiedAt),
+		f.ID, f.Name, f.Size, f.Mime, f.Kind, f.CreatedAt, f.UpdatedAt, f.ClientModifiedAt,
 		nullString(f.PinID), nullString(f.PinSessionID), nullString(f.UserID), nullString(f.DeviceID), f.FolderID,
 		nullString(f.S3UploadID), partSize, encVersion, encKey, encHeader, plainSize)
 	return err
@@ -165,7 +166,7 @@ func (d *DB) FileByID(ctx context.Context, id string) (File, error) {
 // SetReceived records how many bytes of a receiving upload have arrived.
 func (d *DB) SetReceived(ctx context.Context, id string, received int64, at time.Time) error {
 	_, err := d.ExecContext(ctx,
-		"UPDATE files SET received = ?, updated_at = ? WHERE id = ? AND state = 'receiving'", received, ms(at), id)
+		"UPDATE files SET received = ?, updated_at = ? WHERE id = ? AND state = 'receiving'", received, at, id)
 	return err
 }
 
@@ -173,7 +174,7 @@ func (d *DB) SetReceived(ctx context.Context, id string, received int64, at time
 func (d *DB) UnfinishedCount(ctx context.Context, pinSessionID, userID string) (int, error) {
 	var n int
 	err := d.QueryRowContext(ctx, `SELECT COUNT(*) FROM files WHERE state = 'receiving'
-		AND ((?1 != '' AND pin_session_id = ?1) OR (?2 != '' AND user_id = ?2))`, pinSessionID, userID).Scan(&n)
+		AND (pin_session_id = ? OR user_id = ?)`, nullString(pinSessionID), nullString(userID)).Scan(&n)
 	return n, err
 }
 
@@ -200,7 +201,7 @@ func (d *DB) RelPathTaken(ctx context.Context, folderID, relPath string) (bool, 
 // row isn't receiving any more, and ErrConflict if the path was just taken by another upload.
 func (d *DB) MarkFinalizing(ctx context.Context, id, relPath, day string, at time.Time) (bool, error) {
 	res, err := d.ExecContext(ctx, `UPDATE files SET state = 'finalizing', rel_path = ?, upload_day = ?, updated_at = ?
-		WHERE id = ? AND state = 'receiving'`, relPath, day, ms(at), id)
+		WHERE id = ? AND state = 'receiving'`, relPath, day, at, id)
 	if isUniqueViolation(err) {
 		return false, ErrConflict
 	}
@@ -216,7 +217,7 @@ func (d *DB) MarkReady(ctx context.Context, id, mime, kind string, at time.Time)
 	return d.Tx(ctx, func(tx *sql.Tx) error {
 		res, err := tx.ExecContext(ctx, `UPDATE files SET state = 'ready', mime = ?, kind = ?, received = size,
 				uploaded_at = ?, updated_at = ?
-			WHERE id = ? AND state = 'finalizing'`, mime, kind, ms(at), ms(at), id)
+			WHERE id = ? AND state = 'finalizing'`, mime, kind, at, at, id)
 		if err != nil {
 			return err
 		}
@@ -250,7 +251,7 @@ func (d *DB) FilesInStates(ctx context.Context, states ...string) ([]File, error
 // IdleReceiving lists receiving uploads that haven't changed since before.
 func (d *DB) IdleReceiving(ctx context.Context, before time.Time) ([]File, error) {
 	return queryFiles(ctx, d, "SELECT "+fileColumns+" FROM files WHERE state = 'receiving' AND updated_at < ? ORDER BY updated_at",
-		ms(before))
+		before)
 }
 
 // Move is one file's move to another folder: where it goes, and where its bytes come from

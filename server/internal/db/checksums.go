@@ -3,7 +3,6 @@ package db
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"strings"
 )
 
@@ -18,7 +17,7 @@ func (d *DB) CRCCandidates(ctx context.Context, limit int) ([]File, error) {
 func (d *DB) FileCRC32(ctx context.Context, id string) (uint32, bool, error) {
 	var v sql.NullInt64
 	err := d.QueryRowContext(ctx, "SELECT crc32 FROM files WHERE id = ?", id).Scan(&v)
-	if errors.Is(err, sql.ErrNoRows) {
+	if noRow(err) {
 		return 0, false, ErrNotFound
 	}
 	return uint32(v.Int64), v.Valid, err

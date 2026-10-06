@@ -24,7 +24,7 @@ func (d *DB) TrashFiles(ctx context.Context, ids []string, by string, at time.Ti
 				return err
 			}
 			if _, err := tx.ExecContext(ctx, `UPDATE files SET state = 'trashed', deleted_at = ?, deleted_by = ?, updated_at = ?
-				WHERE id = ?`, ms(at), nullString(by), ms(at), id); err != nil {
+				WHERE id = ?`, at, nullString(by), at, id); err != nil {
 				return err
 			}
 			f.State, f.DeletedAt, f.DeletedBy, f.UpdatedAt = StateTrashed, &at, by, at
@@ -46,7 +46,7 @@ func (d *DB) Trashed(ctx context.Context) ([]File, error) {
 // TrashedBefore lists the files deleted before t, which the daily purge removes for good.
 func (d *DB) TrashedBefore(ctx context.Context, t time.Time) ([]File, error) {
 	return queryFiles(ctx, d, "SELECT "+fileColumns+" FROM files WHERE state = 'trashed' AND deleted_at < ? ORDER BY deleted_at",
-		ms(t))
+		t)
 }
 
 // TrashedByID returns the trashed files among ids.
@@ -77,7 +77,7 @@ func (d *DB) RestoreFile(ctx context.Context, id, relPath string, at time.Time) 
 	err := d.Tx(ctx, func(tx *sql.Tx) error {
 		res, err := tx.ExecContext(ctx, `UPDATE files SET state = 'ready', rel_path = ?, deleted_at = NULL, deleted_by = NULL,
 				updated_at = ?
-			WHERE id = ? AND state = 'trashed'`, relPath, ms(at), id)
+			WHERE id = ? AND state = 'trashed'`, relPath, at, id)
 		if isUniqueViolation(err) {
 			return ErrConflict
 		}

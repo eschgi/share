@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"strconv"
 	"time"
 
@@ -18,7 +17,7 @@ var ErrConflict = errors.New("already exists")
 func (d *DB) Meta(ctx context.Context, key string) (string, error) {
 	var v string
 	err := d.QueryRowContext(ctx, "SELECT value FROM meta WHERE key = ?", key).Scan(&v)
-	if errors.Is(err, sql.ErrNoRows) {
+	if noRow(err) {
 		return "", ErrNotFound
 	}
 	return v, err
@@ -42,23 +41,19 @@ func setMeta(ctx context.Context, tx *sql.Tx, key, value string) error {
 // JobRun is when the periodic job of that name last ran without an error; the zero time if
 // it never did.
 func (d *DB) JobRun(ctx context.Context, name string) (time.Time, error) {
-	v, err := d.Meta(ctx, "job:"+name)
-	if errors.Is(err, ErrNotFound) {
+	var at time.Time
+	err := d.QueryRowContext(ctx, "SELECT ran_at FROM job_runs WHERE name = ?", name).Scan(&at)
+	if noRow(err) {
 		return time.Time{}, nil
 	}
-	if err != nil {
-		return time.Time{}, err
-	}
-	n, err := strconv.ParseInt(v, 10, 64)
-	if err != nil {
-		return time.Time{}, fmt.Errorf("the last run of %s: %w", name, err)
-	}
-	return fromMS(n), nil
+	return at, err
 }
 
 // SetJobRun records a run of the periodic job of that name.
 func (d *DB) SetJobRun(ctx context.Context, name string, at time.Time) error {
-	return d.SetMeta(ctx, "job:"+name, strconv.FormatInt(ms(at), 10))
+	_, err := d.ExecContext(ctx, `INSERT INTO job_runs (name, ran_at) VALUES (?, ?)
+		ON CONFLICT (name) DO UPDATE SET ran_at = excluded.ran_at`, name, at)
+	return err
 }
 
 // ServerID returns this server's permanent random id, creating it on first use. Apps compare

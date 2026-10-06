@@ -17,7 +17,7 @@ func (d *DB) SetRole(ctx context.Context, id, role string) error {
 	return d.Tx(ctx, func(tx *sql.Tx) error {
 		var current string
 		err := tx.QueryRowContext(ctx, "SELECT role FROM users WHERE id = ?", id).Scan(&current)
-		if errors.Is(err, sql.ErrNoRows) {
+		if noRow(err) {
 			return ErrNotFound
 		}
 		if err != nil || current == role {
@@ -80,8 +80,8 @@ func (d *DB) RevokeInvite(ctx context.Context, id string, at time.Time) error {
 		return err
 	}
 	return d.Tx(ctx, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, "UPDATE invites SET revoked_at = ? WHERE id = ? AND used_at IS NULL AND revoked_at IS NULL",
-			ms(at), id); err != nil {
+		if _, err := tx.ExecContext(ctx, "UPDATE invites SET revoked_at = ?, person_key = NULL WHERE id = ? AND used_at IS NULL AND revoked_at IS NULL",
+			at, id); err != nil {
 			return err
 		}
 		_, err := tx.ExecContext(ctx, "DELETE FROM invite_keys WHERE invite_id = ?", id) // locked for nobody now

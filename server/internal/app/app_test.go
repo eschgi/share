@@ -336,7 +336,7 @@ func TestUploadInChunksLandsInTheDayFolder(t *testing.T) {
 	data := randomBytes(t, size)
 
 	loc := c.mustCreate("Holiday video.mp4", len(data))
-	if !strings.HasPrefix(loc, "/tus/") || len(idOf(loc)) != 26 {
+	if !strings.HasPrefix(loc, "/tus/") || !ids.Valid(idOf(loc)) {
 		t.Fatalf("Location %q is not a relative upload path", loc)
 	}
 	last := c.send(loc, data, 0, chunk)
