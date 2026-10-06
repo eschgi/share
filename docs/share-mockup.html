@@ -777,6 +777,24 @@
   .wb.placed{padding-bottom:0}
   .gfiles{flex:1;min-height:0;overflow:hidden;margin:2px -4px 14px}
   .gfiles .day{padding:16px 4px 9px}
+  /* ---------- keys: a device that waits for keys, and the question before they are passed on ---------- */
+  .keysban{display:flex;gap:14px;align-items:flex-start;background:var(--s1);border:1px solid var(--line-soft);border-radius:18px;
+    padding:14px 16px 16px;margin:4px 12px 8px;flex:none}
+  .keysban > .ic{width:22px;height:22px;color:var(--accent-text);margin-top:1px}
+  .keysban > div{flex:1;min-width:0}
+  .keysban b{font-size:15.5px;font-weight:600}
+  .keysban p{margin:4px 0 0;font-size:14px;line-height:1.5;color:var(--text-2)}
+  .keysban > .acts{flex:none;margin:-6px -8px 0 0}
+  .dlib .keysban{margin:16px 0 6px;padding:18px 20px}
+  .dlib .keysban p{font-size:14.5px}
+  .kcode{gap:6px}
+  .kcode b{width:38px;height:46px;font-size:21px}
+  .kcode i{width:10px;flex:none}
+  .keysban .kcode{margin-top:12px}
+  .sbtns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:22px}
+  .fchips{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0}
+  .tile.lockd{filter:saturate(.3) brightness(.62)}
+  .tile.lockd > .tico{color:rgba(255,255,255,.8)}
 </style>
 </head>
 <body>
@@ -1734,6 +1752,54 @@
     </div>
   </section>
 
+  <section class="sec" id="keys">
+    <div class="sec-head">
+      <div class="sec-tag">Proposal · keys</div>
+      <h2>Keys, passed on only with your OK</h2>
+      <p>Encrypted folders open only on the family's phones and browsers, which pass the keys on to each other. Today they do that by themselves, for every device and person the server lists, so someone who could change the server's database could slip in one of their own. With this proposal a device asks first, and both screens show the same code, made from the receiving device's own key, which no one else can show. Signing in with the password and joining with an invite link ask nothing: they bring their keys with them.</p>
+    </div>
+    <p class="sub-h">In the app</p>
+    <div class="board">
+
+      <div class="slot">
+        <h3><span class="n">50</span>A new phone waits for its keys <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Stefan's new phone, whose sign-in brought no key: his password can't open it, say right after it was reset. Encrypted files stay locked until one of his phones or browsers allows this one (54); plain files show as always.</p>
+        <div class="phone" data-shot="50-keys-waiting"><div class="sb" data-time="9:41"></div><div class="ab"><h2 class="fpick"><span class="t">Family</span><span data-i="chev" class="down"></span></h2><span class="ib"><span data-i="search"></span></span><span class="av sm acc">S</span></div><div class="keysban"><span data-i="lock"></span><div><b>Waiting for approval</b><p data-tr>Allow this phone on one of your other phones or browsers. It shows this code there too:</p><div class="code kcode"><b>4</b><b>8</b><b>2</b><i></i><b>1</b><b>9</b><b>7</b></div></div></div><div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div><div class="scroll"><div class="day"><div><h4>Today</h4><div class="meta">6 files · 74 MB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p3/l p8/l v2@0:18/l p6/l p1/l p4/l"></div><div class="day"><div><h4>Yesterday</h4><div class="meta">45 files · 620 MB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p4/l p7/l p9/l v5@1:15/l p2 p10 p6 p3 p5 p1 p8 p2"></div><div class="day"><div><h4>Sunday, 27 Sep</h4><div class="meta">48 files · 1.1 GB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p1 p2 p5 v4@0:42 p3 p8 p9 p10"></div></div><nav class="nav" data-on="library"></nav><div class="gest"></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">51</span>Allowing a new browser <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Stefan's phone has his keys, and asks before passing them to the browser in 53. The browser's name comes from the server; the code doesn't, so only the right browser can show it. Not me signs that browser out.</p>
+        <div class="phone" data-shot="51-keys-allow-browser"><div class="sb" data-time="9:42"></div><div class="ab"><h2 class="fpick"><span class="t">Family</span><span data-i="chev" class="down"></span></h2><span class="ib"><span data-i="search"></span></span><span class="av sm acc">S</span></div><div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div><div class="scroll"><div class="day"><div><h4>Today</h4><div class="meta">6 files · 74 MB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p3 p8 v2@0:18 p6 p1 p4"></div><div class="day"><div><h4>Yesterday</h4><div class="meta">45 files · 620 MB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p4 p7 p9 v5@1:15 p2 p10 p6 p3 p5 p1 p8 p2"></div><div class="day"><div><h4>Sunday, 27 Sep</h4><div class="meta">48 files · 1.1 GB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p1 p2 p5 v4@0:42 p3 p8 p9 p10"></div></div><nav class="nav" data-on="library"></nav><div class="gest"></div><div class="scrim"></div><div class="sheet"><div class="grip"></div><h3>A new browser wants your keys</h3><div class="group"><div class="row"><span class="ri acc"><span data-i="monitor"></span></span><div class="rt"><b>Chrome · Windows</b><span>Signed in 1 minute ago</span></div></div></div><div class="label">Does it show this code?</div><div class="code kcode"><b>7</b><b>3</b><b>5</b><i></i><b>0</b><b>4</b><b>1</b></div><p class="help" data-tr>Another code, or you didn't just sign in? Tap <b>Not me</b>: that browser is signed out and gets nothing.</p><div class="sbtns"><div class="btn outline sm">Not me</div><div class="btn primary sm"><span data-i="check"></span>Allow</div></div></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">52</span>Allowing someone a new key <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Maria lost her phone, and her new key was made by itself (55). Before Stefan's phone opens her folders for it, he compares her code: in person, or on a call.</p>
+        <div class="phone" data-shot="52-keys-allow-person"><div class="sb" data-time="10:15"></div><div class="ab"><h2 class="fpick"><span class="t">Family</span><span data-i="chev" class="down"></span></h2><span class="ib"><span data-i="search"></span></span><span class="av sm acc">S</span></div><div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div><div class="scroll"><div class="day"><div><h4>Today</h4><div class="meta">6 files · 74 MB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p3 p8 v2@0:18 p6 p1 p4"></div><div class="day"><div><h4>Yesterday</h4><div class="meta">45 files · 620 MB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p4 p7 p9 v5@1:15 p2 p10 p6 p3 p5 p1 p8 p2"></div><div class="day"><div><h4>Sunday, 27 Sep</h4><div class="meta">48 files · 1.1 GB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p1 p2 p5 v4@0:42 p3 p8 p9 p10"></div></div><nav class="nav" data-on="library"></nav><div class="gest"></div><div class="scrim"></div><div class="sheet"><div class="grip"></div><h3>Maria waits for her folders</h3><p class="lead sm" data-tr>Her key is new: the old one was lost with her phone. Allow it, and her folders open for it again:</p><div class="fchips"><span class="ftag"><span data-i="folder"></span>Family</span><span class="ftag"><span data-i="folder"></span>Wedding Anna &amp; Marco</span><span class="ftag"><span data-i="folder"></span>Kindergarten</span></div><div class="label">Ask Maria for the code on her screen</div><div class="code kcode"><b>8</b><b>1</b><b>3</b><i></i><b>5</b><b>5</b><b>2</b></div><div class="sbtns"><div class="btn outline sm">Not now</div><div class="btn primary sm"><span data-i="check"></span>Allow</div></div></div></div>
+      </div>
+
+    </div>
+    <p class="sub-h">On the website</p>
+    <div class="board">
+
+      <div class="slot wide">
+        <h3><span class="n">53</span>A new browser waits for its keys <span class="badge proposal">proposal</span></h3>
+        <p class="cap">The same wait in a browser, here on a computer: the encrypted files locked, the code to compare on one of Stefan's phones (51), and for admins the recovery code as another way.</p>
+        <div class="desktop" data-shot="53-keys-waiting-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>Library · Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com/library</span></div></div><div class="dview"><div class="ahd"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div><nav class="dtabs"><a class="on"><span data-i="images"></span>Library</a><a><span data-i="upload"></span>Send</a><a><span data-i="settings"></span>Settings</a></nav><span class="dsearch"><span data-i="search"></span>Search file names</span><span class="av acc">S</span></div><div class="dlib withf"><div class="fside"><div class="glabel">Folders</div><div class="frow"><span class="fcov all"><span data-i="images"></span></span><div><b>All folders</b><span>2,875 files</span></div></div><div class="frow on"><span class="fcov ph t3"><span data-i="image"></span></span><div><b>Family</b><span>2,340 files</span></div></div><div class="frow"><span class="fcov ph t6"><span data-i="image"></span></span><div><b>Wedding Anna &amp; Marco</b><span>412 files</span></div></div><div class="frow"><span class="fcov doc"><span data-i="file"></span></span><div><b>Kindergarten</b><span>86 files</span></div></div><div class="frow"><span class="fcov doc"><span data-i="file"></span></span><div><b>Taxes 2026</b><span>37 files</span></div></div></div><div class="fmain"><div class="keysban"><span data-i="lock"></span><div><b>Waiting for approval</b><p data-tr>Allow this browser on one of your phones or other browsers. It shows this code there too:</p><div class="code kcode"><b>7</b><b>3</b><b>5</b><i></i><b>0</b><b>4</b><b>1</b></div></div><div class="acts"><span class="tbtn">Use the recovery code</span></div></div><div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div><div class="day"><div><h4>Today</h4><div class="meta">6 files · 74 MB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p3/l p8/l v2@0:18/l p6/l p1/l p4/l"></div><div class="day"><div><h4>Yesterday</h4><div class="meta">45 files · 620 MB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p4/l p7/l p9/l v5@1:15/l p2/l p10/l p6 p3 p5 d#DOCX=Recipes_Oma.docx p8 p1 v3@0:42 p2 p9 p7"></div><div class="day"><div><h4>Sunday, 27 Sep</h4><div class="meta">48 files · 1.1 GB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p1 p2 d#PDF=Invitation.pdf p5 v4@0:42 p3 p8 p6"></div></div></div></div></div>
+      </div>
+      <div class="slot wide">
+        <h3><span class="n">54</span>Allowing a new phone, on a computer <span class="badge proposal">proposal</span></h3>
+        <p class="cap">On a computer the question is a dialog over the library. Allow seals Stefan's key for the phone in 50, which opens its encrypted files at its next check-in, within a minute.</p>
+        <div class="desktop" data-shot="54-keys-allow-phone-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>Library · Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com/library</span></div></div><div class="dview"><div class="ahd"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div><nav class="dtabs"><a class="on"><span data-i="images"></span>Library</a><a><span data-i="upload"></span>Send</a><a><span data-i="settings"></span>Settings</a></nav><span class="dsearch"><span data-i="search"></span>Search file names</span><span class="av acc">S</span></div><div class="dlib withf"><div class="fside"><div class="glabel">Folders</div><div class="frow"><span class="fcov all"><span data-i="images"></span></span><div><b>All folders</b><span>2,875 files</span></div></div><div class="frow on"><span class="fcov ph t3"><span data-i="image"></span></span><div><b>Family</b><span>2,340 files</span></div></div><div class="frow"><span class="fcov ph t6"><span data-i="image"></span></span><div><b>Wedding Anna &amp; Marco</b><span>412 files</span></div></div><div class="frow"><span class="fcov doc"><span data-i="file"></span></span><div><b>Kindergarten</b><span>86 files</span></div></div><div class="frow"><span class="fcov doc"><span data-i="file"></span></span><div><b>Taxes 2026</b><span>37 files</span></div></div></div><div class="fmain"><div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div><div class="day"><div><h4>Today</h4><div class="meta">6 files · 74 MB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p3 p8 v2@0:18 p6 p1 p4"></div><div class="day"><div><h4>Yesterday</h4><div class="meta">45 files · 620 MB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p4 p7 p9 v5@1:15 p2 p10 p6 p3 p5 d#DOCX=Recipes_Oma.docx p8 p1 v3@0:42 p2 p9 p7"></div><div class="day"><div><h4>Sunday, 27 Sep</h4><div class="meta">48 files · 1.1 GB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p1 p2 d#PDF=Invitation.pdf p5 v4@0:42 p3 p8 p6"></div></div></div><div class="scrim"></div><div class="ddlg"><h3>A new phone wants your keys</h3><div class="group"><div class="row"><span class="ri acc"><span data-i="smartphone"></span></span><div class="rt"><b>Pixel 8</b><span>Signed in just now</span></div></div></div><div class="label">Does it show this code?</div><div class="code kcode"><b>4</b><b>8</b><b>2</b><i></i><b>1</b><b>9</b><b>7</b></div><p class="help" data-tr>Another code, or nobody just signed in? Choose <b>Not me</b>: that phone is signed out and gets nothing.</p><div class="dbtns"><span class="tbtn">Not me</span><div class="btn primary sm"><span data-i="check"></span>Allow</div></div></div></div></div>
+      </div>
+      <div class="slot wide">
+        <h3><span class="n">55</span>Waiting for an admin <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Maria in a browser after her phone was lost: a new key, made by itself, and her folders locked until an admin allows it (52) with the code she reads out.</p>
+        <div class="desktop" data-shot="55-keys-waiting-admin-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>Library · Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com/library</span></div></div><div class="dview"><div class="ahd"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div><nav class="dtabs"><a class="on"><span data-i="images"></span>Library</a><a><span data-i="upload"></span>Send</a><a><span data-i="settings"></span>Settings</a></nav><span class="dsearch"><span data-i="search"></span>Search file names</span><span class="av tan">M</span></div><div class="dlib withf"><div class="fside"><div class="glabel">Folders</div><div class="frow"><span class="fcov all"><span data-i="images"></span></span><div><b>All folders</b><span>2,838 files</span></div></div><div class="frow on"><span class="fcov ph t3"><span data-i="image"></span></span><div><b>Family</b><span>2,340 files</span></div></div><div class="frow"><span class="fcov ph t6"><span data-i="image"></span></span><div><b>Wedding Anna &amp; Marco</b><span>412 files</span></div></div><div class="frow"><span class="fcov doc"><span data-i="file"></span></span><div><b>Kindergarten</b><span>86 files</span></div></div></div><div class="fmain"><div class="keysban"><span data-i="lock"></span><div><b>Waiting for an admin</b><p data-tr>Your key is new. An admin opens your folders for it: tell them this code.</p><div class="code kcode"><b>8</b><b>1</b><b>3</b><i></i><b>5</b><b>5</b><b>2</b></div></div></div><div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div><div class="day"><div><h4>Today</h4><div class="meta">6 files · 74 MB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p3/l p8/l v2@0:18/l p6/l p1/l p4/l"></div><div class="day"><div><h4>Yesterday</h4><div class="meta">45 files · 620 MB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p4/l p7/l p9/l v5@1:15/l p2/l p10/l p6 p3 p5 d#DOCX=Recipes_Oma.docx p8 p1 v3@0:42 p2 p9 p7"></div><div class="day"><div><h4>Sunday, 27 Sep</h4><div class="meta">48 files · 1.1 GB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p1 p2 d#PDF=Invitation.pdf p5 v4@0:42 p3 p8 p6"></div></div></div></div></div>
+      </div>
+
+    </div>
+  </section>
+
 </div>
 
 <script>
@@ -1751,7 +1817,8 @@
   });
 
   // Tile shorthand: p<tone> photo, v<tone>@<duration> video, d#<EXT>[=<name>] document.
-  // Flags after "/": k done, u<n> uploading n%, q queued, s selected, o selectable, h on this phone, c current.
+  // Flags after "/": k done, u<n> uploading n%, q queued, s selected, o selectable, h on this phone, c current,
+  // l encrypted and locked (its key isn't open on the device).
   function tile(tok) {
     const [spec, ...flags] = tok.split('/');
     const f = {};
@@ -1760,12 +1827,13 @@
     if (spec[0] === 'd') {
       const [, ext, name] = spec.match(/^d#([A-Z0-9]+)(?:=(.+))?$/);
       cls += ' doc';
-      inner += ic('file', 'tico') + (name ? `<span class="fname">${name}</span><span class="extb">${ext}</span>` : `<span class="ext">${ext}</span>`);
+      inner += ic(f.l ? 'lock' : 'file', 'tico') + (name ? `<span class="fname">${name}</span><span class="extb">${ext}</span>` : `<span class="ext">${ext}</span>`);
     } else {
       const [, tone, dur] = spec.match(/^[pv](\d+)(?:@(.+))?$/);
       cls += ` ph t${tone}`;
-      inner += ic(spec[0] === 'v' ? 'play' : 'image', 'tico') + (dur ? `<span class="dur">${dur}</span>` : '');
+      inner += ic(f.l ? 'lock' : spec[0] === 'v' ? 'play' : 'image', 'tico') + (dur ? `<span class="dur">${dur}</span>` : '');
     }
+    if (f.l) cls += ' lockd';
     if (f.s) cls += ' sel';
     if (f.q) cls += ' queued';
     if (f.c) cls += ' cur';
@@ -1826,6 +1894,82 @@
   // English is written in the markup. T maps each English string to [German, Italian]; elements marked
   // data-tr are translated as a whole, because their inline markup sits at a different place in each language.
   const T = {
+      "Waiting for approval": [
+          "Warten auf Freigabe",
+          "In attesa di approvazione"
+      ],
+      "Allow this phone on one of your other phones or browsers. It shows this code there too:": [
+          "Gib dieses Handy auf einem deiner anderen Handys oder Browser frei. Dort steht derselbe Code:",
+          "Approva questo telefono su uno dei tuoi altri telefoni o browser. Lì compare lo stesso codice:"
+      ],
+      "Allow this browser on one of your phones or other browsers. It shows this code there too:": [
+          "Gib diesen Browser auf einem deiner Handys oder anderen Browser frei. Dort steht derselbe Code:",
+          "Approva questo browser su uno dei tuoi telefoni o su un altro browser. Lì compare lo stesso codice:"
+      ],
+      "A new browser wants your keys": [
+          "Ein neuer Browser möchte deine Schlüssel",
+          "Un nuovo browser vuole le tue chiavi"
+      ],
+      "A new phone wants your keys": [
+          "Ein neues Handy möchte deine Schlüssel",
+          "Un nuovo telefono vuole le tue chiavi"
+      ],
+      "Signed in 1 minute ago": [
+          "Vor 1 Minute angemeldet",
+          "Accesso 1 minuto fa"
+      ],
+      "Signed in just now": [
+          "Gerade angemeldet",
+          "Accesso appena fatto"
+      ],
+      "Does it show this code?": [
+          "Zeigt er diesen Code?",
+          "Mostra questo codice?"
+      ],
+      "Another code, or you didn't just sign in? Tap <b>Not me</b>: that browser is signed out and gets nothing.": [
+          "Ein anderer Code, oder du hast dich gerade nicht angemeldet? Tippe auf <b>Nicht ich</b>: Dieser Browser wird abgemeldet und bekommt nichts.",
+          "Un altro codice, o non hai appena fatto l'accesso? Tocca <b>Non sono io</b>: quel browser viene disconnesso e non riceve nulla."
+      ],
+      "Another code, or nobody just signed in? Choose <b>Not me</b>: that phone is signed out and gets nothing.": [
+          "Ein anderer Code, oder niemand hat sich gerade angemeldet? Wähle <b>Nicht ich</b>: Dieses Handy wird abgemeldet und bekommt nichts.",
+          "Un altro codice, o nessuno ha appena fatto l'accesso? Scegli <b>Non sono io</b>: quel telefono viene disconnesso e non riceve nulla."
+      ],
+      "Not me": [
+          "Nicht ich",
+          "Non sono io"
+      ],
+      "Allow": [
+          "Erlauben",
+          "Consenti"
+      ],
+      "Maria waits for her folders": [
+          "Maria wartet auf ihre Ordner",
+          "Maria aspetta le sue cartelle"
+      ],
+      "Her key is new: the old one was lost with her phone. Allow it, and her folders open for it again:": [
+          "Ihr Schlüssel ist neu: Der alte ging mit ihrem Handy verloren. Erlaube ihn, und ihre Ordner öffnen sich wieder dafür:",
+          "La sua chiave è nuova: la vecchia è andata persa con il telefono. Consentila, e le sue cartelle si riaprono per lei:"
+      ],
+      "Ask Maria for the code on her screen": [
+          "Frag Maria nach dem Code auf ihrem Bildschirm",
+          "Chiedi a Maria il codice sul suo schermo"
+      ],
+      "Not now": [
+          "Jetzt nicht",
+          "Non ora"
+      ],
+      "Waiting for an admin": [
+          "Warten auf einen Admin",
+          "In attesa di un admin"
+      ],
+      "Your key is new. An admin opens your folders for it: tell them this code.": [
+          "Dein Schlüssel ist neu. Ein Admin öffnet deine Ordner dafür: Nenne ihm diesen Code.",
+          "La tua chiave è nuova. Un admin riapre le tue cartelle per lei: digli questo codice."
+      ],
+      "Use the recovery code": [
+          "Wiederherstellungscode verwenden",
+          "Usa il codice di recupero"
+      ],
       "EN": [
           "DE",
           "IT"
