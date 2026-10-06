@@ -1,7 +1,8 @@
 name: CI
 
-# Every push to main leaves the server for Linux and Windows, and the signed APK, as artifacts
-# for a day. A tag such as v0.1.0 also publishes them as a GitHub release.
+# Every run leaves the server for Linux and Windows as an artifact for a week, and pushes to main
+# and pull requests from this repository's own branches the signed APK too. A tag such as v0.1.0
+# also publishes them as a GitHub release.
 on:
   push:
     branches: [main]
@@ -92,7 +93,7 @@ jobs:
         with:
           name: share-server
           path: dist/
-          retention-days: 1
+          retention-days: 7
       - name: Known vulnerabilities
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
@@ -188,10 +189,11 @@ jobs:
           cd android
           ./gradlew --console=plain testDirectDebugUnitTest testPlayDebugUnitTest lintDirectDebug
       # The APK the server hands out, signed with the release key from the repository's secrets
-      # (app/README.md says which). Only for pushes to this repository, never for pull requests.
+      # (app/README.md says which): for pushes, and for pull requests from this repository's own
+      # branches. A pull request from a fork never gets the key; GitHub keeps secrets from it.
       - name: Release key
         id: key
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
         env:
           KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
@@ -235,7 +237,7 @@ jobs:
         with:
           name: share-apk
           path: dist/
-          retention-days: 1
+          retention-days: 7
 
   release:
     name: Release

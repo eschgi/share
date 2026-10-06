@@ -553,9 +553,10 @@ The server's tests use a bucket of their own. To run the bucket tests against a 
 on a fresh prefix, set `SHARE_TEST_S3` to its `s3` setting:
 `(cd server && SHARE_TEST_S3='{"endpoint": …}' go test ./internal/s3 ./internal/app)`.
 
-CI checks every push and pull request. A push to `main` also leaves the server for Linux and
-Windows as the artifact `share-server` for a day, and the signed APK as `share-apk` once the
-signing secrets are set ([`app/README.md`](app/README.md)). A version tag makes a release with all of
+CI checks every push and pull request, and leaves the server for Linux and Windows as the artifact
+`share-server` for a week. Pushes to `main` and pull requests from this repository's own branches
+also leave the signed APK as `share-apk`, once the signing secrets are set
+([`app/README.md`](app/README.md)). A version tag makes a release with all of
 them and `SHA256SUMS`, and publishes the Docker image as `ghcr.io/eschgi/share` (after the first
 one, make the package public once in GitHub's package settings):
 

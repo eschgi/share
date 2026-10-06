@@ -61,10 +61,11 @@ gh secret set ANDROID_KEY_PASSWORD
 
 On Linux or macOS the first line is `base64 < share-release.jks | gh secret set ANDROID_KEYSTORE_BASE64`.
 
-Every push to `main` then leaves `share.apk` and `share.apk.json` as the artifact `share-apk` for
-a day, and a version tag puts them in the release. The key is only used for pushes to this
-repository, never for pull requests. Without the secrets, pushes still pass without an APK, and a
-tag fails rather than making a release without it.
+Every push to `main`, and every pull request from one of this repository's branches, then leaves
+`share.apk` and `share.apk.json` as the artifact `share-apk` for a week, and a version tag puts
+them in the release. A pull request from a fork never gets the key: GitHub doesn't hand secrets to
+it. Without the secrets, runs still pass without an APK, and a tag fails rather than making a
+release without it.
 
 ## Tests
 
