@@ -43,6 +43,14 @@ vi.mock('../src/e2ee/store', () => {
 
 vi.mock('../src/api', async (importOriginal) => {
   const real = await importOriginal<typeof Api>();
+  // The server refuses fields a grant doesn't have, as the contract shows them.
+  const grants = (await import('../../contract/api/keys_grants.json')).default.request as Record<string, object[]>;
+  const strict = (g: Api.Grants) => {
+    for (const [list, entries] of Object.entries(g) as [string, object[]][]) {
+      const allowed = Object.keys(grants[list][0]);
+      for (const e of entries) for (const k of Object.keys(e)) if (!allowed.includes(k)) throw new real.ApiError(400, 'bad_request', `Invalid request body: unknown field "${k}"`);
+    }
+  };
   const conflict = (code: string) => new real.ApiError(409, code, code);
   const member = () => {
     const c = fake.caller;
@@ -111,6 +119,7 @@ vi.mock('../src/api', async (importOriginal) => {
       p.lock = lock;
     },
     postGrants: async (g: Api.Grants) => {
+      strict(g);
       const { c, p } = member();
       for (const d of g.devices) {
         if (fake.devices.get(d.device)?.user !== c.user) throw new real.ApiError(400, 'bad_request', 'not their device');

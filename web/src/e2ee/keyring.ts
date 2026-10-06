@@ -291,15 +291,20 @@ export class Keyring {
     for (const d of a.todo.devices) {
       g.devices.push({ device: d.id, sealed: b64u(await sealKey(fromB64u(d.public_key), purposes.person, personContext(me.user.id), person.raw!)) });
     }
+    // Each grant carries just its own fields: the server refuses any other (contract/api/keys_grants.json).
     for (const n of a.todo.people) {
       const k = raw(n.folder, n.version);
-      if (k) g.people.push({ ...n, sealed: b64u(await sealKey(fromB64u(n.public_key), purposes.folder, folderContext(n.folder, n.version), k)) });
+      if (!k) continue;
+      const sealed = await sealKey(fromB64u(n.public_key), purposes.folder, folderContext(n.folder, n.version), k);
+      g.people.push({ folder: n.folder, version: n.version, user: n.user, sealed: b64u(sealed) });
     }
     if (a.recovery_key) {
       const recovery = fromB64u(a.recovery_key);
       for (const v of a.todo.recovery) {
         const k = raw(v.folder, v.version);
-        if (k) g.recovery.push({ ...v, sealed: b64u(await sealKey(recovery, purposes.folder, folderContext(v.folder, v.version), k)) });
+        if (!k) continue;
+        const sealed = await sealKey(recovery, purposes.folder, folderContext(v.folder, v.version), k);
+        g.recovery.push({ folder: v.folder, version: v.version, sealed: b64u(sealed) });
       }
     }
     for (const p of a.todo.pins) {
