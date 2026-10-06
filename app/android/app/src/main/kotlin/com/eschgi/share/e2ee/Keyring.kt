@@ -24,8 +24,8 @@ interface DeviceKeyStore {
     fun save(deviceId: String, pair: KeyPair)
 }
 
-/** Who this phone is signed in as: the person, and the phone's id on the server. */
-data class Account(val userId: String, val deviceId: String)
+/** Who this phone is signed in as: the person, the phone's id on the server, and whether the person is an admin. */
+data class Account(val userId: String, val deviceId: String, val admin: Boolean = false)
 
 /** An encrypted file's key, sealed for version [version] of its folder's key ([FileRef]'s enc). */
 data class SealedFile(val id: String, val folder: String, val version: Int, val key: String, val header: String, val plainSize: Long) {
@@ -80,6 +80,13 @@ class Keyring(private val api: KeysApi, private val store: DeviceKeyStore) {
     /** The person's key was just opened with the password, which so needs no new lock. */
     private var openedWithPassword = false
 
+    /**
+     * A password typed on this phone while the person's key wasn't open here: it locks the key
+     * once the key opens (another device sealed it, or this one made a new one), so that the next
+     * device opens it with the password. Only ever in memory.
+     */
+    private var typedPassword: String? = null
+
     private val fileKeys = object : LinkedHashMap<String, ByteArray>(256, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ByteArray>?) = size > 4096
     }
@@ -120,6 +127,7 @@ class Keyring(private val api: KeysApi, private val store: DeviceKeyStore) {
         answer = null
         device = null
         person = null
+        typedPassword = null
         folders = emptyMap()
         synchronized(fileKeys) { fileKeys.clear() }
         changed(Status.OFF)
@@ -132,19 +140,26 @@ class Keyring(private val api: KeysApi, private val store: DeviceKeyStore) {
             api.call("PUT", "/api/keys/device", JSONObject().put("public_key", b64u(dev.publicKey)))
             a = api.call("GET", "/api/keys", null)
         }
-        if (a.getJSONObject("person").str("public_key") == null) {
-            // The first phone or browser of this person makes their key.
+        // The first phone or browser of this person makes their key, and so does a member's once
+        // their key is lost: no phone or browser holds it any more, and no password opens it.
+        // Nothing is lost with a new one: whoever has Share open with the folders seals them for it
+        // again. An admin's phone asks instead, as the recovery code opens every folder again.
+        val known = a.getJSONObject("person")
+        val lost = known.str("public_key") != null && known.getInt("held_by") == 0 && known.str("password_lock") == null && !me.admin
+        if (known.str("public_key") == null || lost) {
             val p = Hpke.generateKeyPair()
             val sealed = E2ee.sealKey(dev.publicKey, E2ee.PURPOSE_PERSON, E2ee.personContext(me.userId), p.privateKey)
             try {
-                api.call("PUT", "/api/keys/person", JSONObject().put("public_key", b64u(p.publicKey)).put("sealed", b64u(sealed)))
+                api.call("PUT", "/api/keys/person", JSONObject().put("public_key", b64u(p.publicKey)).put("sealed", b64u(sealed)).put("start_over", lost))
             } catch (e: KeysApiError) {
                 if (e.code != "key_exists") throw e // another one was quicker
             }
             a = api.call("GET", "/api/keys", null)
         }
         person = openPerson(me, dev, a, password)
-        if (person != null && password != null && !openedWithPassword) keepPasswordLock(me, a, password)
+        if (password != null) typedPassword = password
+        typedPassword?.let { if (person != null && !openedWithPassword) keepPasswordLock(me, a, it) }
+        if (person != null) typedPassword = null
         folders = openFolders(a)
         answer = a
         changed(if (person != null) Status.READY else Status.WAITING)

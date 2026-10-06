@@ -39,6 +39,7 @@ type Keys struct {
 	PersonPublic []byte
 	PersonSealed []byte // the person's private key, sealed for this device
 	PasswordLock []byte // the person's private key, locked with their password
+	HeldBy       int    // how many of the person's signed-in devices have it sealed for them
 	Folders      []SealedFolderKey
 }
 
@@ -51,9 +52,10 @@ func sees(folder string) string {
 // the folders they see, sealed for them or not yet.
 func (d *DB) KeysOf(ctx context.Context, userID, deviceID string) (Keys, error) {
 	var k Keys
-	err := d.pool.QueryRowContext(ctx, `SELECT u.public_key, u.password_lock, dv.public_key, pk.sealed
+	err := d.pool.QueryRowContext(ctx, `SELECT u.public_key, u.password_lock, dv.public_key, pk.sealed,
+			(SELECT COUNT(*) FROM person_keys p JOIN devices o ON o.id = p.device_id WHERE o.user_id = u.id AND o.revoked_at IS NULL)
 		FROM users u JOIN devices dv ON dv.user_id = u.id LEFT JOIN person_keys pk ON pk.device_id = dv.id
-		WHERE u.id = $1 AND dv.id = $2`, userID, deviceID).Scan(&k.PersonPublic, &k.PasswordLock, &k.DevicePublic, &k.PersonSealed)
+		WHERE u.id = $1 AND dv.id = $2`, userID, deviceID).Scan(&k.PersonPublic, &k.PasswordLock, &k.DevicePublic, &k.PersonSealed, &k.HeldBy)
 	if noRow(err) {
 		return k, ErrNotFound
 	}

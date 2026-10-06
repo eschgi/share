@@ -68,7 +68,7 @@ vi.mock('../src/api', async (importOriginal) => {
       const mine = versions().filter((v) => sees(p, v.folder));
       return {
         device_key: fake.devices.get(c.device)!.publicKey,
-        person: { public_key: p.publicKey, sealed: p.sealed.get(c.device) ?? null, password_lock: p.lock },
+        person: { public_key: p.publicKey, sealed: p.sealed.get(c.device) ?? null, password_lock: p.lock, held_by: [...p.sealed.keys()].filter((d) => fake.devices.has(d)).length },
         folders: mine.map((v) => ({ ...v, sealed: fake.sealed.get(`${v.folder}:${v.version}:${c.user}`) ?? null })),
         recovery_key: p.admin ? (fake.recovery?.public_key ?? null) : null,
         todo: {
@@ -199,6 +199,8 @@ describe('keyring', { timeout: 60_000 }, () => {
   fake.folders.set('plain', { encrypted: false, versions: [] });
   person('ada', true);
   person('max', false, ['f1']);
+  person('eve', false, ['f1']);
+  person('zed', true);
   const a1 = browser('ada', 'a1');
   const a2 = browser('ada', 'a2');
   let code = '';
@@ -250,30 +252,30 @@ describe('keyring', { timeout: 60_000 }, () => {
   });
 
   it('checks in quietly: seals for a browser that waits, which then opens it, never showing loading', async () => {
-    const a4 = browser('ada', 'a4');
-    as(a4);
-    await a4.ring.start(a4.me);
-    expect(a4.ring.status).toBe('waiting');
+    const aw = browser('ada', 'aw');
+    as(aw);
+    await aw.ring.start(aw.me);
+    expect(aw.ring.status).toBe('waiting');
     const seen: string[] = [];
-    a4.ring.watch(() => seen.push(a4.ring.status));
+    aw.ring.watch(() => seen.push(aw.ring.status));
     as(a1);
     await a1.ring.checkIn();
-    as(a4);
-    await a4.ring.checkIn();
-    expect(a4.ring.status).toBe('ready');
+    as(aw);
+    await aw.ring.checkIn();
+    expect(aw.ring.status).toBe('ready');
     expect(seen).not.toContain('loading');
-    expect(await a4.ring.fileKey({ id: file.id, folder: 'f1', enc: file.enc! })).toEqual(fileKey);
+    expect(await aw.ring.fileKey({ id: file.id, folder: 'f1', enc: file.enc! })).toEqual(fileKey);
 
     // Without an answer, a check-in keeps what is open, and the status.
     fake.offline = true;
     try {
-      await a4.ring.checkIn();
+      await aw.ring.checkIn();
     } finally {
       fake.offline = false;
     }
-    expect(a4.ring.status).toBe('ready');
+    expect(aw.ring.status).toBe('ready');
     expect(seen).not.toContain('failed');
-    expect(await a4.ring.fileKey({ id: file.id, folder: 'f1', enc: file.enc! })).toEqual(fileKey);
+    expect(await aw.ring.fileKey({ id: file.id, folder: 'f1', enc: file.enc! })).toEqual(fileKey);
   });
 
   it('opens the keys in a new browser with the password, and not with a wrong one', async () => {
@@ -311,6 +313,69 @@ describe('keyring', { timeout: 60_000 }, () => {
     as(m1);
     await m1.ring.refresh();
     expect(m1.ring.encryptFor('f2')).toBeNull();
+  });
+
+  it('locks a key with the password typed while it waited, once another browser sealed it', async () => {
+    const e1 = browser('eve', 'e1');
+    as(e1);
+    await e1.ring.start(e1.me); // her first browser makes her key, without a password
+    as(a1);
+    await a1.ring.checkIn(); // the admin seals f1 for her
+    as(e1);
+    await e1.ring.checkIn();
+    expect(e1.ring.hasFolderKey('f1', 1)).toBe(true);
+    expect(fake.people.get('eve')!.lock).toBeNull();
+
+    // A password from an admin opens no lock: another browser waits, until hers seals it the key.
+    const e2 = browser('eve', 'e2');
+    as(e2);
+    await e2.ring.signedIn(e2.me, 'eve password');
+    expect(e2.ring.status).toBe('waiting');
+    as(e1);
+    await e1.ring.checkIn();
+    as(e2);
+    await e2.ring.checkIn();
+    expect(e2.ring.status).toBe('ready');
+    expect(fake.people.get('eve')!.lock).not.toBeNull();
+
+    // So the next browser opens it with the password at once.
+    const e3 = browser('eve', 'e3');
+    as(e3);
+    await e3.ring.signedIn(e3.me, 'eve password');
+    expect(e3.ring.status).toBe('ready');
+    expect(e3.ring.hasFolderKey('f1', 1)).toBe(true);
+  });
+
+  it("makes a member a new key by itself once theirs is lost, for which an admin's browser seals the folders", async () => {
+    // Every browser of hers is signed out, and an admin gives her a new password: the lock goes.
+    const eve = fake.people.get('eve')!;
+    for (const d of ['e1', 'e2', 'e3']) {
+      fake.devices.delete(d);
+      eve.sealed.delete(d);
+    }
+    eve.lock = null;
+    const e4 = browser('eve', 'e4');
+    as(e4);
+    await e4.ring.signedIn(e4.me, 'new eve password');
+    expect(e4.ring.status).toBe('ready');
+    expect(e4.ring.hasFolderKey('f1', 1)).toBe(false);
+    expect(eve.lock).not.toBeNull();
+    as(a1);
+    await a1.ring.checkIn();
+    as(e4);
+    await e4.ring.checkIn();
+    expect(await e4.ring.fileKey({ id: file.id, folder: 'f1', enc: file.enc! })).toEqual(fileKey);
+
+    // An admin's browser asks instead, as the recovery code opens every folder again.
+    const z1 = browser('zed', 'z1');
+    as(z1);
+    await z1.ring.start(z1.me);
+    fake.devices.delete('z1');
+    fake.people.get('zed')!.sealed.delete('z1');
+    const z2 = browser('zed', 'z2');
+    as(z2);
+    await z2.ring.signedIn(z2.me, 'zed password');
+    expect(z2.ring.status).toBe('waiting');
   });
 
   it("moves an encrypted file's key to another encrypted folder, never to a plain one", async () => {

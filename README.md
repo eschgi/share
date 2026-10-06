@@ -180,7 +180,9 @@ The design and the formats are in [docs/e2ee-plan.md](docs/e2ee-plan.md).
   minute: someone given a folder, a new phone of someone, the recovery key. A new phone or browser
   shows encrypted files as locked and waits for another one of the person, which takes a minute
   while that one has Share open; signing in with the password opens them at once, and an
-  invite carries the keys in its link, after the token, where the server never sees them.
+  invite carries the keys in its link, after the token, where the server never sees them. A
+  member whose key is lost, with no phone or browser left that holds it and no password that opens
+  it, gets a new one by itself, and the folders come again from whoever has Share open.
 - **The recovery code.** The first encrypted folder shows its admin a recovery code, once: written
   down or printed, it opens every encrypted folder again should all phones and browsers be lost.
   A new one can be made in the settings, which ends the old one.

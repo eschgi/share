@@ -98,9 +98,9 @@ scalar, everything binary in JSON as base64url without padding.
 ## How it works
 
 **Every start of the website or the app, signed in,** asks `GET /api/keys` and does what is due,
-and so does a check-in every half minute while the page is shown or the app is in front, and when
-it comes back (quietly: the status doesn't pass through loading, and stays as it is without an
-answer):
+and so does a check-in every half minute while the page is open (behind other tabs too, which
+browsers allow about once a minute) or the app is in front, and when either comes back (quietly:
+the status doesn't pass through loading, and stays as it is without an answer):
 - sends this device's public key, if the server doesn't have it (new device, or a browser whose
   storage was cleared);
 - makes the person key if the person has none yet, sealed for this device;
@@ -117,9 +117,14 @@ admin's device then finds everyone else on its to-do list at once.
 
 **A device that has no person key yet** (a new browser after a sign-in, a phone whose key was lost)
 shows encrypted files as locked and says it waits for another phone or browser of the person. A
-password sign-in opens the person key from its password lock at once. Admins can also use the
-recovery code. If no other device will come, "start over" makes a new person key: the person loses
-their folder keys until someone who has them is online, which admins always are sooner or later.
+password sign-in opens the person key from its password lock at once. Without a lock (the person
+joined with an invite, or an admin gave them a new password), the password typed stays in the
+device's memory until the key comes, and then locks it, so the next device opens it at once.
+Admins can also use the recovery code. If no other device will come, "start over" makes a new person
+key: the person loses their folder keys until someone who has them is online, which admins always
+are sooner or later. A member's device does that by itself when the key is lost, which `held_by`
+says: no phone or browser holds it any more, and no password lock opens it. An admin's device asks
+instead, since the recovery code opens every folder again.
 
 **Turning encryption on** for a folder (admins): the device makes the recovery key first if there is
 none and shows its code, then the folder key, seals it for the admin's person key and the recovery

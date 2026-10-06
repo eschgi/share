@@ -61,15 +61,15 @@ object Keys {
 
     /** Who the phone is signed in as; null when signed out. */
     fun account(context: Context): Account? {
-        val user = SecretStore(context).read(USER) ?: return null
-        val id = try {
-            JSONObject(user).optString("id")
+        val user = try {
+            JSONObject(SecretStore(context).read(USER) ?: return null)
         } catch (e: JSONException) {
-            ""
+            return null
         }
+        val id = user.optString("id")
         val device = ServerStore(context).config()?.deviceId
         if (id.isEmpty() || device.isNullOrEmpty()) return null
-        return Account(id, device)
+        return Account(id, device, admin = user.optString("role") == "admin")
     }
 
     /** Opens the keys, or opens them again and does what is due; with [password] right after signing in with it, [quiet] for a check-in (Keyring.sync). The state. */

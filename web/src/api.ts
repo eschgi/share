@@ -588,7 +588,7 @@ export const purgeFiles = (ids: string[]) => request<{ changed: number }>('POST'
 /** What this browser can open, and what it can seal for others. */
 export interface KeysAnswer {
   device_key: string | null;
-  person: { public_key: string | null; sealed: string | null; password_lock: string | null };
+  person: { public_key: string | null; sealed: string | null; password_lock: string | null; held_by: number };
   folders: { folder: string; version: number; public_key: string; sealed: string | null }[];
   recovery_key: string | null;
   todo: {

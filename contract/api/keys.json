@@ -8,7 +8,8 @@
     "person": {
       "public_key": "BOoK7BbB52RAZMcAfKQQLjL8yXeQdFC6SjgFDQuE6_QCLP7iXRaIzQc0VbnOm0RpNONTdswHfJdNix83cVz2SN4",
       "sealed": "kq-C1mWsV1iFUzNoO9cSR-PVo4fyrs4kg_-Sx19doYBM1BbF76Jm292nN71xpQ64vUWpLWrd1U1c7GQlqQDpR1dU8H3CvISLsMxJdnbPB31kM45-Dlzhz0xEC3r-VBW7K7gT_qtxhJEVsmzhkzcxRE8",
-      "password_lock": "HsK-CjVqsf87rGnQqHVph1WvX7fvZZLvWhKJTLL5NLnIK0M9IejaYbZvBP19cLdAXMuLhuzkCb4nGfrHmzKl57R0nMEJJm6zaWpB8EJIHuw"
+      "password_lock": "HsK-CjVqsf87rGnQqHVph1WvX7fvZZLvWhKJTLL5NLnIK0M9IejaYbZvBP19cLdAXMuLhuzkCb4nGfrHmzKl57R0nMEJJm6zaWpB8EJIHuw",
+      "held_by": 2
     },
     "folders": [
       {
@@ -54,5 +55,5 @@
       ]
     }
   },
-  "notes": "End-to-end encryption (docs/e2ee-plan.md); binary values are base64url without padding, keys P-256 (65 bytes public, 32 private), sealing and locking as in contract/crypto. What a phone or browser needs at every start: device_key is the public key it sent (null before PUT /api/keys/device; a different one means its own was lost: send a new one). person: the person's public key (null until a device makes it with PUT /api/keys/person), their private key sealed for this device (null while no device sealed it for this one), and locked with their password (null without). folders: every version of the keys of the folders the person sees, sealed for the person, or null while nobody did yet. recovery_key: null until an admin makes it. todo is what this device can do with the keys its person holds, and sends with POST /api/keys/grants: seal the person key for their devices that lack it, seal folder keys for people who see the folder and lack a version, seal folder keys for the recovery key, make the next version of a folder's key (rekey, with POST /api/folders/{id}/keys), and lock versions for PIN links that show a folder (the PIN's secret is sealed for version secret_version). Only devices: a PIN gets 403 forbidden."
+  "notes": "End-to-end encryption (docs/e2ee-plan.md); binary values are base64url without padding, keys P-256 (65 bytes public, 32 private), sealing and locking as in contract/crypto. What a phone or browser needs at every start: device_key is the public key it sent (null before PUT /api/keys/device; a different one means its own was lost: send a new one). person: the person's public key (null until a device makes it with PUT /api/keys/person), their private key sealed for this device (null while no device sealed it for this one), and locked with their password (null without); held_by, how many of the person's phones and browsers hold it (with none and no password lock it is lost, and a device that waits for it makes a new one with start_over). folders: every version of the keys of the folders the person sees, sealed for the person, or null while nobody did yet. recovery_key: null until an admin makes it. todo is what this device can do with the keys its person holds, and sends with POST /api/keys/grants: seal the person key for their devices that lack it, seal folder keys for people who see the folder and lack a version, seal folder keys for the recovery key, make the next version of a folder's key (rekey, with POST /api/folders/{id}/keys), and lock versions for PIN links that show a folder (the PIN's secret is sealed for version secret_version). Only devices: a PIN gets 403 forbidden."
 }

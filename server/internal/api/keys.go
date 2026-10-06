@@ -76,11 +76,14 @@ type Keys struct {
 	Todo        KeysTodo    `json:"todo"`
 }
 
-// PersonKey is the person's key: public, sealed for this device, locked with the password.
+// PersonKey is the person's key: public, sealed for this device, locked with the password, and
+// how many of the person's phones and browsers hold it. Held by none, without a password lock, it
+// is lost, and a device that waits for it makes a new one.
 type PersonKey struct {
 	PublicKey    B64 `json:"public_key"`
 	Sealed       B64 `json:"sealed"`
 	PasswordLock B64 `json:"password_lock"`
+	HeldBy       int `json:"held_by"`
 }
 
 // FolderKey is a version of a folder's key, with its private key sealed for the person, or
@@ -151,7 +154,7 @@ func (a *API) keys(w http.ResponseWriter, r *http.Request) {
 	}
 	out := Keys{
 		DeviceKey:   k.DevicePublic,
-		Person:      PersonKey{PublicKey: k.PersonPublic, Sealed: k.PersonSealed, PasswordLock: k.PasswordLock},
+		Person:      PersonKey{PublicKey: k.PersonPublic, Sealed: k.PersonSealed, PasswordLock: k.PasswordLock, HeldBy: k.HeldBy},
 		Folders:     []FolderKey{},
 		RecoveryKey: recovery,
 		Todo:        KeysTodo{Devices: []DeviceTodo{}, People: []PersonTodo{}, Recovery: []VersionRef{}, Rekey: []string{}, Pins: []PinTodo{}},

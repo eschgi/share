@@ -66,6 +66,7 @@ type keysAnswer struct {
 		PublicKey    *string `json:"public_key"`
 		Sealed       *string `json:"sealed"`
 		PasswordLock *string `json:"password_lock"`
+		HeldBy       int     `json:"held_by"`
 	} `json:"person"`
 	Folders []struct {
 		Folder    string  `json:"folder"`
@@ -703,6 +704,40 @@ func TestPasswordLock(t *testing.T) {
 	}
 	if a := mk.sync(); *a.Person.PublicKey != b64u.EncodeToString(mk2pub) {
 		t.Error("the new person key isn't there")
+	}
+}
+
+// held_by says how many of a person's phones and browsers hold their key. A laptop where Maria
+// signs in with a password an admin gave her waits while her phone holds the key, and finds it
+// lost once the phone is signed out: held by none, and no password lock.
+func TestHeldBy(t *testing.T) {
+	e := newEnv(t)
+	admin := e.admin()
+	maria := e.accept(e.invite(admin, "Maria", db.RoleMember), "Maria's phone")
+	mk := e.keyring(maria)
+	mk.makePersonKey()
+	if a := mk.sync(); a.Person.HeldBy != 1 {
+		t.Errorf("held by %d after the phone made it", a.Person.HeldBy)
+	}
+	r := e.postJSON(nil, "/api/users/"+maria.userID+"/password", admin.token, map[string]any{"username": "maria"}, nil)
+	if r.status != http.StatusOK {
+		t.Fatalf("new password: %d %s", r.status, r.body)
+	}
+	np := r.json(t)
+	r = e.postJSON(nil, "/api/auth/login", "", map[string]string{"username": np["username"].(string), "password": np["password"].(string), "device_name": "Laptop"}, nil)
+	if r.status != http.StatusOK {
+		t.Fatalf("login: %d %s", r.status, r.body)
+	}
+	v := r.json(t)
+	laptop := e.keyring(signedIn{v["token"].(string), maria.userID, v})
+	if a := laptop.sync(); a.Person.Sealed != nil || a.Person.PasswordLock != nil || a.Person.HeldBy != 1 {
+		t.Errorf("the laptop waits for the phone: %+v", a.Person)
+	}
+	if r := e.postJSON(nil, "/api/auth/logout", maria.token, map[string]any{}, nil); r.status != http.StatusNoContent {
+		t.Fatalf("logout: %d %s", r.status, r.body)
+	}
+	if a := laptop.sync(); a.Person.HeldBy != 0 || a.Person.PasswordLock != nil {
+		t.Errorf("with the phone signed out, the key is lost: %+v", a.Person)
 	}
 }
 

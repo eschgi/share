@@ -97,7 +97,7 @@ class KeyringTest {
                     .put("rekey", JSONArray(if (p.admin) Fake.rekey.toList() else emptyList())).put("pins", todoPins)
                 return JSONObject()
                     .put("device_key", Fake.devices[device]!!.second ?: JSONObject.NULL)
-                    .put("person", JSONObject().put("public_key", p.publicKey ?: JSONObject.NULL).put("sealed", p.sealed[device] ?: JSONObject.NULL).put("password_lock", p.lock ?: JSONObject.NULL))
+                    .put("person", JSONObject().put("public_key", p.publicKey ?: JSONObject.NULL).put("sealed", p.sealed[device] ?: JSONObject.NULL).put("password_lock", p.lock ?: JSONObject.NULL).put("held_by", p.sealed.keys.count { Fake.devices.containsKey(it) }))
                     .put("folders", folders)
                     .put("recovery_key", if (p.admin) Fake.recovery?.first ?: JSONObject.NULL else JSONObject.NULL)
                     .put("todo", todo)
@@ -182,7 +182,7 @@ class KeyringTest {
                 keys[deviceId] = pair
             }
         }
-        return Phone(Account(user, device), Keyring(api, store))
+        return Phone(Account(user, device, admin = Fake.people[user]!!.admin), Keyring(api, store))
     }
 
     private fun Phone.sync(password: String? = null) {
@@ -211,6 +211,8 @@ class KeyringTest {
             Fake.folders["plain"] = mutableListOf()
             Fake.people["ada"] = Person(true, HashSet())
             Fake.people["max"] = Person(false, hashSetOf("f1"))
+            Fake.people["eve"] = Person(false, hashSetOf("f1"))
+            Fake.people["zed"] = Person(true, HashSet())
         }
 
         private var a1: Phone? = null
@@ -320,6 +322,59 @@ class KeyringTest {
         a1!!.call { encryptFolder("f2", null) }
         m1.sync()
         assertNull(m1.ring.encryptFor("f2"))
+    }
+
+    @Test
+    fun ea_aPasswordTypedWhileWaitingLocksTheKeyOnceItArrives() {
+        val e1 = phone("eve", "e1")
+        e1.sync() // her first phone makes her key, without a password
+        a1!!.checkIn() // the admin seals f1 for her
+        e1.checkIn()
+        assertTrue(e1.ring.hasFolderKey("f1", 1))
+        assertNull(Fake.people["eve"]!!.lock)
+
+        // A password from an admin opens no lock: another phone waits, until hers seals it the key.
+        val e2 = phone("eve", "e2")
+        e2.sync("eve password")
+        assertEquals(Keyring.Status.WAITING, e2.ring.status)
+        e1.checkIn()
+        e2.checkIn()
+        assertEquals(Keyring.Status.READY, e2.ring.status)
+        assertNotNull(Fake.people["eve"]!!.lock)
+
+        // So the next phone opens it with the password at once.
+        val e3 = phone("eve", "e3")
+        e3.sync("eve password")
+        assertEquals(Keyring.Status.READY, e3.ring.status)
+        assertTrue(e3.ring.hasFolderKey("f1", 1))
+    }
+
+    @Test
+    fun eb_aMembersLostKeyIsReplacedByItselfAndAnAdminSealsTheFoldersForIt() {
+        // Every phone of hers is signed out, and an admin gives her a new password: the lock goes.
+        val eve = Fake.people["eve"]!!
+        for (d in listOf("e1", "e2", "e3")) {
+            Fake.devices.remove(d)
+            eve.sealed.remove(d)
+        }
+        eve.lock = null
+        val e4 = phone("eve", "e4")
+        e4.sync("new eve password")
+        assertEquals(Keyring.Status.READY, e4.ring.status)
+        assertFalse(e4.ring.hasFolderKey("f1", 1))
+        assertNotNull(eve.lock)
+        a1!!.checkIn()
+        e4.checkIn()
+        assertArrayEquals(fileKey, e4.ring.fileKey(file("f1", seal!!)))
+
+        // An admin's phone asks instead, as the recovery code opens every folder again.
+        val z1 = phone("zed", "z1")
+        z1.sync()
+        Fake.devices.remove("z1")
+        Fake.people["zed"]!!.sealed.remove("z1")
+        val z2 = phone("zed", "z2")
+        z2.sync("zed password")
+        assertEquals(Keyring.Status.WAITING, z2.ring.status)
     }
 
     @Test

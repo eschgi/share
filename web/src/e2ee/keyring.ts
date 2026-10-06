@@ -81,6 +81,10 @@ export class Keyring {
   private syncing = 0;
   /** The person's key was just opened with the password, which so needs no new lock. */
   private openedWithPassword = false;
+  /** A password typed on this page while the person's key wasn't open here: it locks the key once
+   * the key opens (another device sealed it, or this one made a new one), so that the next device
+   * opens it with the password. Only ever in memory. */
+  private typedPassword: string | null = null;
 
   /** Calls f whenever the status or the keys change; returns how to stop. */
   watch(f: () => void): () => void {
@@ -98,6 +102,7 @@ export class Keyring {
     if (this.me?.device.id !== me.device.id) {
       this.me = me;
       this.running = null;
+      this.typedPassword = null;
     }
     this.running ??= this.sync().catch(() => this.changed('failed'));
     return this.running;
@@ -178,19 +183,25 @@ export class Keyring {
       await api.putDeviceKey(b64u(device.publicKey));
       a = await api.getKeys();
     }
-    if (!a.person.public_key) {
-      // The first device of this person makes their key.
+    // The first device of this person makes their key, and so does a member's device once their
+    // key is lost: no phone or browser holds it any more, and no password opens it. Nothing is lost
+    // with a new one: whoever has Share open with the folders seals them for it again. An admin's
+    // device asks instead, as the recovery code opens every folder again.
+    const lost = !!a.person.public_key && a.person.held_by === 0 && !a.person.password_lock && me.user.role !== 'admin';
+    if (!a.person.public_key || lost) {
       const p = await generateKeyPair(true);
       const sealed = await sealKey(device.publicKey, purposes.person, personContext(me.user.id), p.raw!);
       try {
-        await api.putPersonKey(b64u(p.publicKey), b64u(sealed));
+        await api.putPersonKey(b64u(p.publicKey), b64u(sealed), lost);
       } catch (e) {
         if (!(e instanceof ApiError && e.code === 'key_exists')) throw e; // another device was quicker
       }
       a = await api.getKeys();
     }
     this.person = await this.openPerson(a, password);
-    if (this.person && password && !this.openedWithPassword) await this.keepPasswordLock(a, password);
+    if (password) this.typedPassword = password;
+    if (this.person && this.typedPassword && !this.openedWithPassword) await this.keepPasswordLock(a, this.typedPassword);
+    if (this.person) this.typedPassword = null;
     // The keys open meanwhile stay usable until the new set replaces them; a version's key
     // never changes, so one already open needn't be opened again.
     const opened = new Map<string, KeyPair>();
