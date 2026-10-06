@@ -167,7 +167,7 @@ func (c *fakeClock) Now() time.Time      { return c.t }
 func (c *fakeClock) Add(d time.Duration) { c.t = c.t.Add(d) }
 func newTestService(t *testing.T) (*Service, *fakeClock) {
 	t.Helper()
-	d := dbtest.Open(t, t.TempDir())
+	d := dbtest.Open(t)
 	clock := &fakeClock{time.Date(2026, 9, 27, 10, 0, 0, 0, time.UTC)}
 	if _, _, err := d.EnsureFirstFolder(context.Background(), db.Folder{ID: ids.New(), Name: "Share", CreatedBy: "first-start"}, clock.t); err != nil {
 		t.Fatal(err)

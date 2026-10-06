@@ -2,110 +2,25 @@ package db
 
 import (
 	"context"
-	"fmt"
-	"path/filepath"
+	"database/sql"
 	"slices"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/eschgi/share/server/internal/db/pgtest"
 	"github.com/eschgi/share/server/internal/ids"
 )
 
-// migrateTo brings a new database to version n only, as an older program would have.
-func migrateTo(t *testing.T, d *DB, n int) {
-	t.Helper()
-	migrations, err := loadMigrations(dialect{}.migrations())
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, m := range migrations[:n] {
-		if _, err := d.Exec(m.sql); err != nil {
-			t.Fatalf("%s: %v", m.name, err)
-		}
-		if _, err := d.Exec(fmt.Sprintf("PRAGMA user_version = %d", m.version)); err != nil {
-			t.Fatal(err)
-		}
-	}
-}
-
-func TestMigrationPutsEverythingIntoTheFirstFolder(t *testing.T) {
+// The first start makes one folder; later starts find it and change nothing.
+func TestEnsureFirstFolderOnce(t *testing.T) {
+	d := openTest(t)
 	ctx := context.Background()
-	dir := t.TempDir()
-	d, err := Open(filepath.Join(dir, "share.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer d.Close()
-	migrateTo(t, d, 5)
-
-	// A server from before folders: an admin, a member, invites in every state, two PINs and
-	// files that are ready, trashed and still arriving.
-	for _, q := range []string{
-		`INSERT INTO users (id, name, role, created_at, created_by) VALUES ('admin', 'Stefan', 'admin', 1, 'cli'), ('maria', 'Maria', 'member', 1, 'cli')`,
-		`INSERT INTO invites (id, token_hash, name, role, user_id, created_by, created_at, expires_at, used_at, revoked_at) VALUES
-			('open', x'01', 'Oma Rosa', 'member', NULL, 'admin', 1, 9999999999999, NULL, NULL),
-			('openadmin', x'02', 'Peter', 'admin', NULL, 'admin', 1, 9999999999999, NULL, NULL),
-			('used', x'03', 'Anna', 'member', NULL, 'admin', 1, 9999999999999, 2, NULL),
-			('phone', x'04', 'Maria', 'member', 'maria', 'admin', 1, 9999999999999, NULL, NULL),
-			('expired', x'05', 'Marco', 'member', NULL, 'admin', 1, 2, NULL, NULL)`,
-		`INSERT INTO pins (id, code, kind, created_by, created_at, expires_at, ended_at) VALUES
-			('live', 'K7M2Q', 'permanent', 'admin', 1, NULL, NULL), ('ended', '4HX9T', 'day', 'admin', 1, 2, 2)`,
-		`INSERT INTO files (id, state, name, size, received, rel_path, upload_day, created_at, updated_at) VALUES
-			('ready', 'ready', 'IMG_1.jpg', 10, 10, '2026-09-26/IMG_1.jpg', '2026-09-26', 1758844800000, 1),
-			('trashed', 'trashed', 'IMG_2.jpg', 10, 10, '2026-09-26/IMG_2.jpg', '2026-09-26', 1758931200000, 1),
-			('arriving', 'receiving', 'IMG_3.jpg', 10, 4, NULL, NULL, 1759017600000, 1)`,
-	} {
-		if _, err := d.Exec(q); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := d.Migrate(ctx, filepath.Join(dir, "backups")); err != nil {
-		t.Fatal(err)
-	}
-
-	first := Folder{ID: ids.New(), Name: "Share", Dir: "", CreatedBy: "first-start"}
+	first := Folder{ID: ids.New(), Name: "Share", Dir: "Share", CreatedBy: "first-start"}
 	got, made, err := d.EnsureFirstFolder(ctx, first, t0)
-	if err != nil || !made || got.ID != first.ID || got.Name != "Share" {
+	if err != nil || !made || got.ID != first.ID || !got.CreatedAt.Equal(t0) || got.RenamingFrom != nil {
 		t.Fatalf("EnsureFirstFolder = %+v, %v, %v", got, made, err)
 	}
-	if want := time.UnixMilli(1758844800000).UTC(); !got.CreatedAt.Equal(want) {
-		t.Errorf("the folder dates from %v, want the oldest file's %v", got.CreatedAt, want)
-	}
-	for _, id := range []string{"ready", "trashed", "arriving"} {
-		if f, _ := d.FileByID(ctx, id); f.FolderID != first.ID {
-			t.Errorf("file %s is in folder %q", id, f.FolderID)
-		}
-	}
-	for _, id := range []string{"live", "ended"} {
-		if p, _ := d.PinByID(ctx, id); p.FolderID != first.ID {
-			t.Errorf("PIN %s sends into %q", id, p.FolderID)
-		}
-	}
-	if folders, _ := d.FoldersOf(ctx, "maria"); len(folders) != 1 || folders[0].ID != first.ID {
-		t.Errorf("Maria sees %+v", folders)
-	}
-	if folders, _ := d.FoldersOf(ctx, "admin"); len(folders) != 0 {
-		t.Errorf("the admin got rows %+v; admins see every folder without them", folders)
-	}
-	invites := map[string]bool{}
-	rows, err := d.Query("SELECT invite_id FROM invite_folders WHERE folder_id = ?", first.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for rows.Next() {
-		var id string
-		rows.Scan(&id)
-		invites[id] = true
-	}
-	rows.Close()
-	if len(invites) != 1 || !invites["open"] {
-		t.Errorf("invites that give the folder: %v, want only the open one for a new member", invites)
-	}
-
-	// Once there is a folder, nothing changes any more.
-	again, made, err := d.EnsureFirstFolder(ctx, Folder{ID: ids.New(), Name: "Other", CreatedBy: "first-start"}, t0)
+	again, made, err := d.EnsureFirstFolder(ctx, Folder{ID: ids.New(), Name: "Other", Dir: "Other", CreatedBy: "first-start"}, t0)
 	if err != nil || made || again.ID != first.ID {
 		t.Fatalf("second EnsureFirstFolder = %+v, %v, %v", again, made, err)
 	}
@@ -178,36 +93,62 @@ func TestNoFoldersShowNothing(t *testing.T) {
 	}
 }
 
-// The library's pages come newest first without sorting: from files_by_folder for one
-// folder, and from files_ready_by_time for several.
-func TestLibraryPagesUseTheirIndexes(t *testing.T) {
-	if pgtest.Enabled() {
-		t.Skip("SQLite's query plans")
-	}
+// The queries that must stay quick use their indexes. The library's pages come newest first
+// from an index, without sorting: files_by_folder or files_ready_by_time, whichever the
+// statistics favour. The lookups that ignore case use the casefold() indexes.
+func TestQueriesUseTheirIndexes(t *testing.T) {
 	d := openTest(t)
-	for _, tc := range []struct {
-		folders []string
-		index   string
-	}{
-		{[]string{"a"}, "files_by_folder"},
-		{[]string{"a", "b", "c"}, "files_ready_by_time"},
-	} {
-		w, args := LibraryFilter{Folders: tc.folders}.where(dialect{})
-		rows, err := d.Query("EXPLAIN QUERY PLAN SELECT id FROM files WHERE "+w+" ORDER BY uploaded_at DESC, id LIMIT 10", args...)
+	ctx := context.Background()
+	explain := func(query string, args ...any) string {
+		t.Helper()
+		var plan []string
+		err := d.Tx(ctx, func(tx *sql.Tx) error {
+			// Empty tables are cheapest to read whole and to sort, unless that is ruled out.
+			if _, err := tx.ExecContext(ctx, "SET LOCAL enable_seqscan = off"); err != nil {
+				return err
+			}
+			if _, err := tx.ExecContext(ctx, "SET LOCAL enable_sort = off"); err != nil {
+				return err
+			}
+			rows, err := tx.QueryContext(ctx, "EXPLAIN "+query, args...)
+			if err != nil {
+				return err
+			}
+			defer rows.Close()
+			for rows.Next() {
+				var line string
+				if err := rows.Scan(&line); err != nil {
+					return err
+				}
+				plan = append(plan, line)
+			}
+			return rows.Err()
+		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		var plan []string
-		for rows.Next() {
-			var id, parent, unused int
-			var detail string
-			rows.Scan(&id, &parent, &unused, &detail)
-			plan = append(plan, detail)
-		}
-		rows.Close()
-		got := strings.Join(plan, "; ")
-		if !strings.Contains(got, tc.index) || strings.Contains(got, "TEMP B-TREE") {
-			t.Errorf("%d folders: %s", len(tc.folders), got)
+		return strings.Join(plan, "\n")
+	}
+	page := func(folders ...string) (string, []any) {
+		w, args := LibraryFilter{Folders: folders}.where()
+		return "SELECT id FROM files WHERE " + w + " ORDER BY uploaded_at DESC, id LIMIT 10", args
+	}
+	one, oneArgs := page(ids.New())
+	several, severalArgs := page(ids.New(), ids.New(), ids.New())
+	for _, tc := range []struct {
+		name, query string
+		args        []any
+		index       string
+	}{
+		{"a page of one folder", one, oneArgs, "Index Scan using files_"},
+		{"a page of several folders", several, severalArgs, "Index Scan using files_"},
+		{"UserByUsername", userByUsername, []any{"ÖTZI"}, "users_username"},
+		{"RelPathTaken", relPathTaken, []any{ids.New(), "2026-09-27/ÜBER.PDF"}, "files_rel_path"},
+		{"DirTaken", dirTaken, []any{"ÄRZTE"}, "folders_dir"},
+	} {
+		plan := explain(tc.query, tc.args...)
+		if !strings.Contains(plan, tc.index) || strings.Contains(plan, "Sort") || strings.Contains(plan, "Seq Scan") {
+			t.Errorf("%s doesn't use %s alone:\n%s", tc.name, tc.index, plan)
 		}
 	}
 }

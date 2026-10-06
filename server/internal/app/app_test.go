@@ -95,14 +95,10 @@ func newEnvWith(t *testing.T, settings string) *env {
 	return e
 }
 
-// testDatabase is the "database" setting of a test's configuration: none for SQLite, or a
-// schema of its own on the PostgreSQL server in SHARE_TEST_POSTGRES.
+// testDatabase is the "database" setting of a test's configuration: a schema of its own on the
+// PostgreSQL server in SHARE_TEST_POSTGRES.
 func testDatabase(t *testing.T) string {
-	url := pgtest.URL(t)
-	if url == "" {
-		return ""
-	}
-	quoted, _ := json.Marshal(url)
+	quoted, _ := json.Marshal(pgtest.URL(t))
 	return `, "database": {"postgres": ` + string(quoted) + `}`
 }
 

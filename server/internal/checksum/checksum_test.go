@@ -26,7 +26,7 @@ type fixture struct {
 func newFixture(t *testing.T, pace int64) *fixture {
 	t.Helper()
 	dir := t.TempDir()
-	d := dbtest.Open(t, dir)
+	d := dbtest.Open(t)
 	folder, _, err := d.EnsureFirstFolder(context.Background(), db.Folder{ID: ids.New(), Name: "Share", CreatedBy: "first-start"}, time.Now())
 	if err != nil {
 		t.Fatal(err)

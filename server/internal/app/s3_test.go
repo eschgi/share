@@ -19,7 +19,6 @@ import (
 
 	"github.com/eschgi/share/server/internal/config"
 	"github.com/eschgi/share/server/internal/db"
-	"github.com/eschgi/share/server/internal/db/pgtest"
 	"github.com/eschgi/share/server/internal/ids"
 	"github.com/eschgi/share/server/internal/s3"
 	"github.com/eschgi/share/server/internal/s3/s3test"
@@ -164,9 +163,6 @@ func TestS3ModeStarts(t *testing.T) {
 
 // With PostgreSQL and a bucket, the server keeps nothing on its own disk: no data folder.
 func TestNothingIsKeptOnThisMachine(t *testing.T) {
-	if !pgtest.Enabled() {
-		t.Skip("needs PostgreSQL (SHARE_TEST_POSTGRES)")
-	}
 	fake := s3test.New(t)
 	fake.SetMinPartSize(s3TestPart)
 	setting, _ := json.Marshal(fake.Config("share/"))

@@ -32,7 +32,6 @@ String storageWarningText(AppLocalizations t, String code) => switch (code) {
       'other_drive' => t.storageWarnOtherDrive,
       'not_a_drive' => t.storageWarnNotADrive,
       'data_unreadable' => t.storageWarnDataUnreadable,
-      'data_unsafe' => t.storageWarnDataUnsafe,
       'data_in_memory' => t.storageWarnDataInMemory,
       'drive_full' => t.storageWarnDriveFull,
       'fat32' => t.storageWarnFat32,

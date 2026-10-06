@@ -6,25 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/eschgi/share/server/internal/ids"
-	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // ErrConflict is returned when a unique value (a PIN code, a library path) is already taken.
 var ErrConflict = errors.New("already exists")
-
-// isUniqueViolation reports whether err comes from a UNIQUE constraint, in SQLite or in
-// PostgreSQL (23505).
-func isUniqueViolation(err error) bool {
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) {
-		return pgErr.Code == "23505"
-	}
-	return err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed")
-}
 
 // Meta returns a value from the meta table.
 func (d *DB) Meta(ctx context.Context, key string) (string, error) {

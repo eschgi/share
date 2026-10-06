@@ -84,14 +84,17 @@ func (d *DB) UserByID(ctx context.Context, id string) (User, error) {
 	return scanUser(d.QueryRowContext(ctx, "SELECT "+userColumns+" FROM users WHERE id = ?", id))
 }
 
+// userByUsername finds a person on users_username.
+const userByUsername = "SELECT " + userColumns + " FROM users WHERE casefold(username) = casefold(? COLLATE pg_c_utf8)"
+
 // UserByUsername finds a person by username, ignoring case.
 func (d *DB) UserByUsername(ctx context.Context, username string) (User, error) {
-	return scanUser(d.QueryRowContext(ctx, "SELECT "+userColumns+" FROM users WHERE "+d.dialect.noCase("username"), username))
+	return scanUser(d.QueryRowContext(ctx, userByUsername, username))
 }
 
 // Users lists everyone, admins first, then by name.
 func (d *DB) Users(ctx context.Context) ([]User, error) {
-	rows, err := d.QueryContext(ctx, "SELECT "+userColumns+" FROM users ORDER BY role = 'member', "+d.dialect.orderNoCase("name")+", id")
+	rows, err := d.QueryContext(ctx, "SELECT "+userColumns+" FROM users ORDER BY role = 'member', casefold(name), id")
 	if err != nil {
 		return nil, err
 	}

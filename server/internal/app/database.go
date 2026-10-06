@@ -11,31 +11,24 @@ import (
 	"github.com/eschgi/share/server/internal/storage"
 )
 
-// OpenDatabase opens the database of cfg, SQLite in data_dir or PostgreSQL, brings its schema
-// up to date, checks that it belongs to this storage and makes the first folder if there is
-// none yet. The server and the commands that work on the database directly use it alike; the
-// server waits while PostgreSQL doesn't answer.
+// OpenDatabase opens the PostgreSQL database of cfg, brings its schema up to date, checks that
+// it belongs to this storage and makes the first folder if there is none yet. The server and the
+// commands that work on the database directly use it alike; the server waits while PostgreSQL
+// doesn't answer.
 func OpenDatabase(ctx context.Context, cfg *config.Config, now time.Time, wait bool) (*db.DB, error) {
-	layout := storage.Layout{StorageDir: cfg.StorageDir, DataDir: cfg.DataDir}
-	var d *db.DB
-	var err error
-	if cfg.Database != nil {
-		d, err = openPostgres(ctx, cfg.Database, wait)
-	} else {
-		d, err = db.Open(layout.DBPath())
-	}
+	d, err := openPostgres(ctx, cfg.Database, wait)
 	if err != nil {
 		return nil, err
 	}
-	if err := setUpDatabase(ctx, d, cfg, layout, now); err != nil {
+	if err := setUpDatabase(ctx, d, cfg, now); err != nil {
 		d.Close()
 		return nil, err
 	}
 	return d, nil
 }
 
-func setUpDatabase(ctx context.Context, d *db.DB, cfg *config.Config, layout storage.Layout, now time.Time) error {
-	if err := d.Migrate(ctx, layout.BackupDir()); err != nil {
+func setUpDatabase(ctx context.Context, d *db.DB, cfg *config.Config, now time.Time) error {
+	if err := d.Migrate(ctx); err != nil {
 		return err
 	}
 	if err := storage.ClaimStorage(ctx, d, cfg.StorageKey()); err != nil {
@@ -49,12 +42,12 @@ func setUpDatabase(ctx context.Context, d *db.DB, cfg *config.Config, layout sto
 var postgresRetry = 5 * time.Second
 
 // openPostgres opens the PostgreSQL database. When waiting, it asks again while nothing
-// answers, as when a free database host wakes a paused one; a refused login or database ends
-// it at once, since waiting won't change that.
-func openPostgres(ctx context.Context, c *config.Database, wait bool) (*db.DB, error) {
+// answers, as when a free database host wakes a paused one; a refused login or database, or a
+// server Share can't use, ends it at once, since waiting won't change that.
+func openPostgres(ctx context.Context, c config.Database, wait bool) (*db.DB, error) {
 	start, lastLog := time.Now(), time.Time{}
 	for {
-		d, err := db.OpenPostgres(ctx, c.Postgres)
+		d, err := db.Open(ctx, c.Postgres)
 		if err == nil || !wait || !db.Unreachable(err) {
 			return d, err
 		}

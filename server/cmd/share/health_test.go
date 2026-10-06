@@ -22,7 +22,7 @@ func TestHealthURL(t *testing.T) {
 		if settings != "" {
 			settings = ", " + settings
 		}
-		cfg, err := config.Parse([]byte(`{"public_url": "https://share.example.com", "storage_dir": "/srv/share"` + settings + `}`))
+		cfg, err := config.Parse([]byte(`{"public_url": "https://share.example.com", "storage_dir": "/srv/share", "database": {"postgres": "postgres://share@localhost/share"}` + settings + `}`))
 		if err != nil {
 			t.Fatalf("%s: %v", tc.ports, err)
 		}
@@ -42,7 +42,7 @@ func TestProxyLine(t *testing.T) {
 		`, "proxy": "x-forwarded"`: "Proxy: x-forwarded, from 127.0.0.1/32, ::1/128",
 		`, "proxy": {"headers": "cloudflare", "trusted_proxies": ["172.30.0.2"]}`: "Proxy: cloudflare, from 172.30.0.2",
 	} {
-		cfg, err := config.Parse([]byte(`{"public_url": "https://share.example.com", "storage_dir": "/srv/share"` + settings + `}`))
+		cfg, err := config.Parse([]byte(`{"public_url": "https://share.example.com", "storage_dir": "/srv/share", "database": {"postgres": "postgres://share@localhost/share"}` + settings + `}`))
 		if err != nil {
 			t.Fatal(err)
 		}

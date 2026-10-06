@@ -40,8 +40,9 @@ func TestInitAndCheckABucket(t *testing.T) {
 	t.Cleanup(func() { openBucket = saved })
 	dir := t.TempDir()
 	setting, _ := json.Marshal(fake.Config("share/"))
+	database, _ := json.Marshal(pgtest.URL(t))
 	path := filepath.Join(dir, "config.json")
-	cfg := fmt.Sprintf(`{"public_url": "https://share.example.com", "data_dir": %q, "s3": %s}`, filepath.Join(dir, "data"), setting)
+	cfg := fmt.Sprintf(`{"public_url": "https://share.example.com", "data_dir": %q, "s3": %s, "database": {"postgres": %s}}`, filepath.Join(dir, "data"), setting, database)
 	if err := os.WriteFile(path, []byte(cfg), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -68,9 +69,6 @@ func TestInitAndCheckABucket(t *testing.T) {
 // With PostgreSQL and a bucket, init has nothing to make on this machine.
 func TestInitWithPostgresAndABucket(t *testing.T) {
 	url := pgtest.URL(t)
-	if url == "" {
-		t.Skip("needs PostgreSQL (SHARE_TEST_POSTGRES)")
-	}
 	fake := s3test.New(t)
 	saved := openBucket
 	openBucket = func(c *config.S3) (*s3.Bucket, error) {

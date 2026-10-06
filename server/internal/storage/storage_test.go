@@ -111,7 +111,7 @@ func newFixtureWith(t *testing.T, before func(d *db.DB, l Layout)) *fixture {
 	if err := Init(l); err != nil {
 		t.Fatal(err)
 	}
-	d := dbtest.Open(t, l.DataDir)
+	d := dbtest.Open(t)
 	if before != nil {
 		before(d, l)
 	}

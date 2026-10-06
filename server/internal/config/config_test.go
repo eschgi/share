@@ -11,7 +11,16 @@ import (
 	"testing"
 )
 
-const minimal = `{"public_url": "https://share.example.com", "storage_dir": "/mnt/usb/share"}`
+const minimal = `{"public_url": "https://share.example.com", "storage_dir": "/mnt/usb/share", "database": {"postgres": "postgres://share@localhost/share"}}`
+
+// parse parses a config.json, with a database added when it names none: every server needs
+// one, and most tests are about something else.
+func parse(body string) (*Config, error) {
+	if !strings.Contains(body, `"database"`) {
+		body = strings.Replace(body, "{", `{"database": {"postgres": "postgres://share@localhost/share"}, `, 1)
+	}
+	return Parse([]byte(body))
+}
 
 // bucket is a valid "s3" object.
 const bucket = `{"endpoint": "https://s3.eu-central-1.amazonaws.com", "region": "eu-central-1", "bucket": "share",
@@ -31,7 +40,7 @@ func s3With(over string) string {
 }
 
 func TestDefaults(t *testing.T) {
-	cfg, err := Parse([]byte(minimal))
+	cfg, err := parse(minimal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,8 +62,8 @@ func TestDefaults(t *testing.T) {
 }
 
 func TestPartialNestedObjectKeepsOtherDefaults(t *testing.T) {
-	cfg, err := Parse([]byte(`{"public_url": "https://s.example.com", "storage_dir": "/srv/share",
-		"upload": {"chunk_size_mib": 50}, "http": {}}`))
+	cfg, err := parse(`{"public_url": "https://s.example.com", "storage_dir": "/srv/share",
+		"upload": {"chunk_size_mib": 50}, "http": {}}`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +76,7 @@ func TestPartialNestedObjectKeepsOtherDefaults(t *testing.T) {
 }
 
 func TestTimeZone(t *testing.T) {
-	cfg, err := Parse([]byte(`{"public_url": "https://s.example.com", "storage_dir": "/srv/share", "time_zone": "Europe/Rome"}`))
+	cfg, err := parse(`{"public_url": "https://s.example.com", "storage_dir": "/srv/share", "time_zone": "Europe/Rome"}`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +86,7 @@ func TestTimeZone(t *testing.T) {
 }
 
 func TestPublicURLIsNormalized(t *testing.T) {
-	cfg, err := Parse([]byte(`{"public_url": "https://Share.Example.com/", "storage_dir": "/srv/share"}`))
+	cfg, err := parse(`{"public_url": "https://Share.Example.com/", "storage_dir": "/srv/share"}`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +136,7 @@ func TestErrors(t *testing.T) {
 		{"chunk too big", `{"public_url": "https://a.example", "storage_dir": "/s", "upload": {"chunk_size_mib": 100}}`, "chunk_size_mib"},
 		{"no storage", `{"public_url": "https://a.example"}`, `storage_dir: is required, or "s3" for a bucket`},
 		{"drive and bucket", `{"public_url": "https://a.example", "storage_dir": "/s", "data_dir": "/d", "s3": ` + bucket + `}`, `"s3" can't both be set`},
-		{"bucket without data_dir", `{"public_url": "https://a.example", "s3": ` + bucket + `}`, `data_dir: is required with "s3"`},
+		{"no database", `{"public_url": "https://a.example", "storage_dir": "/s"}`, "database.postgres: is required: Share keeps its records in PostgreSQL"},
 		{"unknown bucket field", s3With(`{"bucket": "share", "storage_class": "STANDARD"}`), "unknown field"},
 		{"no endpoint", s3With(`{"endpoint": ""}`), "s3.endpoint: is required"},
 		{"http endpoint on the internet", s3With(`{"endpoint": "http://s3.example.com"}`), "plain http is only for a bucket at home"},
@@ -157,7 +166,7 @@ func TestErrors(t *testing.T) {
 }
 
 func TestAllProblemsAreReportedTogether(t *testing.T) {
-	_, err := Parse([]byte(`{"storage_dir": "rel", "trash_days": 0}`))
+	_, err := parse(`{"storage_dir": "rel", "trash_days": 0}`)
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -170,11 +179,11 @@ func TestAllProblemsAreReportedTogether(t *testing.T) {
 
 func TestPlainHTTPAtHome(t *testing.T) {
 	for _, public := range []string{"http://localhost:8080", "http://192.168.8.52:8080", "http://share.local:8080"} {
-		if _, err := Parse([]byte(`{"public_url": "` + public + `", "storage_dir": "/s"}`)); err != nil {
+		if _, err := parse(`{"public_url": "` + public + `", "storage_dir": "/s"}`); err != nil {
 			t.Errorf("%s: %v", public, err)
 		}
 	}
-	cfg, err := Parse([]byte(`{"public_url": "https://share.example.com", "storage_dir": "/s", "home_url": "http://192.168.8.52:8080/"}`))
+	cfg, err := parse(`{"public_url": "https://share.example.com", "storage_dir": "/s", "home_url": "http://192.168.8.52:8080/"}`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,23 +193,23 @@ func TestPlainHTTPAtHome(t *testing.T) {
 }
 
 func TestHTTPSPort(t *testing.T) {
-	cfg, err := Parse([]byte(`{"public_url": "https://share.example.com", "storage_dir": "/s",
-		"https": {}, "home_url": "https://192.168.8.52:8443"}`))
+	cfg, err := parse(`{"public_url": "https://share.example.com", "storage_dir": "/s",
+		"https": {}, "home_url": "https://192.168.8.52:8443"}`)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if cfg.HTTPS.Listen != ":8443" || !cfg.SelfSigned() || cfg.CertificateHost() != "192.168.8.52" {
 		t.Errorf("https %+v, self-signed %v, host %q", cfg.HTTPS, cfg.SelfSigned(), cfg.CertificateHost())
 	}
-	cfg, err = Parse([]byte(`{"public_url": "https://share.example.com", "storage_dir": "/s", "http": null,
-		"https": {"listen": ":443", "certificate": {"cert_file": "/etc/share/cert.pem", "key_file": "/etc/share/key.pem"}}}`))
+	cfg, err = parse(`{"public_url": "https://share.example.com", "storage_dir": "/s", "http": null,
+		"https": {"listen": ":443", "certificate": {"cert_file": "/etc/share/cert.pem", "key_file": "/etc/share/key.pem"}}}`)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if cfg.HTTP != nil || cfg.SelfSigned() || cfg.HTTPS.Certificate.KeyFile != "/etc/share/key.pem" {
 		t.Errorf("http %+v, https %+v", cfg.HTTP, cfg.HTTPS)
 	}
-	if _, err := Parse([]byte(`{"public_url": "https://share.example.com", "storage_dir": "/s", "https": {"certificate": "self-signed"}}`)); err != nil {
+	if _, err := parse(`{"public_url": "https://share.example.com", "storage_dir": "/s", "https": {"certificate": "self-signed"}}`); err != nil {
 		t.Error(err)
 	}
 }
@@ -218,7 +227,7 @@ func TestProxy(t *testing.T) {
 		{`{"headers": "cloudflare", "trusted_proxies": ["10.0.0.0/8"]}`, "cloudflare", []string{"10.0.0.0/8"}},
 		{`null`, "", nil},
 	} {
-		cfg, err := Parse([]byte(`{"public_url": "https://a.example", "storage_dir": "/s", "proxy": ` + tc.json + `}`))
+		cfg, err := parse(`{"public_url": "https://a.example", "storage_dir": "/s", "proxy": ` + tc.json + `}`)
 		if err != nil {
 			t.Fatalf("%s: %v", tc.json, err)
 		}
@@ -273,9 +282,9 @@ func TestDeployExamplesAreValid(t *testing.T) {
 }
 
 func TestS3(t *testing.T) {
-	cfg, err := Parse([]byte(`{"public_url": "https://share.example.com", "home_url": "http://192.168.8.52:8080", "data_dir": "/srv/share-data",
+	cfg, err := parse(`{"public_url": "https://share.example.com", "home_url": "http://192.168.8.52:8080", "data_dir": "/srv/share-data",
 		"s3": {"endpoint": "HTTPS://S3.EU-Central-1.Amazonaws.com:443/", "region": "eu-central-1", "bucket": "Family-Files",
-		"prefix": "/share", "access_key_id": "AKIAIOSFODNN7EXAMPLE", "secret_access_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"}}`))
+		"prefix": "/share", "access_key_id": "AKIAIOSFODNN7EXAMPLE", "secret_access_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"}}`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -294,14 +303,14 @@ func TestS3(t *testing.T) {
 		}
 	}
 
-	cfg, err = Parse([]byte(`{"public_url": "https://a.example", "data_dir": "/d", "upload": {"max_file_size_gib": 10}, "s3": ` + bucket + `}`))
+	cfg, err = parse(`{"public_url": "https://a.example", "data_dir": "/d", "upload": {"max_file_size_gib": 10}, "s3": ` + bucket + `}`)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if cfg.MaxFileSize() != 10<<30 || cfg.S3.Prefix != "" || cfg.StorageKey() != "s3:share/" {
 		t.Errorf("largest file %d, prefix %q, key %q", cfg.MaxFileSize(), cfg.S3.Prefix, cfg.StorageKey())
 	}
-	if disk, _ := Parse([]byte(minimal)); disk.StorageKey() != "disk" {
+	if disk, _ := parse(minimal); disk.StorageKey() != "disk" {
 		t.Errorf("disk key %q", disk.StorageKey())
 	}
 
@@ -312,7 +321,7 @@ func TestS3(t *testing.T) {
 		"http://minio.local:80":     "http://minio.local",
 		"https://[2001:db8::1]:443": "https://[2001:db8::1]",
 	} {
-		cfg, err := Parse([]byte(s3With(`{"endpoint": "` + endpoint + `", "path_style": true}`)))
+		cfg, err := parse(s3With(`{"endpoint": "` + endpoint + `", "path_style": true}`))
 		if err != nil {
 			t.Errorf("%s: %v", endpoint, err)
 		} else if cfg.S3.Endpoint != want || !cfg.S3.PathStyle {
@@ -323,17 +332,18 @@ func TestS3(t *testing.T) {
 
 func TestPostgres(t *testing.T) {
 	const secret = "s3cr3t-pass"
-	parse := func(url string) (*Config, error) {
+	parseURL := func(url string) (*Config, error) {
 		quoted, _ := json.Marshal(url)
-		return Parse([]byte(`{"public_url": "https://a.example", "storage_dir": "/s", "database": {"postgres": ` + string(quoted) + `}}`))
+		return parse(`{"public_url": "https://a.example", "storage_dir": "/s", "database": {"postgres": ` + string(quoted) + `}}`)
 	}
 	for _, ok := range []string{
 		"postgres://share:" + secret + "@ep-x.eu-central-1.aws.neon.tech/share?sslmode=require&channel_binding=require",
 		"postgresql://share:" + secret + "@db.example.com:5432/share?sslmode=verify-full",
 		"postgres://share@127.0.0.1:5433/share",                // on this machine, no TLS needed
 		"postgres://share@nas.home.arpa/share?sslmode=disable", // at home
+		"postgres://share@db/share?sslmode=disable",            // a Docker service next to Share
 	} {
-		if _, err := parse(ok); err != nil {
+		if _, err := parseURL(ok); err != nil {
 			t.Errorf("%s: %v", ok, err)
 		}
 	}
@@ -343,8 +353,10 @@ func TestPostgres(t *testing.T) {
 		{"postgres://share:" + secret + "@db.example.com", "names no database"},
 		{"postgres://share:" + secret + "@db.example.com/share", "needs sslmode=require"},
 		{"postgres://share:" + secret + "@db.example.com/share?sslmode=prefer", "needs sslmode=require"},
+		{"postgres://share:" + secret + "@db.example/share", "needs sslmode=require"},
+		{"postgres://share:" + secret + "@[2001:db8::1]/share", "needs sslmode=require"},
 	} {
-		_, err := parse(tc.url)
+		_, err := parseURL(tc.url)
 		if err == nil || !strings.Contains(err.Error(), tc.want) {
 			t.Errorf("%q: %v, want %q", tc.url, err, tc.want)
 		}
@@ -352,31 +364,26 @@ func TestPostgres(t *testing.T) {
 			t.Errorf("%q: the error shows the password: %v", tc.url, err)
 		}
 	}
-	cfg, err := parse("postgres://share:" + secret + "@ep-x.eu-central-1.aws.neon.tech/share?sslmode=require")
+	cfg, err := parseURL("postgres://share:" + secret + "@ep-x.eu-central-1.aws.neon.tech/share?sslmode=require")
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, shown := range []string{cfg.Database.String(), fmt.Sprintf("%v %+v %#v", *cfg.Database, *cfg.Database, *cfg.Database)} {
+	for _, shown := range []string{cfg.Database.String(), fmt.Sprintf("%v %+v %#v", cfg.Database, cfg.Database, cfg.Database)} {
 		if strings.Contains(shown, secret) || !strings.Contains(shown, "ep-x.eu-central-1.aws.neon.tech/share") {
 			t.Errorf("printed as %q", shown)
 		}
 	}
 }
 
-// With PostgreSQL and a bucket nothing needs to be kept on this machine.
-func TestDataDirIsOptionalWithPostgresAndABucket(t *testing.T) {
+// With a bucket nothing needs to be kept on this machine, unless the https port makes its own
+// certificate.
+func TestDataDirIsOptionalWithABucket(t *testing.T) {
 	s3 := `"s3": {"endpoint": "https://s3.eu-central-1.amazonaws.com", "region": "eu-central-1", "bucket": "family-share", "access_key_id": "AKID", "secret_access_key": "SECRET"}`
-	database := `"database": {"postgres": "postgres://share:pw@db.example.com/share?sslmode=require"}`
-	cfg, err := Parse([]byte(`{"public_url": "https://a.example", ` + s3 + `, ` + database + `}`))
+	cfg, err := parse(`{"public_url": "https://a.example", ` + s3 + `}`)
 	if err != nil || cfg.DataDir != "" {
-		t.Fatalf("a bucket and PostgreSQL: %q, %v", cfg.DataDir, err)
+		t.Fatalf("a bucket: %q, %v", cfg.DataDir, err)
 	}
-	for _, tc := range []struct{ json, want string }{
-		{`{"public_url": "https://a.example", ` + s3 + `}`, `unless "database" names PostgreSQL`},
-		{`{"public_url": "https://a.example", ` + s3 + `, ` + database + `, "https": {"listen": ":8443"}}`, "own certificate"},
-	} {
-		if _, err := Parse([]byte(tc.json)); err == nil || !strings.Contains(err.Error(), tc.want) {
-			t.Errorf("%s: %v, want %q", tc.json, err, tc.want)
-		}
+	if _, err := parse(`{"public_url": "https://a.example", ` + s3 + `, "https": {"listen": ":8443"}}`); err == nil || !strings.Contains(err.Error(), "own certificate") {
+		t.Errorf("a bucket and Share's own certificate without data_dir: %v", err)
 	}
 }

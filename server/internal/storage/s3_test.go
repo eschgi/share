@@ -67,7 +67,7 @@ func newS3Fixture(t *testing.T) *s3Fixture {
 		t.Fatal(err)
 	}
 	dir := t.TempDir()
-	d := dbtest.Open(t, dir)
+	d := dbtest.Open(t)
 	folder, err := EnsureFirstFolder(ctx, d, "", "Share", t0)
 	if err != nil {
 		t.Fatal(err)

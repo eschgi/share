@@ -12,7 +12,7 @@ import (
 
 func TestClaimStorage(t *testing.T) {
 	ctx := context.Background()
-	open := func(t *testing.T) *db.DB { return dbtest.Open(t, t.TempDir()) }
+	open := func(t *testing.T) *db.DB { return dbtest.Open(t) }
 	addFile := func(t *testing.T, d *db.DB) {
 		folder, err := EnsureFirstFolder(ctx, d, t.TempDir(), "Share", t0)
 		if err != nil {

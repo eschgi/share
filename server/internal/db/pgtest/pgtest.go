@@ -1,5 +1,5 @@
-// Package pgtest lets the tests run against PostgreSQL: with SHARE_TEST_POSTGRES set to a
-// server's address, every test gets a schema of its own there, dropped when it ends.
+// Package pgtest gives every test a schema of its own on the PostgreSQL server in
+// SHARE_TEST_POSTGRES, dropped when the test ends.
 package pgtest
 
 import (
@@ -13,16 +13,13 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// Enabled reports whether the tests run against PostgreSQL rather than SQLite.
-func Enabled() bool { return os.Getenv("SHARE_TEST_POSTGRES") != "" }
-
-// URL makes a fresh schema for the test and returns an address that uses it; "" when the tests
-// run against SQLite.
+// URL makes a fresh schema for the test and returns an address that uses it. Without
+// SHARE_TEST_POSTGRES the test fails: the server's tests need a PostgreSQL server.
 func URL(t testing.TB) string {
 	t.Helper()
 	base := os.Getenv("SHARE_TEST_POSTGRES")
 	if base == "" {
-		return ""
+		t.Fatal("SHARE_TEST_POSTGRES isn't set: the server's tests need a PostgreSQL server to make schemas in (README, Development)")
 	}
 	b := make([]byte, 8)
 	rand.Read(b)

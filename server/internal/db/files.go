@@ -184,12 +184,15 @@ func (d *DB) OutstandingBytes(ctx context.Context) (int64, error) {
 	return n.Int64, err
 }
 
+// relPathTaken counts the files on a path on files_rel_path, whose WHERE it repeats.
+const relPathTaken = `SELECT COUNT(*) FROM files
+	WHERE folder_id = ? AND casefold(rel_path) = casefold(? COLLATE pg_c_utf8) AND state IN ('finalizing', 'ready')`
+
 // RelPathTaken reports whether a path in a folder is in use, ignoring case, because exFAT
 // and NTFS drives treat IMG.jpg and img.jpg as the same file.
 func (d *DB) RelPathTaken(ctx context.Context, folderID, relPath string) (bool, error) {
 	var n int
-	err := d.QueryRowContext(ctx, `SELECT COUNT(*) FROM files
-		WHERE folder_id = ? AND `+d.dialect.noCase("rel_path")+` AND state IN ('finalizing', 'ready')`, folderID, relPath).Scan(&n)
+	err := d.QueryRowContext(ctx, relPathTaken, folderID, relPath).Scan(&n)
 	return n > 0, err
 }
 

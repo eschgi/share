@@ -2,48 +2,15 @@ package db
 
 import (
 	"context"
-	"database/sql"
 	"database/sql/driver"
-	"errors"
-	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/stdlib"
 )
 
-// OpenPostgres opens a PostgreSQL database, e.g. postgres://share:…@host/share. Errors name the
-// host and the database, never the password.
-func OpenPostgres(ctx context.Context, url string) (*DB, error) {
-	cfg, err := pgx.ParseConfig(url)
-	if err != nil {
-		return nil, errors.New("the PostgreSQL address can't be read") // its text may hold the password
-	}
-	where := cfg.Host + "/" + cfg.Database
-	sqldb := sql.OpenDB(pgConnector{stdlib.GetConnector(*cfg)})
-	sqldb.SetMaxOpenConns(8)
-	sqldb.SetMaxIdleConns(4)
-	// A database host may close idle connections, Neon when it pauses after 5 minutes.
-	sqldb.SetConnMaxIdleTime(4 * time.Minute)
-	if err := sqldb.PingContext(ctx); err != nil {
-		sqldb.Close()
-		return nil, fmt.Errorf("PostgreSQL at %s: %w", where, err)
-	}
-	return &DB{DB: sqldb, dialect: dialect{postgres: true}}, nil
-}
-
-// Unreachable reports whether err means the database didn't answer at all, rather than
-// refusing the login or the database: waiting may help with the first, not with the second.
-func Unreachable(err error) bool {
-	var pgErr *pgconn.PgError
-	return err != nil && !errors.As(err, &pgErr) && !errors.Is(err, context.Canceled)
-}
-
-// pgConnector hands out connections that understand SQLite's placeholders, so that every query
-// is written once.
+// pgConnector hands out connections that read the queries' ? placeholders as PostgreSQL's $1,
+// $2…
 type pgConnector struct{ driver.Connector }
 
 func (c pgConnector) Connect(ctx context.Context) (driver.Conn, error) {
@@ -76,8 +43,8 @@ func (p pgConn) Ping(ctx context.Context) error             { return p.c.Ping(ct
 func (p pgConn) CheckNamedValue(v *driver.NamedValue) error { return p.c.CheckNamedValue(v) }
 func (p pgConn) ResetSession(ctx context.Context) error     { return p.c.ResetSession(ctx) }
 
-// rebind turns SQLite's placeholders, ? and ?NNN, into PostgreSQL's $1, $2…, outside quoted text
-// and comments. A bare ? is one more than the highest number before it, as in SQLite.
+// rebind turns the placeholders ? and ?NNN into PostgreSQL's $1, $2…, outside quoted text and
+// comments. A bare ? is one more than the highest number before it.
 func rebind(q string) string {
 	if !strings.Contains(q, "?") {
 		return q

@@ -157,14 +157,14 @@ func (d *DB) FolderByID(ctx context.Context, id string) (Folder, error) {
 // LiveFolders lists the folders that aren't deleted, the oldest first: the first one is where
 // things go when nobody says.
 func (d *DB) LiveFolders(ctx context.Context) ([]Folder, error) {
-	return queryFolders(ctx, d, "SELECT "+folderSelect+" FROM folders WHERE deleted_at IS NULL ORDER BY created_at, rowid")
+	return queryFolders(ctx, d, "SELECT "+folderSelect+" FROM folders WHERE deleted_at IS NULL ORDER BY created_at, seq")
 }
 
 // FoldersOf lists the live folders a member was given, the oldest first. Admins see every
 // folder whatever this says.
 func (d *DB) FoldersOf(ctx context.Context, userID string) ([]Folder, error) {
 	return queryFolders(ctx, d, "SELECT "+folderSelect+` FROM folders
-		WHERE deleted_at IS NULL AND id IN (SELECT folder_id FROM folder_people WHERE user_id = ?) ORDER BY created_at, rowid`, userID)
+		WHERE deleted_at IS NULL AND id IN (SELECT folder_id FROM folder_people WHERE user_id = ?) ORDER BY created_at, seq`, userID)
 }
 
 // SetFolderPerson gives a person a folder, or takes it away. Doing it twice changes nothing.
@@ -225,13 +225,13 @@ func (d *DB) SetFolderInvite(ctx context.Context, folderID, inviteID string, get
 // PeopleFolders lists, by member, the live folders they were given, the oldest first.
 func (d *DB) PeopleFolders(ctx context.Context) (map[string][]string, error) {
 	return d.folderLists(ctx, `SELECT fp.user_id, f.id FROM folder_people fp JOIN folders f ON f.id = fp.folder_id
-		WHERE f.deleted_at IS NULL ORDER BY f.created_at, f.rowid`)
+		WHERE f.deleted_at IS NULL ORDER BY f.created_at, f.seq`)
 }
 
 // InviteFolders lists, by invite, the live folders it gives, the oldest first.
 func (d *DB) InviteFolders(ctx context.Context) (map[string][]string, error) {
 	return d.folderLists(ctx, `SELECT i.invite_id, f.id FROM invite_folders i JOIN folders f ON f.id = i.folder_id
-		WHERE f.deleted_at IS NULL ORDER BY f.created_at, f.rowid`)
+		WHERE f.deleted_at IS NULL ORDER BY f.created_at, f.seq`)
 }
 
 func (d *DB) folderLists(ctx context.Context, query string) (map[string][]string, error) {
@@ -251,16 +251,19 @@ func (d *DB) folderLists(ctx context.Context, query string) (map[string][]string
 	return out, rows.Err()
 }
 
+// dirTaken counts the folders with a directory on folders_dir.
+const dirTaken = "SELECT COUNT(*) FROM folders WHERE casefold(dir) = casefold(? COLLATE pg_c_utf8)"
+
 // DirTaken reports whether a folder, deleted or not, has a directory, ignoring case.
 func (d *DB) DirTaken(ctx context.Context, dir string) (bool, error) {
 	var n int
-	err := d.QueryRowContext(ctx, "SELECT COUNT(*) FROM folders WHERE "+d.dialect.noCase("dir"), dir).Scan(&n)
+	err := d.QueryRowContext(ctx, dirTaken, dir).Scan(&n)
 	return n > 0, err
 }
 
 // Relocating lists the folders whose files may still lie under an older directory.
 func (d *DB) Relocating(ctx context.Context) ([]Folder, error) {
-	return queryFolders(ctx, d, "SELECT "+folderSelect+" FROM folders WHERE renaming_from IS NOT NULL ORDER BY created_at, rowid")
+	return queryFolders(ctx, d, "SELECT "+folderSelect+" FROM folders WHERE renaming_from IS NOT NULL ORDER BY created_at, seq")
 }
 
 // FinishRelocation notes that nothing is left under a folder's older directory from.
@@ -520,5 +523,5 @@ func (d *DB) FoldersByID(ctx context.Context, ids []string) ([]Folder, error) {
 	for i, id := range ids {
 		args[i] = id
 	}
-	return queryFolders(ctx, d, "SELECT "+folderSelect+" FROM folders WHERE id IN (?"+strings.Repeat(", ?", len(ids)-1)+") ORDER BY created_at, rowid", args...)
+	return queryFolders(ctx, d, "SELECT "+folderSelect+" FROM folders WHERE id IN (?"+strings.Repeat(", ?", len(ids)-1)+") ORDER BY created_at, seq", args...)
 }

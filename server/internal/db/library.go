@@ -14,7 +14,7 @@ type LibraryFilter struct {
 	Day     string   // YYYY-MM-DD; empty for all days
 }
 
-func (f LibraryFilter) where(dl dialect) (string, []any) {
+func (f LibraryFilter) where() (string, []any) {
 	w := "state = 'ready'"
 	var args []any
 	switch len(f.Folders) {
@@ -24,9 +24,7 @@ func (f LibraryFilter) where(dl dialect) (string, []any) {
 		w += " AND folder_id = ?"
 		args = append(args, f.Folders[0])
 	default:
-		// This keeps SQLite on files_ready_by_time, newest first, rather than reading all of
-		// these folders' files to sort them.
-		w += " AND " + dl.unindexed("folder_id") + " IN (?" + strings.Repeat(", ?", len(f.Folders)-1) + ")"
+		w += " AND folder_id IN (?" + strings.Repeat(", ?", len(f.Folders)-1) + ")"
 		for _, id := range f.Folders {
 			args = append(args, id)
 		}
@@ -36,7 +34,8 @@ func (f LibraryFilter) where(dl dialect) (string, []any) {
 		args = append(args, f.Kind)
 	}
 	if f.Query != "" {
-		w += " AND name " + dl.like() + ` ? ESCAPE '\'`
+		// ILIKE lowers both sides by the column's collation: every letter.
+		w += ` AND name ILIKE ? ESCAPE '\'`
 		args = append(args, "%"+likeEscaper.Replace(f.Query)+"%")
 	}
 	if f.Day != "" {
@@ -57,7 +56,7 @@ type DaySummary struct {
 
 // LibraryDays lists the upload days that have files, newest first.
 func (d *DB) LibraryDays(ctx context.Context, f LibraryFilter) ([]DaySummary, error) {
-	w, args := f.where(d.dialect)
+	w, args := f.where()
 	rows, err := d.QueryContext(ctx, "SELECT upload_day, COUNT(*), SUM(size) FROM files WHERE "+w+
 		" GROUP BY upload_day ORDER BY upload_day DESC", args...)
 	if err != nil {
@@ -83,7 +82,7 @@ type Position struct {
 
 // LibraryFiles lists files newest first, at most limit, after the given position.
 func (d *DB) LibraryFiles(ctx context.Context, f LibraryFilter, after *Position, limit int) ([]File, error) {
-	w, args := f.where(d.dialect)
+	w, args := f.where()
 	if after != nil {
 		// The same order as the files_ready_by_time index: newest first, then by id.
 		w += " AND (uploaded_at < ? OR (uploaded_at = ? AND id > ?))"
@@ -95,7 +94,7 @@ func (d *DB) LibraryFiles(ctx context.Context, f LibraryFilter, after *Position,
 
 // LibraryIDs returns the ids of all matching files, newest first, and their total size.
 func (d *DB) LibraryIDs(ctx context.Context, f LibraryFilter) ([]string, int64, error) {
-	w, args := f.where(d.dialect)
+	w, args := f.where()
 	rows, err := d.QueryContext(ctx, "SELECT id, size FROM files WHERE "+w+" ORDER BY uploaded_at DESC, id", args...)
 	if err != nil {
 		return nil, 0, err

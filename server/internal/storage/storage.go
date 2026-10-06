@@ -23,7 +23,7 @@ const MarkerName = ".share-storage"
 // Layout names the folders.
 type Layout struct {
 	StorageDir string // the library: a directory per folder, with the day folders inside
-	DataDir    string // database, certificates, and the thumbnails on a drive
+	DataDir    string // the https port's own certificate, and the thumbnails on a drive
 }
 
 // UploadsDir holds unfinished tus uploads. It sits inside the storage folder, on the same
@@ -32,12 +32,6 @@ func (l Layout) UploadsDir() string { return filepath.Join(l.StorageDir, ".uploa
 
 // TrashDir holds deleted files for a while; the same drive again, so deleting is a rename.
 func (l Layout) TrashDir() string { return filepath.Join(l.StorageDir, ".trash") }
-
-// DBPath is the SQLite database.
-func (l Layout) DBPath() string { return filepath.Join(l.DataDir, "share.db") }
-
-// BackupDir holds database copies taken before migrations.
-func (l Layout) BackupDir() string { return filepath.Join(l.DataDir, "backups") }
 
 // ThumbsDir holds one small JPEG per file that has a thumbnail, as ab/<id>.jpg.
 func (l Layout) ThumbsDir() string { return filepath.Join(l.DataDir, "thumbs") }
@@ -231,14 +225,14 @@ func CheckS3(ctx context.Context, dataDir string, b *s3.Bucket, origins []string
 			r.problem("s3_cors", "the bucket's CORS rules don't let Share's pages on %s send and fetch files; `share check` prints the rules to set", strings.Join(refused, " and "))
 		}
 	}
-	if dataDir != "" { // with PostgreSQL and a bucket nothing is kept on this machine
+	if dataDir != "" { // with a bucket nothing may be kept on this machine
 		r.checkData(dataDir)
 	}
 	return r
 }
 
-// checkData looks at the data folder, where the database is on a drive and with a bucket
-// alike. It reports false when the folder can't be used at all.
+// checkData looks at the data folder, which holds the thumbnails on a drive and the https
+// port's own certificate. It reports false when the folder can't be used at all.
 func (r *Report) checkData(dir string) bool {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		r.problem("data_unreadable", "data folder: %v", err)
@@ -250,12 +244,10 @@ func (r *Report) checkData(dir string) bool {
 		return false
 	}
 	switch r.Data.Type {
-	case "fuseblk", "nfs", "cifs", "smb2":
-		r.problem("data_unsafe", "the data folder is on %s; SQLite isn't safe there — set data_dir to a local disk", r.Data.Type)
 	case "tmpfs":
-		r.problem("data_in_memory", "the data folder is in memory (tmpfs) and would be lost on restart")
+		r.problem("data_in_memory", "the data folder is in memory (tmpfs): its thumbnails and certificate would be lost on restart")
 	case "overlay":
-		r.problem("data_in_memory", "the data folder is inside the container (overlay) and would be lost when the container is made anew; put it on a volume")
+		r.problem("data_in_memory", "the data folder is inside the container (overlay): its thumbnails and certificate would be lost when the container is made anew; put it on a volume")
 	}
 	return true
 }

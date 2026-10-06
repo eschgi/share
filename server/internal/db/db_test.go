@@ -4,8 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"os"
-	"path/filepath"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -15,22 +15,16 @@ import (
 
 var t0 = time.Date(2026, 9, 27, 10, 0, 0, 0, time.UTC)
 
-// openTest opens a fresh, migrated database: SQLite, or PostgreSQL with SHARE_TEST_POSTGRES.
+// openTest opens a fresh, migrated database: a schema of its own on the PostgreSQL server in
+// SHARE_TEST_POSTGRES.
 func openTest(t *testing.T) *DB {
 	t.Helper()
-	dir := t.TempDir()
-	var d *DB
-	var err error
-	if url := pgtest.URL(t); url != "" {
-		d, err = OpenPostgres(context.Background(), url)
-	} else {
-		d, err = Open(filepath.Join(dir, "share.db"))
-	}
+	d, err := Open(context.Background(), pgtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { d.Close() })
-	if err := d.Migrate(context.Background(), filepath.Join(dir, "backups")); err != nil {
+	if err := d.Migrate(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	return d
@@ -48,55 +42,44 @@ func testFolder(t *testing.T, d *DB, name string) string {
 
 func TestMigrateIsIdempotentAndRefusesNewerDatabases(t *testing.T) {
 	ctx := context.Background()
-	dir := t.TempDir()
-	path := filepath.Join(dir, "share.db")
-	d, err := Open(path)
+	d := openTest(t)
+	if err := d.Migrate(ctx); err != nil {
+		t.Fatalf("second Migrate: %v", err)
+	}
+	migrations, err := loadMigrations()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer d.Close()
-	if err := d.Migrate(ctx, filepath.Join(dir, "backups")); err != nil {
-		t.Fatal(err)
-	}
-	if err := d.Migrate(ctx, filepath.Join(dir, "backups")); err != nil {
-		t.Fatalf("second Migrate: %v", err)
-	}
-	if entries, _ := os.ReadDir(filepath.Join(dir, "backups")); len(entries) != 0 {
-		t.Errorf("a no-op migration made %d backups", len(entries))
-	}
-	if v, err := d.SchemaVersion(ctx); err != nil || v != 8 {
-		t.Errorf("schema version %d, %v", v, err)
+	if v, err := d.SchemaVersion(ctx); err != nil || v != len(migrations) {
+		t.Errorf("schema version %d, %v; want %d", v, err, len(migrations))
 	}
 	if err := d.SetMeta(ctx, "schema_version", "99"); err != nil {
 		t.Fatal(err)
 	}
-	if err := d.Migrate(ctx, filepath.Join(dir, "backups")); err == nil {
-		t.Fatal("Migrate accepted a database newer than the program")
+	if err := d.Migrate(ctx); err == nil || !strings.Contains(err.Error(), "version 99") {
+		t.Fatalf("Migrate on a database newer than the program: %v", err)
 	}
 }
 
-// A database from before the schema version moved into the meta table still has it in
-// SQLite's user_version, and goes on from there.
-func TestMigrateGoesOnFromUserVersion(t *testing.T) {
-	ctx := context.Background()
-	dir := t.TempDir()
-	d, err := Open(filepath.Join(dir, "share.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer d.Close()
-	migrateTo(t, d, 6)
-	if v, err := d.SchemaVersion(ctx); err != nil || v != 6 {
-		t.Fatalf("an old database's version: %d, %v", v, err)
-	}
-	if err := d.Migrate(ctx, filepath.Join(dir, "backups")); err != nil {
-		t.Fatal(err)
-	}
-	if v, err := d.Meta(ctx, "schema_version"); err != nil || v != "8" {
-		t.Errorf("after migrating: %q, %v", v, err)
-	}
-	if entries, _ := os.ReadDir(filepath.Join(dir, "backups")); len(entries) != 1 {
-		t.Errorf("%d backups before migrating, want 1", len(entries))
+// A server Share can't use says why, and the server doesn't wait for that to change.
+func TestUsable(t *testing.T) {
+	for _, tc := range []struct {
+		version  int
+		encoding string
+		want     string
+	}{
+		{180000, "UTF8", ""},
+		{190002, "UTF8", ""},
+		{170006, "UTF8", "it is PostgreSQL 17.6; Share needs 18 or newer"},
+		{180001, "LATIN1", "the database's encoding is LATIN1; Share needs UTF8"},
+	} {
+		err := usable(tc.version, tc.encoding)
+		if tc.want == "" && err != nil || tc.want != "" && fmt.Sprint(err) != tc.want {
+			t.Errorf("usable(%d, %s) = %v, want %q", tc.version, tc.encoding, err, tc.want)
+		}
+		if err != nil && Unreachable(fmt.Errorf("PostgreSQL at db/share: %w", err)) {
+			t.Errorf("%v counts as unreachable", err)
+		}
 	}
 }
 

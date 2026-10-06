@@ -7,12 +7,11 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/eschgi/share/server/internal/db/pgtest"
 	"github.com/eschgi/share/server/internal/ids"
 )
 
-// Two admins demoted at the same time: one of them has to stay, in SQLite (one writer at a
-// time) and in PostgreSQL (serializable transactions, run again after a conflict) alike.
+// Two admins demoted at the same time: one of them has to stay (serializable transactions, run
+// again after a conflict).
 func TestTheLastAdminStaysUnderConcurrency(t *testing.T) {
 	d := openTest(t)
 	ctx := context.Background()
@@ -79,9 +78,6 @@ func TestOneFirstUser(t *testing.T) {
 
 // A transaction that collides with another one runs again and then goes through.
 func TestTxRunsAgainAfterAConflict(t *testing.T) {
-	if !pgtest.Enabled() {
-		t.Skip("PostgreSQL's serialization failures; SQLite has one writer at a time")
-	}
 	d := openTest(t)
 	ctx := context.Background()
 	if err := d.SetMeta(ctx, "library_version", "40"); err != nil {
