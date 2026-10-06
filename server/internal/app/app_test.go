@@ -660,18 +660,26 @@ func TestStartDoesTheHousekeepingThatIsDue(t *testing.T) {
 	}
 	e.clock.Add(31 * 24 * time.Hour)
 
-	serveBriefly := func() {
+	ranNow := func(job string) bool {
+		at, err := e.app.DB.JobRun(ctx, job)
+		return err == nil && at.Equal(e.clock.Now())
+	}
+	// serveUntil starts the server and stops it once job ran now, the last one the start must do:
+	// a start runs what is due first, in order, and stopping earlier would cut that short.
+	serveUntil := func(job string) {
 		t.Helper()
 		ctx, cancel := context.WithCancel(ctx)
 		done := make(chan error, 1)
 		go func() { done <- e.app.Serve(ctx) }()
-		time.Sleep(50 * time.Millisecond)
+		for start := time.Now(); !ranNow(job) && time.Since(start) < 20*time.Second; {
+			time.Sleep(10 * time.Millisecond)
+		}
 		cancel()
 		if err := <-done; err != nil {
 			t.Fatalf("Serve: %v", err)
 		}
 	}
-	serveBriefly()
+	serveUntil("empty the trash")
 	if _, err := e.app.DB.FileByID(ctx, id); !errors.Is(err, db.ErrNotFound) {
 		t.Errorf("a file deleted 31 days ago is still there: %v", err)
 	}
@@ -681,11 +689,11 @@ func TestStartDoesTheHousekeepingThatIsDue(t *testing.T) {
 		}
 	}
 	e.clock.Add(time.Minute)
-	serveBriefly()
-	if at, _ := e.app.DB.JobRun(ctx, "empty the trash"); at.Equal(e.clock.Now()) {
+	serveUntil("reconcile uploads")
+	if ranNow("empty the trash") {
 		t.Error("the trash was emptied again a minute later")
 	}
-	if at, _ := e.app.DB.JobRun(ctx, "reconcile uploads"); !at.Equal(e.clock.Now()) {
+	if !ranNow("reconcile uploads") {
 		t.Error("the repairs didn't run at the second start")
 	}
 }

@@ -247,12 +247,14 @@ func TestRunSetupHandsOverThePort(t *testing.T) {
 	if res.StatusCode != http.StatusNoContent {
 		t.Fatalf("POST /api/setup: %d %s", res.StatusCode, body)
 	}
+	// RunSetup may take its whole shutdown time, 5 seconds: the server waits that long for a
+	// connection that hasn't sent a request yet, such as one a client dialled in reserve.
 	select {
 	case err := <-done:
 		if err != nil {
 			t.Fatal(err)
 		}
-	case <-time.After(5 * time.Second):
+	case <-time.After(15 * time.Second):
 		t.Fatal("RunSetup didn't end")
 	}
 	again, err := net.Listen("tcp", addr)
