@@ -21,7 +21,8 @@ import (
 	"github.com/eschgi/share/server/internal/storage"
 )
 
-// version is set at build time: -ldflags "-X main.version=…".
+// version is Share's, set at build time (-ldflags "-X main.version=…") as scripts/version.sh
+// gives it: 0.1.0 for a release, else e.g. 0.1.0-dev+abc1234.
 var version = "dev"
 
 const usage = `Share — a self-hosted file drop.

@@ -34,7 +34,7 @@ android {
         // Pinned rather than flutter.targetSdkVersion: each Android release changes the rules
         // for background work and local network access, and moving to a new one is a decision.
         targetSdk = 36
-        // From pubspec.yaml (version: name+code), so there is one place to bump.
+        // From pubspec.yaml, Share's version; CI builds pass their own (scripts/version.sh).
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         manifestPlaceholders["linkScheme"] = linkScheme

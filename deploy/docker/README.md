@@ -1,8 +1,9 @@
 # Share in Docker
 
 The image `ghcr.io/eschgi/share` holds the server with its website, for amd64 and arm64. Each
-release is tagged with its version (`0.4.0`), its minor version (`0.4`) and `latest`. To build
-it yourself instead, run `docker build -t share .` in the repository.
+release is tagged with its version (`0.1.0`), its minor version (`0.1`) and `latest`. To build
+it yourself instead, run `docker build --build-arg VERSION=$(scripts/version.sh) -t share .` in
+the repository.
 
 Two setups to copy, each a folder with a `compose.yaml` that runs Share and its database,
 PostgreSQL 18:
@@ -77,8 +78,8 @@ when the bucket still needs them.
 starts. The database stays on PostgreSQL 18: a new major version of PostgreSQL needs the data
 copied over with `pg_dump` and back, which the image doesn't do by itself.
 
-From Share 0.1, which kept its records in a file in the volume `share`: see
-[the README](../../README.md#upgrading). This version starts with an empty database.
+From a build before 0.1.0, which kept its records in a file in the volume `share`: see
+[the README](../../README.md#upgrading). Share starts with an empty database.
 
 ## Good to know
 

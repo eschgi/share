@@ -1,8 +1,9 @@
 name: share_app
 description: "Share: see, download and send the files of a Share server."
 publish_to: 'none'
-# name+code: the code goes into versionCode and must grow with every release.
-version: 0.3.0+3
+# Share's version, the one in VERSION, and the versionCode made of it: scripts/version.sh set
+# changes both.
+version: 0.1.0+100
 
 environment:
   sdk: ^3.13.0

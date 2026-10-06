@@ -359,12 +359,12 @@ build the APK yourself is in [`app/README.md`](app/README.md).
 
 ### Upgrading
 
-From 0.1, which kept its records in SQLite in `data_dir`: Share now keeps them in PostgreSQL and
-starts empty there, without the people, PINs, folders and the library's list of files of 0.1;
-everyone joins again with a new invite. Set `database` in `config.json` (with Docker, take the
-setup's new `compose.yaml` and its `.env`). Give the new Share an empty storage folder or volume:
-it never overwrites the old files, but it doesn't show them either. Keep the old folder, with
-`<data_dir>/share.db` in it, until you no longer need 0.1.
+From a build before 0.1.0, which kept its records in SQLite in `data_dir`: Share now keeps them in
+PostgreSQL and starts empty there, without the old build's people, PINs, folders and list of
+files; everyone joins again with a new invite. Set `database` in `config.json` (with Docker, take
+the setup's new `compose.yaml` and its `.env`). Give the new Share an empty storage folder or
+volume: it never overwrites the old files, but it doesn't show them either. Keep the old folder,
+with `<data_dir>/share.db` in it, until you no longer need the old build.
 
 From a version before `proxy`: Share no longer trusts Cloudflare's tunnel by default. Behind a
 tunnel, add `"proxy": "cloudflare"` to `config.json` (the old `cloudflare` setting is refused with
@@ -546,7 +546,7 @@ export SHARE_TEST_POSTGRES='postgres://postgres:test@127.0.0.1:5433/postgres?ssl
 (cd app/android && ./gradlew testDirectDebugUnitTest testPlayDebugUnitTest)
 scripts/build-linux.sh                         # dist/share-linux-arm64, dist/share-linux-amd64
 scripts/build-windows.sh                       # dist/share-windows-{amd64,arm64}.exe
-docker build -t share .                        # the Docker image
+docker build --build-arg VERSION=$(scripts/version.sh) -t share .   # the Docker image
 ```
 
 The server's tests use a bucket of their own. To run the bucket tests against a real one instead,
@@ -556,13 +556,23 @@ on a fresh prefix, set `SHARE_TEST_S3` to its `s3` setting:
 CI checks every push and pull request, and leaves the server for Linux and Windows as the artifact
 `share-server` for a week. Pushes to `main` and pull requests from this repository's own branches
 also leave the signed APK as `share-apk`, once the signing secrets are set
-([`app/README.md`](app/README.md)). A version tag makes a release with all of
-them and `SHA256SUMS`, and publishes the Docker image as `ghcr.io/eschgi/share` (after the first
-one, make the package public once in GitHub's package settings):
+([`app/README.md`](app/README.md)).
+
+Share has one version, for the server, its website and the app: the one in `VERSION`. A build of
+the commit tagged with it is that version, e.g. `0.1.0`; any other build says what it was made
+from, e.g. `0.1.0-dev+abc1234`, in `share version` and on the About pages. The app's versionCode
+follows from the version (0.1.0 is 100, 1.2.3 is 10203), so it grows with it.
+`scripts/version.sh` prints a build's version, and makes a new one for a release:
 
 ```sh
-git tag v0.4.0 && git push origin v0.4.0      # a tag with a dash (v0.4.0-rc1) is a pre-release
+scripts/version.sh set 0.2.0                   # VERSION and app/pubspec.yaml
+git commit -am "Release 0.2.0" && git tag v0.2.0 && git push origin main v0.2.0
 ```
+
+The tag makes a release with the server, the APK and `SHA256SUMS`, and publishes the Docker image
+as `ghcr.io/eschgi/share` (after the first one, make the package public once in GitHub's package
+settings). CI refuses a tag that isn't `VERSION`'s; one with a dash, such as `v0.2.0-rc1`, is a
+pre-release.
 
 ## License
 

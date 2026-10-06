@@ -2,7 +2,8 @@
 
 # The Share server with its website, in a small image without a shell. The build stages run on
 # the builder's own platform and cross-compile, so arm64 images need no emulation. VERSION is
-# what `share version` and the About screens say.
+# what `share version` and the About screens say, from scripts/version.sh:
+# docker build --build-arg VERSION=$(scripts/version.sh) -t share .
 
 # The website, built once: it is the same on every platform.
 FROM --platform=$BUILDPLATFORM node:22-slim AS web

@@ -36,7 +36,8 @@ keyPassword=…
 Then `flutter build apk --flavor direct --release` makes
 `build/app/outputs/flutter-apk/app-direct-release.apk`, the file for the server's `app.apk_file`.
 Next to it, as `share.apk.json`, the server wants its version, the two parts of `version:` in
-`pubspec.yaml`: `{"version_code": 3, "version_name": "0.3.0"}`.
+`pubspec.yaml`: `{"version_code": 100, "version_name": "0.1.0"}`. That is Share's version, from
+`VERSION` (`scripts/version.sh`); CI's builds put in their own, e.g. `0.1.0-dev+abc1234`.
 
 ### Signed by GitHub Actions
 
