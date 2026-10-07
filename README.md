@@ -1,5 +1,17 @@
 # Share
 
+> [!WARNING]
+> **Share is in early development and has not reached version 1.0.0.**
+>
+> Until the 1.0.0 release:
+> - **Updates may not install smoothly.** A new version can require manual steps, such as setting
+>   up the database again, and updating in place is not guaranteed to work.
+> - **Bugs are to be expected.** Features may be incomplete or behave unexpectedly.
+> - **The structure can change considerably** between versions, including the database, the
+>   configuration, the API, the way files are stored and the apps, without a migration path.
+>
+> Use it to try Share out, and keep your own copies of anything you can't afford to lose.
+
 A self-hosted place where family and friends drop photos, videos and documents.
 
 - **Sending** works in any browser with a 5-character PIN: no app, no account. Uploads go in
