@@ -6,6 +6,7 @@ import (
 	"image"
 	"image/color"
 	"image/jpeg"
+	"path/filepath"
 	"testing"
 )
 
@@ -196,5 +197,29 @@ func TestDecodeBytes(t *testing.T) {
 	}
 	if _, err := readJPEGHeader(bytes.NewReader(append(frameOnly(false, 8, 8, 0x11)[:2], 0xFF, 0xC3, 0, 2))); err == nil {
 		t.Error("a lossless JPEG passed; Go can't decode those")
+	}
+}
+
+// Phones' full-size photos get a thumbnail from the server too: 50 MP from a Pixel's HI RES
+// mode, 48 MP from an iPhone, 64 MP from others (issue #2).
+func TestPhonePhotosAreNotTooLarge(t *testing.T) {
+	for _, tc := range []struct{ w, h int }{{8160, 6144}, {8064, 6048}, {9248, 6936}} {
+		h, err := readJPEGHeader(bytes.NewReader(frameOnly(false, tc.w, tc.h, 0x22, 0x11, 0x11)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if int64(tc.w)*int64(tc.h) > maxPixels || h.decodeBytes() > maxDecodeBytes {
+			t.Errorf("%d×%d, %d MB to decode: too large for a thumbnail", tc.w, tc.h, h.decodeBytes()>>20)
+		}
+	}
+}
+
+// A thumbnail's folder is named after the id's last two characters: an id starts with the time
+// it was made, so its first ones would put years of thumbnails into one folder.
+func TestPathUsesTheRandomEndOfTheID(t *testing.T) {
+	s := &Store{Dir: filepath.Join("data", "thumbs")}
+	id := "0199b3a4-6f2e-7c41-9d3a-5e8f0b2c4d6e"
+	if got, want := s.Path(id), filepath.Join("data", "thumbs", "6e", id+".jpg"); got != want {
+		t.Errorf("Path = %s, want %s", got, want)
 	}
 }

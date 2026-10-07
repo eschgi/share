@@ -1,0 +1,65 @@
+{
+  "description": "What the root key (the recovery key) signs: ECDSA on P-256 with SHA-256 of the message, the signature as r and s, 32 bytes each, big endian. A version of a folder's key: \"share-e2ee-v1/sign/folder-key\", then \"folder:<folder>:<version>\", then its public key (65 bytes). A folder that sends plain: \"share-e2ee-v1/sign/plain\", then \"folder:<folder>:<its newest version, 0 if none>\", a newline and its name (UTF-8). The key of a new recovery code: \"share-e2ee-v1/sign/root\", then its public key, signed with the old one. Every case in verify verifies with public_key, and its message is made from its parts as above; none in refuse verifies. fingerprint is the first 16 bytes of SHA-256 of the public key, which a PIN's link carries. ECDSA signs with a random nonce: signing again gives other bytes that verify too. Binary values are base64url without padding.",
+  "private_key": "PEMahEokkfHX8SPoPZ6RF5eu37Cb1TqlWUdJwT3OK7w",
+  "public_key": "BGA5lnxaWcW1KKjSDjwPSPLqXoY7rFXPt4YsOwcq5uGxc3otr4cmw0AevFoBhN09soFB2CjPcLx4_0agD9vfMO8",
+  "fingerprint": "4-ExH9G0Xpq5TLz80_jKkw",
+  "verify": [
+    {
+      "name": "version 1 of a folder's key",
+      "folder": "w3dding5x2k7mbqz4bwdbyj6qs",
+      "version": 1,
+      "folder_key": "BMEgCG0caIINJjJfzDF6Pd-d_w4FtnzHChzzbRYnpIgpvl2uk_dykocZkR05jJ_Fzw32gA8P198Gk-MBxIGOrXc",
+      "message": "c2hhcmUtZTJlZS12MS9zaWduL2ZvbGRlci1rZXlmb2xkZXI6dzNkZGluZzV4Mms3bWJxejRid2RieWo2cXM6MQTBIAhtHGiCDSYyX8wxej3fnf8OBbZ8xwoc820WJ6SIKb5drpP3cpKHGZEdOYyfxc8N9oAPD9ffBpPjAcSBjq13",
+      "signature": "Wh5fyvIf4aaJoFnNAMRyFICpdObkX8m8op311qqAsaRLvur-B0fQP-RgpTIfjY5bIxz2xYEwCpc_EJwh7FY-bw"
+    },
+    {
+      "name": "a folder that was never encrypted, under a name starting with a digit",
+      "folder": "w3dding5x2k7mbqz4bwdbyj6qs",
+      "version": 0,
+      "folder_name": "2026 Ürlaub ✓",
+      "message": "c2hhcmUtZTJlZS12MS9zaWduL3BsYWluZm9sZGVyOnczZGRpbmc1eDJrN21icXo0YndkYnlqNnFzOjAKMjAyNiDDnHJsYXViIOKckw",
+      "signature": "s36zuNzuHetBw65b_NlGc_Jp_QY-xW9eYAWZ2xe3hnSHIWzmjXf2lEJUvsy3kuadsQKT8PAstGKOHTTBffYfgA"
+    },
+    {
+      "name": "a folder switched off after version 3",
+      "folder": "w3dding5x2k7mbqz4bwdbyj6qs",
+      "version": 3,
+      "folder_name": "Family",
+      "message": "c2hhcmUtZTJlZS12MS9zaWduL3BsYWluZm9sZGVyOnczZGRpbmc1eDJrN21icXo0YndkYnlqNnFzOjMKRmFtaWx5",
+      "signature": "zVucsA6-mFyRKH1zkVBgcrJ1BsSKnCN33zfK2FxFbDtc8MiwONrIfR5cgWGBjz6DzKXGQ34TG_QUxyfViQUw4A"
+    },
+    {
+      "name": "the key of a new recovery code, signed with the old one",
+      "new_root": "BHBBizGkum_JOsU_3s5oPTHAu9nrEFj6RHYLPSrHrltnifU9OqcyAHQLoPU3ZszT0R1oj1tVOGtmSt627Kv463w",
+      "message": "c2hhcmUtZTJlZS12MS9zaWduL3Jvb3QEcEGLMaS6b8k6xT_ezmg9McC72esQWPpEdgs9KseuW2eJ9T06pzIAdAug9TdmzNPRHWiPW1U4a2ZK3rbsq_jrfA",
+      "signature": "2YQIv6XzjYLrT5xHDMjuzb1Qu4NyoRbZHgVLwthJQQ_3Y3fQxwPQ_nvabSZR9ISi9yDJlxa8IvCk9X_u0EtwaA"
+    }
+  ],
+  "refuse": [
+    {
+      "name": "the folder key's signature, for version 2",
+      "message": "c2hhcmUtZTJlZS12MS9zaWduL2ZvbGRlci1rZXlmb2xkZXI6dzNkZGluZzV4Mms3bWJxejRid2RieWo2cXM6MgTBIAhtHGiCDSYyX8wxej3fnf8OBbZ8xwoc820WJ6SIKb5drpP3cpKHGZEdOYyfxc8N9oAPD9ffBpPjAcSBjq13",
+      "signature": "Wh5fyvIf4aaJoFnNAMRyFICpdObkX8m8op311qqAsaRLvur-B0fQP-RgpTIfjY5bIxz2xYEwCpc_EJwh7FY-bw"
+    },
+    {
+      "name": "the plain statement, for another name",
+      "message": "c2hhcmUtZTJlZS12MS9zaWduL3BsYWluZm9sZGVyOnczZGRpbmc1eDJrN21icXo0YndkYnlqNnFzOjMKRmFtaWx5IA",
+      "signature": "zVucsA6-mFyRKH1zkVBgcrJ1BsSKnCN33zfK2FxFbDtc8MiwONrIfR5cgWGBjz6DzKXGQ34TG_QUxyfViQUw4A"
+    },
+    {
+      "name": "the plain statement, for a newer version",
+      "message": "c2hhcmUtZTJlZS12MS9zaWduL3BsYWluZm9sZGVyOnczZGRpbmc1eDJrN21icXo0YndkYnlqNnFzOjQKRmFtaWx5",
+      "signature": "zVucsA6-mFyRKH1zkVBgcrJ1BsSKnCN33zfK2FxFbDtc8MiwONrIfR5cgWGBjz6DzKXGQ34TG_QUxyfViQUw4A"
+    },
+    {
+      "name": "the folder key's signature, as a plain statement",
+      "message": "c2hhcmUtZTJlZS12MS9zaWduL3BsYWluZm9sZGVyOnczZGRpbmc1eDJrN21icXo0YndkYnlqNnFzOjEK",
+      "signature": "Wh5fyvIf4aaJoFnNAMRyFICpdObkX8m8op311qqAsaRLvur-B0fQP-RgpTIfjY5bIxz2xYEwCpc_EJwh7FY-bw"
+    },
+    {
+      "name": "the folder key's signature with a flipped bit",
+      "message": "c2hhcmUtZTJlZS12MS9zaWduL2ZvbGRlci1rZXlmb2xkZXI6dzNkZGluZzV4Mms3bWJxejRid2RieWo2cXM6MQTBIAhtHGiCDSYyX8wxej3fnf8OBbZ8xwoc820WJ6SIKb5drpP3cpKHGZEdOYyfxc8N9oAPD9ffBpPjAcSBjq13",
+      "signature": "Wh5fyvIf4aaJoFnNAMRyFICpdObkX8m8op311qqAsaRLvur-B0fQP-VgpTIfjY5bIxz2xYEwCpc_EJwh7FY-bw"
+    }
+  ]
+}

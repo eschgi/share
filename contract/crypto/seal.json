@@ -1,0 +1,70 @@
+{
+  "description": "Keys Share seals with HPKE (contract/crypto/hpke_rfc9180.json has the suite): sealed is the encapsulated key (65 bytes), then the ciphertext; purpose is HPKE's info, aad its associated data, both as UTF-8. Every case in open opens with private_key to plaintext, whose public key is public_key; none in refuse opens. Binary values are base64url without padding.",
+  "open": [
+    {
+      "name": "a file key for version 1 of a folder's key",
+      "purpose": "share-e2ee-v1/file",
+      "aad": "folder:w3dding5x2k7mbqz4bwdbyj6qs:1",
+      "private_key": "ubfI-7glw-TsNCYdyosIGWzEDAl1nYpXgTOknicSF8c",
+      "public_key": "BMEgCG0caIINJjJfzDF6Pd-d_w4FtnzHChzzbRYnpIgpvl2uk_dykocZkR05jJ_Fzw32gA8P198Gk-MBxIGOrXc",
+      "plaintext": "A8ZByrsIVU9E3urS8YjN-3-Bk3gW-2a81zYR-A-n47A",
+      "sealed": "BKe76ca7ieFfp3NPn58BsSz4zlKKtR1KIl-H44Icozod_4OsQaZ3nL4i3foj6OEwuguwrRv7Nc3m9wTxY2nHK6Dfzb-hS-XhZ5wIIjgEuUkI_mqcFxpOhOtg_TSC-NWY4mFbUFpZACcZ8RX-Bb5RKr4"
+    },
+    {
+      "name": "a folder's private key for a person",
+      "purpose": "share-e2ee-v1/folder",
+      "aad": "folder:w3dding5x2k7mbqz4bwdbyj6qs:1",
+      "private_key": "mXCeNGKKIvKqwzbchetWszJUFVungNbHj7eLIu-3YlQ",
+      "public_key": "BKsRghN51w7Y5ou_M__dndc_RQXnYHa8o4ZddRGzGJhi2NgXiNRcWkJqrq8BcwEi8P9JyR3q3Euy9ttpU_GPu9M",
+      "plaintext": "ubfI-7glw-TsNCYdyosIGWzEDAl1nYpXgTOknicSF8c",
+      "sealed": "BNZ4dErTsY0SL061ZypNwTKJ0RxxzdsiWoL91GJMhF5u4oDriL3066zUIcL0PjthoUDQ28e3bFJmaw8WRS3WW2dJic6JDOy5xZLYcDnWzJshTxIhsCYcLg9JyCeEXDzoSYbyp_k5PTQx2-o7WJWmHik"
+    },
+    {
+      "name": "a person's private key for one of their browsers",
+      "purpose": "share-e2ee-v1/person",
+      "aad": "person:u7ld5x2k7mbqz4bwdbyj6qsqxa",
+      "private_key": "CFBQnwI5MNRtvUKGdUHFVnIv1OjqqfKFY6lQ6O2FBf0",
+      "public_key": "BOIqaxN46rKWJWEmQp0jkPg2h67pJk41dWq4HWjQKnIl6cOK5f11MbdxCrO0KWlgf3epNEa8AsBV2oc3M4-Qy3c",
+      "plaintext": "mXCeNGKKIvKqwzbchetWszJUFVungNbHj7eLIu-3YlQ",
+      "sealed": "BAe0ISfXHfcurKDQiACffD6xUW8R2riMg7U9uo6iS3-cDUK_QCjhUcuoHK69p-oPuhYoKMFUjA3sgQ3C2599MpWuf3Y5FLIXYranoz-ktz_GKk8An9SaQSBPSu6J2jQ1EszAZKy5-CNLQMZeaPdY8fM"
+    },
+    {
+      "name": "the recovery key's private key for an admin's person key",
+      "purpose": "share-e2ee-v1/root",
+      "aad": "root",
+      "private_key": "mXCeNGKKIvKqwzbchetWszJUFVungNbHj7eLIu-3YlQ",
+      "public_key": "BKsRghN51w7Y5ou_M__dndc_RQXnYHa8o4ZddRGzGJhi2NgXiNRcWkJqrq8BcwEi8P9JyR3q3Euy9ttpU_GPu9M",
+      "plaintext": "PEMahEokkfHX8SPoPZ6RF5eu37Cb1TqlWUdJwT3OK7w",
+      "sealed": "BOSY3Ukl-qO1rAVqztgMe4IuqD9KPRZpKoDPMe_xTRA2sEIimemN5haq87zuWlvE_wXh9LaOs7jaz4wsO9ND7WIwa1tWJblwgQqZKwYoA2oddiRiSQ9LNw3QGppqGq9IlcKlQSzfsJAwHhjV1g7jeUg"
+    }
+  ],
+  "refuse": [
+    {
+      "name": "the file key, opened as if for version 2",
+      "purpose": "share-e2ee-v1/file",
+      "aad": "folder:w3dding5x2k7mbqz4bwdbyj6qs:2",
+      "private_key": "ubfI-7glw-TsNCYdyosIGWzEDAl1nYpXgTOknicSF8c",
+      "public_key": "BMEgCG0caIINJjJfzDF6Pd-d_w4FtnzHChzzbRYnpIgpvl2uk_dykocZkR05jJ_Fzw32gA8P198Gk-MBxIGOrXc",
+      "plaintext": "A8ZByrsIVU9E3urS8YjN-3-Bk3gW-2a81zYR-A-n47A",
+      "sealed": "BKe76ca7ieFfp3NPn58BsSz4zlKKtR1KIl-H44Icozod_4OsQaZ3nL4i3foj6OEwuguwrRv7Nc3m9wTxY2nHK6Dfzb-hS-XhZ5wIIjgEuUkI_mqcFxpOhOtg_TSC-NWY4mFbUFpZACcZ8RX-Bb5RKr4"
+    },
+    {
+      "name": "the file key, opened as a folder key",
+      "purpose": "share-e2ee-v1/folder",
+      "aad": "folder:w3dding5x2k7mbqz4bwdbyj6qs:1",
+      "private_key": "ubfI-7glw-TsNCYdyosIGWzEDAl1nYpXgTOknicSF8c",
+      "public_key": "BMEgCG0caIINJjJfzDF6Pd-d_w4FtnzHChzzbRYnpIgpvl2uk_dykocZkR05jJ_Fzw32gA8P198Gk-MBxIGOrXc",
+      "plaintext": "A8ZByrsIVU9E3urS8YjN-3-Bk3gW-2a81zYR-A-n47A",
+      "sealed": "BKe76ca7ieFfp3NPn58BsSz4zlKKtR1KIl-H44Icozod_4OsQaZ3nL4i3foj6OEwuguwrRv7Nc3m9wTxY2nHK6Dfzb-hS-XhZ5wIIjgEuUkI_mqcFxpOhOtg_TSC-NWY4mFbUFpZACcZ8RX-Bb5RKr4"
+    },
+    {
+      "name": "the file key with its last bit flipped",
+      "purpose": "share-e2ee-v1/file",
+      "aad": "folder:w3dding5x2k7mbqz4bwdbyj6qs:1",
+      "private_key": "ubfI-7glw-TsNCYdyosIGWzEDAl1nYpXgTOknicSF8c",
+      "public_key": "BMEgCG0caIINJjJfzDF6Pd-d_w4FtnzHChzzbRYnpIgpvl2uk_dykocZkR05jJ_Fzw32gA8P198Gk-MBxIGOrXc",
+      "plaintext": "A8ZByrsIVU9E3urS8YjN-3-Bk3gW-2a81zYR-A-n47A",
+      "sealed": "BKe76ca7ieFfp3NPn58BsSz4zlKKtR1KIl-H44Icozod_4OsQaZ3nL4i3foj6OEwuguwrRv7Nc3m9wTxY2nHK6Dfzb-hS-XhZ5wIIjgEuUkI_mqcFxpOhOtg_TSC-NWY4mFbUFpZACcZ8RX-Bb5RKr8"
+    }
+  ]
+}

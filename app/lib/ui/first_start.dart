@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../app.dart';
@@ -98,39 +100,65 @@ class _SharedWaiting extends StatelessWidget {
   }
 }
 
-/// Scans an invite's QR code, or, without Google Play services, asks for the link, and opens
-/// what it was: an invite (screen 10), or a PIN link (sending with that PIN, screen 1).
+/// A scan under way: a second tap would find the scanner busy.
+bool _scanning = false;
+
+/// Scans an invite's QR code, or, when the scanner doesn't open, asks for the link, saying why;
+/// then opens what it was: an invite (screen 10), or a PIN link (sending with that PIN, screen 1).
+/// The first scan may wait for Google Play services to install the scanner, which a note says.
 Future<void> scanInvite(BuildContext context) async {
+  if (_scanning) return;
+  _scanning = true;
   final services = Services.read(context);
   final t = AppLocalizations.of(context);
   final messenger = ScaffoldMessenger.of(context);
+  var noted = false;
+  final note = Timer(const Duration(milliseconds: 800), () {
+    noted = true;
+    messenger.showSnackBar(SnackBar(content: Text(t.scanPreparing), duration: const Duration(seconds: 40)));
+  });
   String? text;
+  ScanProblem? problem;
   try {
     text = await services.platform.scanCode();
-  } on ScanUnavailable {
+  } on ScanUnavailable catch (e) {
+    problem = e.problem;
+  } finally {
+    note.cancel();
+    if (noted) messenger.hideCurrentSnackBar();
+    _scanning = false;
+  }
+  if (problem != null) {
     if (!context.mounted) return;
-    text = await askForInviteLink(context);
+    text = await askForInviteLink(context, problem);
   }
   if (text == null || !context.mounted) return;
   switch (parseLink(text)) {
     case final InviteLink link:
       await Navigator.push(context, MaterialPageRoute<void>(builder: (_) => InviteScreen(link: link)));
     case final PinLink link:
-      await Navigator.push(context, MaterialPageRoute<void>(builder: (_) => PinEntryScreen(server: link.server, code: link.code)));
+      await Navigator.push(context, MaterialPageRoute<void>(builder: (_) => PinEntryScreen(server: link.server, code: link.code, secret: link.secret, root: link.root)));
     case null:
       messenger.showSnackBar(SnackBar(content: Text(t.scanNotAnInvite)));
   }
 }
 
-Future<String?> askForInviteLink(BuildContext context) {
+/// Asks for an invite's link when the scanner didn't open, saying why.
+Future<String?> askForInviteLink(BuildContext context, ScanProblem problem) {
   final t = AppLocalizations.of(context);
   final field = TextEditingController();
+  final why = switch (problem) {
+    ScanProblem.noPlayServices => t.scanUnavailable,
+    ScanProblem.installing => t.scanInstalling,
+    ScanProblem.outdated => t.scanOutdated,
+    ScanProblem.failed => t.scanFailed,
+  };
   return showDialog<String>(
     context: context,
     builder: (context) => AlertDialog(
       title: Text(t.pasteInvite),
       content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(t.scanUnavailable, style: TextStyle(color: context.colors.text2)),
+        Text(why, style: TextStyle(color: context.colors.text2)),
         const SizedBox(height: 16),
         TextField(controller: field, autofocus: true, decoration: InputDecoration(hintText: t.pasteInviteHint)),
       ]),

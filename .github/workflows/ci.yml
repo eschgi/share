@@ -1,7 +1,8 @@
 name: CI
 
-# Every push to main leaves the server for Linux and Windows, and the signed APK, as artifacts
-# for a day. A tag such as v0.1.0 also publishes them as a GitHub release.
+# Every run leaves the server for Linux and Windows as an artifact for a week, and pushes to main
+# and pull requests from this repository's own branches the signed APK too. A tag such as v0.1.0
+# also publishes them as a GitHub release.
 on:
   push:
     branches: [main]
@@ -10,6 +11,11 @@ on:
 
 permissions:
   contents: read
+
+env:
+  # The commit the builds name in their version (scripts/version.sh): a pull request's own, not
+  # the merge with its base that CI checks out.
+  SHARE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
   web:
@@ -43,6 +49,24 @@ jobs:
     defaults:
       run:
         working-directory: server
+    services:
+      # PostgreSQL 18, the oldest version Share supports and the one the Docker setups run. Every
+      # test makes a schema of its own there.
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: share
+          POSTGRES_PASSWORD: share
+          POSTGRES_DB: share
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U share"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      SHARE_TEST_POSTGRES: postgres://share:share@127.0.0.1:5432/share?sslmode=disable
     steps:
       - uses: actions/checkout@v7
         with:
@@ -62,7 +86,7 @@ jobs:
       - name: Build for Linux and Windows, on arm64 and amd64
         # As scripts/build-linux.sh and scripts/build-windows.sh do, with the website from above.
         run: |
-          version=$(git describe --tags --always)
+          version=$(../scripts/version.sh) # and on a tag, it must be VERSION's
           mkdir -p ../dist
           for arch in arm64 amd64; do
             CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -ldflags "-s -w -X main.version=$version" -o ../dist/share-linux-$arch ./cmd/share
@@ -74,7 +98,7 @@ jobs:
         with:
           name: share-server
           path: dist/
-          retention-days: 1
+          retention-days: 7
       - name: Known vulnerabilities
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
@@ -93,6 +117,30 @@ jobs:
         with:
           fetch-depth: 0 # the tags, for the version in the image
       - uses: docker/setup-buildx-action@v4
+      - name: Check the Caddy setup
+        working-directory: deploy/docker/caddy
+        run: POSTGRES_PASSWORD=unused docker compose config --quiet
+      - name: Build the image for this machine
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: ghcr.io/eschgi/share:latest
+          cache-from: type=gha
+      - name: Start Share and its database as the tunnel's setup does
+        # Without the tunnel: Share has to become healthy and reach PostgreSQL 18.
+        working-directory: deploy/docker/cloudflared
+        run: |
+          cp config.example.json config.json
+          printf 'POSTGRES_PASSWORD=%s\nTUNNEL_TOKEN=unused\n' "$(openssl rand -hex 16)" > .env
+          if ! docker compose up -d --wait --wait-timeout 180 share; then
+            docker compose logs
+            exit 1
+          fi
+          docker compose exec -T share share check > check.txt || true
+          cat check.txt
+          grep -q 'PostgreSQL at db/share, version 18' check.txt
+          docker compose down -v
       - if: github.ref_type == 'tag'
         uses: docker/login-action@v4
         with:
@@ -107,7 +155,7 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
       - id: version
-        run: echo "version=$(git describe --tags --always)" >> "$GITHUB_OUTPUT"
+        run: echo "version=$(scripts/version.sh)" >> "$GITHUB_OUTPUT"
       - uses: docker/build-push-action@v7
         with:
           context: .
@@ -127,6 +175,8 @@ jobs:
         working-directory: app
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the tags, for the version in the APK
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -146,10 +196,11 @@ jobs:
           cd android
           ./gradlew --console=plain testDirectDebugUnitTest testPlayDebugUnitTest lintDirectDebug
       # The APK the server hands out, signed with the release key from the repository's secrets
-      # (app/README.md says which). Only for pushes to this repository, never for pull requests.
+      # (app/README.md says which): for pushes, and for pull requests from this repository's own
+      # branches. A pull request from a fork never gets the key; GitHub keeps secrets from it.
       - name: Release key
         id: key
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
         env:
           KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
@@ -178,12 +229,14 @@ jobs:
             echo "keyAlias=$(esc "$KEY_ALIAS")"
             echo "keyPassword=$(esc "$KEY_PASSWORD")"
           } > android/key.properties
-          flutter build apk --flavor direct --release
+          # Share's version, with the commit unless this is the release; the code from VERSION.
+          name=$(../scripts/version.sh)
+          code=$(../scripts/version.sh code)
+          flutter build apk --flavor direct --release --build-name "$name" --build-number "$code"
           mkdir -p ../dist
           cp build/app/outputs/flutter-apk/app-direct-release.apk ../dist/share.apk
-          # The server takes the version from share.apk.json next to the APK (pubspec: name+code).
-          version=$(sed -n 's/^version: *//p' pubspec.yaml)
-          printf '{"version_code": %s, "version_name": "%s"}\n' "${version#*+}" "${version%+*}" > ../dist/share.apk.json
+          # The server takes the version from share.apk.json next to the APK.
+          printf '{"version_code": %s, "version_name": "%s"}\n' "$code" "$name" > ../dist/share.apk.json
           cat ../dist/share.apk.json
       - name: Forget the release key
         if: always() && steps.key.outputs.present == 'true'
@@ -193,7 +246,7 @@ jobs:
         with:
           name: share-apk
           path: dist/
-          retention-days: 1
+          retention-days: 7
 
   release:
     name: Release

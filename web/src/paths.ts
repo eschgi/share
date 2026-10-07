@@ -20,8 +20,9 @@ export function isAppPath(path: string): boolean {
   return false;
 }
 
-/** What a path shows: the PIN pages, the sign-in, or the pages of people with an account. */
-export type View = 'pin' | 'signIn' | 'account';
+/** What a path shows: the PIN pages, the sign-in, or the pages of people with an account; or
+ * the setup page, which is a page of its own. */
+export type View = 'pin' | 'signIn' | 'account' | 'setup';
 
 export interface Decision {
   view: View;
@@ -32,14 +33,16 @@ export interface Decision {
 /**
  * Where a visit goes. Signed in, the start is the library, and a PIN link goes to sending,
  * which needs no PIN then. Signed out, the account's pages ask to sign in first and come back
- * afterwards.
+ * afterwards. While nobody has an account (setup), Share is set up first.
  */
-export function decide(path: string, signedIn: boolean, pinLink: boolean): Decision {
+export function decide(path: string, signedIn: boolean, pinLink: boolean, setup = false): Decision {
   if (signedIn) {
     if (path === '/') return { view: 'account', redirect: pinLink ? '/send' : '/library' };
     if (path === '/sign-in') return { view: 'account', redirect: '/library' };
     return { view: 'account' };
   }
+  // Nobody has an account yet: Share is to be set up, unless a PIN from the console came along.
+  if (setup && !pinLink) return { view: 'setup' };
   if (path === '/') return { view: 'pin' };
   if (path === '/sign-in') return { view: 'signIn' };
   if (path === '/send' || path.startsWith('/send/')) return { view: 'pin', redirect: '/' };

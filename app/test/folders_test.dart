@@ -9,6 +9,7 @@ import 'package:share_app/ui/widgets.dart';
 
 import 'admin_test.dart' show adminServer, openSettings, tapInList;
 import 'app_test.dart' show daysAgo, signedInPhone, startApp, today;
+import 'support/contract.dart';
 import 'support/fake_platform.dart';
 import 'support/fake_server.dart';
 import 'support/fonts.dart';
@@ -212,6 +213,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Rename'));
     await tester.pumpAndSettle();
+    expect(find.text("Its folder on the server's drive gets the new name too."), findsOneWidget);
     await tester.enterText(find.byType(TextField), 'family');
     await tester.tap(find.widgetWithText(TextButton, 'Rename'));
     await tester.pumpAndSettle();
@@ -234,9 +236,32 @@ void main() {
     expect(server.pins.where((p) => p['folder'] == wedding), isEmpty, reason: 'its PINs ended');
   });
 
+  testWidgets('in a bucket, renaming a folder renames nothing on a drive', (tester) async {
+    final server = adminServer()
+      ..storage = {
+        ...contractResponse('api/storage.json'),
+        'storage': 's3',
+        's3_bucket': 'family-photos',
+        's3_endpoint': 'https://s3.eu-central-003.backblazeb2.com',
+        'storage_dir': '',
+      };
+    await startApp(tester, signedInPhone(), server);
+    await openSettings(tester);
+    await tapInList(tester, find.text('Folders'));
+    await tester.tap(find.text('Family'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(AppIcons.more));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Rename'));
+    await tester.pumpAndSettle();
+    expect(find.text('Rename the folder'), findsOneWidget);
+    expect(find.text("Its folder on the server's drive gets the new name too."), findsNothing);
+  });
+
   testWidgets('a new folder opens at once; the last one can\'t be deleted', (tester) async {
     final server = adminServer();
-    await startApp(tester, signedInPhone(), server);
+    final platform = signedInPhone();
+    await startApp(tester, platform, server);
     await openSettings(tester);
     expect(find.text('1 folder'), findsOneWidget);
     await tapInList(tester, find.text('Folders'));
@@ -258,7 +283,13 @@ void main() {
     await tester.tap(find.widgetWithText(TextButton, 'Create'));
     await tester.pumpAndSettle();
     expect(find.text("A folder needs a name, and it can't be a date like 2026-09-27."), findsOneWidget);
+    // Once there is a recovery key, a phone that doesn't hold it can't sign a new folder.
+    platform.lacksRoot = true;
     await tester.enterText(find.byType(TextField), 'Kindergarten');
+    await tester.tap(find.widgetWithText(TextButton, 'Create'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('it needs the recovery key'), findsOneWidget);
+    platform.lacksRoot = false;
     await tester.tap(find.widgetWithText(TextButton, 'Create'));
     await tester.pumpAndSettle();
     expect(find.widgetWithText(AppBar, 'Kindergarten'), findsOneWidget);
@@ -327,7 +358,8 @@ void main() {
     await tester.tap(find.text('Show the QR code'));
     await tester.pumpAndSettle();
     final made = server.requests.lastWhere((r) => r.url.path == '/api/invites');
-    expect(jsonDecode(made.body), {'name': 'Oma Rosa', 'role': 'member', 'folders': [wedding, family]});
+    // The root this phone trusts goes along, locked with the link's secret.
+    expect(jsonDecode(made.body), {'name': 'Oma Rosa', 'role': 'member', 'folders': [wedding, family], 'root': 'locked-root'});
     expect(boxOf('Family').onChanged, isNull, reason: 'made already');
 
     // An admin sees every folder: nothing to tick.
@@ -339,7 +371,7 @@ void main() {
     expect(find.byType(Checkbox), findsNothing);
     await tester.tap(find.text('Show the QR code'));
     await tester.pumpAndSettle();
-    expect(jsonDecode(server.requests.lastWhere((r) => r.url.path == '/api/invites').body), {'name': 'Anna', 'role': 'admin'});
+    expect(jsonDecode(server.requests.lastWhere((r) => r.url.path == '/api/invites').body), {'name': 'Anna', 'role': 'admin', 'root': 'locked-root'});
   });
 
   testWidgets('with one folder an invite gives it without asking', (tester) async {

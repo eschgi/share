@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"strings"
 	"time"
 )
 
@@ -13,18 +12,18 @@ import (
 // moved to the trash folder afterwards (storage.Library.Trash).
 func (d *DB) TrashFiles(ctx context.Context, ids []string, by string, at time.Time) ([]File, error) {
 	var out []File
-	err := d.Tx(ctx, func(tx *sql.Tx) error {
+	err := d.inTx(ctx, func(tx *sql.Tx) error {
 		out = nil
 		for _, id := range ids {
-			f, err := scanFile(tx.QueryRowContext(ctx, "SELECT "+fileColumns+" FROM files WHERE id = ? AND state = 'ready'", id))
+			f, err := scanFile(tx.QueryRowContext(ctx, "SELECT "+fileColumns+" FROM files WHERE id = $1 AND state = 'ready'", id))
 			if errors.Is(err, ErrNotFound) {
 				continue
 			}
 			if err != nil {
 				return err
 			}
-			if _, err := tx.ExecContext(ctx, `UPDATE files SET state = 'trashed', deleted_at = ?, deleted_by = ?, updated_at = ?
-				WHERE id = ?`, ms(at), nullString(by), ms(at), id); err != nil {
+			if _, err := tx.ExecContext(ctx, `UPDATE files SET state = 'trashed', deleted_at = $1, deleted_by = $2, updated_at = $3
+				WHERE id = $4`, at, nullString(by), at, id); err != nil {
 				return err
 			}
 			f.State, f.DeletedAt, f.DeletedBy, f.UpdatedAt = StateTrashed, &at, by, at
@@ -40,13 +39,13 @@ func (d *DB) TrashFiles(ctx context.Context, ids []string, by string, at time.Ti
 
 // Trashed lists the files in the trash, the most recently deleted first.
 func (d *DB) Trashed(ctx context.Context) ([]File, error) {
-	return queryFiles(ctx, d, "SELECT "+fileColumns+" FROM files WHERE state = 'trashed' ORDER BY deleted_at DESC, id")
+	return queryAll(ctx, d.pool, scanFile, "SELECT "+fileColumns+" FROM files WHERE state = 'trashed' ORDER BY deleted_at DESC, id")
 }
 
 // TrashedBefore lists the files deleted before t, which the daily purge removes for good.
 func (d *DB) TrashedBefore(ctx context.Context, t time.Time) ([]File, error) {
-	return queryFiles(ctx, d, "SELECT "+fileColumns+" FROM files WHERE state = 'trashed' AND deleted_at < ? ORDER BY deleted_at",
-		ms(t))
+	return queryAll(ctx, d.pool, scanFile, "SELECT "+fileColumns+" FROM files WHERE state = 'trashed' AND deleted_at < $1 ORDER BY deleted_at",
+		t)
 }
 
 // TrashedByID returns the trashed files among ids.
@@ -54,18 +53,13 @@ func (d *DB) TrashedByID(ctx context.Context, ids []string) ([]File, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
-	args := make([]any, len(ids))
-	for i, id := range ids {
-		args[i] = id
-	}
-	return queryFiles(ctx, d, "SELECT "+fileColumns+" FROM files WHERE state = 'trashed' AND id IN (?"+
-		strings.Repeat(", ?", len(ids)-1)+") ORDER BY deleted_at DESC, id", args...)
+	return queryAll(ctx, d.pool, scanFile, "SELECT "+fileColumns+" FROM files WHERE state = 'trashed' AND id = ANY($1) ORDER BY deleted_at DESC, id", ids)
 }
 
 // TrashStats counts the trash and its bytes.
 func (d *DB) TrashStats(ctx context.Context) (files int, bytes int64, err error) {
 	var n sql.NullInt64
-	err = d.QueryRowContext(ctx, "SELECT COUNT(*), SUM(size) FROM files WHERE state = 'trashed'").Scan(&files, &n)
+	err = d.pool.QueryRowContext(ctx, "SELECT COUNT(*), SUM(size) FROM files WHERE state = 'trashed'").Scan(&files, &n)
 	return files, n.Int64, err
 }
 
@@ -74,10 +68,10 @@ func (d *DB) TrashStats(ctx context.Context) (files int, bytes int64, err error)
 // and ErrConflict if relPath was just taken.
 func (d *DB) RestoreFile(ctx context.Context, id, relPath string, at time.Time) (bool, error) {
 	var restored bool
-	err := d.Tx(ctx, func(tx *sql.Tx) error {
-		res, err := tx.ExecContext(ctx, `UPDATE files SET state = 'ready', rel_path = ?, deleted_at = NULL, deleted_by = NULL,
-				updated_at = ?
-			WHERE id = ? AND state = 'trashed'`, relPath, ms(at), id)
+	err := d.inTx(ctx, func(tx *sql.Tx) error {
+		res, err := tx.ExecContext(ctx, `UPDATE files SET state = 'ready', rel_path = $1, deleted_at = NULL, deleted_by = NULL,
+				updated_at = $2
+			WHERE id = $3 AND state = 'trashed'`, relPath, at, id)
 		if isUniqueViolation(err) {
 			return ErrConflict
 		}
@@ -95,7 +89,7 @@ func (d *DB) RestoreFile(ctx context.Context, id, relPath string, at time.Time) 
 
 // PurgeFile forgets a trashed file for good. It returns false if it wasn't in the trash.
 func (d *DB) PurgeFile(ctx context.Context, id string) (bool, error) {
-	res, err := d.ExecContext(ctx, "DELETE FROM files WHERE id = ? AND state = 'trashed'", id)
+	res, err := d.pool.ExecContext(ctx, "DELETE FROM files WHERE id = $1 AND state = 'trashed'", id)
 	if err != nil {
 		return false, err
 	}
@@ -106,6 +100,6 @@ func (d *DB) PurgeFile(ctx context.Context, id string) (bool, error) {
 // LibraryStats counts the files in the library and their bytes.
 func (d *DB) LibraryStats(ctx context.Context) (files int, bytes int64, err error) {
 	var n sql.NullInt64
-	err = d.QueryRowContext(ctx, "SELECT COUNT(*), SUM(size) FROM files WHERE state = 'ready'").Scan(&files, &n)
+	err = d.pool.QueryRowContext(ctx, "SELECT COUNT(*), SUM(size) FROM files WHERE state = 'ready'").Scan(&files, &n)
 	return files, n.Int64, err
 }

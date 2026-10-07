@@ -4,6 +4,7 @@ import './account.css';
 import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
 import { getInfo, getMe, onSignedOut, type Info, type Me } from '../api';
 import { Icon } from '../components/Icon';
+import { keyring } from '../e2ee/keyring';
 import { Page } from '../components/Page';
 import { setSignedInHint } from '../hint';
 import { noticeLanguage } from '../notify';
@@ -58,8 +59,42 @@ export function Account({ me: first, notice }: AccountProps) {
       location.replace('/sign-in?signed_out=1&next=' + encodeURIComponent(location.pathname));
     };
     onSignedOut(signedOut);
-    if (first) startSender(signedOut);
-    return () => onSignedOut(null);
+    if (first) {
+      startSender(signedOut);
+      void keyring.start(first);
+    }
+    // The keys may have news: someone to seal for or to ask about, a key sealed for this browser,
+    // a check to answer, a new version. So the page checks in while it is open, also in a tab
+    // behind others or a window that is covered (where the browser makes it once a minute at
+    // most), and at once when it comes back: every half minute, and every few seconds while a
+    // check runs or this browser waits for keys (keyring.pace).
+    let timer = 0;
+    let due = Infinity;
+    const next = () => {
+      clearTimeout(timer);
+      const wait = keyring.pace();
+      due = Date.now() + wait;
+      timer = window.setTimeout(() => void checkIn(), wait);
+    };
+    const checkIn = async () => {
+      if (keyring.me) await keyring.checkIn();
+      next();
+    };
+    // Sooner when the keys say so, e.g. once this browser turns out to wait for them.
+    const sooner = keyring.watch(() => {
+      if (Date.now() + keyring.pace() < due) next();
+    });
+    const back = () => {
+      if (document.visibilityState === 'visible') void checkIn();
+    };
+    document.addEventListener('visibilitychange', back);
+    next();
+    return () => {
+      onSignedOut(null);
+      document.removeEventListener('visibilitychange', back);
+      sooner();
+      clearTimeout(timer);
+    };
   }, []);
 
   useEffect(() => {
@@ -68,7 +103,7 @@ export function Account({ me: first, notice }: AccountProps) {
   }, [lang]);
 
   useEffect(() => {
-    if (!toast) return;
+    if (!toast || toast.sticky) return;
     const id = setTimeout(() => setToast(null), toast.action ? 10_000 : 6_000);
     return () => clearTimeout(id);
   }, [toast]);

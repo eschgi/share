@@ -15,6 +15,7 @@ import 'admin/pins_screen.dart';
 import 'about_screen.dart';
 import 'admin/trash_screen.dart';
 import 'devices.dart';
+import 'encryption.dart';
 import 'format.dart';
 import 'icons.dart';
 import 'server_screen.dart';
@@ -22,8 +23,8 @@ import 'theme_sheet.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
-/// What share check found about the drive, in the admin's words; a code from a newer server
-/// gets a general line.
+/// What share check found about the drive or the bucket, in the admin's words; a code from a
+/// newer server gets a general line.
 String storageWarningText(AppLocalizations t, String code) => switch (code) {
       'marker_missing' => t.storageWarnMarkerMissing,
       'storage_unreadable' => t.storageWarnStorageUnreadable,
@@ -31,14 +32,23 @@ String storageWarningText(AppLocalizations t, String code) => switch (code) {
       'other_drive' => t.storageWarnOtherDrive,
       'not_a_drive' => t.storageWarnNotADrive,
       'data_unreadable' => t.storageWarnDataUnreadable,
-      'data_unsafe' => t.storageWarnDataUnsafe,
       'data_in_memory' => t.storageWarnDataInMemory,
       'drive_full' => t.storageWarnDriveFull,
       'fat32' => t.storageWarnFat32,
       'ignores_case' => t.storageWarnIgnoresCase,
       'low_space' => t.storageWarnLowSpace,
+      's3_unreachable' => t.storageWarnS3Unreachable,
+      's3_denied' => t.storageWarnS3Denied,
+      's3_cors' => t.storageWarnS3Cors,
+      's3_clock_skew' => t.storageWarnS3ClockSkew,
       _ => t.storageWarnUnknown,
     };
+
+/// The host of a bucket's endpoint, e.g. s3.eu-central-1.amazonaws.com.
+String _hostOf(String endpoint) {
+  final host = Uri.tryParse(endpoint)?.host ?? '';
+  return host.isEmpty ? endpoint : host;
+}
 
 /// Screen 17: profile, language, server, password, signing out and deleting the account;
 /// admins also get the upload PINs, the folders, the people and the storage.
@@ -204,15 +214,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (storage != null) ...[
         SectionLabel(t.settingsStorage),
         SettingsGroup(children: [
-          SettingsRow(
-            leading: SettingsRow.icon(context, AppIcons.hardDrive),
-            title: storage.storageDir,
-            monoTitle: true,
-            subtitle: [
-              t.storageSetOnServer,
-              if (storage.totalBytes > 0) t.storageFree(formatBytes(storage.freeBytes, locale), formatBytes(storage.totalBytes, locale)),
-            ].join('\n'),
-          ),
+          // A bucket has no free space to tell of: where it is, and what the library holds.
+          if (storage.storage == Storage.s3)
+            SettingsRow(
+              leading: SettingsRow.icon(context, AppIcons.cloud),
+              title: storage.s3Bucket,
+              monoTitle: true,
+              subtitle: [
+                _hostOf(storage.s3Endpoint),
+                t.storageSetOnServer,
+                t.storageLibrary(storage.files, formatBytes(storage.bytes, locale)),
+              ].join('\n'),
+            )
+          else
+            SettingsRow(
+              leading: SettingsRow.icon(context, AppIcons.hardDrive),
+              title: storage.storageDir,
+              monoTitle: true,
+              subtitle: [
+                t.storageSetOnServer,
+                if (storage.totalBytes > 0) t.storageFree(formatBytes(storage.freeBytes, locale), formatBytes(storage.totalBytes, locale)),
+              ].join('\n'),
+            ),
           for (final w in storage.warnings)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
@@ -232,6 +255,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ]),
       ],
+      const EncryptionSettings(),
       const SizedBox(height: 14),
     ];
   }

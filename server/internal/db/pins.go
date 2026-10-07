@@ -24,6 +24,19 @@ type Pin struct {
 	EndedAt     *time.Time
 	FolderID    string // the folder it sends into; "" once that folder is gone for good
 	ShowsFolder bool   // guests with it also see and download what is in the folder
+	// Secret: what its link's secret brings for an encrypted folder; read with the PIN, but
+	// without Keys.
+	Secret *PinSecret
+}
+
+// PinSecret is what the link of a PIN that shows an encrypted folder brings: its secret, locked
+// with a key from a version of the folder's private key, and the root and the folder's keys
+// locked with it. Only InsertPin reads Keys.
+type PinSecret struct {
+	Locked  []byte
+	Version int
+	Root    []byte
+	Keys    []PinKey
 }
 
 // LiveAt reports whether the PIN still lets people send at time now.
@@ -33,22 +46,25 @@ func (p Pin) LiveAt(now time.Time) bool {
 
 const pinColumns = "id, code, kind, created_by, created_at, expires_at, ended_at, folder_id, shows_folder"
 
+// pinSelect is what a PIN is read with: its columns and its link's locked secret and root.
+const pinSelect = pinColumns + ", secret_locked, secret_version, root_locked"
+
 func scanPin(row interface{ Scan(...any) error }) (Pin, error) {
 	var p Pin
-	var created int64
-	var expires, ended sql.NullInt64
 	var folderID sql.NullString
-	err := row.Scan(&p.ID, &p.Code, &p.Kind, &p.CreatedBy, &created, &expires, &ended, &folderID, &p.ShowsFolder)
-	if errors.Is(err, sql.ErrNoRows) {
+	var secretLocked, rootLocked []byte
+	var secretVersion sql.NullInt64
+	err := row.Scan(&p.ID, &p.Code, &p.Kind, &p.CreatedBy, &p.CreatedAt, &p.ExpiresAt, &p.EndedAt, &folderID, &p.ShowsFolder, &secretLocked, &secretVersion, &rootLocked)
+	if noRow(err) {
 		return p, ErrNotFound
 	}
 	if err != nil {
 		return p, err
 	}
-	p.CreatedAt = fromMS(created)
-	p.ExpiresAt = optTime(expires)
-	p.EndedAt = optTime(ended)
 	p.FolderID = folderID.String
+	if secretLocked != nil {
+		p.Secret = &PinSecret{Locked: secretLocked, Version: int(secretVersion.Int64), Root: rootLocked}
+	}
 	return p, nil
 }
 
@@ -57,8 +73,23 @@ func (d *DB) InsertPin(ctx context.Context, p Pin) error {
 	if p.FolderID == "" {
 		return errors.New("db: a PIN needs a folder")
 	}
-	_, err := d.ExecContext(ctx, "INSERT INTO pins ("+pinColumns+") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		p.ID, p.Code, p.Kind, p.CreatedBy, ms(p.CreatedAt), nullMS(p.ExpiresAt), nullMS(p.EndedAt), p.FolderID, p.ShowsFolder)
+	err := d.inTx(ctx, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, "INSERT INTO pins ("+pinColumns+") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+			p.ID, p.Code, p.Kind, p.CreatedBy, p.CreatedAt, p.ExpiresAt, p.EndedAt, p.FolderID, p.ShowsFolder)
+		if err != nil || p.Secret == nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, "UPDATE pins SET secret_locked = $1, secret_version = $2, root_locked = $3 WHERE id = $4",
+			p.Secret.Locked, p.Secret.Version, p.Secret.Root, p.ID); err != nil {
+			return err
+		}
+		for _, k := range p.Secret.Keys {
+			if _, err := tx.ExecContext(ctx, "INSERT INTO pin_keys (pin_id, version, locked) VALUES ($1, $2, $3)", p.ID, k.Version, k.Locked); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 	if isUniqueViolation(err) {
 		return ErrConflict
 	}
@@ -67,36 +98,23 @@ func (d *DB) InsertPin(ctx context.Context, p Pin) error {
 
 // PinByCode looks up a PIN by its code, live or not.
 func (d *DB) PinByCode(ctx context.Context, code string) (Pin, error) {
-	return scanPin(d.QueryRowContext(ctx, "SELECT "+pinColumns+" FROM pins WHERE code = ?", code))
+	return scanPin(d.pool.QueryRowContext(ctx, "SELECT "+pinSelect+" FROM pins WHERE code = $1", code))
 }
 
 // PinByID looks up a PIN by id.
 func (d *DB) PinByID(ctx context.Context, id string) (Pin, error) {
-	return scanPin(d.QueryRowContext(ctx, "SELECT "+pinColumns+" FROM pins WHERE id = ?", id))
+	return scanPin(d.pool.QueryRowContext(ctx, "SELECT "+pinSelect+" FROM pins WHERE id = $1", id))
 }
 
 // Pins lists every PIN, newest first.
 func (d *DB) Pins(ctx context.Context) ([]Pin, error) {
-	rows, err := d.QueryContext(ctx, "SELECT "+pinColumns+" FROM pins ORDER BY created_at DESC, id")
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []Pin
-	for rows.Next() {
-		p, err := scanPin(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, p)
-	}
-	return out, rows.Err()
+	return queryAll(ctx, d.pool, scanPin, "SELECT "+pinSelect+" FROM pins ORDER BY created_at DESC, id")
 }
 
 // EndPin ends a PIN. Its sessions stop working at once, because a session is only valid
 // while its PIN is live. Ending an already ended PIN changes nothing.
 func (d *DB) EndPin(ctx context.Context, id string, at time.Time) error {
-	res, err := d.ExecContext(ctx, "UPDATE pins SET ended_at = ? WHERE id = ? AND ended_at IS NULL", ms(at), id)
+	res, err := d.pool.ExecContext(ctx, "UPDATE pins SET ended_at = $1 WHERE id = $2 AND ended_at IS NULL", at, id)
 	if err != nil {
 		return err
 	}
@@ -111,8 +129,8 @@ func (d *DB) EndPin(ctx context.Context, id string, at time.Time) error {
 // EndExpiredPins marks 24-hour PINs whose time is up as ended, so lists show them as such.
 // They stopped working at expires_at already; this only records it.
 func (d *DB) EndExpiredPins(ctx context.Context, now time.Time) (int64, error) {
-	res, err := d.ExecContext(ctx,
-		"UPDATE pins SET ended_at = expires_at WHERE ended_at IS NULL AND expires_at IS NOT NULL AND expires_at <= ?", ms(now))
+	res, err := d.pool.ExecContext(ctx,
+		"UPDATE pins SET ended_at = expires_at WHERE ended_at IS NULL AND expires_at IS NOT NULL AND expires_at <= $1", now)
 	if err != nil {
 		return 0, err
 	}

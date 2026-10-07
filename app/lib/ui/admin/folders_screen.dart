@@ -5,7 +5,9 @@ import '../../app.dart';
 import '../../data/api.dart';
 import '../../data/folders.dart';
 import '../../data/models.dart';
+import '../../data/platform.dart';
 import '../../l10n/app_localizations.dart';
+import '../encryption.dart';
 import '../folders.dart';
 import '../format.dart';
 import '../icons.dart';
@@ -15,6 +17,8 @@ import 'pins_screen.dart';
 
 /// What went wrong with a change to a folder, in words.
 String folderProblem(AppLocalizations t, Object e) => switch (e) {
+      KeysException(code: 'needs_root') => t.encryptionNeedsRoot,
+      KeysException(code: 'offline') => t.commonOffline,
       ApiException(code: 'folder_name_taken') => t.folderNameTaken,
       ApiException(code: 'bad_request') => t.folderNameBad,
       ApiException(code: 'folder_busy') => t.folderBusy,
@@ -65,14 +69,15 @@ class _FoldersScreenState extends State<FoldersScreen> {
     if (mounted) setState(() {});
   }
 
-  Future<void> _open(String id) async {
-    await Navigator.push(context, MaterialPageRoute<void>(builder: (_) => FolderScreen(id: id)));
+  Future<void> _open(String id, {bool encrypt = false}) async {
+    await Navigator.push(context, MaterialPageRoute<void>(builder: (_) => FolderScreen(id: id, encrypt: encrypt)));
     await _load();
   }
 
   Future<void> _new() async {
-    final made = await showDialog<FolderInfo>(context: context, builder: (_) => const FolderNameDialog());
-    if (made != null && mounted) await _open(made.id);
+    final made = await showDialog<FolderName>(context: context, builder: (_) => const FolderNameDialog());
+    // Encrypting it asks once more, and the first time makes the recovery code.
+    if (made != null && mounted) await _open(made.folder.id, encrypt: made.encrypt);
   }
 
   @override
@@ -105,6 +110,7 @@ class _FoldersScreenState extends State<FoldersScreen> {
                   leading: FolderCover(folder: f),
                   title: f.name,
                   subtitle: [
+                    if (f.encrypted) t.encryptionEncrypted,
                     lines.count(f.files),
                     if (_pins?.where((p) => p.folder == f.id).length case final n? when n > 0) t.foldersPins(n),
                     if (f.adminsOnly) t.folderOnlyAdminsLine,
@@ -123,10 +129,12 @@ class _FoldersScreenState extends State<FoldersScreen> {
   }
 }
 
-/// Screen 41: a folder, who sees it, the PINs that send into it, and renaming or deleting it.
+/// Screen 41: a folder, whether its files are encrypted, who sees it, the PINs that send into
+/// it, and renaming or deleting it. With [encrypt], encrypting it is asked at once.
 class FolderScreen extends StatefulWidget {
-  const FolderScreen({super.key, required this.id});
+  const FolderScreen({super.key, required this.id, this.encrypt = false});
   final String id;
+  final bool encrypt;
 
   @override
   State<FolderScreen> createState() => _FolderScreenState();
@@ -180,7 +188,7 @@ class _FolderScreenState extends State<FolderScreen> {
     if (mounted) setState(() => _turned.remove(key));
   }
 
-  Future<void> _rename(FolderInfo f) => showDialog<FolderInfo>(context: context, builder: (_) => FolderNameDialog(folder: f));
+  Future<void> _rename(FolderInfo f) => showDialog<FolderName>(context: context, builder: (_) => FolderNameDialog(folder: f));
 
   Future<void> _delete(FolderInfo f) async {
     final t = AppLocalizations.of(context);
@@ -294,6 +302,8 @@ class _FolderScreenState extends State<FolderScreen> {
               ),
             ]),
           ),
+          const SizedBox(height: 12),
+          SettingsGroup(children: [EncryptionRow(folder: f, ask: widget.encrypt)]),
           SectionLabel(t.folderWhoSees),
           if (people == null)
             const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()))
@@ -341,7 +351,11 @@ class _FolderScreenState extends State<FolderScreen> {
   }
 }
 
-/// A new folder's name, or a new name for [folder]; the folder as it is now, or null.
+/// A folder made or renamed, and whether a new one is to be encrypted.
+typedef FolderName = ({FolderInfo folder, bool encrypt});
+
+/// A new folder's name, or a new name for [folder]; the folder as it is now, or null. A new one
+/// can be encrypted, as admins set for new folders by default.
 class FolderNameDialog extends StatefulWidget {
   const FolderNameDialog({super.key, this.folder});
   final FolderInfo? folder;
@@ -354,6 +368,17 @@ class _FolderNameDialogState extends State<FolderNameDialog> {
   late final _name = TextEditingController(text: widget.folder?.name ?? '');
   String? _error;
   bool _busy = false;
+  bool _encrypt = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.folder == null) {
+      Services.read(context).keys.newFoldersEncrypted().then((on) {
+        if (mounted) setState(() => _encrypt = on);
+      }, onError: (Object _) {});
+    }
+  }
 
   @override
   void dispose() {
@@ -372,9 +397,12 @@ class _FolderNameDialogState extends State<FolderNameDialog> {
     });
     try {
       final f = widget.folder;
-      final made = f == null ? await services.admin.createFolder(name) : await services.admin.renameFolder(f.id, name);
+      // Once there is a recovery key, it signs a folder that sends plain, under its name.
+      final made = f == null
+          ? await services.admin.createFolder(await services.platform.newFolderBody(name))
+          : await services.admin.renameFolder(f.id, await services.platform.renameBody(f, name));
       await services.folders.load();
-      if (mounted) Navigator.pop(context, made);
+      if (mounted) Navigator.pop(context, (folder: made, encrypt: f == null && _encrypt));
     } on Exception catch (e) {
       if (mounted) setState(() => _error = folderProblem(t, e));
     } finally {
@@ -386,6 +414,8 @@ class _FolderNameDialogState extends State<FolderNameDialog> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final renaming = widget.folder != null;
+    // A bucket has no directory to rename with the folder.
+    final s3 = Services.read(context).admin.storageMode == Storage.s3;
     return AlertDialog(
       title: Text(renaming ? t.folderRenameTitle : t.foldersNew),
       content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -399,12 +429,20 @@ class _FolderNameDialogState extends State<FolderNameDialog> {
             counterText: '',
             errorText: _error,
             errorMaxLines: 3,
-            helperText: _error == null ? (renaming ? t.folderRenameHelp : t.folderNewHelp) : null,
+            helperText: _error == null ? (renaming ? (s3 ? null : t.folderRenameHelp) : t.folderNewHelp) : null,
             helperMaxLines: 3,
           ),
           onChanged: (_) => setState(() => _error = null),
           onSubmitted: (_) => _save(),
         ),
+        if (!renaming)
+          CheckboxListTile(
+            value: _encrypt,
+            onChanged: (v) => setState(() => _encrypt = v ?? false),
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+            title: Text(t.encryptionNewFolder, style: const TextStyle(fontSize: 15)),
+          ),
       ]),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: Text(t.commonCancel)),

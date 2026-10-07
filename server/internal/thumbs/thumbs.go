@@ -24,6 +24,7 @@ import (
 
 	"github.com/eschgi/share/server/internal/auth"
 	"github.com/eschgi/share/server/internal/db"
+	"github.com/eschgi/share/server/internal/e2ee"
 	"github.com/eschgi/share/server/internal/ids"
 )
 
@@ -41,9 +42,11 @@ const (
 	// delay gives the uploader time to send a thumbnail before the server makes one.
 	delay = 2 * time.Minute
 	// maxDecodeBytes is the most memory decoding one photo may take; a small machine has little.
+	// A phone's 50 MP photo takes 72 MB.
 	maxDecodeBytes = 128 << 20
-	// maxPixels keeps the decoding time reasonable on a small machine's processor.
-	maxPixels = 40_000_000
+	// maxPixels keeps the decoding time reasonable on a small machine's processor: an Intel N150
+	// decodes a phone's 50 MP photo in about a second.
+	maxPixels = 100_000_000
 	// tries is how often a photo is tried again after a read error before it is given up.
 	tries = 3
 	batch = 20
@@ -65,63 +68,114 @@ var sentDecodes = make(chan struct{}, 2)
 // Meta is what the uploader measured on the original file. Nil fields are unknown.
 type Meta struct {
 	Width, Height, DurationMS *int64
+	// Sealed: the thumbnail of an encrypted file, sealed on the uploader's device; only its
+	// size can be checked.
+	Sealed bool
 }
 
-// Store saves thumbnails as <Dir>/ab/<id>.jpg and records them in the database.
+// Bucket keeps the thumbnails when the files are in a bucket; *s3.Bucket is one.
+type Bucket interface {
+	ThumbKey(id string) string
+	Put(ctx context.Context, key string, data []byte, contentType, disposition string) error
+	ReadAll(ctx context.Context, key string, max int64) ([]byte, error)
+	Remove(ctx context.Context, key string) error
+}
+
+// Store saves thumbnails as <Dir>/<the id's last two characters>/<id>.jpg, or in the bucket
+// next to the files, and records them in the database.
 type Store struct {
 	DB   *db.DB
 	Dir  string
-	Root *os.Root // the storage folder, for reading library files
-	// Open opens a library file; without it the file is read at its path in Root.
-	Open func(context.Context, db.File) (*os.File, error)
+	Open func(context.Context, db.File) (io.ReadSeekCloser, error) // opens a library file
 	Now  func() time.Time
 	Logf func(string, ...any)
+
+	// Bucket keeps the thumbnails instead of Dir when the files are in a bucket.
+	Bucket Bucket
 
 	mu     sync.Mutex     // one writer at a time, so a sent and a made thumbnail never cross
 	failed map[string]int // read errors per photo, for giving up after a few
 }
 
-func (s *Store) open(ctx context.Context, f db.File) (*os.File, error) {
-	if s.Open != nil {
-		return s.Open(ctx, f)
-	}
-	return s.Root.Open(f.RelPath)
-}
+// Path is where the thumbnail of file id is kept on a drive: in a folder named after the id's
+// last two characters, which are random, where its first ones are the time it was made.
+func (s *Store) Path(id string) string { return filepath.Join(s.Dir, id[len(id)-2:], id+".jpg") }
 
-// Path is where the thumbnail of file id is kept.
-func (s *Store) Path(id string) string { return filepath.Join(s.Dir, id[:2], id+".jpg") }
+// Read returns the thumbnail of file id; fs.ErrNotExist if there is none.
+func (s *Store) Read(ctx context.Context, id string) ([]byte, error) {
+	if s.Bucket != nil {
+		return s.Bucket.ReadAll(ctx, s.Bucket.ThumbKey(id), e2ee.MaxThumbSize)
+	}
+	return os.ReadFile(s.Path(id))
+}
 
 // CanSend checks that p may send a thumbnail for file id: its uploader within a day of the
 // upload, or an admin. The API asks before it reads the picture.
 func (s *Store) CanSend(ctx context.Context, p *auth.Principal, id string) error {
+	_, err := s.canSend(ctx, p, id)
+	return err
+}
+
+func (s *Store) canSend(ctx context.Context, p *auth.Principal, id string) (db.File, error) {
 	if !ids.Valid(id) {
-		return ErrNotFound
+		return db.File{}, ErrNotFound
 	}
 	f, err := s.DB.FileByID(ctx, id)
 	if errors.Is(err, db.ErrNotFound) || (err == nil && f.State != db.StateReady) {
-		return ErrNotFound
+		return f, ErrNotFound
 	}
+	if err != nil {
+		return f, err
+	}
+	if p.Kind == auth.KindDevice && p.Role == "admin" {
+		return f, nil
+	}
+	if !p.Owns(f) {
+		return f, ErrNotFound
+	}
+	if f.UploadedAt == nil || s.Now().Sub(*f.UploadedAt) > uploaderWindow {
+		return f, ErrTooLate
+	}
+	return f, nil
+}
+
+// PutSent stores a thumbnail sent by the file's uploader, or by an admin. It replaces any
+// thumbnail the file already has. An encrypted file's thumbnail comes sealed; a plain file's
+// must be a whole JPEG.
+func (s *Store) PutSent(ctx context.Context, p *auth.Principal, id string, data []byte, m Meta) error {
+	f, err := s.canSend(ctx, p, id)
 	if err != nil {
 		return err
 	}
-	if p.Kind == auth.KindDevice && p.Role == "admin" {
-		return nil
+	if m.Sealed != (f.Enc != nil) {
+		return ErrInvalid
 	}
-	if !p.Owns(f) {
+	if m.Sealed {
+		if len(data) <= e2ee.LockOverhead || len(data) > e2ee.MaxThumbSize {
+			return ErrInvalid
+		}
+	} else if err := checkJPEG(ctx, data); err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.write(ctx, id, data); err != nil {
+		return err
+	}
+	ok, err := s.DB.SetClientThumb(ctx, id, m.Width, m.Height, m.DurationMS, s.Now())
+	if err != nil {
+		return err
+	}
+	if !ok { // it left the library in the meantime
+		s.drop(ctx, id)
 		return ErrNotFound
-	}
-	if f.UploadedAt == nil || s.Now().Sub(*f.UploadedAt) > uploaderWindow {
-		return ErrTooLate
 	}
 	return nil
 }
 
-// PutSent stores a thumbnail sent by the file's uploader, or by an admin. It replaces any
-// thumbnail the file already has.
-func (s *Store) PutSent(ctx context.Context, p *auth.Principal, id string, data []byte, m Meta) error {
-	if err := s.CanSend(ctx, p, id); err != nil {
-		return err
-	}
+// checkJPEG makes sure data is a whole JPEG of at most maxSentSide pixels a side.
+func checkJPEG(ctx context.Context, data []byte) error {
 	cfg, format, err := image.DecodeConfig(bytes.NewReader(data))
 	if err != nil || format != "jpeg" || cfg.Width < 1 || cfg.Height < 1 || cfg.Width > maxSentSide || cfg.Height > maxSentSide {
 		return ErrInvalid
@@ -135,20 +189,6 @@ func (s *Store) PutSent(ctx context.Context, p *auth.Principal, id string, data 
 	<-sentDecodes
 	if err != nil {
 		return ErrInvalid // the app shows these; only whole, valid pictures get through
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if err := s.write(id, data); err != nil {
-		return err
-	}
-	ok, err := s.DB.SetClientThumb(ctx, id, m.Width, m.Height, m.DurationMS, s.Now())
-	if err != nil {
-		return err
-	}
-	if !ok { // it left the library in the meantime
-		os.Remove(s.Path(id))
-		return ErrNotFound
 	}
 	return nil
 }
@@ -227,12 +267,29 @@ func (s *Store) retry(id string) bool {
 	return false
 }
 
-// Remove deletes a file's thumbnail, when the file is gone for good.
+// Remove deletes a file's thumbnail, when the file is gone for good. In a bucket the purge
+// notes the thumbnail for removal with the file, since this runs where no call to the bucket
+// may be made.
 func (s *Store) Remove(id string) {
-	if err := os.Remove(s.Path(id)); err != nil && !errors.Is(err, os.ErrNotExist) {
-		s.Logf("thumbs: removing %s: %v", id, err)
+	if s.Bucket == nil {
+		if err := os.Remove(s.Path(id)); err != nil && !errors.Is(err, os.ErrNotExist) {
+			s.Logf("thumbs: removing %s: %v", id, err)
+		}
 	}
 	s.forget(id)
+}
+
+// drop deletes a thumbnail just written for a file that left the library meanwhile.
+func (s *Store) drop(ctx context.Context, id string) {
+	var err error
+	if s.Bucket != nil {
+		err = s.Bucket.Remove(ctx, s.Bucket.ThumbKey(id))
+	} else if err = os.Remove(s.Path(id)); errors.Is(err, os.ErrNotExist) {
+		err = nil
+	}
+	if err != nil {
+		s.Logf("thumbs: removing %s: %v", id, err)
+	}
 }
 
 func (s *Store) forget(id string) {
@@ -276,7 +333,7 @@ func (s *Store) make(ctx context.Context, f db.File) error {
 	default:
 		return unusable{fmt.Errorf("can't read %s", f.Mime)}
 	}
-	file, err := s.open(ctx, f)
+	file, err := s.Open(ctx, f)
 	if errors.Is(err, fs.ErrNotExist) {
 		return unusable{err}
 	}
@@ -341,10 +398,13 @@ func (s *Store) make(ctx context.Context, f db.File) error {
 	if cur.Thumb != db.ThumbFailed || cur.State != db.StateReady {
 		return nil
 	}
-	if err := s.write(f.ID, buf.Bytes()); err != nil {
+	if err := s.write(ctx, f.ID, buf.Bytes()); err != nil {
 		return err
 	}
-	_, err = s.DB.SetServerThumb(ctx, f.ID, width, height, s.Now())
+	ok, err := s.DB.SetServerThumb(ctx, f.ID, width, height, s.Now())
+	if err == nil && !ok { // purged meanwhile
+		s.drop(ctx, f.ID)
+	}
 	return err
 }
 
@@ -364,8 +424,12 @@ func pixelBytes(m color.Model) int64 {
 	return 4
 }
 
-// write saves a thumbnail through a temporary file, so a reader never sees half of one.
-func (s *Store) write(id string, data []byte) error {
+// write saves a thumbnail: in the bucket, or on the drive through a temporary file, so a
+// reader never sees half of one.
+func (s *Store) write(ctx context.Context, id string, data []byte) error {
+	if s.Bucket != nil {
+		return s.Bucket.Put(ctx, s.Bucket.ThumbKey(id), data, "image/jpeg", "")
+	}
 	dir := filepath.Dir(s.Path(id))
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err

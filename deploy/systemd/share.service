@@ -1,12 +1,15 @@
-# Share as a systemd service on Linux. To install it:
+# Share as a systemd service on Linux, with PostgreSQL 18 or newer on the same machine or
+# elsewhere. To install it:
 #
+#   sudo -u postgres createuser --pwprompt share                    (the database: README.md)
+#   sudo -u postgres createdb --owner share --encoding UTF8 --template template0 share
 #   sudo useradd --system --home-dir /srv/share --shell /usr/sbin/nologin share
 #   sudo install -m 755 share-linux-amd64 /usr/local/bin/share     (or share-linux-arm64)
 #   sudo mkdir -p /etc/share /srv/share && sudo chown share: /srv/share
-#   sudo cp config.json /etc/share/                                  (storage_dir: /srv/share)
+#   sudo cp config.json /etc/share/                  (storage_dir: /srv/share, and "database")
 #   sudo -u share share init --config /etc/share/config.json
 #   sudo cp share.service /etc/systemd/system/ && sudo systemctl enable --now share
-#   journalctl -u share                                              (the first admin's invite)
+#   journalctl -u share                          (the link to the setup page, for the first admin)
 #
 # Commands then run as the same user: sudo -u share share pin create --day --config /etc/share/config.json
 # With data_dir outside storage_dir, add it to ReadWritePaths too.
@@ -14,7 +17,8 @@
 [Unit]
 Description=Share
 Wants=network-online.target
-After=network-online.target
+# After PostgreSQL when it runs here; Share waits for the database anyway.
+After=network-online.target postgresql.service
 
 [Service]
 User=share

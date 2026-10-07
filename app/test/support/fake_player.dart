@@ -36,6 +36,9 @@ class FakeMediaPlayer implements MediaPlayer {
   @override
   Future<void> seekTo(Duration position) async => _set(position: position);
 
+  /// Stops halfway, as when the network goes or a link ends.
+  void fail() => _value.value = PlayerValue(ready: true, failed: true, position: now.position, duration: now.duration);
+
   @override
   Future<void> dispose() async => disposed = true;
 

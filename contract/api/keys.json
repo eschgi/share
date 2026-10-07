@@ -1,0 +1,111 @@
+{
+  "method": "GET",
+  "path": "/api/keys",
+  "auth": "device",
+  "status": 200,
+  "response": {
+    "device_key": "BP5Xqgr0LIgKJsxpLCxqCYP0IBXFuhbhlS4whnsboXUZct_cyjLT2j4RuYAd2bTu7wOfI6OFx1f7FSd0kFbx7To",
+    "person": {
+      "public_key": "BOoK7BbB52RAZMcAfKQQLjL8yXeQdFC6SjgFDQuE6_QCLP7iXRaIzQc0VbnOm0RpNONTdswHfJdNix83cVz2SN4",
+      "sealed": "kq-C1mWsV1iFUzNoO9cSR-PVo4fyrs4kg_-Sx19doYBM1BbF76Jm292nN71xpQ64vUWpLWrd1U1c7GQlqQDpR1dU8H3CvISLsMxJdnbPB31kM45-Dlzhz0xEC3r-VBW7K7gT_qtxhJEVsmzhkzcxRE8",
+      "password_lock": "HsK-CjVqsf87rGnQqHVph1WvX7fvZZLvWhKJTLL5NLnIK0M9IejaYbZvBP19cLdAXMuLhuzkCb4nGfrHmzKl57R0nMEJJm6zaWpB8EJIHuw",
+      "held_by": 2,
+      "note": "dBHXF_FFebKqEA-7s0-lk_6u0nJIt2Ljq1gF8HZaK5wdfg83xEkhvT9lZOrffxQqcmaMR-Ij0W7djEe0avxbruJh9TsmFS0mO6g7A3zUli5DSAEla4henJBR8yCw24PznqetvQ105t7H89-uzI9kZWZkGnuiZg8wEfw1cCkcV5kNGgCRJokZ8l2dBhLfNZ1gJqJA9FiaXXkfHdl8_vp3entPFSQav1e9Q3rUsSmEBTTz84dc"
+    },
+    "folders": [
+      {
+        "folder": "f4mily5x2k7mbqz4bwdbyj6qsq",
+        "version": 1,
+        "public_key": "BD6DSZYRQziHQxVPHDEuXP2MXE_NYfU4KzqIj3kOYLpMHBJE-WoTxJjmMJnP1rUglfpbFwAY-RtCJNKv0Burx14",
+        "signature": "JbCL6gbCh0z6pN0XsthChF3oKlvFOYiKx4BUojmcz8n8wtoxzj3RZr3NOjOEflu7B_0Hykd4QjGxmvRYcs7vuQ",
+        "sealed": "214P3l6NWr5tlB8FZrCrFc4sCUghW778MsWZiyWfPuIUdt_xblTn_e-v_ARvl5ZcXDnfJ3BLx4V5WqwHKlXoMeNyUY-Jv88DkASE0xT5RoU7elhye1TvVoEvuzbmqRVBtwfASQUbNo1GR8q9y6GWKP0"
+      }
+    ],
+    "roots": [
+      {
+        "public_key": "BPImZaYMEtKJGF2VDuiBNgkWb2sRPReNbA_TkB_yOaGglfIPk5VlDPk4C47bIkprJIoekk6P0K4uGpSSozBfGIw",
+        "signature": null
+      },
+      {
+        "public_key": "BBCQD540f66IbcZQd5XsdFxMP8sussc-FJNMhn7gV7pySZv6Eh6DayrBVybufWsK9qsTw46SyuDRUFexWZh_lMw",
+        "signature": "_Fn0-V0UOBo6eDJWNHuf_Oac1wB66KdYzKQV1ake6GPItsAzeuMtb8qiVRbN8vi4ZXZmvvIVuSgr_iAHJpfndw"
+      }
+    ],
+    "root_sealed": "zqclnNOY-nmo71knjIwhBQPM-LmmGoa_7yNv_N8x0982B0A2SoA9w5ZTQotr1SEP6L1a5XWpldDnhGvT6uCAIYgmhoIE33DGLpsBxswmLCR5nrkejg9TroSHjnvIxhvijw4_MEYKxRmBc48HwuTpEHE",
+    "todo": {
+      "devices": [
+        {
+          "id": "d4ld5x2k7mbqz4bwdbyj6qsqxa",
+          "public_key": "BMmYyu1hjVZiPGtw6To8VR7ubX_Uhpt5oHzlpQJ6NKVwvSHzARYhSsXNAOzpVNhD1gUWGMdgfNMNb-29G98okLw",
+          "name": "Chrome · Windows",
+          "client": "web",
+          "created_at": "2026-10-06T17:11:11.191Z",
+          "active": true
+        }
+      ],
+      "people": [
+        {
+          "folder": "f4mily5x2k7mbqz4bwdbyj6qsq",
+          "version": 1,
+          "user": "u7ld5x2k7mbqz4bwdbyj6qsqxa",
+          "name": "Maria",
+          "public_key": "BO_wgxnd_ogCHgijEQLzuGO9oADVgaVEb7b7LTJNaTaicF7BZ3w8Q03QaUui70Y2kmOJrKNBSa2leYx42d7kwi0",
+          "active": true
+        }
+      ],
+      "roots": [
+        {
+          "user": "u8ev5x2k7mbqz4bwdbyj6qsqxa",
+          "name": "Eva",
+          "public_key": "BJz5gZuDM7FGc4KIznqB8T-yheDg8e1C7I_k8TPXciNqH2RxUBKrPW0SNqtNyB_lxifwt6SpXSRA4iP3dzi_8xg",
+          "active": true
+        }
+      ],
+      "recovery": [
+        {
+          "folder": "f4mily5x2k7mbqz4bwdbyj6qsq",
+          "version": 1
+        }
+      ],
+      "rekey": [
+        "f4mily5x2k7mbqz4bwdbyj6qsq"
+      ],
+      "pins": [
+        {
+          "pin": "p5ld5x2k7mbqz4bwdbyj6qsqxa",
+          "folder": "f4mily5x2k7mbqz4bwdbyj6qsq",
+          "version": 2,
+          "secret_version": 1,
+          "secret_locked": "ZeJ8Kf2q1TkptG7-g2dWazJbURe4XQRWjXVwtARiVISfS4P1EBz868k6-OAaFUNFCufHLkXBIdFs2emt"
+        }
+      ]
+    },
+    "checks": [
+      {
+        "id": "c1ld5x2k7mbqz4bwdbyj6qsqxa",
+        "asking": true,
+        "device": "d4ld5x2k7mbqz4bwdbyj6qsqxa",
+        "user": null,
+        "from": "Pixel 8",
+        "commitment": "0fJCZyaJ64OSfrNTFkcOzLAubOUSRPAEohbNQhWb2zg",
+        "answer": "BEPcH3QCVv6Nau3qRJ8hC4a1PfAc-ClDDC4z7k-gTofCNEpygKwtRVjNBP5ACQMEu4GN-jCDeT7vchuo0aZuqH4",
+        "answered": false,
+        "reveal": "BNXjZPiBTrA3-zpXMtXhtLqiI2f9WPsN1iEDEqC94UFuKQ4Vqtdh3oGr-EiZPrFLC3UvKERyAENd9lT4_IxSPgg",
+        "confirmation": "9-FPN1suAFVhFXlHgKczP4HGARdD0RYkZpYKZAVMTaE7FZX1h9rAJ6jkt8jhmGPDU7j8fiZIuZ6kJQvT1bfkg6Btu7PPgSPohsCBkdXQzQTTr5XM5Lau9LGkOhUHCiKjXPUaYNVzjgygBKCIrj59QwB0zBG_7oDliReohhC-vHlAzxPYQzy6wTQ7vab5dX7YYRN66a9JxAudoaQyE5klVEGmvrFNn5EiA3sPfET4rBmxN6x9SrWESXZ3d8Qe_uSMM0_6Fe95BEp1E9GB9_5z_kRjNery7jUTlBckv4ZD81whmtGhgkfjHLRdO3_l4HxkBigA832uc2dNuiRqWGBQHtdUAFPAVtZlHvDtMrYD5r1KQF8QZGP_3pYTXOxtwUba"
+      },
+      {
+        "id": "c2ld5x2k7mbqz4bwdbyj6qsqxa",
+        "asking": false,
+        "device": null,
+        "user": "u7ld5x2k7mbqz4bwdbyj6qsqxa",
+        "from": "Chrome · Windows",
+        "commitment": "DEcaDdWpSaLvJj_4RG-CUDDFX8j0beIHz8KhZung8I0",
+        "answer": null,
+        "answered": false,
+        "reveal": null,
+        "confirmation": null
+      }
+    ]
+  },
+  "notes": "End-to-end encryption (docs/e2ee-plan.md); binary values are base64url without padding, keys P-256 (65 bytes public, 32 private), sealing, locking and signing as in contract/crypto. What a phone or browser needs at every start: device_key is the public key it sent (null before PUT /api/keys/device; a different one means its own was lost: send a new one). person: the person's public key (null until a device makes it with PUT /api/keys/person), their private key sealed for this device (null while no device sealed it for this one), and locked with their password (null without); held_by, how many of the person's phones and browsers hold it (with none and no password lock it is lost, and a device that waits for it makes a new one with start_over); note, what the person's phones and browsers keep for the next one, locked with a key from the person's private key (PUT /api/keys/note; null until one wrote it): JSON {\"root\": the root they trust, \"folders\": {folder id: the newest version of its key they saw}}. folders: every version of the keys of the folders the person sees, each signed by the newest root (contract/crypto/sign.json), sealed for the person, or null while nobody did yet. roots: the chain of root keys, the first first, each signed by the one before (the first's signature is null); the newest is the recovery key and signs everything; empty until an admin makes it. A device trusts the root it learned where the database can't change it, and follows the chain from there. root_sealed: the newest root's private key sealed for the person (share-e2ee-v1/root, aad root), for an admin who holds it; null otherwise. todo is what this device can do with the keys its person holds, and sends with POST /api/keys/grants: seal the person key for their devices that lack it (todo.devices; after a check, the device seals it for itself from the check's confirmation), seal folder keys for people who see the folder and lack a version (admins only: a member's todo.people is empty, and folder keys a member seals for someone else are left out), seal the root's private key for admins who lack it (todo.roots, for those who hold it), seal folder keys for the recovery key, which is the newest root the device trusts (todo.recovery), make and sign the next version of an encrypted folder's key (rekey, with POST /api/folders/{id}/keys; for those who hold the root), and lock versions for PIN links that show a folder (the PIN's secret is locked with a key from version secret_version: share-e2ee-v1/pin-secret, folder:<id>:<version>). Only devices: a PIN gets 403 forbidden. todo.devices name the devices that wait (name, client app or web, created_at when they signed in), todo.people and todo.roots the people (name); active, when the device, or a device of the person that holds their key, was seen in the last 15 minutes, so it can answer a check (the server notes a visit at most every 10 minutes). A device only passes keys on to them after a check (contract/api/keys_check.json), or, for a person whose key it checked before, at once; a device whose check has its confirmation is listed to nobody. checks are the open checks this device takes part in: asking, one it opened; otherwise one for this device (device) or for its person (user), listed to the device that answered it, or while none did to every device of the person that holds their key. from is the asking device's name; commitment, answer (the waiting side's one-time public key, with answered when this device gave it), reveal (the asking device's one-time public key) and confirmation (what the asking device hands on after Allow, locked for the waiting side) come in that order."
+}

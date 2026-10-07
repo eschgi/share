@@ -777,6 +777,116 @@
   .wb.placed{padding-bottom:0}
   .gfiles{flex:1;min-height:0;overflow:hidden;margin:2px -4px 14px}
   .gfiles .day{padding:16px 4px 9px}
+  /* ---------- keys: a device that waits for keys, and the question before they are passed on ---------- */
+  .keysban{display:flex;gap:14px;align-items:flex-start;background:var(--s1);border:1px solid var(--line-soft);border-radius:18px;
+    padding:14px 16px 16px;margin:4px 12px 8px;flex:none}
+  .keysban > .ic{width:22px;height:22px;color:var(--accent-text);margin-top:1px}
+  .keysban > div{flex:1;min-width:0}
+  .keysban b{font-size:15.5px;font-weight:600}
+  .keysban p{margin:4px 0 0;font-size:14px;line-height:1.5;color:var(--text-2)}
+  .keysban > .acts{flex:none;margin:-6px -8px 0 0}
+  .dlib .keysban{margin:16px 0 6px;padding:18px 20px}
+  .dlib .keysban p{font-size:14.5px}
+  .kcode{gap:6px}
+  .kcode b{width:38px;height:46px;font-size:21px}
+  .kcode i{width:10px;flex:none}
+  .keysban .kcode{margin-top:12px}
+  .sbtns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:22px}
+  .fchips{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0}
+  .tile.lockd{filter:saturate(.3) brightness(.62)}
+  .tile.lockd > .tico{color:rgba(255,255,255,.8)}
+  /* ---------- nearby: Quick Share, or a QR code that connects a browser straight to this device ---------- */
+  .sheet .choice{background:var(--s2);margin-top:10px;padding:16px 14px}
+  .ddlg .qrcard{background:var(--s2);margin-top:4px}
+  .wb > .drow{flex:none;margin-top:4px}
+  .wb > .route + .grid,.wb > .bytes + .grid{margin-top:16px}
+  /* ---------- sending automatically: a day's new photos go to a folder by themselves ---------- */
+  .card.auto{margin-top:14px}
+  .card.auto .ah{display:flex;gap:14px;align-items:flex-start}
+  .card.auto .at{flex:1;min-width:0}
+  .card.auto .at b{display:block;font-size:16px;font-weight:600}
+  .card.auto .at span{display:block;font-size:13.5px;line-height:1.45;color:var(--text-2);margin-top:3px}
+  .card.auto > p{margin:12px 0 0;font-size:14px;line-height:1.5;color:var(--text-2)}
+  .card.auto > .btn{margin-top:14px}
+  .card.auto .btnrow{margin-top:16px}
+  .card.auto .btnrow .btn{height:46px;font-size:15px}
+  .card.auto + .lead{margin-top:20px}
+  .autoban{display:flex;gap:12px;align-items:center;background:var(--accent-soft);border-radius:16px;padding:8px 6px 8px 14px;margin:4px 12px 8px;flex:none}
+  .autoban .live{width:10px;height:10px;border-radius:50%;background:var(--accent-text);flex:none}
+  .autoban .at{flex:1;min-width:0;padding:4px 0}
+  .autoban .at b{display:block;font-size:14.5px;font-weight:600;color:var(--accent-text)}
+  .autoban .at span{display:block;font-size:12.5px;color:var(--text-2);margin-top:1px}
+  .phone.lock{background:#0F0C0A}
+  .lockbg{position:absolute;inset:0;background:radial-gradient(130% 70% at 25% 0%,#4A3527 0%,#211913 55%,#0F0C0A 100%)}
+  .phone.lock > :not(.lockbg){position:relative}
+  .lockclock{text-align:center;margin-top:54px;font-family:var(--serif);font-size:84px;font-weight:700;line-height:1;flex:none}
+  .lockdate{text-align:center;font-size:16px;color:var(--text-2);margin-top:10px;flex:none}
+  .ntf{margin:0 12px;background:rgba(40,33,28,.94);border-radius:26px;padding:14px 18px 12px;flex:none}
+  .ntf .nh{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-3)}
+  .ntf .nh .ic{width:16px;height:16px;color:var(--accent-text)}
+  .ntf b{display:block;font-size:15px;font-weight:600;margin-top:8px;line-height:1.35}
+  .ntf p{margin:3px 0 0;font-size:13.5px;line-height:1.45;color:var(--text-2)}
+  .ntf .nbar{height:4px;border-radius:2px;background:var(--s3);margin-top:12px;overflow:hidden}
+  .ntf .nbar i{display:block;height:100%;background:var(--accent)}
+  .ntf .nacts{display:flex;gap:22px;margin-top:12px;font-size:14px;font-weight:600;color:var(--accent-text)}
+  .lockdate + .ntf{margin-top:44px}
+  .tile .fromb{position:absolute;left:5px;bottom:5px;width:19px;height:19px;border-radius:50%;background:rgba(18,13,10,.66);color:#fff;
+    font-size:10.5px;font-weight:700;display:grid;place-items:center}
+  /* ---------- faces: the photos one is in, found on one's own phone ---------- */
+  .facesline{display:flex;gap:12px;align-items:center;background:var(--s1);border:1px solid var(--line-soft);border-radius:16px;padding:10px 14px;margin:6px 12px 4px;flex:none}
+  .facesline > .ic{width:20px;height:20px;color:var(--accent-text)}
+  .facesline .at{flex:1;min-width:0}
+  .facesline .at b{display:block;font-size:14.5px;font-weight:600}
+  .facesline .at span{display:block;font-size:12.5px;color:var(--text-3);margin-top:1px}
+  .phone.cam{background:#050403}
+  .camtop{display:flex;align-items:center;gap:12px;padding:6px 14px 0;color:#fff;flex:none;position:relative;z-index:3}
+  .camtop b{flex:1;font-size:16px;font-weight:600}
+  .camdots{display:flex;gap:6px;margin-right:10px} .camdots i{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.3)} .camdots i.on{background:var(--accent-text)}
+  .camoval{width:250px;height:330px;border:3px dashed var(--accent-text);border-radius:50%;margin:56px auto 0;display:grid;place-items:center;flex:none;
+    background:radial-gradient(closest-side,rgba(90,70,58,.55),rgba(30,24,20,.2))}
+  .camoval .ic{width:140px;height:140px;color:rgba(255,255,255,.28)}
+  .camoval .ic svg{stroke-width:1.2}
+  .camhint{text-align:center;font-size:17px;font-weight:500;color:#fff;margin:26px 24px 0}
+  .shutter{width:78px;height:78px;border-radius:50%;border:4px solid #fff;display:grid;place-items:center;margin:0 auto 26px;flex:none}
+  .shutter i{width:62px;height:62px;border-radius:50%;background:#fff}
+  .vfound{position:absolute;left:16px;right:16px;top:calc(50% + 126px);z-index:3;display:flex;align-items:center;gap:10px;background:rgba(28,22,18,.88);
+    border-radius:16px;padding:6px 6px 6px 14px;color:#fff}
+  .vfound > .ic{width:18px;height:18px;color:var(--accent-text)}
+  .vfound .t{flex:1;font-size:14.5px;font-weight:500}
+  .lockhint{text-align:center;font-size:13px;color:var(--text-3);margin:18px 0 6px;flex:none}
+  /* ---------- a PIN's poster: printed, so in paper colours whatever the theme ---------- */
+  .paper{width:780px;height:1103px;zoom:.5;background:#FBF7F1;color:#2A1F18;position:relative;overflow:hidden;display:flex;flex-direction:column;
+    align-items:center;text-align:center;padding:76px 76px 60px;box-shadow:0 30px 70px rgba(0,0,0,.6),0 3px 10px rgba(0,0,0,.45)}
+  body.shot .paper{zoom:1;box-shadow:none}
+  .paper .pbrand{display:flex;align-items:center;gap:10px;font-family:var(--serif);font-weight:700;font-size:26px;color:#A4461F}
+  .paper .pbrand .ic{width:28px;height:28px}
+  .paper .pt{font-family:var(--serif);font-weight:700;font-size:78px;line-height:1.05;margin-top:34px}
+  .paper .pdate{font-size:24px;color:#5F5147;margin-top:14px}
+  .paper .pline{font-family:var(--serif);font-size:33px;line-height:1.3;color:#3A2C24;margin-top:34px}
+  .paper .pqr{width:300px;height:300px;padding:20px;background:#fff;border:2px solid #E6DACB;border-radius:28px;margin-top:38px;flex:none}
+  .paper .pqr svg{width:100%;height:100%;display:block}
+  .paper .pscan{font-size:23px;font-weight:600;margin-top:18px}
+  .paper .psteps{display:flex;gap:24px;justify-content:center;margin-top:36px}
+  .paper .psteps div{width:184px;font-size:19px;line-height:1.35;color:#4A3A30}
+  .paper .psteps b{display:grid;place-items:center;width:44px;height:44px;border-radius:50%;background:#C45A30;color:#fff;font-size:21px;margin:0 auto 10px}
+  .paper .pnote{font-size:19px;line-height:1.45;color:#5F5147;margin:30px 0 0}
+  .paper .por{font-size:18px;color:#85766A;margin-top:auto;padding-top:20px}
+  .paper .pcode{display:flex;gap:8px;justify-content:center;margin-top:12px}
+  .paper .pcode b{width:50px;height:60px;border-radius:12px;border:2px solid #D9CBBB;display:grid;place-items:center;font-family:var(--mono);font-size:30px;font-weight:700}
+  .paper.cards{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;padding:0}
+  .tcard{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px 28px;border:0 dashed #CDBDAB}
+  .tcard:nth-child(odd){border-right-width:2px} .tcard:nth-child(-n+2){border-bottom-width:2px}
+  .tcard .pt{font-size:40px;margin-top:0}
+  .tcard .pline{font-size:19px;margin-top:10px}
+  .tcard .pqr{width:196px;height:196px;padding:14px;border-radius:18px;margin-top:20px}
+  .tcard .pscan{font-size:16px;margin-top:12px}
+  .tcard .pcode{margin-top:12px} .tcard .pcode b{width:32px;height:40px;font-size:20px;border-radius:8px}
+  .ddlg.poster{width:1040px}
+  .pedit{display:flex;gap:30px;align-items:flex-start}
+  .pform{flex:1;min-width:0}
+  .pform .dopt:first-child{margin-top:0}
+  .pprev{width:340px;height:481px;flex:none;border-radius:6px;overflow:hidden;box-shadow:0 12px 34px rgba(0,0,0,.45)}
+  .pprev .paper{zoom:.436;box-shadow:none}
 </style>
 </head>
 <body>
@@ -833,6 +943,10 @@
   <symbol id="i-user-x" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m17 8 5 5"/><path d="m22 8-5 5"/></symbol>
   <symbol id="i-log-out" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></symbol>
   <symbol id="i-palette" viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></symbol>
+  <symbol id="i-radio" viewBox="0 0 24 24"><path d="M16.247 7.761a6 6 0 0 1 0 8.478"/><path d="M19.075 4.933a10 10 0 0 1 0 14.134"/><path d="M4.925 19.067a10 10 0 0 1 0-14.134"/><path d="M7.753 16.239a6 6 0 0 1 0-8.478"/><circle cx="12" cy="12" r="2"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/></symbol>
+  <symbol id="i-printer" viewBox="0 0 24 24"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/><rect x="6" y="14" width="12" height="8" rx="1"/></symbol>
 </svg>
 
 <div class="page">
@@ -1734,6 +1848,224 @@
     </div>
   </section>
 
+  <section class="sec" id="keys">
+    <div class="sec-head">
+      <div class="sec-tag">Proposal · keys</div>
+      <h2>Keys, passed on only with your OK</h2>
+      <p>Encrypted folders open only on the family's phones and browsers, which pass the keys on to each other. Today they do that by themselves, for every device and person the server lists, so someone who could change the server's database could slip in one of their own. With this proposal a device asks first, and both screens show the same code, made from the receiving device's own key, which no one else can show. Signing in with the password and joining with an invite link ask nothing: they bring their keys with them.</p>
+    </div>
+    <p class="sub-h">In the app</p>
+    <div class="board">
+
+      <div class="slot">
+        <h3><span class="n">50</span>A new phone waits for its keys <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Stefan's new phone, whose sign-in brought no key: his password can't open it, say right after it was reset. Encrypted files stay locked until one of his phones or browsers allows this one (54); plain files show as always.</p>
+        <div class="phone" data-shot="50-keys-waiting"><div class="sb" data-time="9:41"></div><div class="ab"><h2 class="fpick"><span class="t">Family</span><span data-i="chev" class="down"></span></h2><span class="ib"><span data-i="search"></span></span><span class="av sm acc">S</span></div><div class="keysban"><span data-i="lock"></span><div><b>Waiting for approval</b><p data-tr>Allow this phone on one of your other phones or browsers. It shows this code there too:</p><div class="code kcode"><b>4</b><b>8</b><b>2</b><i></i><b>1</b><b>9</b><b>7</b></div></div></div><div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div><div class="scroll"><div class="day"><div><h4>Today</h4><div class="meta">6 files · 74 MB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p3/l p8/l v2@0:18/l p6/l p1/l p4/l"></div><div class="day"><div><h4>Yesterday</h4><div class="meta">45 files · 620 MB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p4/l p7/l p9/l v5@1:15/l p2 p10 p6 p3 p5 p1 p8 p2"></div><div class="day"><div><h4>Sunday, 27 Sep</h4><div class="meta">48 files · 1.1 GB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p1 p2 p5 v4@0:42 p3 p8 p9 p10"></div></div><nav class="nav" data-on="library"></nav><div class="gest"></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">51</span>Allowing a new browser <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Stefan's phone has his keys, and asks before passing them to the browser in 53. The browser's name comes from the server; the code doesn't, so only the right browser can show it. Not me signs that browser out.</p>
+        <div class="phone" data-shot="51-keys-allow-browser"><div class="sb" data-time="9:42"></div><div class="ab"><h2 class="fpick"><span class="t">Family</span><span data-i="chev" class="down"></span></h2><span class="ib"><span data-i="search"></span></span><span class="av sm acc">S</span></div><div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div><div class="scroll"><div class="day"><div><h4>Today</h4><div class="meta">6 files · 74 MB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p3 p8 v2@0:18 p6 p1 p4"></div><div class="day"><div><h4>Yesterday</h4><div class="meta">45 files · 620 MB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p4 p7 p9 v5@1:15 p2 p10 p6 p3 p5 p1 p8 p2"></div><div class="day"><div><h4>Sunday, 27 Sep</h4><div class="meta">48 files · 1.1 GB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p1 p2 p5 v4@0:42 p3 p8 p9 p10"></div></div><nav class="nav" data-on="library"></nav><div class="gest"></div><div class="scrim"></div><div class="sheet"><div class="grip"></div><h3>A new browser wants your keys</h3><div class="group"><div class="row"><span class="ri acc"><span data-i="monitor"></span></span><div class="rt"><b>Chrome · Windows</b><span>Signed in 1 minute ago</span></div></div></div><div class="label">Does it show this code?</div><div class="code kcode"><b>7</b><b>3</b><b>5</b><i></i><b>0</b><b>4</b><b>1</b></div><p class="help" data-tr>Another code, or you didn't just sign in? Tap <b>Not me</b>: that browser is signed out and gets nothing.</p><div class="sbtns"><div class="btn outline sm">Not me</div><div class="btn primary sm"><span data-i="check"></span>Allow</div></div></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">52</span>Allowing someone a new key <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Maria lost her phone, and her new key was made by itself (55). Before Stefan's phone opens her folders for it, he compares her code: in person, or on a call.</p>
+        <div class="phone" data-shot="52-keys-allow-person"><div class="sb" data-time="10:15"></div><div class="ab"><h2 class="fpick"><span class="t">Family</span><span data-i="chev" class="down"></span></h2><span class="ib"><span data-i="search"></span></span><span class="av sm acc">S</span></div><div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div><div class="scroll"><div class="day"><div><h4>Today</h4><div class="meta">6 files · 74 MB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p3 p8 v2@0:18 p6 p1 p4"></div><div class="day"><div><h4>Yesterday</h4><div class="meta">45 files · 620 MB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p4 p7 p9 v5@1:15 p2 p10 p6 p3 p5 p1 p8 p2"></div><div class="day"><div><h4>Sunday, 27 Sep</h4><div class="meta">48 files · 1.1 GB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p1 p2 p5 v4@0:42 p3 p8 p9 p10"></div></div><nav class="nav" data-on="library"></nav><div class="gest"></div><div class="scrim"></div><div class="sheet"><div class="grip"></div><h3>Maria waits for her folders</h3><p class="lead sm" data-tr>Her key is new: the old one was lost with her phone. Allow it, and her folders open for it again:</p><div class="fchips"><span class="ftag"><span data-i="folder"></span>Family</span><span class="ftag"><span data-i="folder"></span>Wedding Anna &amp; Marco</span><span class="ftag"><span data-i="folder"></span>Kindergarten</span></div><div class="label">Ask Maria for the code on her screen</div><div class="code kcode"><b>8</b><b>1</b><b>3</b><i></i><b>5</b><b>5</b><b>2</b></div><div class="sbtns"><div class="btn outline sm">Not now</div><div class="btn primary sm"><span data-i="check"></span>Allow</div></div></div></div>
+      </div>
+
+    </div>
+    <p class="sub-h">On the website</p>
+    <div class="board">
+
+      <div class="slot wide">
+        <h3><span class="n">53</span>A new browser waits for its keys <span class="badge proposal">proposal</span></h3>
+        <p class="cap">The same wait in a browser, here on a computer: the encrypted files locked, the code to compare on one of Stefan's phones (51), and for admins the recovery code as another way.</p>
+        <div class="desktop" data-shot="53-keys-waiting-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>Library · Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com/library</span></div></div><div class="dview"><div class="ahd"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div><nav class="dtabs"><a class="on"><span data-i="images"></span>Library</a><a><span data-i="upload"></span>Send</a><a><span data-i="settings"></span>Settings</a></nav><span class="dsearch"><span data-i="search"></span>Search file names</span><span class="av acc">S</span></div><div class="dlib withf"><div class="fside"><div class="glabel">Folders</div><div class="frow"><span class="fcov all"><span data-i="images"></span></span><div><b>All folders</b><span>2,875 files</span></div></div><div class="frow on"><span class="fcov ph t3"><span data-i="image"></span></span><div><b>Family</b><span>2,340 files</span></div></div><div class="frow"><span class="fcov ph t6"><span data-i="image"></span></span><div><b>Wedding Anna &amp; Marco</b><span>412 files</span></div></div><div class="frow"><span class="fcov doc"><span data-i="file"></span></span><div><b>Kindergarten</b><span>86 files</span></div></div><div class="frow"><span class="fcov doc"><span data-i="file"></span></span><div><b>Taxes 2026</b><span>37 files</span></div></div></div><div class="fmain"><div class="keysban"><span data-i="lock"></span><div><b>Waiting for approval</b><p data-tr>Allow this browser on one of your phones or other browsers. It shows this code there too:</p><div class="code kcode"><b>7</b><b>3</b><b>5</b><i></i><b>0</b><b>4</b><b>1</b></div></div><div class="acts"><span class="tbtn">Use the recovery code</span></div></div><div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div><div class="day"><div><h4>Today</h4><div class="meta">6 files · 74 MB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p3/l p8/l v2@0:18/l p6/l p1/l p4/l"></div><div class="day"><div><h4>Yesterday</h4><div class="meta">45 files · 620 MB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p4/l p7/l p9/l v5@1:15/l p2/l p10/l p6 p3 p5 d#DOCX=Recipes_Oma.docx p8 p1 v3@0:42 p2 p9 p7"></div><div class="day"><div><h4>Sunday, 27 Sep</h4><div class="meta">48 files · 1.1 GB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p1 p2 d#PDF=Invitation.pdf p5 v4@0:42 p3 p8 p6"></div></div></div></div></div>
+      </div>
+      <div class="slot wide">
+        <h3><span class="n">54</span>Allowing a new phone, on a computer <span class="badge proposal">proposal</span></h3>
+        <p class="cap">On a computer the question is a dialog over the library. Allow seals Stefan's key for the phone in 50, which opens its encrypted files at its next check-in, within a minute.</p>
+        <div class="desktop" data-shot="54-keys-allow-phone-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>Library · Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com/library</span></div></div><div class="dview"><div class="ahd"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div><nav class="dtabs"><a class="on"><span data-i="images"></span>Library</a><a><span data-i="upload"></span>Send</a><a><span data-i="settings"></span>Settings</a></nav><span class="dsearch"><span data-i="search"></span>Search file names</span><span class="av acc">S</span></div><div class="dlib withf"><div class="fside"><div class="glabel">Folders</div><div class="frow"><span class="fcov all"><span data-i="images"></span></span><div><b>All folders</b><span>2,875 files</span></div></div><div class="frow on"><span class="fcov ph t3"><span data-i="image"></span></span><div><b>Family</b><span>2,340 files</span></div></div><div class="frow"><span class="fcov ph t6"><span data-i="image"></span></span><div><b>Wedding Anna &amp; Marco</b><span>412 files</span></div></div><div class="frow"><span class="fcov doc"><span data-i="file"></span></span><div><b>Kindergarten</b><span>86 files</span></div></div><div class="frow"><span class="fcov doc"><span data-i="file"></span></span><div><b>Taxes 2026</b><span>37 files</span></div></div></div><div class="fmain"><div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div><div class="day"><div><h4>Today</h4><div class="meta">6 files · 74 MB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p3 p8 v2@0:18 p6 p1 p4"></div><div class="day"><div><h4>Yesterday</h4><div class="meta">45 files · 620 MB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p4 p7 p9 v5@1:15 p2 p10 p6 p3 p5 d#DOCX=Recipes_Oma.docx p8 p1 v3@0:42 p2 p9 p7"></div><div class="day"><div><h4>Sunday, 27 Sep</h4><div class="meta">48 files · 1.1 GB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p1 p2 d#PDF=Invitation.pdf p5 v4@0:42 p3 p8 p6"></div></div></div><div class="scrim"></div><div class="ddlg"><h3>A new phone wants your keys</h3><div class="group"><div class="row"><span class="ri acc"><span data-i="smartphone"></span></span><div class="rt"><b>Pixel 8</b><span>Signed in just now</span></div></div></div><div class="label">Does it show this code?</div><div class="code kcode"><b>4</b><b>8</b><b>2</b><i></i><b>1</b><b>9</b><b>7</b></div><p class="help" data-tr>Another code, or nobody just signed in? Choose <b>Not me</b>: that phone is signed out and gets nothing.</p><div class="dbtns"><span class="tbtn">Not me</span><div class="btn primary sm"><span data-i="check"></span>Allow</div></div></div></div></div>
+      </div>
+      <div class="slot wide">
+        <h3><span class="n">55</span>Waiting for an admin <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Maria in a browser after her phone was lost: a new key, made by itself, and her folders locked until an admin allows it (52) with the code she reads out.</p>
+        <div class="desktop" data-shot="55-keys-waiting-admin-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>Library · Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com/library</span></div></div><div class="dview"><div class="ahd"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div><nav class="dtabs"><a class="on"><span data-i="images"></span>Library</a><a><span data-i="upload"></span>Send</a><a><span data-i="settings"></span>Settings</a></nav><span class="dsearch"><span data-i="search"></span>Search file names</span><span class="av tan">M</span></div><div class="dlib withf"><div class="fside"><div class="glabel">Folders</div><div class="frow"><span class="fcov all"><span data-i="images"></span></span><div><b>All folders</b><span>2,838 files</span></div></div><div class="frow on"><span class="fcov ph t3"><span data-i="image"></span></span><div><b>Family</b><span>2,340 files</span></div></div><div class="frow"><span class="fcov ph t6"><span data-i="image"></span></span><div><b>Wedding Anna &amp; Marco</b><span>412 files</span></div></div><div class="frow"><span class="fcov doc"><span data-i="file"></span></span><div><b>Kindergarten</b><span>86 files</span></div></div></div><div class="fmain"><div class="keysban"><span data-i="lock"></span><div><b>Waiting for an admin</b><p data-tr>Your key is new. An admin opens your folders for it: tell them this code.</p><div class="code kcode"><b>8</b><b>1</b><b>3</b><i></i><b>5</b><b>5</b><b>2</b></div></div></div><div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div><div class="day"><div><h4>Today</h4><div class="meta">6 files · 74 MB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p3/l p8/l v2@0:18/l p6/l p1/l p4/l"></div><div class="day"><div><h4>Yesterday</h4><div class="meta">45 files · 620 MB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p4/l p7/l p9/l v5@1:15/l p2/l p10/l p6 p3 p5 d#DOCX=Recipes_Oma.docx p8 p1 v3@0:42 p2 p9 p7"></div><div class="day"><div><h4>Sunday, 27 Sep</h4><div class="meta">48 files · 1.1 GB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p1 p2 d#PDF=Invitation.pdf p5 v4@0:42 p3 p8 p6"></div></div></div></div></div>
+      </div>
+
+    </div>
+  </section>
+
+  <section class="sec" id="nearby">
+    <div class="sec-head">
+      <div class="sec-tag">Proposal · nearby</div>
+      <h2>Sending to someone nearby</h2>
+      <p>Photos for the person next to you, in seconds, straight from phone to phone. Android does that already with Quick Share: Bluetooth finds the other device and Wi-Fi Direct carries the files, without the internet, and from a Pixel 10 or a recent Galaxy it reaches iPhones by AirDrop too. So Share builds no radio of its own: Nearby hands the files to Quick Share. What Share adds is the way to everyone else, through the browser: a QR code that connects this phone, or the website on a computer, with any browser on the same Wi-Fi. The server introduces the two once; the files go straight across and never touch it.</p>
+    </div>
+    <p class="sub-h">In the app</p>
+    <div class="board">
+
+      <div class="slot">
+        <h3><span class="n">56</span>Send nearby <span class="badge proposal">proposal</span></h3>
+        <p class="cap">A new button next to Share in the selection. Quick Share finds phones, tablets and Windows computers nearby; Share hands it the files, decrypted, as its Share button does today. Its line names iPhones only on phones whose Quick Share reaches them. The QR code (57) is for everyone else.</p>
+        <div class="phone" data-shot="56-nearby-choose"><div class="sb" data-time="15:20"></div><div class="ab ctx"><span class="ib"><span data-i="x"></span></span><h2>12 selected</h2><span class="tbtn">Select all</span></div><div class="scroll"><div class="day"><div><h4>Today</h4><div class="meta">12 of 18 selected</div></div><span class="dsel part"><span data-i="minus"></span></span></div><div class="grid g4" data-tiles="p3/s p8/s p6/s p1/s p4/s p7/s p9/s p2/s p10/s p5/s p3/s p8/s p6/o p1/o v2@0:18/o p4/o p9/o p2/o"></div></div><div class="actionbar"><span class="abtn"><span data-i="share"></span></span><span class="abtn"><span data-i="radio"></span></span><div class="btn primary"><span data-i="download"></span>Download 12</div></div><div class="gest"></div><div class="scrim"></div><div class="sheet"><div class="grip"></div><h3>Send 12 photos nearby</h3><div class="choice"><div class="cico"><span data-i="radio"></span></div><div class="ct"><b>Quick Share</b><span>To phones and computers nearby, iPhones too. The fastest way, even without internet.</span></div><span class="chev" data-i="chev"></span></div><div class="choice"><div class="cico"><span data-i="qr"></span></div><div class="ct"><b>QR code for a browser</b><span>For any other phone or computer: its camera opens the photos, straight from this phone.</span></div><span class="chev" data-i="chev"></span></div><div class="note slim"><span data-i="shield"></span><p>Both send straight to the other device, not through your server.</p></div></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">57</span>A QR code for a browser <span class="badge proposal">proposal</span></h3>
+        <p class="cap">The code opens Share's website with a key made for this one sending. The server introduces the two devices, so both need the internet for that moment; then the photos go straight across the Wi-Fi, and the key lets both check each other: neither the server nor anyone else on the Wi-Fi sees them. With no Wi-Fi in common, the other device joins this phone's hotspot first.</p>
+        <div class="phone" data-shot="57-nearby-qr"><div class="sb" data-time="15:20"></div><div class="ab back"><span class="ib"><span data-i="back"></span></span><h2>Send nearby</h2></div><div class="wb"><div class="qrcard"><div class="qr" data-qr="57"></div><b>Scan this with the other device's camera</b><span class="exp"><span data-i="wifi"></span>On the same Wi-Fi: Wedding Anna &amp; Marco</span></div><div class="dest"><div class="drow"><span class="ri"><span data-i="images"></span></span><div><b>12 photos</b><span>84 MB · in full quality</span></div></div><div class="drow"><span class="ri"><span data-i="shield"></span></span><div><b>Only for whoever scans this</b><span>Works until you close this screen</span></div></div></div><div class="grow"></div><div class="btn outline"><span data-i="wifi"></span>Open a hotspot</div><p class="small">With no Wi-Fi in common, the other device joins this phone first.</p></div><div class="gest"></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">58</span>Sending directly <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Once a browser is there, the code gives way to the progress, at Wi-Fi speed. Show the code lets the next person scan; when this screen closes the code stops working, so nobody can come back for the photos later.</p>
+        <div class="phone" data-shot="58-nearby-sending"><div class="sb" data-time="15:21"></div><div class="ab back"><span class="ib"><span data-i="back"></span></span><h2>Send nearby</h2></div><div class="wb"><div class="drow"><span class="ri acc"><span data-i="smartphone"></span></span><div><b>iPhone · Safari</b><span>Connected directly</span></div></div><div class="count"><span class="big">7</span><span class="of">of 12</span><span class="eta">A few seconds left</span></div><div class="bar"><i style="width:58%"></i></div><div class="bytes"><span>49 of 84 MB</span><span>22 MB/s</span></div><div class="route"><span data-i="wifi"></span>Straight over Wi-Fi · not through your server</div><div class="grid g4" data-tiles="p3/k p8/k p6/k p1/k p4/k p7/k p9/u60 p2/q p10/q p5/q p3/q p8/q"></div><div class="grow"></div><div class="btnrow"><div class="btn outline">Stop</div><div class="btn tonal"><span data-i="qr"></span>Show the code</div></div></div><div class="gest"></div></div>
+      </div>
+
+    </div>
+    <p class="sub-h">On the website</p>
+    <div class="board">
+
+      <div class="slot">
+        <h3><span class="n">59</span>Receiving, on an iPhone <span class="badge proposal">proposal</span></h3>
+        <p class="cap">No app and no account: the camera opens the link, and the page takes the photos as they come. Save to Photos goes through the iPhone's share sheet; on a computer the same button downloads them. Nothing stays on the server.</p>
+        <div class="phone" data-shot="59-nearby-receive"><div class="sb" data-time="15:21"></div><div class="wb"><div class="brand"><span data-i="images"></span><span translate="no">Share</span><span class="langpill"><span data-i="globe"></span>EN</span></div><h1 class="hero md">Stefan sends you 12 photos</h1><p class="lead">Straight from his phone, over this Wi-Fi.</p><div class="count"><span class="big">7</span><span class="of">of 12</span><span class="eta">22 MB/s</span></div><div class="bar"><i style="width:58%"></i></div><div class="bytes"><span>49 of 84 MB</span><span>directly</span></div><div class="grid g3" data-tiles="p3/k p8/k p6/k p1/k p4/k p7/k p9/u60 p2/q p10/q"></div><div class="grow"></div><div class="btn primary"><span data-i="download"></span>Save to Photos</div><p class="small">Nothing is kept on a server. Close this page when you're done.</p></div></div>
+      </div>
+      <div class="slot wide">
+        <h3><span class="n">60</span>From a computer to a phone <span class="badge proposal">proposal</span></h3>
+        <p class="cap">The other way round, for a computer without Quick Share, such as a Mac next to an Android phone: Nearby in the selection shows the code in a dialog, and the phone's camera opens it. Two phones' browsers can do the same, an iPhone's and an Android's.</p>
+        <div class="desktop" data-shot="60-nearby-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>Library · Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com/library</span></div></div><div class="dview"><div class="ahd"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div><nav class="dtabs"><a class="on"><span data-i="images"></span>Library</a><a><span data-i="upload"></span>Send</a><a><span data-i="settings"></span>Settings</a></nav><span class="dsearch"><span data-i="search"></span>Search file names</span><span class="av tan">M</span></div><div class="dlib"><div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div><div class="day"><div><h4>Today</h4><div class="meta">3 of 6 selected</div></div><span class="dsel part"><span data-i="minus"></span></span></div><div class="grid g8" data-tiles="p3/s p8/s v2@0:18/s d#PDF=Car_insurance.pdf/o p6/o p1/o"></div><div class="day"><div><h4>Yesterday</h4><div class="meta">45 files · 620 MB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p4/o p7/o p9/o v5@1:15/o p2/o p10/o p6/o p3/o p5/o d#DOCX=Recipes_Oma.docx/o p8/o p1/o v3@0:42/o p2/o p9/o p7/o"></div></div><div class="selbar"><span class="ib"><span data-i="x"></span></span><b>3 selected</b><span class="sz">45 MB</span><span class="tbtn">Select all</span><span class="gap"></span><div class="btn tonal sm"><span data-i="radio"></span>Nearby</div><div class="btn primary sm"><span data-i="download"></span>Download 3</div></div><div class="scrim"></div><div class="ddlg"><h3>Send 3 files nearby</h3><div class="qrcard"><div class="qr" data-qr="60"></div><b>Scan this with the phone's camera</b><span class="exp"><span data-i="wifi"></span>On the same Wi-Fi as this computer</span></div><div class="group mt12"><div class="row"><span class="ri acc"><span data-i="smartphone"></span></span><div class="rt"><b>Android · Chrome</b><span>Receiving 2 of 3 · 31 of 45 MB</span></div></div></div><div class="dbtns"><span class="tbtn">Close</span></div></div></div></div>
+      </div>
+
+    </div>
+  </section>
+
+  <section class="sec" id="automatic">
+    <div class="sec-head">
+      <div class="sec-tag">Proposal · automatic</div>
+      <h2>Today's photos, sent by themselves</h2>
+      <p>For a day others should see as it happens, a wedding, a trip, a child's birthday: turned on in the morning, every photo and video taken with the camera goes to the chosen folder on its own, and at midnight it stops by itself; the next day it is one tap again. Share sees only the camera's folder, which the person gives it once, so it needs none of the photo permissions Google Play reviews, and in an encrypted folder the photos go up encrypted, as always. The others see who is sending and who shared each photo, without notifications, and the sender can take a photo back until midnight. Only the app can send automatically: a browser never sees a phone's gallery. How it works: <a href="auto-send-plan.md">auto-send-plan.md</a>.</p>
+    </div>
+    <p class="sub-h">Stefan's phone</p>
+    <div class="board">
+
+      <div class="slot">
+        <h3><span class="n">61</span>Send automatically <span class="badge proposal">proposal</span></h3>
+        <p class="cap">A card on the Send tab, under picking by hand. It's for one day, not for good: what goes to the others stays a choice made that morning, not a setting forgotten for months.</p>
+        <div class="phone" data-shot="61-auto-offer"><div class="sb" data-time="9:12"></div><div class="ab"><h2>Send</h2><span class="av sm acc">S</span></div><div class="scroll pad"><p class="lead sm">No PIN needed while you're signed in.</p><div class="picks"><div class="pick"><span data-i="images"></span><b>Photos &amp; videos</b></div><div class="pick"><span data-i="file"></span><b>Other files</b></div></div><div class="card auto"><div class="ah"><span class="ri acc"><span data-i="camera"></span></span><div class="at"><b>Send automatically</b><span>For a day others should see as it happens: a wedding, a trip, a birthday.</span></div></div><p>Photos and videos you take from now on go to a folder by themselves, until midnight.</p><div class="btn tonal sm"><span data-i="camera"></span>Turn on for today</div></div><div class="note slim"><span data-i="smartphone"></span><p>Keeps going in the background, even if you close the app.</p></div></div><nav class="nav" data-on="send"></nav><div class="gest"></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">62</span>For which folder, until when <span class="badge proposal">proposal</span></h3>
+        <p class="cap">The folder open in the library comes first, and it always runs until midnight. The photos come from the camera's folder alone: the first time, Android's folder picker opens there, and one tap gives Share that folder and nothing else of the gallery, so no screenshots and nothing other apps saved. Big videos wait for Wi-Fi.</p>
+        <div class="phone" data-shot="62-auto-setup"><div class="sb" data-time="9:12"></div><div class="ab"><h2>Send</h2><span class="av sm acc">S</span></div><div class="scroll pad"><p class="lead sm">No PIN needed while you're signed in.</p><div class="picks"><div class="pick"><span data-i="images"></span><b>Photos &amp; videos</b></div><div class="pick"><span data-i="file"></span><b>Other files</b></div></div></div><nav class="nav" data-on="send"></nav><div class="gest"></div><div class="scrim"></div><div class="sheet"><div class="grip"></div><h3>Send automatically</h3><div class="label t0">Into</div><div class="fsel"><span class="fcov ph t6"><span data-i="image"></span></span><div class="rt"><b>Wedding Anna &amp; Marco</b><span>412 files · 9 people</span></div><span data-i="chev" class="down"></span></div><div class="label">From</div><div class="fsel"><span class="fcov all"><span data-i="camera"></span></span><div class="rt"><b>Camera</b><span>DCIM/Camera · nothing else of the gallery</span></div><span class="tbtn">Change</span></div><div class="swrow"><div class="rt"><b>Videos too</b><span>Big ones wait for Wi-Fi.</span></div><span class="sw on"></span></div><div class="note slim"><span data-i="users"></span><p>Until midnight, only what you take from now on. The 9 people in this folder see it as it arrives.</p></div><div class="btn primary mt20"><span data-i="camera"></span>Start for today</div></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">63</span>While it's on <span class="badge proposal">proposal</span></h3>
+        <p class="cap">A line over the library says it's on, how much went and until when. A new photo is noticed seconds after it's taken, also with Share closed, and goes up over Wi-Fi or mobile data. Pause leaves out what is taken meanwhile, for a while nobody needs to see. Photos from others carry their initial.</p>
+        <div class="phone" data-shot="63-auto-on"><div class="sb" data-time="15:40"></div><div class="ab"><h2 class="fpick"><span class="t">Wedding Anna &amp; Marco</span><span data-i="chev" class="down"></span></h2><span class="ib"><span data-i="search"></span></span><span class="av sm acc">S</span></div><div class="autoban"><span class="live"></span><div class="at"><b>Sending automatically</b><span>38 photos, 2 videos today · until midnight</span></div><span class="tbtn">Pause</span></div><div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div><div class="scroll"><div class="day"><div><h4>Today</h4><div class="meta">40 files · 610 MB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p6/u70 p2/q p9 p4 v3@0:24 p1/aM p7 p5 p8 p3/aM p10 p2 p6 p9 v4@0:41 p1 p5/aP p8 p3 p7"></div></div><nav class="nav" data-on="library"></nav><div class="gest"></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">64</span>With the app closed <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Android wakes Share when a photo is taken, and one notification stays while the day runs, with Pause and Stop. It is quiet: one for the day, not one per photo.</p>
+        <div class="phone lock" data-shot="64-auto-notification"><div class="lockbg"></div><div class="sb" data-time="15:42"></div><div class="lockclock">15:42</div><div class="lockdate">Saturday, 10 October</div><div class="ntf"><div class="nh"><span data-i="images"></span><span translate="no">Share</span><span>· now</span></div><b>Sending automatically to Wedding Anna &amp; Marco</b><p>39 photos, 2 videos today · until midnight</p><div class="nbar"><i style="width:64%"></i></div><div class="nacts"><span>Pause</span><span>Stop for today</span></div></div><div class="grow"></div><div class="lockhint">Swipe up to open</div><div class="gest"></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">65</span>Not this one <span class="badge proposal">proposal</span></h3>
+        <p class="cap">A photo that shouldn't be there: its sender takes it back, until midnight, without asking an admin. It goes to Recently deleted, where admins can still bring it back for 30 days. The website's viewer has the same.</p>
+        <div class="phone viewer" data-shot="65-auto-take-back"><div class="sb" data-time="15:50"></div><div class="vtop"><span class="ib"><span data-i="back"></span></span><div class="vt"><b>Today</b><span>15:48 · sent automatically</span></div><span class="ib"><span data-i="more"></span></span></div><div class="vphoto"></div><div class="vbottom"><div class="film" data-tiles="p2 p5 p1/c p7 p3"></div><div class="vmeta">20261010_154802.jpg · 5.1 MB · 4080 × 3072</div><div class="vactions"><div><span data-i="download"></span>Download</div><div><span data-i="share"></span>Share</div><div><span data-i="undo"></span>Take back</div></div></div><div class="gest"></div><div class="scrim"></div><div class="sheet"><div class="grip"></div><h3>Take this photo back?</h3><p class="lead sm">It leaves Wedding Anna &amp; Marco for everyone. You can do this until midnight, for photos you sent automatically.</p><div class="btnrow"><div class="btn outline">Keep it</div><div class="btn primary"><span data-i="undo"></span>Take back</div></div></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">66</span>The day after <span class="badge proposal">proposal</span></h3>
+        <p class="cap">At midnight it stops by itself and says what went. Turning it on again is one tap, so nothing runs on by mistake.</p>
+        <div class="phone" data-shot="66-auto-ended"><div class="sb" data-time="8:30"></div><div class="ab"><h2>Send</h2><span class="av sm acc">S</span></div><div class="scroll pad"><div class="card auto"><div class="ah"><span class="ri ok"><span data-i="check"></span></span><div class="at"><b>Sent automatically yesterday</b><span>86 photos and 4 videos went to Wedding Anna &amp; Marco. It stopped at midnight.</span></div></div><div class="btnrow"><div class="btn outline sm">OK</div><div class="btn tonal sm"><span data-i="camera"></span>Again today</div></div></div><p class="lead sm">No PIN needed while you're signed in.</p><div class="picks"><div class="pick"><span data-i="images"></span><b>Photos &amp; videos</b></div><div class="pick"><span data-i="file"></span><b>Other files</b></div></div></div><nav class="nav" data-on="send"></nav><div class="gest"></div></div>
+      </div>
+
+    </div>
+    <p class="sub-h">Everyone else in the folder</p>
+    <div class="board">
+
+      <div class="slot">
+        <h3><span class="n">67</span>Watching them arrive <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Maria has the folder open: a line says who is sending, and every photo from someone else carries their initial. No notifications: what is new is there when she looks. The website shows the same to everyone with an account.</p>
+        <div class="phone" data-shot="67-auto-others"><div class="sb" data-time="15:45"></div><div class="ab"><h2 class="fpick"><span class="t">Wedding Anna &amp; Marco</span><span data-i="chev" class="down"></span></h2><span class="ib"><span data-i="search"></span></span><span class="av sm tan">M</span></div><div class="autoban"><span class="live"></span><div class="at"><b>Stefan is sending today's photos</b><span>They show up here as he takes them</span></div></div><div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div><div class="scroll"><div class="day"><div><h4>Today</h4><div class="meta">41 files · 626 MB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p6/aS p2/aS p9/aS p4/aS v3@0:24/aS p1 p7/aS p5/aS p8/aP p3/aS p10 p2/aS p6/aS p9/aS v4@0:41/aS p1/aS"></div><div class="day"><div><h4>Yesterday</h4><div class="meta">45 files · 620 MB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p4 p7 p9 v5@1:15"></div></div><nav class="nav" data-on="library"></nav><div class="gest"></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">68</span>Who shared it <span class="badge proposal">proposal</span></h3>
+        <p class="cap">One photo says who shared it, when, and that it went by itself. Photos from PIN guests stay without a name, as before.</p>
+        <div class="phone viewer" data-shot="68-auto-from"><div class="sb" data-time="15:46"></div><div class="vtop"><span class="ib"><span data-i="back"></span></span><div class="vt"><b>Today</b><span>From Stefan · 15:44 · sent automatically</span></div><span class="ib"><span data-i="more"></span></span></div><div class="vphoto"></div><div class="vbottom"><div class="film" data-tiles="p8 p3 p6/c p1 p7"></div><div class="vmeta">20261010_154402.jpg · 4.8 MB · 4080 × 3072</div><div class="vactions"><div><span data-i="download"></span>Download</div><div><span data-i="share"></span>Share</div><div><span data-i="info"></span>Details</div></div></div><div class="gest"></div></div>
+      </div>
+
+    </div>
+  </section>
+
+  <section class="sec" id="poster">
+    <div class="sec-head">
+      <div class="sec-tag">Proposal · poster</div>
+      <h2>A poster for the PIN</h2>
+      <p>For a wedding or a party, nobody has to send the guests a link: a poster at the entrance and a card on each table do it. It is made from a PIN, in the app or on the website, and printed or saved as a PDF. The QR code opens the PIN's page, which needs no app and no account; the code to type is for phones whose camera reads no QR codes. For an encrypted folder the QR code carries the link's secret, as the PIN's link does: whoever types the code sends encrypted too, but sees the folder only through the QR code.</p>
+    </div>
+    <div class="board">
+
+      <div class="slot">
+        <h3><span class="n">69</span>Poster, in the app <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Poster joins Share and QR code on a PIN's card. The app makes the page itself and hands it to Android's printing, which lists the printers nearby and Save as PDF.</p>
+        <div class="phone" data-shot="69-poster-app"><div class="sb" data-time="20:14"></div><div class="ab back"><span class="ib"><span data-i="back"></span></span><h2>Upload PINs</h2></div><div class="scroll pad"><div class="glabel">Permanent</div><div class="pincard"><div class="pc-top"><div class="code"><b>A</b><b>N</b><b>N</b><b>A</b><b>5</b></div><span class="pcico" data-i="infinity"></span></div><div class="pc-meta"><span class="ftag"><span data-i="folder"></span>Wedding Anna &amp; Marco</span>Since 5 Oct · not used yet</div><div class="pc-actions"><span><span data-i="share"></span>Share</span><span><span data-i="qr"></span>QR code</span><span><span data-i="printer"></span>Poster</span></div></div></div><div class="gest"></div><div class="scrim"></div><div class="sheet"><div class="grip"></div><h3>Poster</h3><div class="opts"><div class="opt on"><span data-i="file"></span><i class="radio"></i><b>Poster</b><span class="sub">One A4 page, for a wall</span></div><div class="opt"><span data-i="copy"></span><i class="radio"></i><b>Table cards</b><span class="sub">Four on a page, to cut out</span></div></div><div class="label">Title</div><div class="input">Anna &amp; Marco</div><div class="label">Under it</div><div class="input">Share your photos of today with us</div><div class="btn primary mt20"><span data-i="printer"></span>Print or save as PDF</div></div></div>
+      </div>
+      <div class="slot wide">
+        <h3><span class="n">70</span>Poster, on a computer <span class="badge proposal">proposal</span></h3>
+        <p class="cap">On a computer the poster opens in a dialog, with a preview that follows every change. Title and line are free; the date and the code to type can go. Print uses the browser's own dialog, which also saves a PDF.</p>
+        <div class="desktop" data-shot="70-poster-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>Settings · Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com/settings/pins</span></div></div><div class="dview"><div class="ahd"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div><nav class="dtabs"><a><span data-i="images"></span>Library</a><a><span data-i="upload"></span>Send</a><a class="on"><span data-i="settings"></span>Settings</a></nav><span class="av acc">S</span></div><div class="dset"><div class="pane"><div class="profile"><span class="av lg acc">S</span><div><b>Stefan <span class="role admin"><span data-i="crown"></span>Admin</span></b><span class="sub">Signed in in this browser</span></div><span class="chev" data-i="chev"></span></div><div class="group"><div class="row on"><span class="ri acc"><span data-i="key"></span></span><div class="rt"><b>Upload PINs</b><span>1 permanent · 1 for 24 hours</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="users"></span></span><div class="rt"><b>People</b><span>3 people · 1 invite open</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="trash"></span></span><div class="rt"><b>Recently deleted</b><span>3 files · 9.3 MB</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="hdd"></span></span><div class="rt"><b>Storage</b><span>789 GB free of 931 GB</span></div></div></div><div class="group"><div class="row"><span class="ri"><span data-i="globe"></span></span><div class="rt"><b>Language</b><span>Automatic · English</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="palette"></span></span><div class="rt"><b>Theme</b><span>Ember</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="lock"></span></span><div class="rt"><b>Password</b><span>Set · username stefan</span></div><span class="chev" data-i="chev"></span></div></div><div class="group"><div class="row"><span class="ri"><span data-i="log-out"></span></span><div class="rt"><b>Sign out</b></div></div><div class="row dang"><span class="ri dang"><span data-i="user-x"></span></span><div class="rt"><b>Delete my account</b></div></div></div></div><div class="pane pane2"><div class="phead"><h2>Upload PINs</h2><span class="btn primary xs"><span data-i="plus"></span>New PIN</span></div><p class="lead sm" data-tr>A PIN only lets people <b>send</b>. Nobody can see or download anything with it.</p><div class="pgrid"><div><div class="glabel">Permanent</div><div class="pincard"><div class="pc-top"><div class="code"><b>A</b><b>N</b><b>N</b><b>A</b><b>5</b></div><span class="pcico" data-i="infinity"></span></div><div class="pc-meta"><span class="ftag"><span data-i="folder"></span>Wedding Anna &amp; Marco</span>Since 5 Oct · not used yet</div><div class="pc-actions"><span><span data-i="copy"></span>Copy link</span><span><span data-i="qr"></span>QR code</span><span><span data-i="printer"></span>Poster</span><span class="danger">End now</span></div></div><div><div class="glabel">For 24 hours</div><div class="pincard"><div class="pc-top"><div class="code"><b>4</b><b>H</b><b>X</b><b>9</b><b>T</b></div></div><div class="pc-meta"><span class="timepill sm"><span data-i="clock"></span>Ends today 18:30</span>45 files from 7 devices</div><div class="pc-actions"><span><span data-i="copy"></span>Copy link</span><span><span data-i="qr"></span>QR code</span><span class="danger">End now</span></div></div></div></div></div></div><div class="scrim"></div><div class="ddlg poster"><div class="dlgh"><h3>Poster for ANNA5</h3><span class="ib"><span data-i="x"></span></span></div><div class="pedit"><div class="pform"><div class="dopt on"><div class="dt"><b>Poster</b><span>One A4 page, for a wall</span></div><i class="radio"></i></div><div class="dopt"><div class="dt"><b>Table cards</b><span>Four on a page, to cut out</span></div><i class="radio"></i></div><div class="label">Title</div><div class="input">Anna &amp; Marco</div><div class="label">Under it</div><div class="input">Share your photos of today with us</div><div class="swrow"><div class="rt"><b>Date</b><span>Saturday, 10 October 2026</span></div><span class="sw on"></span></div><div class="swrow"><div class="rt"><b>The code to type</b><span>For phones whose camera reads no QR codes</span></div><span class="sw on"></span></div></div><div class="pprev"><div class="paper"><div class="pbrand"><span data-i="images"></span><span translate="no">Share</span></div><div class="pt">Anna &amp; Marco</div><div class="pdate">Saturday, 10 October 2026</div><div class="pline">Share your photos of today with us</div><div class="pqr" data-qr="70"></div><div class="pscan">Scan with your phone's camera</div><div class="psteps"><div><b>1</b>Scan the code</div><div><b>2</b>Choose photos and videos</div><div><b>3</b>Done, in full quality</div></div><p class="pnote">No app, no account. Scan again later to see everyone's photos.</p><div class="por">No QR reader? Open share.example.com and type:</div><div class="pcode"><b>A</b><b>N</b><b>N</b><b>A</b><b>5</b></div></div></div></div><div class="dbtns"><span class="tbtn">Download PDF</span><div class="btn primary sm"><span data-i="printer"></span>Print</div></div></div></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">71</span>The poster <span class="badge proposal">proposal</span></h3>
+        <p class="cap">One A4 page: for whom, one line, a big QR code and three steps, in the server's language. The code to type sits at the bottom. A PIN that shows its folder adds that guests can scan again later to see everyone's photos.</p>
+        <div class="paper" data-shot="71-poster-a4"><div class="pbrand"><span data-i="images"></span><span translate="no">Share</span></div><div class="pt">Anna &amp; Marco</div><div class="pdate">Saturday, 10 October 2026</div><div class="pline">Share your photos of today with us</div><div class="pqr" data-qr="70"></div><div class="pscan">Scan with your phone's camera</div><div class="psteps"><div><b>1</b>Scan the code</div><div><b>2</b>Choose photos and videos</div><div><b>3</b>Done, in full quality</div></div><p class="pnote">No app, no account. Scan again later to see everyone's photos.</p><div class="por">No QR reader? Open share.example.com and type:</div><div class="pcode"><b>A</b><b>N</b><b>N</b><b>A</b><b>5</b></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">72</span>Cards for the tables <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Four cards on a page, cut along the dashed lines: one for each table, with the same QR code and the code to type.</p>
+        <div class="paper cards" data-shot="72-poster-cards"><div class="tcard"><div class="pt">Anna &amp; Marco</div><div class="pline">Share your photos of today with us</div><div class="pqr" data-qr="70"></div><div class="pscan">Scan with your phone's camera</div><div class="pcode"><b>A</b><b>N</b><b>N</b><b>A</b><b>5</b></div></div><div class="tcard"><div class="pt">Anna &amp; Marco</div><div class="pline">Share your photos of today with us</div><div class="pqr" data-qr="70"></div><div class="pscan">Scan with your phone's camera</div><div class="pcode"><b>A</b><b>N</b><b>N</b><b>A</b><b>5</b></div></div><div class="tcard"><div class="pt">Anna &amp; Marco</div><div class="pline">Share your photos of today with us</div><div class="pqr" data-qr="70"></div><div class="pscan">Scan with your phone's camera</div><div class="pcode"><b>A</b><b>N</b><b>N</b><b>A</b><b>5</b></div></div><div class="tcard"><div class="pt">Anna &amp; Marco</div><div class="pline">Share your photos of today with us</div><div class="pqr" data-qr="70"></div><div class="pscan">Scan with your phone's camera</div><div class="pcode"><b>A</b><b>N</b><b>N</b><b>A</b><b>5</b></div></div></div>
+      </div>
+
+    </div>
+  </section>
+
+  <section class="sec" id="faces">
+    <div class="sec-head">
+      <div class="sec-tag">Proposal · faces</div>
+      <h2>Only the photos with me</h2>
+      <p>After a wedding there are 1,200 photos, and Stefan is in 40 of them. Turned on by Stefan for himself, his phone learns his face from three selfies, looks at the photos of his folders itself, and keeps a list of the ones he is in: a filter in the library, and the only ones it saves into his gallery by itself. His face never leaves his phone, nobody else's face is kept anywhere, and the server learns nothing, so it works in encrypted folders too. Two small open models do the work on the phone: YuNet finds the faces (MIT licence), SFace tells whether one is Stefan's (Apache 2.0). It finds most, not all: a face in profile or behind sunglasses can slip through, and Not me corrects a wrong one.</p>
+    </div>
+    <div class="board">
+
+      <div class="slot">
+        <h3><span class="n">73</span>Find me in photos <span class="badge proposal">proposal</span></h3>
+        <p class="cap">In Settings, and only for oneself: nobody can look for someone else. It says what stays where before anything happens. In the EU a face used to recognise someone is biometric data, one more reason it is asked for and stays on the phone.</p>
+        <div class="phone" data-shot="73-faces-start"><div class="sb" data-time="22:05"></div><div class="ab back"><span class="ib"><span data-i="back"></span></span><h2>Photos with me</h2></div><div class="wb"><div class="roundico"><span data-i="user"></span></div><h1 class="hero md">Find the photos you're in</h1><div class="dest"><div class="drow"><span class="ri"><span data-i="camera"></span></span><div><b>Three selfies</b><span>Your phone learns your face from them.</span></div></div><div class="drow"><span class="ri"><span data-i="images"></span></span><div><b>It looks itself</b><span>At the photos of your folders, new ones as they come.</span></div></div><div class="drow"><span class="ri"><span data-i="lock"></span></span><div><b>Your face stays here</b><span>It never leaves this phone, and nobody else's face is kept.</span></div></div></div><div class="grow"></div><div class="btn primary"><span data-i="camera"></span>Take three selfies</div><p class="small">Only for you: nobody can look for someone else.</p></div><div class="gest"></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">74</span>Learning a face <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Three selfies, the head turned a little each time, make a face print: 128 numbers, kept encrypted on this phone. Update my face, later on, helps when a child grows.</p>
+        <div class="phone cam" data-shot="74-faces-selfie"><div class="sb" data-time="22:06"></div><div class="camtop"><span class="ib"><span data-i="x"></span></span><b>2 of 3</b><span class="camdots"><i class="on"></i><i class="on"></i><i></i></span></div><div class="camoval"><span data-i="user"></span></div><p class="camhint">Turn your head a little to the left</p><div class="grow"></div><div class="shutter"><i></i></div><div class="gest"></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">75</span>With me <span class="badge proposal">proposal</span></h3>
+        <p class="cap">A new chip next to Photos and Videos. New photos are looked at as they arrive; older ones on Wi-Fi while the phone charges, which the line says. Looking takes the phone a fraction of a second per photo; fetching the photo is the bigger part, hence Wi-Fi for older ones.</p>
+        <div class="phone" data-shot="75-faces-filter"><div class="sb" data-time="9:30"></div><div class="ab"><h2 class="fpick"><span class="t">Wedding Anna &amp; Marco</span><span data-i="chev" class="down"></span></h2><span class="ib"><span data-i="search"></span></span><span class="av sm acc">S</span></div><div class="chips"><span class="chip">All</span><span class="chip on">With me</span><span class="chip">Photos</span><span class="chip">Videos</span></div><div class="facesline"><span data-i="user"></span><div class="at"><b>38 photos with you</b><span>Still looking through 870 older ones, on Wi-Fi</span></div></div><div class="scroll"><div class="day"><div><h4>Saturday, 10 Oct</h4><div class="meta">31 of 1,214 with you</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p6/aM p2/aP p9 p4/aM p1/aM p7/aP p5 p8/aM p3/aM p10/aP p2/aM p6 p9/aM p1/aP p5/aM p8/aM"></div><div class="day"><div><h4>Friday, 9 Oct</h4><div class="meta">7 of 96 with you</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p3/aM p7/aP p10 p4/aM"></div></div><nav class="nav" data-on="library"></nav><div class="gest"></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">76</span>Not me <span class="badge proposal">proposal</span></h3>
+        <p class="cap">One photo says Stefan is in it. Not me takes it off his list; on a photo the phone missed, Also me puts it on. Both stay on his phones only, like the list itself.</p>
+        <div class="phone viewer" data-shot="76-faces-not-me"><div class="sb" data-time="9:31"></div><div class="vtop"><span class="ib"><span data-i="back"></span></span><div class="vt"><b>Saturday, 10 Oct</b><span>From Maria · 21:12</span></div><span class="ib"><span data-i="more"></span></span></div><div class="vphoto"></div><div class="vfound"><span data-i="user"></span><span class="t">You're in this photo</span><span class="tbtn">Not me</span></div><div class="vbottom"><div class="film" data-tiles="p8 p3 p6/c p1 p7"></div><div class="vmeta">PXL_20261010_211205.jpg · 3.9 MB · 4080 × 3072</div><div class="vactions"><div><span data-i="download"></span>Download</div><div><span data-i="share"></span>Share</div><div><span data-i="info"></span>Details</div></div></div><div class="gest"></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">77</span>Receive only those <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Receive automatically puts a folder's new photos into the gallery by themselves; with Only photos with me, just those Stefan is in. It pairs with sending automatically: Maria's phone sends everything, Stefan's keeps what he is in.</p>
+        <div class="phone" data-shot="77-faces-receive"><div class="sb" data-time="9:33"></div><div class="ab"><h2 class="fpick"><span class="t">Wedding Anna &amp; Marco</span><span data-i="chev" class="down"></span></h2><span class="ib"><span data-i="search"></span></span><span class="av sm acc">S</span></div><div class="chips"><span class="chip">All</span><span class="chip on">With me</span><span class="chip">Photos</span><span class="chip">Videos</span></div><div class="scroll"><div class="grid g4" data-tiles="p6/aM p2/aP p9 p4/aM p1/aM p7/aP p5 p8/aM"></div></div><nav class="nav" data-on="library"></nav><div class="gest"></div><div class="scrim"></div><div class="sheet"><div class="grip"></div><h3>Receive automatically</h3><div class="label t0">From</div><div class="fsel"><span class="fcov ph t6"><span data-i="image"></span></span><div class="rt"><b>Wedding Anna &amp; Marco</b><span>1,310 files · 9 people</span></div><span data-i="chev" class="down"></span></div><div class="swrow"><div class="rt"><b>Only photos with me</b><span>38 so far, and new ones as they arrive.</span></div><span class="sw on"></span></div><div class="swrow"><div class="rt"><b>Videos too</b><span>Faces are looked for in photos only.</span></div><span class="sw"></span></div><div class="note slim"><span data-i="images"></span><p>Into this phone's gallery, album Share.</p></div><div class="btn primary mt20"><span data-i="download"></span>Start</div></div></div>
+      </div>
+
+    </div>
+  </section>
+
 </div>
 
 <script>
@@ -1751,21 +2083,23 @@
   });
 
   // Tile shorthand: p<tone> photo, v<tone>@<duration> video, d#<EXT>[=<name>] document.
-  // Flags after "/": k done, u<n> uploading n%, q queued, s selected, o selectable, h on this phone, c current.
+  // Flags after "/": k done, u<n> uploading n%, q queued, s selected, o selectable, h on this phone, c current,
+  // l encrypted and locked (its key isn't open on the device), a<initial> sent by someone else.
   function tile(tok) {
     const [spec, ...flags] = tok.split('/');
     const f = {};
-    flags.forEach(x => { if (x[0] === 'u') f.u = +x.slice(1); else f[x] = true; });
+    flags.forEach(x => { if (x[0] === 'u') f.u = +x.slice(1); else if (x[0] === 'a') f.a = x.slice(1); else f[x] = true; });
     let cls = 'tile', inner = '';
     if (spec[0] === 'd') {
       const [, ext, name] = spec.match(/^d#([A-Z0-9]+)(?:=(.+))?$/);
       cls += ' doc';
-      inner += ic('file', 'tico') + (name ? `<span class="fname">${name}</span><span class="extb">${ext}</span>` : `<span class="ext">${ext}</span>`);
+      inner += ic(f.l ? 'lock' : 'file', 'tico') + (name ? `<span class="fname">${name}</span><span class="extb">${ext}</span>` : `<span class="ext">${ext}</span>`);
     } else {
       const [, tone, dur] = spec.match(/^[pv](\d+)(?:@(.+))?$/);
       cls += ` ph t${tone}`;
-      inner += ic(spec[0] === 'v' ? 'play' : 'image', 'tico') + (dur ? `<span class="dur">${dur}</span>` : '');
+      inner += ic(f.l ? 'lock' : spec[0] === 'v' ? 'play' : 'image', 'tico') + (dur ? `<span class="dur">${dur}</span>` : '');
     }
+    if (f.l) cls += ' lockd';
     if (f.s) cls += ' sel';
     if (f.q) cls += ' queued';
     if (f.c) cls += ' cur';
@@ -1774,6 +2108,7 @@
     if (f.o) inner += '<span class="selm"></span>';
     if (f.h) inner += `<span class="onph">${ic('smartphone')}</span>`;
     if (f.u != null) inner += `<span class="tprog"><i style="width:${f.u}%"></i></span>`;
+    if (f.a) inner += `<span class="fromb">${f.a}</span>`;
     return `<div class="${cls}">${inner}</div>`;
   }
   document.querySelectorAll('[data-tiles]').forEach(el => {
@@ -1826,6 +2161,590 @@
   // English is written in the markup. T maps each English string to [German, Italian]; elements marked
   // data-tr are translated as a whole, because their inline markup sits at a different place in each language.
   const T = {
+      "Photos with me": [
+          "Fotos mit mir",
+          "Foto con me"
+      ],
+      "Find the photos you're in": [
+          "Finde die Fotos, auf denen du bist",
+          "Trova le foto in cui ci sei"
+      ],
+      "Three selfies": [
+          "Drei Selfies",
+          "Tre selfie"
+      ],
+      "Your phone learns your face from them.": [
+          "Daraus lernt dein Handy dein Gesicht.",
+          "Da questi il telefono impara il tuo viso."
+      ],
+      "It looks itself": [
+          "Es sucht selbst",
+          "Cerca da solo"
+      ],
+      "At the photos of your folders, new ones as they come.": [
+          "In den Fotos deiner Ordner, neue sobald sie kommen.",
+          "Nelle foto delle tue cartelle, quelle nuove appena arrivano."
+      ],
+      "Your face stays here": [
+          "Dein Gesicht bleibt hier",
+          "Il tuo viso resta qui"
+      ],
+      "It never leaves this phone, and nobody else's face is kept.": [
+          "Es verlässt dieses Handy nie, und kein anderes Gesicht wird gespeichert.",
+          "Non lascia mai questo telefono, e nessun altro viso viene conservato."
+      ],
+      "Take three selfies": [
+          "Drei Selfies machen",
+          "Scatta tre selfie"
+      ],
+      "Only for you: nobody can look for someone else.": [
+          "Nur für dich: Niemand kann nach jemand anderem suchen.",
+          "Solo per te: nessuno può cercare qualcun altro."
+      ],
+      "2 of 3": [
+          "2 von 3",
+          "2 di 3"
+      ],
+      "Turn your head a little to the left": [
+          "Dreh den Kopf ein wenig nach links",
+          "Gira un po' la testa a sinistra"
+      ],
+      "With me": [
+          "Mit mir",
+          "Con me"
+      ],
+      "38 photos with you": [
+          "38 Fotos mit dir",
+          "38 foto con te"
+      ],
+      "Still looking through 870 older ones, on Wi-Fi": [
+          "Sucht noch in 870 älteren, über WLAN",
+          "Sta ancora cercando in 870 più vecchie, via Wi-Fi"
+      ],
+      "Saturday, 10 Oct": [
+          "Samstag, 10. Okt.",
+          "Sabato 10 ott"
+      ],
+      "31 of 1,214 with you": [
+          "31 von 1.214 mit dir",
+          "31 di 1.214 con te"
+      ],
+      "Friday, 9 Oct": [
+          "Freitag, 9. Okt.",
+          "Venerdì 9 ott"
+      ],
+      "7 of 96 with you": [
+          "7 von 96 mit dir",
+          "7 di 96 con te"
+      ],
+      "From Maria · 21:12": [
+          "Von Maria · 21:12",
+          "Da Maria · 21:12"
+      ],
+      "You're in this photo": [
+          "Du bist auf diesem Foto",
+          "Ci sei in questa foto"
+      ],
+      "PXL_20261010_211205.jpg · 3.9 MB · 4080 × 3072": [
+          "PXL_20261010_211205.jpg · 3,9 MB · 4080 × 3072",
+          "PXL_20261010_211205.jpg · 3,9 MB · 4080 × 3072"
+      ],
+      "Receive automatically": [
+          "Automatisch empfangen",
+          "Ricezione automatica"
+      ],
+      "1,310 files · 9 people": [
+          "1.310 Dateien · 9 Personen",
+          "1.310 file · 9 persone"
+      ],
+      "Only photos with me": [
+          "Nur Fotos mit mir",
+          "Solo foto con me"
+      ],
+      "38 so far, and new ones as they arrive.": [
+          "Bisher 38, und neue, sobald sie ankommen.",
+          "Finora 38, e quelle nuove appena arrivano."
+      ],
+      "Faces are looked for in photos only.": [
+          "Gesichter werden nur in Fotos gesucht.",
+          "I volti vengono cercati solo nelle foto."
+      ],
+      "Into this phone's gallery, album Share.": [
+          "In die Galerie dieses Handys, Album Share.",
+          "Nella galleria di questo telefono, album Share."
+      ],
+      "Start": [
+          "Starten",
+          "Avvia"
+      ],
+      "Until midnight, only what you take from now on. The 9 people in this folder see it as it arrives.": [
+          "Bis Mitternacht, nur was du ab jetzt aufnimmst. Die 9 Personen in diesem Ordner sehen es, sobald es ankommt.",
+          "Fino a mezzanotte, solo ciò che scatti da ora. Le 9 persone di questa cartella lo vedono appena arriva."
+      ],
+      "It leaves Wedding Anna & Marco for everyone. You can do this until midnight, for photos you sent automatically.": [
+          "Es verschwindet für alle aus Hochzeit Anna & Marco. Das geht bis Mitternacht, für Fotos, die du automatisch gesendet hast.",
+          "Sparisce per tutti da Matrimonio Anna & Marco. Puoi farlo fino a mezzanotte, per le foto che hai inviato in automatico."
+      ],
+      "From Stefan · 15:44 · sent automatically": [
+          "Von Stefan · 15:44 · automatisch gesendet",
+          "Da Stefan · 15:44 · inviata in automatico"
+      ],
+      "20261010_154402.jpg · 4.8 MB · 4080 × 3072": [
+          "20261010_154402.jpg · 4,8 MB · 4080 × 3072",
+          "20261010_154402.jpg · 4,8 MB · 4080 × 3072"
+      ],
+      "From": [
+          "Woher",
+          "Da dove"
+      ],
+      "Camera": [
+          "Kamera",
+          "Fotocamera"
+      ],
+      "DCIM/Camera · nothing else of the gallery": [
+          "DCIM/Camera · sonst nichts aus der Galerie",
+          "DCIM/Camera · nient'altro della galleria"
+      ],
+      "Change": [
+          "Ändern",
+          "Cambia"
+      ],
+      "Since 5 Oct · not used yet": [
+          "Seit 5. Okt. · noch nicht benutzt",
+          "Dal 5 ott · non ancora usato"
+      ],
+      "Poster": [
+          "Poster",
+          "Locandina"
+      ],
+      "One A4 page, for a wall": [
+          "Eine A4-Seite, für die Wand",
+          "Una pagina A4, da appendere"
+      ],
+      "Table cards": [
+          "Tischkarten",
+          "Cartoncini per i tavoli"
+      ],
+      "Four on a page, to cut out": [
+          "Vier pro Seite, zum Ausschneiden",
+          "Quattro per pagina, da ritagliare"
+      ],
+      "Title": [
+          "Titel",
+          "Titolo"
+      ],
+      "Under it": [
+          "Darunter",
+          "Sotto"
+      ],
+      "Share your photos of today with us": [
+          "Teilt eure Fotos von heute mit uns",
+          "Condividete con noi le vostre foto di oggi"
+      ],
+      "Print or save as PDF": [
+          "Drucken oder als PDF sichern",
+          "Stampa o salva come PDF"
+      ],
+      "Poster for ANNA5": [
+          "Poster für ANNA5",
+          "Locandina per ANNA5"
+      ],
+      "Date": [
+          "Datum",
+          "Data"
+      ],
+      "Saturday, 10 October 2026": [
+          "Samstag, 10. Oktober 2026",
+          "Sabato 10 ottobre 2026"
+      ],
+      "The code to type": [
+          "Der Code zum Eintippen",
+          "Il codice da digitare"
+      ],
+      "For phones whose camera reads no QR codes": [
+          "Für Handys, deren Kamera keine QR-Codes liest",
+          "Per i telefoni la cui fotocamera non legge i codici QR"
+      ],
+      "Download PDF": [
+          "PDF herunterladen",
+          "Scarica PDF"
+      ],
+      "Print": [
+          "Drucken",
+          "Stampa"
+      ],
+      "Scan with your phone's camera": [
+          "Mit der Handykamera scannen",
+          "Inquadralo con la fotocamera del telefono"
+      ],
+      "Scan the code": [
+          "Code scannen",
+          "Inquadra il codice"
+      ],
+      "Choose photos and videos": [
+          "Fotos und Videos auswählen",
+          "Scegli foto e video"
+      ],
+      "Done, in full quality": [
+          "Fertig, in voller Qualität",
+          "Fatto, in qualità originale"
+      ],
+      "No app, no account. Scan again later to see everyone's photos.": [
+          "Keine App, kein Konto. Später noch einmal scannen: Dann seht ihr die Fotos von allen.",
+          "Nessuna app, nessun account. Inquadralo di nuovo più tardi per vedere le foto di tutti."
+      ],
+      "No QR reader? Open share.example.com and type:": [
+          "Kein QR-Leser? Öffne share.example.com und tippe:",
+          "Niente lettore QR? Apri share.example.com e digita:"
+      ],
+      "Send automatically": [
+          "Automatisch senden",
+          "Invio automatico"
+      ],
+      "For a day others should see as it happens: a wedding, a trip, a birthday.": [
+          "Für einen Tag, den andere gleich miterleben sollen: eine Hochzeit, eine Reise, einen Geburtstag.",
+          "Per un giorno che gli altri devono vivere in diretta: un matrimonio, un viaggio, un compleanno."
+      ],
+      "Photos and videos you take from now on go to a folder by themselves, until midnight.": [
+          "Fotos und Videos, die du ab jetzt machst, landen von selbst in einem Ordner, bis Mitternacht.",
+          "Le foto e i video che scatti da ora vanno da soli in una cartella, fino a mezzanotte."
+      ],
+      "Turn on for today": [
+          "Für heute einschalten",
+          "Attiva per oggi"
+      ],
+      "Into": [
+          "Wohin",
+          "Dove"
+      ],
+      "412 files · 9 people": [
+          "412 Dateien · 9 Personen",
+          "412 file · 9 persone"
+      ],
+      "Videos too": [
+          "Auch Videos",
+          "Anche i video"
+      ],
+      "Big ones wait for Wi-Fi.": [
+          "Große warten auf WLAN.",
+          "Quelli grandi aspettano il Wi-Fi."
+      ],
+      "Start for today": [
+          "Für heute starten",
+          "Avvia per oggi"
+      ],
+      "Sending automatically": [
+          "Sendet automatisch",
+          "Invio automatico in corso"
+      ],
+      "38 photos, 2 videos today · until midnight": [
+          "Heute 38 Fotos, 2 Videos · bis Mitternacht",
+          "Oggi 38 foto, 2 video · fino a mezzanotte"
+      ],
+      "Pause": [
+          "Pause",
+          "Pausa"
+      ],
+      "40 files · 610 MB": [
+          "40 Dateien · 610 MB",
+          "40 file · 610 MB"
+      ],
+      "Saturday, 10 October": [
+          "Samstag, 10. Oktober",
+          "Sabato 10 ottobre"
+      ],
+      "· now": [
+          "· jetzt",
+          "· ora"
+      ],
+      "Sending automatically to Wedding Anna & Marco": [
+          "Sendet automatisch an Hochzeit Anna & Marco",
+          "Invio automatico a Matrimonio Anna & Marco"
+      ],
+      "39 photos, 2 videos today · until midnight": [
+          "Heute 39 Fotos, 2 Videos · bis Mitternacht",
+          "Oggi 39 foto, 2 video · fino a mezzanotte"
+      ],
+      "Stop for today": [
+          "Für heute beenden",
+          "Ferma per oggi"
+      ],
+      "Swipe up to open": [
+          "Zum Öffnen nach oben wischen",
+          "Scorri verso l'alto per aprire"
+      ],
+      "15:48 · sent automatically": [
+          "15:48 · automatisch gesendet",
+          "15:48 · inviata in automatico"
+      ],
+      "20261010_154802.jpg · 5.1 MB · 4080 × 3072": [
+          "20261010_154802.jpg · 5,1 MB · 4080 × 3072",
+          "20261010_154802.jpg · 5,1 MB · 4080 × 3072"
+      ],
+      "Take back": [
+          "Zurücknehmen",
+          "Ritira"
+      ],
+      "Take this photo back?": [
+          "Dieses Foto zurücknehmen?",
+          "Ritirare questa foto?"
+      ],
+      "Keep it": [
+          "Behalten",
+          "Tienila"
+      ],
+      "Sent automatically yesterday": [
+          "Gestern automatisch gesendet",
+          "Inviate in automatico ieri"
+      ],
+      "86 photos and 4 videos went to Wedding Anna & Marco. It stopped at midnight.": [
+          "86 Fotos und 4 Videos gingen an Hochzeit Anna & Marco. Um Mitternacht hat es aufgehört.",
+          "86 foto e 4 video sono andati a Matrimonio Anna & Marco. Si è fermato a mezzanotte."
+      ],
+      "OK": [
+          "OK",
+          "OK"
+      ],
+      "Again today": [
+          "Heute wieder",
+          "Anche oggi"
+      ],
+      "Stefan is sending today's photos": [
+          "Stefan sendet die Fotos von heute",
+          "Stefan sta inviando le foto di oggi"
+      ],
+      "They show up here as he takes them": [
+          "Sie erscheinen hier, sobald er sie macht",
+          "Compaiono qui man mano che le scatta"
+      ],
+      "41 files · 626 MB": [
+          "41 Dateien · 626 MB",
+          "41 file · 626 MB"
+      ],
+      "12 selected": [
+          "12 ausgewählt",
+          "12 selezionati"
+      ],
+      "12 of 18 selected": [
+          "12 von 18 ausgewählt",
+          "12 di 18 selezionati"
+      ],
+      "Download 12": [
+          "12 herunterladen",
+          "Scarica 12"
+      ],
+      "Send 12 photos nearby": [
+          "12 Fotos an ein Gerät in der Nähe",
+          "12 foto a un dispositivo qui vicino"
+      ],
+      "To phones and computers nearby, iPhones too. The fastest way, even without internet.": [
+          "An Handys und Computer in der Nähe, auch an iPhones. Der schnellste Weg, auch ohne Internet.",
+          "A telefoni e computer qui vicino, anche agli iPhone. Il modo più veloce, anche senza internet."
+      ],
+      "QR code for a browser": [
+          "QR-Code für einen Browser",
+          "Codice QR per un browser"
+      ],
+      "For any other phone or computer: its camera opens the photos, straight from this phone.": [
+          "Für jedes andere Handy oder jeden Computer: Seine Kamera öffnet die Fotos, direkt von diesem Handy.",
+          "Per qualsiasi altro telefono o computer: la sua fotocamera apre le foto, direttamente da questo telefono."
+      ],
+      "Both send straight to the other device, not through your server.": [
+          "Beide senden direkt an das andere Gerät, nicht über deinen Server.",
+          "Entrambi inviano direttamente all'altro dispositivo, non tramite il tuo server."
+      ],
+      "Send nearby": [
+          "In der Nähe senden",
+          "Invia qui vicino"
+      ],
+      "Scan this with the other device's camera": [
+          "Scanne das mit der Kamera des anderen Geräts",
+          "Scansionalo con la fotocamera dell'altro dispositivo"
+      ],
+      "On the same Wi-Fi: Wedding Anna & Marco": [
+          "Im selben WLAN: Hochzeit Anna & Marco",
+          "Sulla stessa rete Wi-Fi: Matrimonio Anna & Marco"
+      ],
+      "12 photos": [
+          "12 Fotos",
+          "12 foto"
+      ],
+      "84 MB · in full quality": [
+          "84 MB · in voller Qualität",
+          "84 MB · in qualità originale"
+      ],
+      "Only for whoever scans this": [
+          "Nur für den, der das scannt",
+          "Solo per chi lo scansiona"
+      ],
+      "Works until you close this screen": [
+          "Gilt, bis du diese Ansicht schließt",
+          "Vale finché non chiudi questa schermata"
+      ],
+      "Open a hotspot": [
+          "Hotspot öffnen",
+          "Apri un hotspot"
+      ],
+      "With no Wi-Fi in common, the other device joins this phone first.": [
+          "Ohne gemeinsames WLAN verbindet sich das andere Gerät zuerst mit diesem Handy.",
+          "Senza una rete Wi-Fi in comune, l'altro dispositivo si collega prima a questo telefono."
+      ],
+      "Connected directly": [
+          "Direkt verbunden",
+          "Collegato direttamente"
+      ],
+      "of 12": [
+          "von 12",
+          "di 12"
+      ],
+      "A few seconds left": [
+          "Noch wenige Sekunden",
+          "Ancora pochi secondi"
+      ],
+      "49 of 84 MB": [
+          "49 von 84 MB",
+          "49 di 84 MB"
+      ],
+      "Straight over Wi-Fi · not through your server": [
+          "Direkt über WLAN · nicht über deinen Server",
+          "Direttamente via Wi-Fi · non tramite il tuo server"
+      ],
+      "Stop": [
+          "Stoppen",
+          "Interrompi"
+      ],
+      "Show the code": [
+          "Code zeigen",
+          "Mostra il codice"
+      ],
+      "Stefan sends you 12 photos": [
+          "Stefan sendet dir 12 Fotos",
+          "Stefan ti invia 12 foto"
+      ],
+      "Straight from his phone, over this Wi-Fi.": [
+          "Direkt von seinem Handy, über dieses WLAN.",
+          "Direttamente dal suo telefono, tramite questa rete Wi-Fi."
+      ],
+      "directly": [
+          "direkt",
+          "diretto"
+      ],
+      "Save to Photos": [
+          "In Fotos sichern",
+          "Salva in Foto"
+      ],
+      "Nothing is kept on a server. Close this page when you're done.": [
+          "Auf keinem Server bleibt etwas liegen. Schließ diese Seite, wenn du fertig bist.",
+          "Su nessun server resta niente. Chiudi questa pagina quando hai finito."
+      ],
+      "3 of 6 selected": [
+          "3 von 6 ausgewählt",
+          "3 di 6 selezionati"
+      ],
+      "3 selected": [
+          "3 ausgewählt",
+          "3 selezionati"
+      ],
+      "Nearby": [
+          "In der Nähe",
+          "Qui vicino"
+      ],
+      "Download 3": [
+          "3 herunterladen",
+          "Scarica 3"
+      ],
+      "Send 3 files nearby": [
+          "3 Dateien an ein Gerät in der Nähe",
+          "3 file a un dispositivo qui vicino"
+      ],
+      "Scan this with the phone's camera": [
+          "Scanne das mit der Kamera des Handys",
+          "Scansionalo con la fotocamera del telefono"
+      ],
+      "On the same Wi-Fi as this computer": [
+          "Im selben WLAN wie dieser Computer",
+          "Sulla stessa rete Wi-Fi di questo computer"
+      ],
+      "Receiving 2 of 3 · 31 of 45 MB": [
+          "Empfängt 2 von 3 · 31 von 45 MB",
+          "Riceve 2 di 3 · 31 di 45 MB"
+      ],
+      "Waiting for approval": [
+          "Warten auf Freigabe",
+          "In attesa di approvazione"
+      ],
+      "Allow this phone on one of your other phones or browsers. It shows this code there too:": [
+          "Gib dieses Handy auf einem deiner anderen Handys oder Browser frei. Dort steht derselbe Code:",
+          "Approva questo telefono su uno dei tuoi altri telefoni o browser. Lì compare lo stesso codice:"
+      ],
+      "Allow this browser on one of your phones or other browsers. It shows this code there too:": [
+          "Gib diesen Browser auf einem deiner Handys oder anderen Browser frei. Dort steht derselbe Code:",
+          "Approva questo browser su uno dei tuoi telefoni o su un altro browser. Lì compare lo stesso codice:"
+      ],
+      "A new browser wants your keys": [
+          "Ein neuer Browser möchte deine Schlüssel",
+          "Un nuovo browser vuole le tue chiavi"
+      ],
+      "A new phone wants your keys": [
+          "Ein neues Handy möchte deine Schlüssel",
+          "Un nuovo telefono vuole le tue chiavi"
+      ],
+      "Signed in 1 minute ago": [
+          "Vor 1 Minute angemeldet",
+          "Accesso 1 minuto fa"
+      ],
+      "Signed in just now": [
+          "Gerade angemeldet",
+          "Accesso appena fatto"
+      ],
+      "Does it show this code?": [
+          "Zeigt er diesen Code?",
+          "Mostra questo codice?"
+      ],
+      "Another code, or you didn't just sign in? Tap <b>Not me</b>: that browser is signed out and gets nothing.": [
+          "Ein anderer Code, oder du hast dich gerade nicht angemeldet? Tippe auf <b>Nicht ich</b>: Dieser Browser wird abgemeldet und bekommt nichts.",
+          "Un altro codice, o non hai appena fatto l'accesso? Tocca <b>Non sono io</b>: quel browser viene disconnesso e non riceve nulla."
+      ],
+      "Another code, or nobody just signed in? Choose <b>Not me</b>: that phone is signed out and gets nothing.": [
+          "Ein anderer Code, oder niemand hat sich gerade angemeldet? Wähle <b>Nicht ich</b>: Dieses Handy wird abgemeldet und bekommt nichts.",
+          "Un altro codice, o nessuno ha appena fatto l'accesso? Scegli <b>Non sono io</b>: quel telefono viene disconnesso e non riceve nulla."
+      ],
+      "Not me": [
+          "Nicht ich",
+          "Non sono io"
+      ],
+      "Allow": [
+          "Erlauben",
+          "Consenti"
+      ],
+      "Maria waits for her folders": [
+          "Maria wartet auf ihre Ordner",
+          "Maria aspetta le sue cartelle"
+      ],
+      "Her key is new: the old one was lost with her phone. Allow it, and her folders open for it again:": [
+          "Ihr Schlüssel ist neu: Der alte ging mit ihrem Handy verloren. Erlaube ihn, und ihre Ordner öffnen sich wieder dafür:",
+          "La sua chiave è nuova: la vecchia è andata persa con il telefono. Consentila, e le sue cartelle si riaprono per lei:"
+      ],
+      "Ask Maria for the code on her screen": [
+          "Frag Maria nach dem Code auf ihrem Bildschirm",
+          "Chiedi a Maria il codice sul suo schermo"
+      ],
+      "Not now": [
+          "Jetzt nicht",
+          "Non ora"
+      ],
+      "Waiting for an admin": [
+          "Warten auf einen Admin",
+          "In attesa di un admin"
+      ],
+      "Your key is new. An admin opens your folders for it: tell them this code.": [
+          "Dein Schlüssel ist neu. Ein Admin öffnet deine Ordner dafür: Nenne ihm diesen Code.",
+          "La tua chiave è nuova. Un admin riapre le tue cartelle per lei: digli questo codice."
+      ],
+      "Use the recovery code": [
+          "Wiederherstellungscode verwenden",
+          "Usa il codice di recupero"
+      ],
       "EN": [
           "DE",
           "IT"
@@ -3152,14 +4071,14 @@
       ]
   };
   // Names, codes, numbers and file names that stay the same in every language.
-  const KEEP = /^(?:[A-Z0-9]|\d+(?::\d+)?|Stefan|Maria|Peter|maria|Admin|PIN|PDF|DOCX|ZIP|XLSX|•+|\d{8}_\d{6}\.(?:jpg|mp4)|\/srv\/share|(?:https:\/\/)?share\.example\.com(?:\/[a-z\/-]*)?|https:\/\/192\.168\.1\.20:8443|\d+ (?:KB|MB|GB)|@maria|Pixel 8|Chrome · Windows|IMG_\d+\.jpg|image\/jpeg)$/;
+  const KEEP = /^(?:[A-Z0-9]|\d+(?::\d+)?|Stefan|Maria|Peter|maria|Admin|PIN|PDF|DOCX|ZIP|XLSX|•+|\d{8}_\d{6}\.(?:jpg|mp4)|\/srv\/share|(?:https:\/\/)?share\.example\.com(?:\/[a-z\/-]*)?|https:\/\/192\.168\.1\.20:8443|\d+ (?:KB|MB|GB)|@maria|Pixel 8|Chrome · Windows|IMG_\d+\.jpg|image\/jpeg|Quick Share|iPhone · Safari|Android · Chrome|\d+ MB\/s|Anna & Marco)$/;
   const LANGS = ['en', 'de', 'it'];
   const original = new WeakMap();
   function setLang(lang) {
     if (!LANGS.includes(lang)) lang = 'en';
     const k = LANGS.indexOf(lang) - 1;
     const missing = new Set();
-    document.querySelectorAll('.phone, .tablet, .desktop').forEach(ph => {
+    document.querySelectorAll('.phone, .tablet, .desktop, .paper').forEach(ph => {
       ph.querySelectorAll('[data-tr]').forEach(el => {
         if (el.dataset.en == null) el.dataset.en = el.innerHTML;
         const key = el.dataset.en.replace(/\s+/g, ' ').trim();

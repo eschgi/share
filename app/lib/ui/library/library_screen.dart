@@ -9,9 +9,11 @@ import '../../app.dart';
 import '../../data/api.dart';
 import '../../data/folders.dart';
 import '../../data/models.dart';
+import '../../data/platform.dart' show KeysException;
 import '../../l10n/app_localizations.dart';
 import '../admin/delete.dart';
 import '../download_sheet.dart';
+import '../encryption.dart';
 import '../fetch.dart';
 import '../folders.dart';
 import '../format.dart';
@@ -232,15 +234,25 @@ class _LibraryScreenState extends State<LibraryScreen> with WidgetsBindingObserv
   /// the one shown. Files that were all in one folder can go back there.
   Future<void> _move() async {
     final t = AppLocalizations.of(context);
-    final admin = Services.read(context).admin;
+    final services = Services.read(context);
+    final admin = services.admin;
     final files = _c.selectedFiles;
     final ids = [for (final f in files) f.id];
     final from = {for (final f in files) f.folder}.singleOrNull; // where they all are
     final to = await showMoveSheet(context, count: ids.length, list: _folders.list ?? const [], here: from);
     if (to == null || !mounted) return;
     final messenger = ScaffoldMessenger.of(context);
+    String problem(Object e) => switch (e) {
+          ApiException(code: 'not_encrypted') => t.encryptionMoveIntoPlain,
+          KeysException(sealed: true) when to.keyVersion == null => t.encryptionMoveIntoPlain,
+          KeysException(sealed: true) => t.keysCantOpen,
+          _ => t.commonFailed,
+        };
     try {
-      final n = await admin.moveFiles(ids, to.id);
+      // Encrypted files go with their keys, sealed for the folder's newest key.
+      final encrypted = [for (final f in files) if (f.enc != null) f];
+      final keys = encrypted.isEmpty ? const <Json>[] : await services.platform.moveKeys(encrypted, to.id);
+      final n = await admin.moveFiles(ids, to.id, keys: keys);
       _c.clearSelection();
       if (_c.filter.folder != null) {
         _c.remove(ids);
@@ -256,16 +268,23 @@ class _LibraryScreenState extends State<LibraryScreen> with WidgetsBindingObserv
                 label: t.commonUndo,
                 onPressed: () async {
                   try {
-                    await admin.moveFiles(ids, from);
-                  } on Exception {
-                    messenger.showSnackBar(SnackBar(content: Text(t.commonFailed)));
+                    // Back with the keys sealed for where they came from, from those they have now.
+                    final there = [
+                      for (final f in encrypted)
+                        if (keys.where((k) => k['id'] == f.id).firstOrNull case final k?)
+                          FileInfo.fromJson({...f.toJson(), 'folder': to.id, 'enc': {...f.enc!.toJson(), 'version': k['version'], 'key': k['key']}}),
+                    ];
+                    final back = there.isEmpty ? const <Json>[] : await services.platform.moveKeys(there, from);
+                    await admin.moveFiles(ids, from, keys: back);
+                  } on Exception catch (e) {
+                    messenger.showSnackBar(SnackBar(content: Text(problem(e))));
                   }
                   await Future.wait([_c.reload(), _folders.load()]);
                 },
               ),
       ));
-    } on Exception {
-      messenger.showSnackBar(SnackBar(content: Text(t.commonFailed)));
+    } on Exception catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(problem(e))));
     }
   }
 
@@ -293,6 +312,7 @@ class _LibraryScreenState extends State<LibraryScreen> with WidgetsBindingObserv
 
     final slivers = <Widget>[
       if (!_c.selecting) SliverToBoxAdapter(child: _Filters(kind: _c.filter.kind, onKind: _setKind)),
+      if (!_c.selecting) SliverToBoxAdapter(child: KeysBanner(admin: widget.user.isAdmin)),
       if (_c.selecting)
         SliverToBoxAdapter(
           child: Padding(

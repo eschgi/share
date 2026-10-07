@@ -1,11 +1,15 @@
 // Uppy runs headless underneath our own screens: tus for resumable uploads in chunks the
-// server chooses (below Cloudflare's 100 MB request limit), and Golden Retriever to bring the
-// queue back after the page was closed.
+// server chooses (below Cloudflare's 100 MB request limit), or with the files in a bucket our
+// S3 uploader, which sends the parts straight there; and Golden Retriever to bring the queue
+// back after the page was closed.
 import Uppy, { type Body, type Meta, type UppyFile } from '@uppy/core';
 import GoldenRetriever, { type GoldenRetrieverOptions } from '@uppy/golden-retriever';
 import Tus from '@uppy/tus';
 import { errorCode, type Info } from './api';
+import { SendRefused, type FolderPublicKey } from './e2ee/trust';
+import { encOf, encryptingReader, newSeal, parseSeal, remember } from './e2ee/upload';
 import type { Shared } from './inbox';
+import S3Upload, { abortS3Upload } from './s3upload';
 import { dedupeBatches, matchGhosts, unbatched } from './restore';
 import { ThumbQueue } from './thumbs';
 
@@ -47,6 +51,14 @@ export interface UploaderEvents {
   onRestored(): void;
   /** A file shared from another app was sent, or given up: it can leave the inbox. */
   onSharedGone?(key: number): void;
+  /** The key a folder's new files are encrypted for (signed in: the folder said; a PIN: its
+   * own), signed by the root; null while they go plain. Throws SendRefused when nothing may go
+   * into the folder: what the server says about its keys can't be checked. */
+  encryptFor?(folder: string | undefined): Promise<FolderPublicKey | null>;
+  /** Files weren't sent: what the server says about their folder's keys can't be checked. */
+  onRefused?(): void;
+  /** The folder's key changed meanwhile (a new version, or it was encrypted): ask again. */
+  refreshKeys?(): Promise<void>;
   /** Nothing is on its way any more, and some files didn't go. */
   onFailed?(failed: number): void;
   /** Signed in: the folder a file was to go into is gone, or the person doesn't see it any more. */
@@ -54,9 +66,10 @@ export interface UploaderEvents {
 }
 
 /** What a file's upload says about it besides its name and type: the inbox key of a file
- * shared from another app, and the folder it goes into (signed in; a PIN has its own). */
+ * shared from another app, and the folder it goes into (signed in; a PIN has its own). enc
+ * stays empty unless the file goes into an encrypted folder: tus sends every allowed field. */
 export function uploadMeta(shareKey: number | undefined, folder: string | undefined): Meta {
-  const meta: Meta = {};
+  const meta: Meta = { enc: '' };
   if (shareKey !== undefined) meta.shareKey = String(shareKey);
   if (folder !== undefined) meta.folder = folder;
   return meta;
@@ -123,6 +136,10 @@ export class Uploader {
   private readonly folderless = new Set<string>();
   /** A refusal for a gone folder just came in, for the next upload-error. */
   private folderGone = false;
+  /** A refusal because the folder's key changed came in: the file gets a new seal. */
+  private reseal = false;
+  /** How often each file was sealed anew, which ends after a few tries. */
+  private resealed = new Map<string, number>();
   private readonly thumbs = new ThumbQueue();
 
   /** keepQueue: this tab keeps the queue across a closed page (see holdQueueLock). */
@@ -133,28 +150,25 @@ export class Uploader {
       allowMultipleUploadBatches: true,
       restrictions: { maxFileSize: info.max_file_size_bytes > 0 ? info.max_file_size_bytes : null },
     });
-    this.uppy.use(Tus, {
-      endpoint: new URL('/tus/', location.href).href,
-      chunkSize: info.chunk_size_bytes,
-      limit: 3,
-      retryDelays: [0, 1000, 3000, 5000, 10000, 20000, 30000, 60000, 60000, 60000],
-      removeFingerprintOnSuccess: true,
-      allowedMetaFields: ['name', 'type', 'lastModified', 'folder'],
-      onShouldRetry: (err, _attempt, _opts, next) => {
-        const status = err.originalResponse?.getStatus() ?? 0;
-        if (status === 401) {
-          this.endSession(errorCode(err.originalResponse?.getBody()) !== 'session_ended');
-          return false;
-        }
-        if (status === 404 && errorCode(err.originalResponse?.getBody()) === 'folder_gone') {
-          this.folderGone = true;
-          return false;
-        }
-        // Full drive, too large, too many: retrying won't help.
-        if (status === 403 || status === 413) return false;
-        return next(err);
-      },
-    });
+    const retryDelays = [0, 1000, 3000, 5000, 10000, 20000, 30000, 60000, 60000, 60000];
+    if (info.storage === 's3') {
+      this.uppy.use(S3Upload, { limit: 3, retryDelays, refused: (status, code) => this.refused(status, code) });
+    } else {
+      this.uppy.use(Tus, {
+        endpoint: new URL('/tus/', location.href).href,
+        chunkSize: info.chunk_size_bytes,
+        limit: 3,
+        retryDelays,
+        removeFingerprintOnSuccess: true,
+        allowedMetaFields: ['name', 'type', 'lastModified', 'folder', 'enc'],
+        // The encrypted stream for files into an encrypted folder (e2ee/upload.ts).
+        fileReader: encryptingReader,
+        onShouldRetry: (err, _attempt, _opts, next) => {
+          const status = err.originalResponse?.getStatus() ?? 0;
+          return this.refused(status, errorCode(err.originalResponse?.getBody())) ? false : next(err);
+        },
+      });
+    }
 
     this.restoring = keepQueue;
     if (keepQueue) {
@@ -177,6 +191,41 @@ export class Uploader {
       });
       if (serviceWorker) this.keepServiceWorkerAwake();
     }
+
+    // Into an encrypted folder, each file gets its key just before its upload starts, and keeps
+    // it across tries and a closed page. A file whose folder's keys can't be checked fails here,
+    // and leaves the batch; trying it again checks again.
+    this.uppy.addPreProcessor(async (ids, uploadID) => {
+      const refused: string[] = [];
+      for (const id of ids) {
+        const f = this.uppy.getFile(id);
+        if (!f || !(f.data instanceof Blob)) continue;
+        let seal = parseSeal(f.meta.e2ee);
+        if (!seal) {
+          let target: FolderPublicKey | null = null;
+          try {
+            target = (await events.encryptFor?.(typeof f.meta.folder === 'string' ? f.meta.folder : undefined)) ?? null;
+          } catch (e) {
+            if (!(e instanceof SendRefused)) throw e;
+            refused.push(id);
+            continue;
+          }
+          if (!target) continue;
+          seal = await newSeal(target, f.data.size, String(f.meta.lastModified ?? ''));
+          this.uppy.setFileMeta(id, { e2ee: JSON.stringify(seal), enc: JSON.stringify(encOf(seal)) });
+        }
+        remember(f.data, seal);
+      }
+      if (refused.length === 0) return;
+      const { currentUploads } = this.uppy.getState();
+      const upload = currentUploads[uploadID];
+      if (upload) this.uppy.setState({ currentUploads: { ...currentUploads, [uploadID]: { ...upload, fileIDs: upload.fileIDs.filter((id) => !refused.includes(id)) } } });
+      for (const id of refused) {
+        const f = this.uppy.getFile(id);
+        if (f) this.uppy.emit('upload-error', f, new Error("the folder's keys can't be checked"));
+      }
+      events.onRefused?.();
+    });
 
     this.uppy.on('file-added', (file) => {
       this.doneReported = false;
@@ -209,6 +258,17 @@ export class Uploader {
         this.folderless.add(file.id);
         events.onFolderGone?.();
       }
+      const tries = file ? (this.resealed.get(file.id) ?? 0) : 0;
+      if (this.reseal && file && tries < 3) {
+        // Sealed for an older key, or plain into a folder now encrypted: a new seal, a new upload.
+        this.reseal = false;
+        this.resealed.set(file.id, tries + 1);
+        this.uppy.setFileMeta(file.id, { e2ee: undefined, enc: '' });
+        this.uppy.setFileState(file.id, { s3: undefined, tus: undefined });
+        void (events.refreshKeys?.() ?? Promise.resolve()).then(() => this.uppy.retryUpload(file.id).catch(() => {}));
+        return;
+      }
+      this.reseal = false;
       this.checkFailed();
     });
   }
@@ -229,10 +289,24 @@ export class Uploader {
       return;
     }
     const ghosts = this.uppy.getFiles().filter((f) => f.isGhost);
-    const { matched, rest } = matchGhosts(
+    const { matched: found, rest } = matchGhosts(
       ghosts.map((g) => ({ id: g.id, name: g.name ?? '', size: g.size ?? 0, type: g.type ?? '' })),
       files,
     );
+    // An encrypted upload goes on only with the very file it began with: with the same key, a
+    // changed file would spoil both. One changed since starts over.
+    const matched: typeof found = [];
+    for (const [id, file] of found) {
+      const seal = parseSeal(this.uppy.getFile(id)?.meta.e2ee);
+      if (seal && seal.lastModified !== String(file.lastModified)) {
+        const ghost = this.uppy.getFile(id);
+        if (ghost) this.terminate(ghost);
+        this.uppy.removeFile(id);
+        rest.push(file);
+      } else {
+        matched.push([id, file]);
+      }
+    }
     for (const [id, file] of matched) {
       this.uppy.setFileState(id, { data: file, isGhost: false, error: null });
       this.markShared(id, file);
@@ -306,7 +380,10 @@ export class Uploader {
   retryFailed(folder?: string): void {
     for (const f of this.uppy.getFiles()) {
       if (!f.error || f.isGhost) continue;
-      if (this.folderless.delete(f.id) && folder !== undefined) this.uppy.setFileMeta(f.id, { folder });
+      if (this.folderless.delete(f.id) && folder !== undefined) {
+        this.uppy.setFileMeta(f.id, { folder });
+        this.uppy.setFileState(f.id, { s3: undefined }); // a bucket's upload belongs to its folder
+      }
       this.uppy.retryUpload(f.id).catch(() => {});
     }
   }
@@ -366,11 +443,35 @@ export class Uploader {
 
   /** Removes an unfinished upload from the server. */
   private terminate(f: UppyFile<Meta, Body>): void {
+    if (f.progress.uploadComplete) return;
+    if (f.s3) {
+      abortS3Upload(f.s3.id);
+      return;
+    }
     const url = f.tus?.uploadUrl;
-    if (!url || f.progress.uploadComplete) return;
+    if (!url) return;
     fetch(url, { method: 'DELETE', headers: { 'Tus-Resumable': '1.0.0' }, credentials: 'same-origin', keepalive: true }).catch(
       () => {},
     );
+  }
+
+  /** An answer that ends a file, over tus or into the bucket: true when trying again won't
+   * help. A 401 ends the session for every file; a gone folder asks for another one. */
+  private refused(status: number, code: string | undefined): boolean {
+    if (status === 401) {
+      this.endSession(code !== 'session_ended');
+      return true;
+    }
+    if (status === 404 && code === 'folder_gone') {
+      this.folderGone = true;
+      return true;
+    }
+    if (status === 409 && (code === 'key_outdated' || code === 'encryption_required' || code === 'not_encrypted')) {
+      this.reseal = true;
+      return true;
+    }
+    // Full drive, too large, too many: retrying won't help.
+    return status === 403 || status === 413;
   }
 
   /**
@@ -389,7 +490,7 @@ export class Uploader {
   private thumbnail(file: UppyFile<Meta, Body>, uploadURL: string | undefined): void {
     const kind = kindOf(file.name ?? '', file.type ?? '');
     const id = uploadURL?.split('/').pop();
-    if ((kind === 'photo' || kind === 'video') && id && file.data instanceof Blob) this.thumbs.add(id, file.data, kind);
+    if ((kind === 'photo' || kind === 'video') && id && file.data instanceof Blob) this.thumbs.add(id, file.data, kind, parseSeal(file.meta.e2ee));
   }
 
   private endSession(lost: boolean): void {

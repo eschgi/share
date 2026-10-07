@@ -25,7 +25,9 @@ import (
 	"github.com/eschgi/share/server/internal/auth"
 	"github.com/eschgi/share/server/internal/config"
 	"github.com/eschgi/share/server/internal/db"
+	"github.com/eschgi/share/server/internal/db/pgtest"
 	"github.com/eschgi/share/server/internal/ids"
+	"github.com/eschgi/share/server/internal/s3/s3test"
 	"github.com/eschgi/share/server/internal/storage"
 	"github.com/eschgi/share/server/internal/upload"
 )
@@ -47,6 +49,8 @@ type env struct {
 	cfg    *config.Config
 	free   atomic.Int64
 	report atomic.Pointer[storage.Report] // what the storage page finds; nothing when nil
+	fake   *s3test.Server                 // the bucket of an S3 env, unless it is a real one
+	part   int64                          // the parts' size in an S3 env
 }
 
 func newEnv(t *testing.T) *env { return newEnvWith(t, "") }
@@ -60,8 +64,8 @@ func newEnvWith(t *testing.T, settings string) *env {
 		settings = ", " + settings
 	}
 	cfg, err := config.Parse([]byte(fmt.Sprintf(
-		`{"public_url": "https://share.example.test", "storage_dir": %q, "time_zone": "Europe/Rome", "http": {"listen": "127.0.0.1:0"}%s}`,
-		storageDir, settings)))
+		`{"public_url": "https://share.example.test", "storage_dir": %q, "time_zone": "Europe/Rome", "http": {"listen": "127.0.0.1:0"}%s%s}`,
+		storageDir, testDatabase(t), settings)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +76,7 @@ func newEnvWith(t *testing.T, settings string) *env {
 	e.free.Store(1 << 40)
 	upCfg := upload.DefaultConfig()
 	upCfg.FreeSpace = func() (int64, error) { return e.free.Load(), nil }
-	checkStorage := func() storage.Report {
+	checkStorage := func(context.Context) storage.Report {
 		if r := e.report.Load(); r != nil {
 			return *r
 		}
@@ -89,6 +93,13 @@ func newEnvWith(t *testing.T, settings string) *env {
 		a.Close()
 	})
 	return e
+}
+
+// testDatabase is the "database" setting of a test's configuration: a schema of its own on the
+// PostgreSQL server in SHARE_TEST_POSTGRES.
+func testDatabase(t *testing.T) string {
+	quoted, _ := json.Marshal(pgtest.URL(t))
+	return `, "database": {"postgres": ` + string(quoted) + `}`
 }
 
 // newPin makes a PIN of the given kind through the auth service, like `share pin create`.
@@ -325,7 +336,7 @@ func TestUploadInChunksLandsInTheDayFolder(t *testing.T) {
 	data := randomBytes(t, size)
 
 	loc := c.mustCreate("Holiday video.mp4", len(data))
-	if !strings.HasPrefix(loc, "/tus/") || len(idOf(loc)) != 26 {
+	if !strings.HasPrefix(loc, "/tus/") || !ids.Valid(idOf(loc)) {
 		t.Fatalf("Location %q is not a relative upload path", loc)
 	}
 	last := c.send(loc, data, 0, chunk)
@@ -583,8 +594,8 @@ func TestInfoMatchesContract(t *testing.T) {
 	}
 	got := r.json(t)
 	assertShape(t, "info", readFixture(t, "api/info.json")["response"], got)
-	if got["api_version"].(float64) != 2 {
-		t.Errorf("api_version = %v, want 2: every upload, PIN and invite names its folders", got["api_version"])
+	if got["api_version"].(float64) != 3 || got["storage"] != "disk" {
+		t.Errorf("api_version = %v, storage %v; want 3 and disk: files may be in a bucket", got["api_version"], got["storage"])
 	}
 	if got["chunk_size_bytes"].(float64) != 20<<20 {
 		t.Errorf("chunk_size_bytes = %v", got["chunk_size_bytes"])
@@ -631,6 +642,59 @@ func TestServeShutsDownGracefully(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("Serve didn't stop")
+	}
+}
+
+// A server that only ever lives for minutes, as on Cloud Run, still empties the trash: the
+// start does the housekeeping that is due.
+func TestStartDoesTheHousekeepingThatIsDue(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	admin := e.admin()
+	id := tus{e, admin.token}.sendFile("IMG_1.jpg", jpegBytes(t, 32, 24, 1))
+	if r := e.sendJSON("POST", "/api/files/delete", admin.token, map[string]any{"ids": []string{id}}); r.status != http.StatusOK {
+		t.Fatalf("delete: %d %s", r.status, r.body)
+	}
+	if err := e.app.DB.SetJobRun(ctx, "empty the trash", e.clock.Now()); err != nil {
+		t.Fatal(err)
+	}
+	e.clock.Add(31 * 24 * time.Hour)
+
+	ranNow := func(job string) bool {
+		at, err := e.app.DB.JobRun(ctx, job)
+		return err == nil && at.Equal(e.clock.Now())
+	}
+	// serveUntil starts the server and stops it once job ran now, the last one the start must do:
+	// a start runs what is due first, in order, and stopping earlier would cut that short.
+	serveUntil := func(job string) {
+		t.Helper()
+		ctx, cancel := context.WithCancel(ctx)
+		done := make(chan error, 1)
+		go func() { done <- e.app.Serve(ctx) }()
+		for start := time.Now(); !ranNow(job) && time.Since(start) < 20*time.Second; {
+			time.Sleep(10 * time.Millisecond)
+		}
+		cancel()
+		if err := <-done; err != nil {
+			t.Fatalf("Serve: %v", err)
+		}
+	}
+	serveUntil("empty the trash")
+	if _, err := e.app.DB.FileByID(ctx, id); !errors.Is(err, db.ErrNotFound) {
+		t.Errorf("a file deleted 31 days ago is still there: %v", err)
+	}
+	for _, job := range []string{"reconcile uploads", "expire PINs and sessions", "empty the trash"} {
+		if at, err := e.app.DB.JobRun(ctx, job); err != nil || !at.Equal(e.clock.Now()) {
+			t.Errorf("%s last ran at %v, %v", job, at, err)
+		}
+	}
+	e.clock.Add(time.Minute)
+	serveUntil("reconcile uploads")
+	if ranNow("empty the trash") {
+		t.Error("the trash was emptied again a minute later")
+	}
+	if !ranNow("reconcile uploads") {
+		t.Error("the repairs didn't run at the second start")
 	}
 }
 

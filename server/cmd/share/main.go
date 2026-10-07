@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"flag"
 	"fmt"
@@ -18,18 +19,22 @@ import (
 	"github.com/eschgi/share/server/internal/auth"
 	"github.com/eschgi/share/server/internal/config"
 	"github.com/eschgi/share/server/internal/db"
+	"github.com/eschgi/share/server/internal/e2ee"
 	"github.com/eschgi/share/server/internal/storage"
 )
 
-// version is set at build time: -ldflags "-X main.version=…".
+// version is Share's, set at build time (-ldflags "-X main.version=…") as scripts/version.sh
+// gives it: 0.1.0 for a release, else e.g. 0.1.0-dev+abc1234.
 var version = "dev"
 
 const usage = `Share — a self-hosted file drop.
 
 Usage:
-  share serve                 run the server
-  share init                  create the storage folder layout (once, with the drive mounted)
-  share check                 check config, folders and drives
+  share serve                 run the server; a new storage folder is set up first, on the
+                              page whose link it logs
+  share init                  create the storage folder layout (once, with the drive mounted);
+                              with the files in a bucket ("s3"), only the data folder
+  share check                 check config, folders and drives, or the bucket and its CORS rules
   share health                check that the running server answers, e.g. for a container
   share folders               list the folders, with what they hold and who sees them
   share pin create --permanent|--day [--folder NAME] [--show]
@@ -143,7 +148,22 @@ func serve(args []string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	log.Printf("share %s starting", version)
-	a, err := app.New(ctx, cfg, app.Options{WaitForStorage: true, Version: version})
+	setup := app.NewSetup(time.Now())
+	if app.NeedsSetup(cfg) {
+		// A new storage folder, or a drive that isn't mounted yet: the website's setup page
+		// shows which, and sets the folder up, as `share init` does.
+		log.Printf("share: the storage folder %s isn't set up yet: open %s to set it up; from outside the home network within %d minutes of this start, or later with this link:",
+			cfg.StorageDir, setup.Page(cfg), int(app.SetupWindow/time.Minute))
+		log.Printf("share:   %s", setup.Link(cfg))
+		log.Printf("share: or run `share init`, or mount the drive that has it")
+		if err := app.RunSetup(ctx, cfg, setup); err != nil {
+			if ctx.Err() != nil {
+				return nil // stopped before anyone set it up
+			}
+			return err
+		}
+	}
+	a, err := app.New(ctx, cfg, app.Options{WaitForStorage: true, Version: version, Setup: setup})
 	if err != nil {
 		return err
 	}
@@ -159,6 +179,9 @@ func initStorage(args []string) error {
 	cfg, err := f.load()
 	if err != nil {
 		return err
+	}
+	if cfg.S3 != nil {
+		return initS3(cfg)
 	}
 	layout := storage.Layout{StorageDir: cfg.StorageDir, DataDir: cfg.DataDir}
 	if err := storage.Init(layout); err != nil {
@@ -179,7 +202,16 @@ func check(args []string) error {
 	}
 	fmt.Printf("Config %s is valid. Public address: %s\n", *f.config, cfg.PublicURL)
 	fmt.Println(proxyLine(cfg))
-	return printReport(storage.Check(storage.Layout{StorageDir: cfg.StorageDir, DataDir: cfg.DataDir}, cfg.MinFreeSpace()))
+	dbErr := checkDatabase(cfg)
+	if cfg.S3 != nil {
+		err = checkS3(cfg)
+	} else {
+		err = printReport(storage.Check(storage.Layout{StorageDir: cfg.StorageDir, DataDir: cfg.DataDir}, cfg.MinFreeSpace()))
+	}
+	if err == nil {
+		err = dbErr
+	}
+	return err
 }
 
 func printReport(r storage.Report) error {
@@ -246,12 +278,20 @@ func pin(args []string) error {
 		if err != nil {
 			return err
 		}
+		if *show {
+			f, err := d.FoldersByID(ctx, into)
+			if err != nil {
+				return err
+			}
+			if err := noEncrypted(f, "PIN that shows its folder"); err != nil {
+				return err
+			}
+		}
 		p, err := svc.CreatePin(ctx, auth.PinSpec{Kind: kind, FolderID: into[0], ShowsFolder: *show}, "cli")
 		if err != nil {
 			return err
 		}
-		printPin(cfg, p)
-		return nil
+		return printPin(ctx, cfg, d, p)
 	case "list":
 		pins, err := d.Pins(ctx)
 		if err != nil {
@@ -297,19 +337,38 @@ func pin(args []string) error {
 			return err
 		}
 		fmt.Printf("PIN %s has ended. Its replacement:\n", p.Code)
-		printPin(cfg, fresh)
-		return nil
+		return printPin(ctx, cfg, d, fresh)
 	}
 	return fmt.Errorf("unknown pin command %q", sub)
 }
 
-func printPin(cfg *config.Config, p db.Pin) {
+func printPin(ctx context.Context, cfg *config.Config, d *db.DB, p db.Pin) error {
 	fmt.Printf("PIN:   %s\n", p.Code)
-	fmt.Printf("Link:  %s/#%s\n", strings.TrimSuffix(cfg.PublicURL, "/"), p.Code)
+	link := strings.TrimSuffix(cfg.PublicURL, "/") + "/#" + p.Code
+	switch f, err := d.FolderByID(ctx, p.FolderID); {
+	case err != nil:
+		return err
+	case p.Secret != nil:
+		// Its folder is encrypted: the whole link carries a secret that only a key of the folder
+		// opens, which the command line hasn't got. The code alone sends, and shows locked files.
+		link = "in the app or on the website, with the secret that opens the encrypted folder; the code alone only sends"
+	case f.KeyVersion > 0:
+		// Into a folder with keys, the link names the recovery key, which guests' browsers check
+		// the folder's key against (docs/e2ee-plan.md). The command line takes it from the database.
+		root, _, err := d.RecoveryKey(ctx)
+		if err != nil {
+			return err
+		}
+		if root != nil {
+			link += "." + base64.RawURLEncoding.EncodeToString(e2ee.Fingerprint(root))
+		}
+	}
+	fmt.Printf("Link:  %s\n", link)
 	fmt.Printf("Works: %s\n", status(cfg, p))
 	if p.ShowsFolder {
 		fmt.Println("Guests with it also see and download what is in its folder.")
 	}
+	return nil
 }
 
 func status(cfg *config.Config, p db.Pin) string {

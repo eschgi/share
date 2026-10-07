@@ -1,5 +1,5 @@
 {
-  "description": "The paths the server answers with the website's single page (index.html), which routes them itself. Each of library, send and settings may have up to three more segments of letters, digits, dots, dashes and underscores, starting with a letter or digit; sign-in has none. Any other path that isn't a file is 404. /join stays its own page.",
+  "description": "The paths the server answers with the website's single page (index.html), which routes them itself. Each of library, send and settings may have up to three more segments of letters, digits, dots, dashes and underscores, starting with a letter or digit; sign-in has none. Any other path that isn't a file is 404. /join and /setup are pages of their own: /setup sets Share up while nobody has an account, the storage folder on a drive and then the first admin.",
   "pages": ["/", "/sign-in", "/library", "/send", "/settings"],
   "with_sub_pages": ["/library", "/send", "/settings"],
   "max_sub_segments": 3,

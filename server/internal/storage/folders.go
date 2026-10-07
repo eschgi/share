@@ -25,6 +25,9 @@ func EnsureFirstFolder(ctx context.Context, d *db.DB, storageDir, name string, n
 		name = "Share"
 	}
 	dir, err := freeDir(ctx, d, name, func(dir string) bool {
+		if storageDir == "" {
+			return false // in a bucket
+		}
 		_, err := os.Lstat(filepath.Join(storageDir, dir))
 		return err == nil
 	})
@@ -94,7 +97,11 @@ func (lib *Library) relocate(ctx context.Context) error {
 }
 
 // relocateFolder moves what lies under from into dir, and reports whether nothing is left.
+// In a bucket nothing lies anywhere: it is done at once.
 func (lib *Library) relocateFolder(dir, from string) (bool, error) {
+	if lib.root == nil {
+		return true, nil
+	}
 	if from != "" {
 		return lib.merge(from, dir)
 	}
@@ -191,10 +198,22 @@ func cleanFolderName(name string) (string, error) {
 	return name, nil
 }
 
+// NewFolder is a folder to make: its id (a new one when ""), its name, who makes it, and, once
+// there is a root, what the root signed for it (db.InsertFolder): its key's first version, for
+// an encrypted folder, or its plain statement, for the name as it is cleaned.
+type NewFolder struct {
+	ID             string
+	Name           string
+	By             string
+	Key            *db.NewFolderKey
+	PlainSignature []byte
+}
+
 // CreateFolder makes a new folder and its directory. Nobody but the admins sees it until
-// they are given it. It returns ErrBadFolderName, or db.ErrConflict if a folder has the name.
-func (lib *Library) CreateFolder(ctx context.Context, name, by string) (db.Folder, error) {
-	name, err := cleanFolderName(name)
+// they are given it. It returns ErrBadFolderName, or db.ErrConflict if a folder has the name or
+// the id, and db.InsertFolder's errors about the root's signature.
+func (lib *Library) CreateFolder(ctx context.Context, nf NewFolder) (db.Folder, error) {
+	name, err := cleanFolderName(nf.Name)
 	if err != nil {
 		return db.Folder{}, err
 	}
@@ -204,22 +223,32 @@ func (lib *Library) CreateFolder(ctx context.Context, name, by string) (db.Folde
 	if err != nil {
 		return db.Folder{}, err
 	}
-	f := db.Folder{ID: ids.New(), Name: name, Dir: dir, CreatedBy: by, CreatedAt: lib.Now()}
-	if err := lib.DB.InsertFolder(ctx, f); err != nil {
+	if nf.ID == "" {
+		nf.ID = ids.New()
+	}
+	f := db.Folder{ID: nf.ID, Name: name, Dir: dir, CreatedBy: nf.By, CreatedAt: lib.Now(), PlainSignature: nf.PlainSignature}
+	if err := lib.DB.InsertFolder(ctx, f, nf.Key); err != nil {
 		return db.Folder{}, err
 	}
-	if err := lib.root.MkdirAll(dir, 0o755); err != nil {
-		lib.Logf("storage: making the directory %q: %v", dir, err) // the first file makes it too
+	if nf.Key != nil {
+		f.Encrypted, f.KeyVersion = true, nf.Key.Version
+	}
+	if lib.root != nil {
+		if err := lib.root.MkdirAll(dir, 0o755); err != nil {
+			lib.Logf("storage: making the directory %q: %v", dir, err) // the first file makes it too
+		}
 	}
 	return f, nil
 }
 
 // RenameFolder gives a folder a new name, and its directory the same. The files move with
 // the directory in one rename; where that fails (on Windows, while a file in it is open),
-// Reconcile finishes it later, and files are read from wherever they are meanwhile. It
-// returns ErrBadFolderName, db.ErrNotFound, db.ErrConflict for a name that is taken, and
-// db.ErrBusy while the files of an earlier rename are still being moved.
-func (lib *Library) RenameFolder(ctx context.Context, id, name string) (db.Folder, error) {
+// Reconcile finishes it later, and files are read from wherever they are meanwhile. A folder
+// that sends plain needs the root's plain statement for the new name as it is cleaned, once
+// there is a root. It returns ErrBadFolderName, db.ErrNotFound, db.ErrConflict for a name that
+// is taken, db.ErrBusy while the files of an earlier rename are still being moved, and
+// db.ErrBadSignature.
+func (lib *Library) RenameFolder(ctx context.Context, id, name string, plain []byte) (db.Folder, error) {
 	name, err := cleanFolderName(name)
 	if err != nil {
 		return db.Folder{}, err
@@ -241,7 +270,7 @@ func (lib *Library) RenameFolder(ctx context.Context, id, name string) (db.Folde
 			return db.Folder{}, err
 		}
 	}
-	renamed, err := lib.DB.RenameFolder(ctx, id, name, dir)
+	renamed, err := lib.DB.RenameFolder(ctx, id, name, dir, plain)
 	if err != nil || renamed.RenamingFrom == nil {
 		return renamed, err
 	}
@@ -275,7 +304,8 @@ func (lib *Library) DeleteFolder(ctx context.Context, id, by string) ([]db.File,
 	}
 	for _, f := range receiving {
 		if f.FolderID == id {
-			if err := lib.Terminate(ctx, f.ID); err != nil {
+			// Not cut short when the request ends: in a bucket each one is a call.
+			if err := lib.Terminate(context.WithoutCancel(ctx), f.ID); err != nil && !errors.Is(err, ErrFinished) {
 				lib.Logf("storage: dropping %s: %v", f.ID, err)
 			}
 		}
@@ -334,6 +364,9 @@ func (lib *Library) dropEmptyFolders(ctx context.Context) error {
 
 // removeEmptyDirs removes a folder's directory if only empty day folders are left in it.
 func (lib *Library) removeEmptyDirs(dir string) {
+	if lib.root == nil {
+		return
+	}
 	entries, err := fs.ReadDir(lib.root.FS(), dir)
 	if err != nil {
 		return
@@ -358,7 +391,11 @@ func ptrOr(p *string, or string) string {
 // them changes with the folder. The database changes first and the bytes follow; Reconcile
 // finishes what a crash cut short. It returns the files it moved; db.ErrNotFound for no such
 // folder.
-func (lib *Library) MoveFiles(ctx context.Context, fileIDs []string, folderID string) ([]db.File, error) {
+//
+// An encrypted file needs its file key sealed for the target folder's newest key: keys has
+// them by file id. ErrNotEncrypted if the folder never had a key, ErrKeysNeeded if one is
+// missing or sealed for another version.
+func (lib *Library) MoveFiles(ctx context.Context, fileIDs []string, folderID string, keys map[string]db.Enc) ([]db.File, error) {
 	lib.mu.Lock()
 	defer lib.mu.Unlock()
 	to, err := lib.DB.FolderByID(ctx, folderID)
@@ -380,6 +417,17 @@ func (lib *Library) MoveFiles(ctx context.Context, fileIDs []string, folderID st
 		if f.FolderID == to.ID {
 			continue
 		}
+		var enc *db.Enc
+		if f.Enc != nil {
+			k, ok := keys[f.ID]
+			switch {
+			case to.KeyVersion == 0:
+				return nil, ErrNotEncrypted
+			case !ok || k.Version != to.KeyVersion:
+				return nil, ErrKeysNeeded
+			}
+			enc = &k
+		}
 		src, err := lib.locate(ctx, f)
 		if err != nil {
 			return nil, err
@@ -389,7 +437,7 @@ func (lib *Library) MoveFiles(ctx context.Context, fileIDs []string, folderID st
 			return nil, err
 		}
 		claimed[strings.ToLower(rel)] = true
-		moves = append(moves, db.Move{ID: f.ID, FolderID: to.ID, RelPath: rel, From: f.FolderID + "/" + f.RelPath})
+		moves = append(moves, db.Move{ID: f.ID, FolderID: to.ID, RelPath: rel, From: f.FolderID + "/" + f.RelPath, Enc: enc})
 		from = append(from, src)
 		f.FolderID, f.RelPath, f.MovedFrom = to.ID, rel, f.FolderID+"/"+f.RelPath
 		moved = append(moved, f)
@@ -403,6 +451,10 @@ func (lib *Library) MoveFiles(ctx context.Context, fileIDs []string, folderID st
 	var done []string
 	dirs := map[string]bool{}
 	for i, f := range moved {
+		if lib.root == nil {
+			done = append(done, f.ID) // in a bucket the row was all there was to move
+			continue
+		}
 		dst := inFolder(to, f.RelPath)
 		if err := lib.root.MkdirAll(path.Dir(dst), 0o755); err != nil {
 			lib.Logf("storage: moving %s: %v", f.ID, err) // the reconciler tries again

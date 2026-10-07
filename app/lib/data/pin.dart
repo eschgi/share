@@ -82,8 +82,11 @@ class PinRepository {
 
   /// Unlocks sending with [code]. The unfinished uploads of an earlier PIN move to this one on
   /// the server, so they go on. Throws ApiException pin_wrong (attemptsLeft), pin_ended,
-  /// pin_locked (retryAfter) or pin_format.
-  Future<void> unlock(Uri server, String code) async {
+  /// pin_locked (retryAfter) or pin_format. The [secret] of a PIN link that shows an encrypted
+  /// folder opens it here, and with the [root]'s fingerprint of a PIN that only sends into a
+  /// folder with keys, both name the root its uploads check the folder's key with
+  /// (docs/e2ee-plan.md); a typed code has neither.
+  Future<void> unlock(Uri server, String code, {String? secret, String? root}) async {
     final old = await platform.readSecret(_tokenKey);
     final res = await api.postTo(server, '/api/pin/unlock', {'code': code, 'client': 'app'}, bearer: old);
     final info = PinSession.fromJson({...(res['session'] as Map? ?? const {}).cast<String, dynamic>(), 'server': server.toString()});
@@ -92,6 +95,11 @@ class PinRepository {
     await platform.writeSecret(_sessionKey, jsonEncode(info.toJson()));
     await platform.savePinServer(config);
     _set(info);
+    try {
+      await platform.pinLink(secret: secret, root: root);
+    } on KeysException {
+      // its files show locked; opening the link again tries once more
+    }
     await platform.resumeUploads(SendAuth.pin);
   }
 
@@ -122,6 +130,11 @@ class PinRepository {
     await platform.writeSecret(_tokenKey, null);
     await platform.writeSecret(_sessionKey, null);
     await platform.savePinServer(null);
+    try {
+      await platform.forgetPinKeys();
+    } on KeysException {
+      // nothing to forget
+    }
     _set(null);
   }
 }

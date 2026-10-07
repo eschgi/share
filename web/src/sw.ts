@@ -4,6 +4,8 @@
 // site (and an installed app) opens even without a connection and shows what is waiting, and
 // takes files shared from other apps. Uploads and the API always go straight to the network.
 import '@uppy/golden-retriever/lib/ServiceWorker.js';
+import { chunkSize, cipherRange, ContentCipher, decryptStream } from './e2ee/content';
+import { byteRange, parseRange, type StreamOrder } from './e2ee/stream';
 import { stash } from './inbox';
 import { isAppPath, shareTarget } from './paths';
 
@@ -26,7 +28,9 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   if (req.method !== 'GET') return;
-  if (req.mode === 'navigate' && isAppPath(url.pathname)) {
+  if (url.pathname.startsWith('/e2ee/')) {
+    event.respondWith(decrypted(req, url));
+  } else if (req.mode === 'navigate' && isAppPath(url.pathname)) {
     event.respondWith(page(req));
   } else if (url.pathname.startsWith('/assets/')) {
     event.respondWith(asset(req));
@@ -34,6 +38,78 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(fresh(req));
   }
 });
+
+// Encrypted files (docs/e2ee-plan.md): a page tells the worker a file's key and where its bytes
+// are, under a random token (e2ee/files.ts), and GET /e2ee/<token>/<name> gives the file
+// decrypted while it streams, with ranges, so a video seeks and a download resumes. The worker
+// keeps that for 12 hours at most, and forgets it when it stops.
+const streams = new Map<string, StreamOrder & { at: number }>();
+const streamLife = 12 * 3600_000;
+/** Responses still streaming; the page keeps the worker awake while there are any. */
+let open = 0;
+
+self.addEventListener('message', (event) => {
+  const o = event.data as StreamOrder | { type: 'e2ee-ping' } | null;
+  if (o?.type === 'e2ee-ping') return event.ports[0]?.postMessage(open);
+  if (o?.type !== 'e2ee-stream') return;
+  for (const [token, s] of streams) if (Date.now() - s.at > streamLife) streams.delete(token);
+  streams.set(o.token, { ...o, at: Date.now() });
+  event.ports[0]?.postMessage('ok');
+});
+
+/** body, counted in open until it ends or the reader stops. */
+function counted(body: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
+  const reader = body.getReader();
+  let counting = true;
+  const end = () => {
+    if (counting) open--;
+    counting = false;
+  };
+  open++;
+  return new ReadableStream({
+    async pull(c) {
+      try {
+        const r = await reader.read();
+        if (r.done) {
+          end();
+          c.close();
+        } else c.enqueue(r.value);
+      } catch (e) {
+        end();
+        c.error(e);
+      }
+    },
+    cancel(reason) {
+      end();
+      return reader.cancel(reason);
+    },
+  });
+}
+
+async function decrypted(req: Request, url: URL): Promise<Response> {
+  const s = streams.get(url.pathname.split('/')[2]);
+  if (!s) return new Response('This link only works in the tab that made it.', { status: 404 });
+  const range = parseRange(req.headers.get('Range'), s.size);
+  if (range === 'unsatisfiable') return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${s.size}` } });
+  const { start, end } = range ?? { start: 0, end: s.size };
+  const cipher = await ContentCipher.create(s.key, s.header, s.size);
+  const r = cipherRange(s.size, start, end);
+  const last = Math.max(r.first, Math.floor((Math.max(end, 1) - 1) / chunkSize));
+  const res = await fetch(s.src, { headers: { Range: `bytes=${r.from}-${r.to - 1}` }, credentials: 'same-origin' });
+  if ((res.status !== 200 && res.status !== 206) || !res.body) return new Response(null, { status: res.status === 404 ? 404 : 502 });
+  let body: ReadableStream<Uint8Array> = res.body;
+  if (res.status === 200) body = body.pipeThrough(byteRange(r.from, r.to - r.from)); // the range was ignored
+  const headers: Record<string, string> = {
+    'Content-Type': s.mime || 'application/octet-stream',
+    'Content-Length': String(end - start),
+    'Accept-Ranges': 'bytes',
+    'Cache-Control': 'no-store',
+  };
+  if (s.attachment) headers['Content-Disposition'] = `attachment; filename*=UTF-8''${encodeURIComponent(s.name)}`;
+  if (range) headers['Content-Range'] = `bytes ${start}-${end - 1}/${s.size}`;
+  const plain = body.pipeThrough(decryptStream(cipher, r.first, last + 1)).pipeThrough(byteRange(r.skip, end - start));
+  return new Response(counted(plain), { status: range ? 206 : 200, headers });
+}
 
 // A tap on a notification (notify.ts) brings the page back, or opens it.
 self.addEventListener('notificationclick', (event) => {

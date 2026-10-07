@@ -63,7 +63,7 @@ func (e *env) newFolder(name string) db.Folder {
 	e.t.Helper()
 	e.clock.Add(time.Second)
 	f := db.Folder{ID: ids.New(), Name: name, Dir: name, CreatedBy: "test", CreatedAt: e.clock.Now()}
-	if err := e.app.DB.InsertFolder(context.Background(), f); err != nil {
+	if err := e.app.DB.InsertFolder(context.Background(), f, nil); err != nil {
 		e.t.Fatal(err)
 	}
 	return f
@@ -74,7 +74,7 @@ func (e *env) put(folder db.Folder, name string, data []byte) db.File {
 	e.t.Helper()
 	ctx := context.Background()
 	f := db.File{ID: ids.New(), Name: name, Size: int64(len(data)), Kind: db.KindDocument, FolderID: folder.ID,
-		CreatedAt: e.clock.Now(), UpdatedAt: e.clock.Now(), UserID: "someone"}
+		CreatedAt: e.clock.Now(), UpdatedAt: e.clock.Now(), UserID: ids.New()}
 	if err := e.app.DB.InsertReceiving(ctx, f); err != nil {
 		e.t.Fatal(err)
 	}

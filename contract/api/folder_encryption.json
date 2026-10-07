@@ -1,0 +1,30 @@
+{
+  "method": "PUT",
+  "path": "/api/folders/{id}/encryption",
+  "auth": "admin",
+  "status": 200,
+  "request": {
+    "encrypted": true,
+    "key": {
+      "public_key": "BF2ghzfpf6wqlo8B5-55gVc-KKD0VR4XNsq11fKTQQPXMruq55_vIZSz7EM6Wr-RwQFRqYw0eu8yATHyRiB8m70",
+      "signature": "jDS4FAzuu2lzncAjpN5JfAzp7YwgK3hqV0hMQb29-adCZ6c9TXuOq2QeKqQpEzWA589_jDhz6FX_wnNtI4wxPg",
+      "sealed": "QMt93poie8wh-wlWHseVvd6TQZsRH4w-6cSFhrs4RKSBKgRcW3Q06hBioNQXBqbWiMcPOhU7q0P7TAz4IPHIR8J0HCeVg6bAZPUk0RUmFwtdpL_r1FxGHQw-R5BBdI-5QUan9kBk9k5Z3AFm7ojqhUA",
+      "recovery_sealed": "TH0otR-Bt3wdnjOKIH4gdY8w6YPODVabUbZ-t84DtLW8qpNAeVjpN66SyM-36yBlajD6dHHsVACbvKQGHGfP82k7SSjX54ZSg3_zl7lmuP4-hjWSUmlNhZ9-b-edDUQginsS4mFvQ_71Fdnd-yS60Y4"
+    }
+  },
+  "response": {
+    "id": "f4mily5x2k7mbqz4bwdbyj6qsq",
+    "name": "Family",
+    "files": 120,
+    "bytes": 3221225472,
+    "senders": 4,
+    "people": 3,
+    "admins_only": false,
+    "cover": null,
+    "created_at": "2026-09-12T08:00:00Z",
+    "encrypted": true,
+    "key_version": 1,
+    "plain_signature": null
+  },
+  "notes": "Makes the folder's new files encrypted, with key, the next version of the folder's key (one more than key_version, or 1), made on the admin's device: signed by the root (contract/crypto/sign.json: share-e2ee-v1/sign/folder-key, folder:<id>:<version>, its public key), its private key sealed for the admin's person key and for the recovery key (share-e2ee-v1/folder, folder:<id>:<version>); everyone else who sees the folder gets it through the to-do list. Turning it on again after it was off makes a new version too. Or plain again: {\"encrypted\": false, \"plain_signature\": the root's plain statement for the folder's newest version and its name (share-e2ee-v1/sign/plain)}; the encrypted files stay readable, and phones and browsers send plain only with that signature. Answers the folder as GET /api/folders does. Errors: 400 bad_request (on without key, off with one), 400 bad_signature (a signature that doesn't verify under the newest root), 409 key_outdated (someone made that version a moment ago), 409 no_key (no recovery key yet: PUT /api/recovery first), 404 not_found."
+}

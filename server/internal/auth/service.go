@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/eschgi/share/server/internal/db"
@@ -125,6 +126,9 @@ type Service struct {
 	// Wrong current passwords per person, when changing it: someone at an unlocked phone or
 	// browser mustn't be able to try passwords there without end.
 	passwordPerUser *ratelimit.Limiter
+
+	// Someone has an account, which stays so: the last admin can't go.
+	hasAccounts atomic.Bool
 }
 
 // NewService returns a Service with the standard limits.

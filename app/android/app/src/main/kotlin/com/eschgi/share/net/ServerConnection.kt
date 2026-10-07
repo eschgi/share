@@ -11,7 +11,7 @@ import java.net.URL
 import javax.net.ssl.HttpsURLConnection
 
 /** Requests to this phone's server with its key, over the local or the public address. */
-class ServerConnection(private val config: ServerConfig, private val token: String?) {
+class ServerConnection(val config: ServerConfig, private val token: String?) {
 
     fun open(path: String, local: Boolean, readTimeoutMs: Int = 60_000, method: String = "GET"): HttpURLConnection {
         val useLocal = local && config.hasLocal

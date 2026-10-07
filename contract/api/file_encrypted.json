@@ -1,0 +1,28 @@
+{
+  "method": "GET",
+  "path": "/api/files/{id}",
+  "auth": "device",
+  "status": 200,
+  "response": {
+    "id": "q3ld5x2k7mbqz4bwdbyj6qsqxa",
+    "folder": "f4mily5x2k7mbqz4bwdbyj6qsq",
+    "name": "IMG_0001.jpg",
+    "size": 3145728,
+    "mime": "image/jpeg",
+    "kind": "photo",
+    "day": "2026-09-27",
+    "uploaded_at": "2026-09-27T10:00:00Z",
+    "updated_at": "2026-09-27T10:02:00Z",
+    "width": 4032,
+    "height": 3024,
+    "duration_ms": null,
+    "has_thumb": true,
+    "from": "Maria",
+    "enc": {
+      "version": 1,
+      "key": "gFwFPBDe_UjMovFkRWacAm9knrKl0-grjGoIXr_avSbABye5ZG_F41l4vc2GFxHt75EJsgmRRaWLFavaLqw87LAp_iKGL1ld8nRAolj3io80QrMTaCdDuUeBaVLFhgh9t3L4DK875DxY_YOMGtUA-4g",
+      "header": "U0hFMQABAAAzgyUB3x-gAA"
+    }
+  },
+  "notes": "An encrypted file, as file.json: enc says how. key is the file key sealed for version version of its folder's key (share-e2ee-v1/file, folder:<folder id>:<version>); header is what its stored bytes start with (contract/crypto/content.json). size is the plain size; /content and the bucket's links give the encrypted bytes, 16 + size + 16 per 64 KiB, as application/octet-stream, and the thumbnail is sealed (application/octet-stream). Encrypted files are in no ZIP and get no thumbnail from the server."
+}

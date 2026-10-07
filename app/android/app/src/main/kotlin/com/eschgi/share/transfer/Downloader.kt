@@ -1,5 +1,10 @@
 package com.eschgi.share.transfer
 
+import com.eschgi.share.e2ee.ContentCipher
+import com.eschgi.share.e2ee.DecryptingStream
+import com.eschgi.share.e2ee.E2ee
+import com.eschgi.share.e2ee.E2eeException
+import com.eschgi.share.net.S3Connection
 import java.io.EOFException
 import java.io.File
 import java.io.FileOutputStream
@@ -66,9 +71,12 @@ class Abort {
 }
 
 /**
- * One file's download from GET /api/files/{id}/content. What the sink already has is kept
- * and the rest asked for with Range + If-Range; the file's id is its ETag, and a file's
- * content never changes, so a resume is always safe.
+ * One file's download: from GET /api/files/{id}/content, or from the file's link in a bucket.
+ * What the sink already has is kept and the rest asked for with Range (from the server with
+ * If-Range, the file's id being its ETag); a file's content never changes, so a resume is
+ * always safe. An encrypted file (docs/e2ee-plan.md) is decrypted on the way with its
+ * [ContentCipher]: the sink gets the plain bytes, a whole chunk at a time, and a resume asks
+ * for the encrypted bytes from the chunk where the sink stopped.
  */
 class Downloader(private val bufferSize: Int = 256 * 1024) {
 
@@ -102,7 +110,7 @@ class Downloader(private val bufferSize: Int = 256 * 1024) {
     /**
      * Downloads file [id] of [size] bytes into [sink]. [open] makes the request for a path
      * (on the current route, with the phone's key); [onBytes] hears how many bytes the sink
-     * holds as they arrive.
+     * holds as they arrive. With [cipher], the file is encrypted and [size] its plain size.
      */
     fun fetch(
         id: String,
@@ -111,31 +119,106 @@ class Downloader(private val bufferSize: Int = 256 * 1024) {
         open: (path: String) -> HttpURLConnection,
         abort: Abort = Abort(),
         onBytes: (Long) -> Unit = {},
+        cipher: ContentCipher? = null,
+    ): Outcome = receive(size, sink, abort, onBytes, cipher, connect = { offset ->
+        open("/api/files/$id/content").apply { if (offset > 0) setRequestProperty("If-Range", "\"$id\"") }
+    }) { status, conn ->
+        when (status) {
+            401 -> Outcome.SignedOut
+            404, 410 -> Outcome.Gone
+            else -> Outcome.Failed(status, conn.responseMessage ?: "")
+        }
+    }
+
+    /**
+     * Downloads file [id] from the bucket (a server whose files are there), with links from
+     * [link]: the phone's key never goes to the bucket. Objects never change, so a resume needs
+     * only Range. A refused link gets one fresh one and keeps what arrived; a missing object
+     * asks the server whether the file is gone.
+     */
+    fun fetchS3(
+        id: String,
+        size: Long,
+        sink: DownloadSink,
+        link: () -> S3Links.Answer,
+        abort: Abort = Abort(),
+        onBytes: (Long) -> Unit = {},
+        bucket: (url: String) -> HttpURLConnection = { S3Connection.open(it) },
+        cipher: ContentCipher? = null,
+    ): Outcome {
+        var refreshed = false
+        while (true) {
+            val url = when (val answer = link()) {
+                is S3Links.Answer.Link -> answer.url
+                else -> return outcomeOf(answer)
+            }
+            if (!S3Connection.allowed(url)) return Outcome.Failed(0, "a link to plain http outside home")
+            var refusal = 0
+            val outcome = receive(size, sink, abort, onBytes, cipher, connect = { bucket(url) }) { status, _ ->
+                refusal = status
+                Outcome.Failed(status, "")
+            }
+            when (refusal) {
+                0 -> return if (outcome is Outcome.Retry && outcome.cause != null) outcome.copy(cause = S3Connection.scrub(outcome.cause)) else outcome
+                401, 403 -> if (refreshed) return Outcome.Retry(null, refusal) else refreshed = true // a link that ran out
+                404 -> return when (val answer = link()) {
+                    is S3Links.Answer.Link -> Outcome.Failed(404, "the bucket doesn't have the file")
+                    else -> outcomeOf(answer)
+                }
+                else -> return outcome
+            }
+        }
+    }
+
+    /** The server's answer instead of a link. */
+    private fun outcomeOf(answer: S3Links.Answer): Outcome = when (answer) {
+        is S3Links.Answer.Link -> error("a link")
+        S3Links.Answer.SignedOut -> Outcome.SignedOut
+        S3Links.Answer.Gone -> Outcome.Gone
+        is S3Links.Answer.Retry -> Outcome.Retry(answer.cause, answer.status, answer.retryAfterMs)
+        is S3Links.Answer.Failed -> Outcome.Failed(answer.status, answer.code ?: "")
+    }
+
+    /**
+     * What a download from the server and one from the bucket share: what the sink has stays,
+     * and the rest comes with Range, over a request [connect] makes for that offset. Answers
+     * that aren't data and that waiting won't change go to [refused].
+     */
+    private fun receive(
+        size: Long,
+        sink: DownloadSink,
+        abort: Abort,
+        onBytes: (Long) -> Unit,
+        cipher: ContentCipher?,
+        connect: (offset: Long) -> HttpURLConnection,
+        refused: (status: Int, conn: HttpURLConnection) -> Outcome,
     ): Outcome {
         var offset = try {
             sink.length()
         } catch (e: IOException) {
             return Outcome.WriteFailed(e)
         }
-        if (offset > size) {
+        // A plain offset that doesn't start a chunk: the end of a chunk didn't make it.
+        if (offset > size || (cipher != null && offset % E2ee.CHUNK_SIZE != 0L && offset != size)) {
             sink.truncate()
             offset = 0
         }
         if (offset == size) return Outcome.Done // everything arrived last time
         if (abort.stopped) return Outcome.Stopped
 
+        // Where in the stored bytes to go on: for an encrypted file, at the chunk it stopped before.
+        var from = if (cipher == null || offset == 0L) offset else E2ee.readStart(offset).cipherOffset
+        val total = cipher?.encryptedSize ?: size
         val conn = try {
-            open("/api/files/$id/content")
+            connect(from)
         } catch (e: IOException) {
             return Outcome.Retry(e)
         }
         abort.connection = conn
         try {
+            // Without it Android would ask for gzip and unpack it, and ranges wouldn't fit.
             conn.setRequestProperty("Accept-Encoding", "identity")
-            if (offset > 0) {
-                conn.setRequestProperty("Range", "bytes=$offset-")
-                conn.setRequestProperty("If-Range", "\"$id\"")
-            }
+            if (from > 0) conn.setRequestProperty("Range", "bytes=$from-")
             val status = try {
                 conn.responseCode
             } catch (e: IOException) {
@@ -143,21 +226,20 @@ class Downloader(private val bufferSize: Int = 256 * 1024) {
             }
             when (status) {
                 200 -> if (offset > 0) {
-                    // The server sent all of it after all (If-Range didn't match).
+                    // All of it after all (the server's If-Range didn't match).
                     sink.truncate()
                     offset = 0
+                    from = 0
                     onBytes(0)
                 }
                 206 -> {
                     val range = contentRange(conn.getHeaderField("Content-Range"))
-                    if (range == null || range.first != offset || (range.second != null && range.second != size)) {
+                    if (range == null || range.first != from || (range.second != null && range.second != total)) {
                         sink.truncate()
                         onBytes(0)
                         return Outcome.Retry(IOException("unexpected range ${conn.getHeaderField("Content-Range")}"), status)
                     }
                 }
-                401 -> return Outcome.SignedOut
-                404, 410 -> return Outcome.Gone
                 416 -> {
                     // Asked past the end: what we have doesn't fit this file. Start over.
                     sink.truncate()
@@ -166,11 +248,14 @@ class Downloader(private val bufferSize: Int = 256 * 1024) {
                 }
                 408, 429, 500, 502, 503, 504, in 520..530 ->
                     return Outcome.Retry(null, status, retryAfter(conn.getHeaderField("Retry-After")))
-                else -> return Outcome.Failed(status, conn.responseMessage ?: "")
+                else -> return refused(status, conn)
             }
 
             val input = try {
-                conn.inputStream
+                val raw = conn.inputStream
+                if (cipher == null) raw else decrypting(raw, cipher, from, offset)
+            } catch (e: E2eeException) {
+                return Outcome.Failed(status, "not this file: ${e.message}")
             } catch (e: IOException) {
                 return if (abort.stopped) Outcome.Stopped else Outcome.Retry(e, status)
             }
@@ -195,6 +280,11 @@ class Downloader(private val bufferSize: Int = 256 * 1024) {
                     sink.truncate()
                     Outcome.Failed(status, "longer than $size bytes")
                 }
+                is Copied.Broken -> {
+                    // Changed on the way or on the server: it won't decrypt however often it comes.
+                    sink.truncate()
+                    Outcome.Failed(status, "can't be decrypted: ${copied.cause.message}")
+                }
                 Copied.Stopped -> Outcome.Stopped
             }
         } finally {
@@ -207,6 +297,7 @@ class Downloader(private val bufferSize: Int = 256 * 1024) {
         data object Complete : Copied
         data object Stopped : Copied
         data object TooLong : Copied
+        data class Broken(val cause: E2eeException) : Copied
         data class ReadError(val cause: IOException, val offset: Long) : Copied
         data class WriteError(val cause: IOException) : Copied
     }
@@ -218,6 +309,8 @@ class Downloader(private val bufferSize: Int = 256 * 1024) {
             if (abort.stopped) return Copied.Stopped
             val n = try {
                 input.read(buffer)
+            } catch (e: E2eeException) {
+                return Copied.Broken(e)
             } catch (e: IOException) {
                 return Copied.ReadError(e, offset)
             }
@@ -232,6 +325,47 @@ class Downloader(private val bufferSize: Int = 256 * 1024) {
             onBytes(offset)
         }
         return if (offset == size) Copied.Complete else Copied.ReadError(EOFException("ended at $offset of $size"), offset)
+    }
+
+    /**
+     * The plain bytes from [offset] on, of an encrypted file whose stored bytes [raw] gives from
+     * [from]: from the start, the header comes first, and must be this file's. A stream that
+     * ends early fails as a broken connection does, so the download tries again.
+     */
+    private fun decrypting(raw: InputStream, cipher: ContentCipher, from: Long, offset: Long): InputStream {
+        val input = ExactLength(raw, cipher.encryptedSize - from)
+        if (from == 0L) {
+            val header = ByteArray(E2ee.HEADER_SIZE)
+            var n = 0
+            while (n < header.size) {
+                val r = input.read(header, n, header.size - n)
+                if (r < 0) throw EOFException("the header was cut short")
+                n += r
+            }
+            if (!header.contentEquals(cipher.header)) throw E2eeException("another header")
+        }
+        return DecryptingStream(input, cipher, offset / E2ee.CHUNK_SIZE)
+    }
+
+    /** [input], which must give [length] bytes: ending before is an EOFException. */
+    private class ExactLength(private val input: InputStream, private var length: Long) : InputStream() {
+        override fun read(): Int {
+            val one = ByteArray(1)
+            return if (read(one, 0, 1) < 0) -1 else one[0].toInt() and 0xff
+        }
+
+        override fun read(b: ByteArray, off: Int, len: Int): Int {
+            if (len == 0) return 0
+            val n = input.read(b, off, len)
+            if (n < 0) {
+                if (length > 0) throw EOFException("$length bytes short")
+                return -1
+            }
+            length -= n
+            return n
+        }
+
+        override fun close() = input.close()
     }
 
     companion object {

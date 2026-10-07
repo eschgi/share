@@ -91,3 +91,14 @@ func folders(args []string) error {
 	}
 	return w.Flush()
 }
+
+// noEncrypted refuses what would open folders with encrypted files: the command line has no
+// keys to give, which the app and the website have.
+func noEncrypted(folders []db.Folder, what string) error {
+	for _, f := range folders {
+		if f.KeyVersion > 0 {
+			return fmt.Errorf("the folder %q has encrypted files, and the command line has no keys for them: make the %s in the app or on the website", f.Name, what)
+		}
+	}
+	return nil
+}

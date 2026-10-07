@@ -23,7 +23,19 @@ export function normalizePin(input: string): string | null {
   return out.length === pinLength ? out : null;
 }
 
-/** A PIN from the page address: share.example.com/#K7M2Q. */
+/** A PIN from the page address: share.example.com/#K7M2Q, also with the secret of a PIN that
+ * shows an encrypted folder after a dot (#K7M2Q.<secret>). */
 export function pinFromHash(hash: string): string | null {
-  return normalizePin(decodeURIComponent(hash.replace(/^#/, '')));
+  return normalizePin(decodeURIComponent(hash.replace(/^#/, '').split('.')[0]));
+}
+
+/** The secret in a PIN's link: 32 bytes in base64url, 43 characters. */
+export function pinSecretFromHash(hash: string): string | null {
+  return /^#?[^.#]+\.([A-Za-z0-9_-]{43})$/.exec(hash)?.[1] ?? null;
+}
+
+/** The root's fingerprint in the link of a PIN that only sends into a folder with keys: 16 bytes
+ * in base64url, 22 characters. */
+export function pinRootFromHash(hash: string): string | null {
+  return /^#?[^.#]+\.([A-Za-z0-9_-]{22})$/.exec(hash)?.[1] ?? null;
 }

@@ -111,8 +111,8 @@ export function ToastView({ text, action, onDone }: { text: string; action?: { l
           type="button"
           class="tbtn"
           onClick={() => {
+            onDone(); // first, so the action may say something new
             action.run();
-            onDone();
           }}
         >
           {action.label}

@@ -1,0 +1,19 @@
+{
+  "method": "POST",
+  "path": "/api/s3/uploads",
+  "auth": "pin",
+  "request": {"name": "VID_0412.mp4", "size": 52428800, "last_modified_ms": 1758960000000, "folder": "f4mily5x2k7mbqz4bwdbyj6qsq"},
+  "status": 201,
+  "response": {
+    "id": "q3ld5x2k7mbqz4bwdbyj6qsqxa",
+    "part_size": 20971520,
+    "parts": 3,
+    "urls": [
+      {"number": 1, "url": "https://share-files.s3.eu-central-1.amazonaws.com/share/files/q3ld5x2k7mbqz4bwdbyj6qsqxa?partNumber=1&uploadId=VXBsb2FkIElE&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=3600&X-Amz-SignedHeaders=content-length%3Bhost&X-Amz-Signature=…", "size": 20971520},
+      {"number": 2, "url": "https://share-files.s3.eu-central-1.amazonaws.com/share/files/q3ld5x2k7mbqz4bwdbyj6qsqxa?partNumber=2&…", "size": 20971520},
+      {"number": 3, "url": "https://share-files.s3.eu-central-1.amazonaws.com/share/files/q3ld5x2k7mbqz4bwdbyj6qsqxa?partNumber=3&…", "size": 10485760}
+    ],
+    "expires_at": "2026-09-27T11:00:00Z"
+  },
+  "notes": "S3 mode only (GET /api/info says storage \"s3\"); tus is 404 there. Starts an upload into the bucket; the id is the file's id, as with tus. folder as with tus: a signed-in phone or browser says it, a PIN's uploads go into the PIN's folder; last_modified_ms is optional. The file is cut into parts of part_size bytes, the last one shorter; parts is 0 for an empty file, which needs no part and only complete. urls covers the first 10 parts: PUT each part's bytes to its url, exactly size bytes and with no other headers (the length is signed, so the bucket refuses anything else), without the phone's key. The links work until expires_at, about an hour; ask for more with /parts. Errors as tus: unauthorized, session_ended, bad_request, too_large, too_many_uploads, no_folder, folder_gone; and 503 s3_unavailable with Retry-After when the bucket can't start the upload. An upload into an encrypted folder brings enc too: s3_upload_create_encrypted.json. An upload into an encrypted folder brings enc too: s3_upload_create_encrypted.json."
+}

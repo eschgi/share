@@ -42,6 +42,29 @@ void main() {
     expect(platform.screenOn, isFalse);
   });
 
+  testWidgets('trying again after it stopped halfway goes on from there', (tester) async {
+    final players = <FakeMediaPlayer>[];
+    await startApp(tester, signedInPhone(), FakeServer()..addDay(today(), 6), player: (s) => FakeMediaPlayer(s)..also(players.add));
+    await tester.tap(find.byType(LibraryTile).at(2));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Play'));
+    await tester.pumpAndSettle();
+    await players.single.seekTo(const Duration(seconds: 7));
+    await tester.pump();
+    expect(find.text('0:07'), findsOneWidget);
+
+    players.single.fail();
+    await tester.pumpAndSettle();
+    expect(find.textContaining("can't be played here"), findsOneWidget);
+    await tester.tap(find.text('Try again'));
+    await tester.pumpAndSettle();
+    expect(players, hasLength(2));
+    expect(players.first.disposed, isTrue);
+    expect(players.last.now.position, const Duration(seconds: 7));
+    expect(players.last.now.playing, isTrue);
+    expect(find.text('0:07'), findsOneWidget);
+  });
+
   testWidgets("what can't play here opens in another app", (tester) async {
     final platform = signedInPhone();
     await startApp(tester, platform, FakeServer()..addDay(today(), 6), player: (s) => FakeMediaPlayer(s, fails: true));

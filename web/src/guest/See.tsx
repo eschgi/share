@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import de from '../account/i18n/de.json';
 import en from '../account/i18n/en.json';
 import it from '../account/i18n/it.json';
-import { download, startDownload, zipLimit } from '../account/library/actions';
+import { download, downloadEach, eachLimit, hrefsOf, startDownload, zipLimit, type EachNote, type Href } from '../account/library/actions';
 import { LibraryModel } from '../account/library/model';
 import { Tile } from '../account/library/Tile';
 import { canSaveToFolder } from '../account/save/folder';
@@ -16,8 +16,11 @@ import { SaveChoice } from '../account/save/SaveChoice';
 import { SavePanel } from '../account/save/SavePanel';
 import { startSave } from '../account/save/store';
 import { Viewer } from '../account/viewer/Viewer';
-import { ApiError, createDownload, getFileIds, getFiles, getFolders, getLibrary, zipUrl, type FolderInfo } from '../api';
+import { ApiError, createDownload, getFileIds, getFiles, getFolders, getInfo, getLibrary, zipUrl, type FolderInfo } from '../api';
 import { Icon } from '../components/Icon';
+import { keyring } from '../e2ee/keyring';
+import { canEncrypt } from '../e2ee/trust';
+import { pinSecret } from '../e2ee/pinlink';
 import { Page } from '../components/Page';
 import { formatBytes, formatCount, formatDay } from '../format';
 import { addDictionaries, useI18n } from '../i18n';
@@ -32,6 +35,11 @@ export function See({ name, onEnded }: { name: string; onEnded: () => void }) {
   const [choosing, setChoosing] = useState<{ ids: string[]; bytes: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  /** With the files in a bucket, which sends no ZIP, several download one by one. */
+  const [s3, setS3] = useState(false);
+  const [note, setNote] = useState<EachNote | null>(null);
+  /** How many versions of an encrypted folder's key the PIN link's secret opened. */
+  const [opened, setOpened] = useState<number | null>(null);
   const [, redraw] = useState(0);
   const end = useRef<HTMLDivElement>(null);
   const ended = useRef(onEnded);
@@ -50,6 +58,14 @@ export function See({ name, onEnded }: { name: string; onEnded: () => void }) {
       () => {},
     );
 
+  useEffect(() => {
+    void getInfo().then(
+      (info) => setS3(info.storage === 's3'),
+      () => {},
+    );
+    const secret = pinSecret();
+    (secret ? keyring.openPinKeys(secret) : Promise.resolve(0)).then(setOpened, () => setOpened(0));
+  }, []);
   useEffect(() => {
     const stop = model.subscribe(() => redraw((n) => n + 1));
     void model.reload();
@@ -86,7 +102,9 @@ export function See({ name, onEnded }: { name: string; onEnded: () => void }) {
       const { ids, bytes } = await getFileIds(model.filter);
       if (ids.length > zipLimit) return setProblem(t('zip.tooMany'));
       if (ids.length > 1 && canSaveToFolder()) return setChoosing({ ids, bytes });
-      await download(ids, model.files.find((f) => f.id === ids[0]));
+      if (ids.length > 1 && s3) return void (await each(ids));
+      const got = await download(ids, model.files.find((f) => f.id === ids[0]));
+      if (got?.each) return void (await each(ids, got.each));
     } catch (e) {
       failed(e);
     } finally {
@@ -94,10 +112,23 @@ export function See({ name, onEnded }: { name: string; onEnded: () => void }) {
     }
   }
 
+  async function each(ids: string[], href?: Href) {
+    setChoosing(null);
+    if (ids.length > eachLimit) return setProblem(t('each.tooMany', { n: eachLimit }));
+    try {
+      // The list says which are encrypted, and how to open them.
+      downloadEach(ids, setNote, { t, tn }, href ?? hrefsOf((await createDownload(ids)).files));
+    } catch (e) {
+      failed(e);
+    }
+  }
+
   async function zip(ids: string[]) {
     setChoosing(null);
     try {
       const z = await createDownload(ids);
+      // Encrypted files go into no ZIP: all of them one by one, decrypted.
+      if (z.files.some((f) => f.enc)) return void (await each(ids, hrefsOf(z.files)));
       startDownload(zipUrl(z), z.name);
     } catch (e) {
       failed(e);
@@ -131,10 +162,34 @@ export function See({ name, onEnded }: { name: string; onEnded: () => void }) {
           {t('see.downloadAll', { size: formatBytes(total, lang) })}
         </button>
       )}
+      {folder?.key_version != null && opened === 0 && (
+        <p class="help" role="status">
+          <Icon name="lock" />
+          {t(canEncrypt() ? 'see.locked' : 'see.lockedInsecure')}
+        </p>
+      )}
       {problem && (
         <p class="help err" role="alert">
           <Icon name="alert" />
           {problem}
+        </p>
+      )}
+      {note && (
+        <p class="help" role="status">
+          {note.text}
+          {note.action && (
+            <button
+              type="button"
+              class="tbtn"
+              onClick={() => {
+                const run = note.action!.run;
+                setNote(null);
+                run();
+              }}
+            >
+              {note.action.label}
+            </button>
+          )}
         </p>
       )}
       <div class="gfiles">
@@ -174,8 +229,8 @@ export function See({ name, onEnded }: { name: string; onEnded: () => void }) {
         <SaveChoice
           count={choosing.ids.length}
           bytes={choosing.bytes}
-          zipName={guestZipName(name, days.map((d) => d.day), now)}
-          onZip={() => void zip(choosing.ids)}
+          zipName={s3 ? null : guestZipName(name, days.map((d) => d.day), now)}
+          onOther={() => (s3 ? each(choosing.ids) : void zip(choosing.ids))}
           onFolder={(dir) => void intoFolder(choosing.ids, dir)}
           onClose={() => setChoosing(null)}
         />

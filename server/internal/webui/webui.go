@@ -34,22 +34,30 @@ func init() {
 	}
 }
 
-// CSP allows only this origin. Uploads, previews (blob:) and the service worker all stay on it.
-const contentSecurityPolicy = "default-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; " +
-	"worker-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+// contentSecurityPolicy allows only this origin, and a bucket's for what pages send and fetch
+// there. Uploads, previews (blob:) and the service worker otherwise all stay on this origin.
+func contentSecurityPolicy(bucket string) string {
+	if bucket != "" {
+		bucket = " " + bucket
+	}
+	return "default-src 'self'; img-src 'self' blob: data:" + bucket + "; media-src 'self' blob:" + bucket + "; " +
+		"worker-src 'self'; connect-src 'self'" + bucket + "; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+}
 
 // UI serves the website.
 type UI struct {
 	files    fs.FS
 	built    bool
 	manifest []byte
+	csp      string
 }
 
-// New prepares the website for cfg.
-func New(cfg *config.Config) *UI {
+// New prepares the website for cfg. bucket is the origin of the bucket's links, where pages
+// send and fetch the files; "" when they are on a drive.
+func New(cfg *config.Config, bucket string) *UI {
 	files, _ := fs.Sub(dist, "dist")
 	_, err := fs.Stat(files, "index.html")
-	u := &UI{files: files, built: err == nil}
+	u := &UI{files: files, built: err == nil, csp: contentSecurityPolicy(bucket)}
 	u.manifest, _ = json.Marshal(map[string]any{
 		"id":               "/",
 		"name":             cfg.Name,
@@ -89,7 +97,7 @@ func (u *UI) Built() bool { return u.built }
 
 func (u *UI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == ShareTarget {
-		setPageHeaders(w)
+		u.setPageHeaders(w)
 		http.Redirect(w, r, ShareTargetFailed, http.StatusSeeOther)
 		return
 	}
@@ -104,6 +112,8 @@ func (u *UI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		u.page(w, r, "index.html")
 	case p == "/join":
 		u.page(w, r, "join.html")
+	case p == "/setup":
+		u.page(w, r, "setup.html")
 	case p == "/manifest.webmanifest":
 		w.Header().Set("Cache-Control", "no-cache")
 		http.ServeContent(w, r, "manifest.webmanifest", time.Time{}, bytes.NewReader(u.manifest))
@@ -161,7 +171,7 @@ func isScreen(p string) bool {
 // page serves an HTML page with the security headers, and gives the browser its random id
 // for the wrong-PIN limit.
 func (u *UI) page(w http.ResponseWriter, r *http.Request, name string) {
-	setPageHeaders(w)
+	u.setPageHeaders(w)
 	if !u.built {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
@@ -194,15 +204,15 @@ func (u *UI) file(w http.ResponseWriter, r *http.Request, name string) {
 }
 
 func (u *UI) notFound(w http.ResponseWriter) {
-	setPageHeaders(w)
+	u.setPageHeaders(w)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusNotFound)
 	w.Write([]byte(`<!doctype html><meta charset="utf-8"><title>Not found</title><p>Not found.</p>`))
 }
 
-func setPageHeaders(w http.ResponseWriter) {
+func (u *UI) setPageHeaders(w http.ResponseWriter) {
 	h := w.Header()
-	h.Set("Content-Security-Policy", contentSecurityPolicy)
+	h.Set("Content-Security-Policy", u.csp)
 	h.Set("X-Content-Type-Options", "nosniff")
 	h.Set("Referrer-Policy", "no-referrer")
 	h.Set("Cross-Origin-Opener-Policy", "same-origin")

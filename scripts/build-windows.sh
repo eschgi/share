@@ -3,12 +3,12 @@
 # Windows on ARM (windows/arm64). Output: dist/share-windows-amd64.exe,
 # dist/share-windows-arm64.exe.
 #
-#   scripts/build-windows.sh            version from git (e.g. v0.1.0-3-gabc1234, or the commit)
+#   scripts/build-windows.sh            version from VERSION and git (scripts/version.sh)
 #   VERSION=0.1.0 scripts/build-windows.sh
 set -eu
 
 root=$(cd "$(dirname "$0")/.." && pwd)
-version=${VERSION:-$(git -C "$root" describe --tags --always --dirty 2>/dev/null || echo dev)}
+version=${VERSION:-$("$root/scripts/version.sh")}
 
 echo "Building the website"
 (cd "$root/web" && npm ci --no-audit --no-fund && npm run build)

@@ -318,6 +318,20 @@ button.row[aria-disabled='true'] {
   color: var(--text-3);
   font-size: 13px;
 }
+.fhead + .group {
+  margin-top: 12px;
+}
+/* After an encrypted folder's name. */
+.flock {
+  display: inline-flex;
+  margin-left: 6px;
+  color: var(--text-3);
+  vertical-align: -1px;
+}
+.flock .ic {
+  width: 13px;
+  height: 13px;
+}
 @media (prefers-reduced-motion: reduce) {
   .sw,
   .sw::after {

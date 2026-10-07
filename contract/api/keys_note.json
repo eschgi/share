@@ -1,0 +1,10 @@
+{
+  "method": "PUT",
+  "path": "/api/keys/note",
+  "auth": "device",
+  "status": 204,
+  "request": {
+    "note": "O5LiTso2ZJ-VE5DpKyUIBhwbn-0pWPokswcHCiOxpKIKshG8CxDbl8NdM9H00YjkqhDh3sHqtvFiGz80NBwICPPZ6c_AohbTwKGhSXoZIRnKwaU0S1FWbEIFWUHuSAy3wl7pUsT2moB52UmevgfJaQdvhMUZWHi0DImQN7bc0xeT0UkrbwCGM0nDwPoNAVl9GH2xy9Mv936XWPXUg0KT8ShI0Dbwszt_KhzwosQUfcn9so_J"
+  },
+  "notes": "The person's note (docs/e2ee-plan.md): UTF-8 JSON {\"root\": the root their phones and browsers trust, \"folders\": {folder id: the newest version of its key they saw}}, locked with HKDF-SHA256 of the person's private key (share-e2ee-v1/note) and the aad note:<user id> (contract/crypto/lock.json). Each phone or browser adds what it saw; the next one, e.g. after a sign-in with the password, starts from it (GET /api/keys: person.note). Starting over with a new person key drops it. 409 no_key for a person without a key; 400 bad_request for an empty one, or one over 1 MiB."
+}

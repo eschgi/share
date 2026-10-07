@@ -13,11 +13,20 @@ import (
 	"time"
 
 	"github.com/eschgi/share/server/internal/db"
+	"github.com/eschgi/share/server/internal/e2ee"
 	"github.com/eschgi/share/server/internal/ids"
+	"github.com/eschgi/share/server/internal/s3"
 )
 
 // ErrIncomplete means an upload hasn't received all its bytes yet.
 var ErrIncomplete = errors.New("upload is not complete yet")
+
+// Moving encrypted files: the target folder never had a key, or a file's key isn't sealed for
+// its newest one.
+var (
+	ErrNotEncrypted = errors.New("the folder has no key for encrypted files")
+	ErrKeysNeeded   = errors.New("encrypted files need their keys sealed for the folder's newest key")
+)
 
 // Library moves finished uploads into the day folders of their folder, and keeps track of
 // where each file's bytes are.
@@ -32,9 +41,12 @@ type Library struct {
 	// OnPurged is called after a file is removed for good (its thumbnail goes too).
 	OnPurged func(id string)
 
-	root     *os.Root // the storage folder; every library path is opened through it
+	root     *os.Root // the storage folder; every library path is opened through it; nil in a bucket
 	mu       sync.Mutex
 	leftOver map[string]bool // folders whose files couldn't all be moved, already logged
+
+	s3    *s3.Bucket        // the bucket in S3 mode, nil on a drive
+	locks [64]chan struct{} // in a bucket: one upload finishes or is dropped at a time (lockUpload)
 }
 
 // OpenLibrary opens the storage folder for the library.
@@ -47,7 +59,12 @@ func OpenLibrary(d *db.DB, l Layout, loc *time.Location, now func() time.Time, l
 }
 
 // Close releases the storage folder.
-func (lib *Library) Close() error { return lib.root.Close() }
+func (lib *Library) Close() error {
+	if lib.root == nil {
+		return nil
+	}
+	return lib.root.Close()
+}
 
 // Root gives read access to the storage folder, e.g. for downloads.
 func (lib *Library) Root() *os.Root { return lib.root }
@@ -107,13 +124,43 @@ func (lib *Library) movedFrom(ctx context.Context, f db.File) string {
 }
 
 func (lib *Library) exists(p string) bool {
+	if lib.root == nil {
+		return false // a bucket has no paths: names are only rows
+	}
 	_, err := lib.root.Lstat(p)
 	return err == nil
 }
 
-// Open opens a file of the library for reading. A row read before a rename or a move may
-// point to an old place; then the file is looked up again.
-func (lib *Library) Open(ctx context.Context, f db.File) (*os.File, error) {
+// File is a file of the library opened for reading.
+type File interface {
+	io.Reader
+	io.ReaderAt
+	io.Seeker
+	io.Closer
+}
+
+// Open opens a file of the library for reading, from the drive or from the bucket.
+func (lib *Library) Open(ctx context.Context, f db.File) (File, error) {
+	if lib.s3 != nil {
+		obj, err := lib.s3.Open(ctx, lib.s3.Key(f.ID))
+		if err != nil {
+			return nil, err
+		}
+		return obj, nil
+	}
+	file, err := lib.OpenFile(ctx, f)
+	if err != nil {
+		return nil, err // not a nil *os.File in a non-nil File
+	}
+	return file, nil
+}
+
+// OpenFile opens a file of the library on the drive, for sendfile. A row read before a
+// rename or a move may point to an old place; then the file is looked up again.
+func (lib *Library) OpenFile(ctx context.Context, f db.File) (*os.File, error) {
+	if lib.root == nil {
+		return nil, errors.New("storage: the files are in a bucket")
+	}
 	for try := 0; ; try++ {
 		p, err := lib.locate(ctx, f)
 		if err != nil {
@@ -133,6 +180,9 @@ func (lib *Library) Open(ctx context.Context, f db.File) (*os.File, error) {
 // HEAD after a lost response and the reconciler may all call it, in any state, and a crash
 // at any step is picked up again by the next call.
 func (lib *Library) Finalize(ctx context.Context, id string) error {
+	if lib.s3 != nil {
+		return lib.finalizeS3(ctx, id)
+	}
 	lib.mu.Lock()
 	defer lib.mu.Unlock()
 
@@ -150,6 +200,21 @@ func (lib *Library) Finalize(ctx context.Context, id string) error {
 		}
 		if info.Size() != f.Size {
 			return ErrIncomplete
+		}
+		if f.Enc != nil {
+			head := make([]byte, e2ee.HeaderSize)
+			fh, err := lib.root.Open(uploadPath(id))
+			if err != nil {
+				return err
+			}
+			_, err = io.ReadFull(fh, head)
+			fh.Close()
+			if err != nil {
+				return err
+			}
+			if err := checkHeader(f, head); err != nil {
+				return err
+			}
 		}
 		if f, err = lib.claimPath(ctx, f); err != nil {
 			return err
@@ -266,6 +331,9 @@ func (lib *Library) moveIntoLibrary(f db.File, dst string) error {
 }
 
 func (lib *Library) classify(f db.File, at string) (mime, kind string) {
+	if f.Enc != nil {
+		return ClassifyEncrypted(f.Name)
+	}
 	head := make([]byte, 512)
 	fh, err := lib.root.Open(at)
 	if err == nil {
@@ -278,6 +346,9 @@ func (lib *Library) classify(f db.File, at string) (mime, kind string) {
 
 // Terminate drops an unfinished upload: its bytes, its tus info file and its row.
 func (lib *Library) Terminate(ctx context.Context, id string) error {
+	if lib.s3 != nil {
+		return lib.terminateS3(ctx, id)
+	}
 	lib.mu.Lock()
 	defer lib.mu.Unlock()
 	for _, p := range []string{uploadPath(id), infoPath(id)} {
@@ -300,6 +371,9 @@ func (lib *Library) Terminate(ctx context.Context, id string) error {
 //   - a trash, restore or purge that was cut short is finished;
 //   - deleted folders without files are forgotten.
 func (lib *Library) Reconcile(ctx context.Context, ttl time.Duration) error {
+	if lib.s3 != nil {
+		return lib.reconcileS3(ctx, ttl)
+	}
 	if err := lib.relocate(ctx); err != nil {
 		return err
 	}

@@ -1,6 +1,8 @@
 import type { ComponentType } from 'preact';
 import { useEffect, useMemo, useReducer, useRef, useState } from 'preact/hooks';
-import { ApiError, endSession, getInfo, getSession, unlock, type Info } from './api';
+import { ApiError, endSession, getInfo, getSession, unlock, type Info, type Session } from './api';
+import { forgetPinLink, keepPinLink, pinRoot, pinSecret } from './e2ee/pinlink';
+import { canEncrypt, guestKey, pinLinkRoot, type Anchor } from './e2ee/trust';
 import { DropZone } from './components/DropZone';
 import { Page, PagePlaces, type Places } from './components/Page';
 import { useLeaveWarning } from './device';
@@ -8,7 +10,7 @@ import { formatPercent } from './format';
 import { I18nContext, isLang, languages, makeI18n, pickLanguage, storeLanguage, storedLanguage, type Lang } from './i18n';
 import { claimShared, dropShared, shareFailed, sharedGone, type Shared } from './incoming';
 import { noticeLanguage, notify } from './notify';
-import { pinFromHash } from './pin';
+import { pinFromHash, pinRootFromHash, pinSecretFromHash } from './pin';
 import { DoneScreen } from './screens/DoneScreen';
 import { PinScreen } from './screens/PinScreen';
 import { ReadyScreen } from './screens/ReadyScreen';
@@ -56,6 +58,15 @@ export function App() {
   const [, setTick] = useState(0);
   const redraw = () => setTick((n) => n + 1);
   const uploader = useRef<Uploader | null>(null);
+  /** The PIN's session for the uploader, which outlives renders; and the session asked again
+   * after the server refused a key, for its folder's newest one. */
+  const sessionNow = useRef(state.session);
+  sessionNow.current = state.session;
+  const sessionAgain = useRef<Session | null>(null);
+  /** What the PIN's link says of the root, which the folder's key is checked with. */
+  const anchor = useRef<Anchor | null | undefined>(undefined);
+  /** Files weren't sent: the folder's keys can't be checked. */
+  const [refused, setRefused] = useState(false);
   /** A PIN that shows its folder: sending, or looking into the folder. */
   const [tab, setTab] = useState<'send' | 'see'>('send');
   const [See, setSee] = useState<SeeModule['See'] | null>(null);
@@ -77,7 +88,16 @@ export function App() {
     };
   }, []);
 
-  async function doUnlock(code: string) {
+  /** What the PIN's link says of the root: its fingerprint, or the root its secret opens. */
+  async function anchorOf(): Promise<Anchor | null> {
+    if (anchor.current !== undefined) return anchor.current;
+    const fp = pinRoot();
+    const secret = pinSecret();
+    anchor.current = fp ? { fingerprint: fp } : secret ? { root: await pinLinkRoot(secret) } : null;
+    return anchor.current;
+  }
+
+  async function doUnlock(code: string, secret?: string | null, root?: string | null) {
     dispatch({ type: 'unlockStarted' });
     try {
       const res = await unlock(code);
@@ -91,6 +111,11 @@ export function App() {
         location.reload(); // the first load failed; start clean with the new session
         return;
       }
+      // The secret of a link of a PIN that shows an encrypted folder opens it on the See tab, and
+      // with the root's fingerprint, both name the root its folder's key is checked with.
+      keepPinLink(secret ?? null, root ?? null);
+      anchor.current = undefined;
+      sessionAgain.current = null;
       dispatch({ type: 'unlocked', session: res.session });
       uploader.current.resume(); // the server has moved unfinished uploads to this session
     } catch (e) {
@@ -102,6 +127,8 @@ export function App() {
     // A PIN in the link (share.example.com/#K7M2Q) unlocks by itself; take it out of the
     // address so it doesn't stay in the history.
     const hashPin = pinFromHash(location.hash);
+    const hashSecret = pinSecretFromHash(location.hash);
+    const hashRoot = pinRootFromHash(location.hash);
     if (location.hash) history.replaceState(null, '', location.pathname + location.search);
     (async () => {
       try {
@@ -122,10 +149,18 @@ export function App() {
           onRejected: (name) => setRejected((r) => (r.includes(name) ? r : [...r, name])),
           onRestored: () => dispatch({ type: 'restored' }),
           onSharedGone: sharedGone,
+          encryptFor: async () => {
+            const s = sessionAgain.current ?? sessionNow.current;
+            return s?.kind === 'pin' ? guestKey(s, canEncrypt() ? await anchorOf() : null) : null;
+          },
+          onRefused: () => setRefused(true),
+          refreshKeys: async () => {
+            sessionAgain.current = (await getSession()).session;
+          },
         }, keepQueue);
         void claimShared().then(setShared);
         if (hashPin) {
-          await doUnlock(hashPin);
+          await doUnlock(hashPin, hashSecret, hashRoot);
           return;
         }
         const { session, ended } = await getSession();
@@ -149,6 +184,7 @@ export function App() {
   useEffect(() => {
     if (shared.length === 0 || !uploader.current || (state.screen !== 'ready' && state.screen !== 'welcome')) return;
     setRejected([]);
+    setRefused(false);
     uploader.current.addShared(shared);
     setShared([]);
     dispatch({ type: 'filesAdded' });
@@ -170,6 +206,7 @@ export function App() {
   const onFiles = (files: File[]) => {
     if (files.length === 0) return; // e.g. a dropped folder with nothing but hidden files
     setRejected([]);
+    setRefused(false);
     uploader.current?.add(files);
     dispatch({ type: 'filesAdded' });
   };
@@ -185,6 +222,8 @@ export function App() {
   // PIN replaces it.
   const forgetPin = async () => {
     await endSession().catch(() => {});
+    forgetPinLink();
+    anchor.current = undefined;
     uploader.current?.clear();
     dispatch({ type: 'pinForgotten' });
   };
@@ -319,6 +358,7 @@ export function App() {
           snapshot={snap!}
           online={online}
           rejected={rejected}
+          refused={refused ? 'guest' : null}
           onFiles={onFiles}
           onSkipGhosts={onSkipGhosts}
           onRetry={() => uploader.current?.retryFailed()}

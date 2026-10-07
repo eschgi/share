@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"path"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -35,9 +36,11 @@ type downloadRequest struct {
 
 // DownloadFile is one file of a download, with its path inside the ZIP or the folder.
 type DownloadFile struct {
-	ID   string `json:"id"`
-	Path string `json:"path"`
-	Size int64  `json:"size"`
+	ID     string   `json:"id"`
+	Folder string   `json:"folder"`
+	Path   string   `json:"path"`
+	Size   int64    `json:"size"` // the plain size of an encrypted file
+	Enc    *EncInfo `json:"enc"`  // an encrypted file, which the ZIP leaves out; null for a plain one
 }
 
 // DownloadInfo is a ZIP ready to be fetched from GET /api/downloads/{id}.
@@ -80,15 +83,26 @@ func (a *API) createDownload(w http.ResponseWriter, r *http.Request) {
 	}
 	dirs := zipDirs(files, folders)
 	zipOrder(files, dirs)
-	z, err := a.zipOf(files, dirs)
+	all, err := a.zipOf(files, dirs) // the paths of every file, for saving them into a folder
+	if err != nil {
+		internal(w, "download", err)
+		return
+	}
+	// The ZIP leaves encrypted files out: the server can't read them, the devices fetch them
+	// one by one and decrypt them.
+	plain := slices.DeleteFunc(slices.Clone(files), func(f db.File) bool { return f.Enc != nil })
+	z, err := a.zipOf(plain, dirs)
 	if err != nil {
 		internal(w, "download", err)
 		return
 	}
 	sel := a.Downloads.Add(p.Key(), z.ids(), a.zipName(files, folders), dirs != nil)
-	info := DownloadInfo{ID: sel.ID, Name: sel.Name, Size: z.archive.Size(), Count: len(files), Files: make([]DownloadFile, len(files))}
+	info := DownloadInfo{ID: sel.ID, Name: sel.Name, Size: z.archive.Size(), Count: len(plain), Files: make([]DownloadFile, len(files))}
 	for i, f := range files {
-		info.Files[i] = DownloadFile{ID: f.ID, Path: z.paths[i], Size: f.Size}
+		info.Files[i] = DownloadFile{ID: f.ID, Folder: f.FolderID, Path: all.paths[i], Size: f.Size}
+		if e := f.Enc; e != nil {
+			info.Files[i].Size, info.Files[i].Enc = e.PlainSize, &EncInfo{Version: e.Version, Key: e.Key, Header: e.Header}
+		}
 	}
 	httpx.WriteJSON(w, http.StatusCreated, info)
 }
@@ -99,6 +113,10 @@ func (a *API) createDownload(w http.ResponseWriter, r *http.Request) {
 func (a *API) download(w http.ResponseWriter, r *http.Request) {
 	p, folders, ok := a.viewer(w, r)
 	if !ok {
+		return
+	}
+	if a.S3 != nil {
+		httpx.WriteError(w, http.StatusConflict, "s3_no_zip", "The files are in a bucket, which sends no ZIP: download them one by one.")
 		return
 	}
 	sel, ok := a.Downloads.Get(r.PathValue("id"), p.Key())
@@ -127,7 +145,7 @@ func (a *API) download(w http.ResponseWriter, r *http.Request) {
 	}
 	h := w.Header()
 	h.Set("Content-Type", "application/zip")
-	h.Set("Content-Disposition", contentDisposition(sel.Name))
+	h.Set("Content-Disposition", storage.ContentDisposition(sel.Name))
 	h.Set("Cache-Control", "private, no-store, no-transform")
 	h.Set("Content-Security-Policy", "sandbox")
 	h.Set("X-Content-Type-Options", "nosniff")

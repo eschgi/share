@@ -46,7 +46,7 @@ class FakeServer {
   /** Answers a Range request with the whole file, as if it had changed. */
   ignoreRange = new Set<string>();
   constructor(readonly content: Map<string, Uint8Array>) {}
-  fetch = async (id: string, from: number, etag: string | null): Promise<Answer> => {
+  fetch = async ({ id }: SaveItem, from: number, etag: string | null): Promise<Answer> => {
     this.calls.push({ id, from, etag });
     await Promise.resolve();
     if (this.gone.has(id)) return { status: 404, etag: null, body: (async function* () {})() };
@@ -182,6 +182,29 @@ describe('saveFiles', () => {
     const end = await saveFiles(items, folder, fetch, { signal: new AbortController().signal, onChange: () => {}, sleep: noWait });
     expect(end.stopped).toBe('signedOut');
     expect(folder.files.size).toBe(0);
+  });
+
+  it('asks again when the bucket refuses a link, and fails only that file in the end', async () => {
+    const { items, content, folder, server } = setup({ a: 10, b: 10 });
+    const refusals = new Map([
+      ['a', 2], // a link that ran out, twice: fresh ones follow
+      ['b', 9], // a bucket that never lets it through
+    ]);
+    const fetch = async (item: SaveItem, from: number, etag: string | null): Promise<Answer> => {
+      const id = item.id;
+      const left = refusals.get(id) ?? 0;
+      if (left > 0) {
+        refusals.set(id, left - 1);
+        return { status: 403, etag: null, body: (async function* () {})(), remote: true };
+      }
+      return server.fetch(item, from, etag);
+    };
+    const end = await saveFiles(items, folder, fetch, { signal: new AbortController().signal, onChange: () => {}, sleep: noWait });
+    expect(end.stopped).toBeNull();
+    expect(end.done).toBe(1);
+    expect(end.failed.map((f) => f.id)).toEqual(['b']);
+    expect(folder.files.get('2026-10-01/a.jpg')).toEqual(content.get('a'));
+    expect(refusals.get('b')).toBe(5); // the first answer and three more
   });
 
   it('tells which files are in the folder, saved or there already, and where', async () => {

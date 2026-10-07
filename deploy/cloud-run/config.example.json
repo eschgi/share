@@ -1,0 +1,13 @@
+{
+  "public_url": "https://share.example.com",
+  "time_zone": "Europe/Rome",
+  "proxy": {"headers": "x-forwarded", "trusted_proxies": ["169.254.0.0/16"]},
+  "database": {"postgres": "postgres://share:PASSWORD@ep-example-123456.eu-central-1.aws.neon.tech/share?sslmode=require&channel_binding=require"},
+  "s3": {
+    "endpoint": "https://account-id.r2.cloudflarestorage.com",
+    "region": "auto",
+    "bucket": "family-share",
+    "access_key_id": "…",
+    "secret_access_key": "…"
+  }
+}

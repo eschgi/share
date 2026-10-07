@@ -61,7 +61,7 @@ func TestShareTargetMatchesTheContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := routes.ShareTarget
-	u := New(&config.Config{Name: "Share"})
+	u := New(&config.Config{Name: "Share"}, "")
 
 	rec := httptest.NewRecorder()
 	u.ServeHTTP(rec, httptest.NewRequest("GET", "/manifest.webmanifest", nil))
@@ -95,5 +95,25 @@ func TestShareTargetMatchesTheContract(t *testing.T) {
 	}
 	if body.read {
 		t.Error("the server read the shared files")
+	}
+}
+
+func TestPagesMayUseTheBucket(t *testing.T) {
+	const bucket = "https://acct.r2.cloudflarestorage.com"
+	for origin, want := range map[string][]string{
+		"":     {"img-src 'self' blob: data:;", "media-src 'self' blob:;", "connect-src 'self';"},
+		bucket: {"img-src 'self' blob: data: " + bucket + ";", "media-src 'self' blob: " + bucket + ";", "connect-src 'self' " + bucket + ";"},
+	} {
+		rec := httptest.NewRecorder()
+		New(&config.Config{Name: "Share"}, origin).ServeHTTP(rec, httptest.NewRequest("GET", "/", nil))
+		csp := rec.Header().Get("Content-Security-Policy")
+		for _, w := range want {
+			if !strings.Contains(csp, w) {
+				t.Errorf("bucket %q: CSP %q has no %q", origin, csp, w)
+			}
+		}
+		if strings.Contains(csp, "default-src 'self' https") || strings.Contains(csp, "worker-src 'self' https") {
+			t.Errorf("bucket %q: CSP %q lets the bucket do more", origin, csp)
+		}
 	}
 }

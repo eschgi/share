@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../../app.dart';
 import '../../data/api.dart';
 import '../../data/models.dart';
+import '../../data/platform.dart' show KeysException;
 import '../../l10n/app_localizations.dart';
 import '../folders.dart';
 import '../format.dart';
@@ -92,7 +93,39 @@ Future<PinInfo?> makePin(BuildContext context, {String? folder}) async {
   return created;
 }
 
-Future<void> sharePin(BuildContext context, PinInfo p) => Services.read(context).platform.shareText(AppLocalizations.of(context).pinShareText(p.link));
+/// A PIN's link to hand on: for one that shows an encrypted folder, with its secret after a dot,
+/// which this phone opens with the folder's key (docs/e2ee-plan.md). Without that key the link
+/// opens none of the encrypted files, which a note says. For one that only sends into a folder
+/// with keys, with the root's fingerprint, which guests check the folder's key with.
+Future<String> pinLink(BuildContext context, PinInfo p) async {
+  final secret = p.secret;
+  final platform = Services.read(context).platform;
+  if (secret == null) {
+    try {
+      final root = p.showsFolder ? null : await platform.pinLinkRoot(p.folder);
+      return root == null ? p.link : '${p.link}.$root';
+    } on KeysException {
+      return p.link;
+    }
+  }
+  final t = AppLocalizations.of(context);
+  final messenger = ScaffoldMessenger.of(context);
+  try {
+    final s = await platform.pinLinkSecret(p.folder, secret.locked, secret.version);
+    if (s != null) return '${p.link}.$s';
+  } on KeysException {
+    // as without the key
+  }
+  messenger.showSnackBar(SnackBar(content: Text(t.pinsNoKey)));
+  return p.link;
+}
+
+Future<void> sharePin(BuildContext context, PinInfo p) async {
+  final t = AppLocalizations.of(context);
+  final platform = Services.read(context).platform;
+  final link = await pinLink(context, p);
+  await platform.shareText(t.pinShareText(link));
+}
 
 Future<bool> _confirm(BuildContext context, String title, String body, String action) async {
   final t = AppLocalizations.of(context);
@@ -258,21 +291,23 @@ class _Tag extends StatelessWidget {
 }
 
 /// A PIN as a QR code, for someone standing next to you.
-Future<void> showPinQr(BuildContext context, PinInfo pin) {
+Future<void> showPinQr(BuildContext context, PinInfo pin) async {
   final t = AppLocalizations.of(context);
+  final link = await pinLink(context, pin);
+  if (!context.mounted) return;
   return showDialog<void>(
     context: context,
     builder: (context) => Dialog(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(24, 26, 24, 16),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          QrCodeView(pin.link, size: 200, label: pin.link),
+          QrCodeView(link, size: 200, label: link),
           const SizedBox(height: 18),
           CodeBoxes(pin.code, size: 36),
           const SizedBox(height: 14),
           Text(t.pinScanToSend, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
           const SizedBox(height: 4),
-          Text(pin.link, textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: context.colors.text3)),
+          Text(link, textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: context.colors.text3)),
           const SizedBox(height: 8),
           Align(
             alignment: Alignment.centerRight,
@@ -343,8 +378,27 @@ class _NewPinSheetState extends State<NewPinSheet> {
     });
     final navigator = Navigator.of(context);
     try {
-      final pin = await services.admin.createPin(_kind, code: _code.text, folder: folder, showsFolder: _shows);
-      navigator.pop(pin);
+      // A PIN that shows an encrypted folder brings the folder's keys, locked with a secret that
+      // only its link has.
+      ({String secret, Json body})? secret;
+      if (_shows) {
+        try {
+          secret = await services.platform.pinSecret(folder);
+        } on KeysException {
+          secret = null;
+        }
+        if (secret == null && services.folders.byId(folder)?.keyVersion != null) return setState(() => _error = t.keysCantOpen);
+      }
+      final pin = await services.admin.createPin(_kind, code: _code.text, folder: folder, showsFolder: _shows, secret: secret?.body);
+      if (secret != null) return navigator.pop(pin.withLink('${pin.link}.${secret.secret}'));
+      // One that only sends into a folder with keys names the root in its link.
+      String? root;
+      try {
+        root = await services.platform.pinLinkRoot(folder);
+      } on KeysException {
+        root = null;
+      }
+      navigator.pop(root == null ? pin : pin.withLink('${pin.link}.$root'));
     } on ApiException catch (e) {
       setState(() => _error = switch (e.code) { 'pin_taken' => t.pinTaken, 'pin_format' => t.pinBadCode, 'folder_gone' => t.folderGone, _ => t.commonFailed });
     } on NetworkException {

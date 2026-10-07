@@ -1,0 +1,11 @@
+{
+  "method": "PUT",
+  "path": "/api/keys/checks/{id}/reveal",
+  "auth": "device",
+  "status": 204,
+  "request": {
+    "key": "BB5jmXSM2aDHTqZrTpU_bGOoXnKAcC0FAJ78fXc8csOex9F11i3PeWYbESBbbl0XzXGBgqgKCqIhFey7UMe4ghQ",
+    "answer": "BMCB5WCn88giBtsQ_527sdAcMSH74n1J9M_qyyqvybjuOBDVWZzBQChS5Z1G59B0JEGA9ut6NZdDnYE8UV8JMi4"
+  },
+  "notes": "The asking device's one-time public key, once the waiting side answered, and that answer as it saw it, which its code is made from; only from the device that asks. 400 bad_request when the key isn't the one the commitment was made for; 409 not_answered before an answer, when the answer changed meanwhile (the waiting side answered again: reveal for the new one), or when it was revealed already; 404 not_found for another device."
+}

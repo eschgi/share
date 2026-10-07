@@ -15,15 +15,18 @@ import (
 	"github.com/eschgi/share/server/internal/auth"
 	"github.com/eschgi/share/server/internal/checksum"
 	"github.com/eschgi/share/server/internal/config"
+	"github.com/eschgi/share/server/internal/db"
 	"github.com/eschgi/share/server/internal/downloads"
+	"github.com/eschgi/share/server/internal/e2ee"
 	"github.com/eschgi/share/server/internal/httpx"
 	"github.com/eschgi/share/server/internal/localtls"
+	"github.com/eschgi/share/server/internal/s3"
 	"github.com/eschgi/share/server/internal/storage"
 	"github.com/eschgi/share/server/internal/thumbs"
 )
 
 // Version is the API version, sent in /api/info so apps can tell what the server speaks.
-const Version = 2
+const Version = 3
 
 // API holds what the handlers need.
 type API struct {
@@ -36,18 +39,20 @@ type API struct {
 	Local       *localtls.Loader // Share's own certificate on the https port; nil without one
 	APK         *APK
 	Downloads   *downloads.Store
-	Checksums   *checksum.Store
+	Checksums   *checksum.Store // nil in a bucket, which sends no ZIP
+	S3          *s3.Bucket      // where the files are in S3 mode; nil on a drive
 	Now         func() time.Time
 	// ServerVersion is the program's version, e.g. v0.1.0-3-gabc1234, for /api/about.
 	ServerVersion string
 	// CheckStorage looks at the drives, for what the admins' storage page warns about.
-	CheckStorage func() storage.Report
+	CheckStorage func(context.Context) storage.Report
 
 	folderCache folderCache
 }
 
-// Register adds the API routes to mux.
-func (a *API) Register(mux *http.ServeMux) {
+// Register adds the API routes to sm.
+func (a *API) Register(sm *http.ServeMux) {
+	mux := routes{sm}
 	mux.HandleFunc("GET /api/info", a.info)
 	mux.HandleFunc("GET /api/app", a.appInfo)
 	mux.HandleFunc("GET /download/share.apk", a.downloadAPK)
@@ -79,7 +84,11 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/files/{id}/thumb", a.putThumb)
 	mux.HandleFunc("POST /api/downloads", a.createDownload)
 	mux.HandleFunc("GET /api/downloads/{id}", a.download)
+	if a.S3 != nil {
+		mux.HandleFunc("GET /api/s3/files/{id}/url", a.fileURL)
+	}
 	a.registerAdmin(mux)
+	a.registerKeys(mux)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusNotFound, "not_found", "No such API endpoint.")
 	})
@@ -94,9 +103,18 @@ type Info struct {
 	DefaultLanguage  string   `json:"default_language"`
 	ChunkSizeBytes   int64    `json:"chunk_size_bytes"`
 	MaxFileSizeBytes int64    `json:"max_file_size_bytes"`
+	Storage          string   `json:"storage"` // "disk": tus and /content; "s3": the bucket
+	Setup            bool     `json:"setup"`   // nobody has an account yet: the website offers /setup
+	// PublicURL is the server's public address, which pages opened over plain http point to:
+	// browsers encrypt only over https or on localhost.
+	PublicURL string `json:"public_url"`
 }
 
 func (a *API) info(w http.ResponseWriter, r *http.Request) {
+	setup, err := a.Auth.NoAccounts(r.Context())
+	if err != nil {
+		log.Printf("info: %v", err)
+	}
 	httpx.WriteJSON(w, http.StatusOK, Info{
 		ServerID:         a.ServerID,
 		Name:             a.Cfg.Name,
@@ -105,6 +123,9 @@ func (a *API) info(w http.ResponseWriter, r *http.Request) {
 		DefaultLanguage:  a.Cfg.DefaultLanguage,
 		ChunkSizeBytes:   a.Cfg.ChunkSize(),
 		MaxFileSizeBytes: a.MaxFileSize,
+		Storage:          a.storageMode(),
+		Setup:            setup,
+		PublicURL:        a.Cfg.PublicURL,
 	})
 }
 
@@ -119,6 +140,42 @@ type Session struct {
 	FolderName *string `json:"folder_name"`
 	// ShowsFolder: the PIN also shows what is in its folder (/api/folders, /api/library, ...).
 	ShowsFolder bool `json:"shows_folder"`
+	// FolderKey: the newest version of the folder's key, whenever it has one, which uploads seal
+	// their file keys for while it is encrypted, and always for a guest whose link names the root;
+	// null for a folder that was never encrypted.
+	FolderKey *SessionKey `json:"folder_key"`
+	// Roots: the chain of roots, the first first, which a guest whose link names one follows to
+	// the newest, which signs the folder's key.
+	Roots []RootInfo `json:"roots"`
+}
+
+// SessionKey is the newest version of a folder's key, signed by the root.
+type SessionKey struct {
+	Folder    string `json:"folder"`
+	Version   int    `json:"version"`
+	PublicKey B64    `json:"public_key"`
+	Signature B64    `json:"signature"`
+	Encrypted bool   `json:"encrypted"` // new files into the folder must be encrypted
+}
+
+// sessionKeys are the newest key of a PIN's folder, nil without one, and the chain of roots.
+func (a *API) sessionKeys(ctx context.Context, folderID string) (*SessionKey, []RootInfo, error) {
+	roots, err := a.roots(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	f, err := a.Auth.DB.FolderByID(ctx, folderID)
+	if errors.Is(err, db.ErrNotFound) {
+		return nil, roots, nil
+	}
+	if err != nil || f.KeyVersion == 0 {
+		return nil, roots, err
+	}
+	k, err := a.Auth.DB.FolderKeyOf(ctx, f.ID, f.KeyVersion)
+	if err != nil {
+		return nil, nil, err
+	}
+	return &SessionKey{Folder: f.ID, Version: k.Version, PublicKey: k.PublicKey, Signature: k.Signature, Encrypted: f.Encrypted}, roots, nil
 }
 
 // folderName is the name of a PIN's folder for its session, nil on a server with one folder.
@@ -196,9 +253,14 @@ func (a *API) unlock(w http.ResponseWriter, r *http.Request) {
 		internal(w, "unlock", err)
 		return
 	}
+	key, roots, err := a.sessionKeys(r.Context(), res.Session.Pin.FolderID)
+	if err != nil {
+		internal(w, "unlock", err)
+		return
+	}
 	resp := UnlockResponse{
 		Session: Session{Kind: auth.KindPin, PinKind: res.Session.Pin.Kind, ExpiresAt: res.ExpiresAt, FolderName: folder,
-			ShowsFolder: res.Session.Pin.ShowsFolder},
+			ShowsFolder: res.Session.Pin.ShowsFolder, FolderKey: key, Roots: roots},
 		MovedUploads: res.Moved,
 	}
 	if req.Client == "app" {
@@ -221,8 +283,13 @@ func (a *API) session(w http.ResponseWriter, r *http.Request) {
 		internal(w, "session", err)
 		return
 	}
+	key, roots, err := a.sessionKeys(r.Context(), p.PinFolderID)
+	if err != nil {
+		internal(w, "session", err)
+		return
+	}
 	httpx.WriteJSON(w, http.StatusOK, Session{Kind: p.Kind, PinKind: p.PinKind, ExpiresAt: p.PinExpiresAt, FolderName: folder,
-		ShowsFolder: p.PinShowsFolder})
+		ShowsFolder: p.PinShowsFolder, FolderKey: key, Roots: roots})
 }
 
 func (a *API) endSession(w http.ResponseWriter, r *http.Request) {
@@ -248,11 +315,15 @@ func (a *API) putThumb(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteAuthError(w, r, err)
 		return
 	}
-	if mt, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); mt != "image/jpeg" {
-		httpx.WriteError(w, http.StatusUnsupportedMediaType, "unsupported_media_type", "Send the thumbnail as image/jpeg.")
+	var m thumbs.Meta
+	switch mt, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); mt {
+	case "image/jpeg":
+	case "application/octet-stream": // an encrypted file's, sealed
+		m.Sealed = true
+	default:
+		httpx.WriteError(w, http.StatusUnsupportedMediaType, "unsupported_media_type", "Send the thumbnail as image/jpeg, or sealed as application/octet-stream.")
 		return
 	}
-	var m thumbs.Meta
 	q := r.URL.Query()
 	for _, f := range []struct {
 		name string
@@ -279,7 +350,11 @@ func (a *API) putThumb(w http.ResponseWriter, r *http.Request) {
 	err = a.Thumbs.CanSend(r.Context(), p, id)
 	if err == nil {
 		var data []byte
-		data, err = io.ReadAll(http.MaxBytesReader(w, r.Body, thumbs.MaxBytes))
+		limit := int64(thumbs.MaxBytes)
+		if m.Sealed {
+			limit = e2ee.MaxThumbSize
+		}
+		data, err = io.ReadAll(http.MaxBytesReader(w, r.Body, limit))
 		if tooBig := (*http.MaxBytesError)(nil); errors.As(err, &tooBig) {
 			httpx.WriteError(w, http.StatusRequestEntityTooLarge, "too_large", "A thumbnail can be at most 512 KiB.")
 			return
@@ -298,7 +373,7 @@ func (a *API) putThumb(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, thumbs.ErrTooLate):
 		httpx.WriteError(w, http.StatusForbidden, "forbidden", "Thumbnails can only be sent within a day of the upload.")
 	case errors.Is(err, thumbs.ErrInvalid):
-		httpx.WriteError(w, http.StatusBadRequest, "bad_thumbnail", "The thumbnail must be a JPEG of at most 1024×1024 pixels.")
+		httpx.WriteError(w, http.StatusBadRequest, "bad_thumbnail", "The thumbnail must be a JPEG of at most 1024×1024 pixels, sealed for an encrypted file.")
 	default:
 		log.Printf("api: thumbnail: %v", err)
 		httpx.WriteError(w, http.StatusInternalServerError, "internal", "The thumbnail couldn't be stored.")

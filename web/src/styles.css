@@ -226,6 +226,9 @@ button {
 .help.err {
   color: var(--danger);
 }
+.help.warn {
+  color: var(--warn);
+}
 /* Files shared from another app, waiting on the PIN screen. */
 .sharedcard {
   display: flex;
@@ -1230,6 +1233,13 @@ a.small:focus-visible {
 .facts b {
   font-size: 15px;
   font-weight: 500;
+}
+/* The storage folder on the setup page: a path, maybe a long one. */
+.facts b.path {
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 14px;
+  overflow-wrap: anywhere;
 }
 /* "or", between two ways. */
 .or {

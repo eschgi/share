@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"bytes"
+	"fmt"
 	"net/http"
 	"path"
 	"regexp"
@@ -179,18 +181,24 @@ var knownTypes = map[string]fileType{
 
 // GuessKind is the kind a name suggests, used while a file is still arriving.
 func GuessKind(name string) string {
-	if t, ok := knownTypes[strings.ToLower(path.Ext(name))]; ok {
-		return t.kind
+	if _, kind, ok := TypeByName(name); ok {
+		return kind
 	}
 	return db.KindDocument
+}
+
+// TypeByName is the stored mime type and kind of a name whose extension is known.
+func TypeByName(name string) (mime, kind string, ok bool) {
+	t, ok := knownTypes[strings.ToLower(path.Ext(name))]
+	return t.mime, t.kind, ok
 }
 
 // Classify decides the stored mime type and kind from the name and, for unknown extensions,
 // the first bytes. HTML and SVG are stored as plain bytes, so a download can never run as a
 // page on this origin.
 func Classify(name string, head []byte) (mime, kind string) {
-	if t, ok := knownTypes[strings.ToLower(path.Ext(name))]; ok {
-		return t.mime, t.kind
+	if mime, kind, ok := TypeByName(name); ok {
+		return mime, kind
 	}
 	mime = http.DetectContentType(head)
 	switch {
@@ -204,8 +212,54 @@ func Classify(name string, head []byte) (mime, kind string) {
 	return mime, db.KindDocument
 }
 
+// ClassifyEncrypted is Classify for an encrypted file, whose bytes say nothing: by the name
+// alone.
+func ClassifyEncrypted(name string) (mime, kind string) {
+	if mime, kind, ok := TypeByName(name); ok {
+		return mime, kind
+	}
+	return "application/octet-stream", db.KindDocument
+}
+
+// checkHeader makes sure an encrypted file's bytes start with the header its uploader said.
+func checkHeader(f db.File, head []byte) error {
+	if !bytes.Equal(head, f.Enc.Header) {
+		return fmt.Errorf("finalize %s: the encrypted bytes don't start with their header", f.ID)
+	}
+	return nil
+}
+
 // Day is the library folder, and the day a file is grouped under: the upload day in the
 // configured time zone.
 func Day(t time.Time, loc *time.Location) string {
 	return t.In(loc).Format(time.DateOnly)
+}
+
+// ContentDisposition makes a file save under its own name: an ASCII stand-in for old
+// clients, and the real name as UTF-8 (RFC 6266).
+func ContentDisposition(name string) string {
+	var ascii, enc strings.Builder
+	for _, c := range name {
+		if c < 0x20 || c > 0x7E || c == '"' || c == '\\' {
+			ascii.WriteByte('_')
+		} else {
+			ascii.WriteRune(c)
+		}
+	}
+	for _, b := range []byte(name) {
+		if isAttrChar(b) {
+			enc.WriteByte(b)
+		} else {
+			enc.WriteString("%" + strings.ToUpper(strconv.FormatInt(int64(b)|0x100, 16)[1:]))
+		}
+	}
+	return `attachment; filename="` + ascii.String() + `"; filename*=UTF-8''` + enc.String()
+}
+
+func isAttrChar(b byte) bool {
+	switch {
+	case 'a' <= b && b <= 'z', 'A' <= b && b <= 'Z', '0' <= b && b <= '9':
+		return true
+	}
+	return strings.IndexByte("!#$&+-.^_`|~", b) >= 0
 }

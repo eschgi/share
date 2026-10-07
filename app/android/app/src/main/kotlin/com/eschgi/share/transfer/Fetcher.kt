@@ -3,8 +3,10 @@ package com.eschgi.share.transfer
 import android.content.Context
 import android.net.Uri
 import androidx.core.content.FileProvider
+import com.eschgi.share.e2ee.Keys
 import com.eschgi.share.net.RouteMonitor
 import com.eschgi.share.net.ServerConnection
+import com.eschgi.share.net.ServerInfo
 import java.io.File
 import java.io.IOException
 
@@ -45,7 +47,8 @@ object Fetcher {
             if (!force && now - reported < 250_000_000) return
             reported = now
             val states = items.map { if (it.file.id in finished) it.copy(state = TransferItem.DONE) else it }
-            Downloads.emit(BatchSnapshot.of(BATCH, running, false, states, live, local).toMap())
+            // Known after the first file it fetches: from a bucket nothing comes over the address at home.
+            Downloads.emit(BatchSnapshot.of(BATCH, running, false, states, live, local && !ServerInfo.knownS3(config)).toMap())
         }
         try {
             for (file in files) {
@@ -91,10 +94,19 @@ object Fetcher {
         abort: Abort,
         onBytes: (Long) -> Unit,
     ): Boolean {
+        // An encrypted file lands decrypted in the cache, as a saved one does in the gallery.
+        val cipher = Keys.cipher(app, auth, file.enc)
         var attempt = 0
         while (true) {
             val home = Credentials.atHome(auth, RouteMonitor.settled(app).isLocal)
-            when (val outcome = downloader.fetch(file.id, file.size, sink, open = { server.open(it, home) }, abort = abort, onBytes = onBytes)) {
+            val open = { path: String -> server.open(path, home) }
+            // Asked only now, for a file that isn't on the phone: what is there opens offline.
+            val outcome = when (ServerInfo.of(server.config) { server.open(it, home, readTimeoutMs = 15_000) }?.storage) {
+                null -> Downloader.Outcome.Retry(IOException("the server didn't say where its files are"))
+                ServerInfo.Storage.DISK -> downloader.fetch(file.id, file.size, sink, open = open, abort = abort, onBytes = onBytes, cipher = cipher)
+                ServerInfo.Storage.S3 -> downloader.fetchS3(file.id, file.size, sink, link = { S3Links.fetch(file.id, open) }, abort = abort, onBytes = onBytes, cipher = cipher)
+            }
+            when (outcome) {
                 Downloader.Outcome.Done -> {
                     sink.commit()
                     return true

@@ -16,6 +16,9 @@ const (
 // ErrLastAdmin means the change would leave nobody who can manage the server.
 var ErrLastAdmin = errors.New("the last admin can't go")
 
+// ErrNotFirst means someone was to be the first with an account, but someone else is.
+var ErrNotFirst = errors.New("someone has an account already")
+
 // User is a person with an account.
 type User struct {
 	ID           string
@@ -32,21 +35,20 @@ const userColumns = "id, name, username, password_hash, role, created_at, create
 func scanUser(row interface{ Scan(...any) error }) (User, error) {
 	var u User
 	var username, hash sql.NullString
-	var created int64
-	err := row.Scan(&u.ID, &u.Name, &username, &hash, &u.Role, &created, &u.CreatedBy)
-	if errors.Is(err, sql.ErrNoRows) {
+	err := row.Scan(&u.ID, &u.Name, &username, &hash, &u.Role, &u.CreatedAt, &u.CreatedBy)
+	if noRow(err) {
 		return u, ErrNotFound
 	}
 	if err != nil {
 		return u, err
 	}
-	u.Username, u.PasswordHash, u.CreatedAt = username.String, hash.String, fromMS(created)
+	u.Username, u.PasswordHash = username.String, hash.String
 	return u, nil
 }
 
 func insertUser(ctx context.Context, tx *sql.Tx, u User) error {
-	_, err := tx.ExecContext(ctx, "INSERT INTO users ("+userColumns+") VALUES (?, ?, ?, ?, ?, ?, ?)",
-		u.ID, u.Name, nullString(u.Username), nullString(u.PasswordHash), u.Role, ms(u.CreatedAt), u.CreatedBy)
+	_, err := tx.ExecContext(ctx, "INSERT INTO users ("+userColumns+") VALUES ($1, $2, $3, $4, $5, $6, $7)",
+		u.ID, u.Name, nullString(u.Username), nullString(u.PasswordHash), u.Role, u.CreatedAt, u.CreatedBy)
 	if isUniqueViolation(err) {
 		return ErrConflict
 	}
@@ -55,48 +57,56 @@ func insertUser(ctx context.Context, tx *sql.Tx, u User) error {
 
 // InsertUser adds a person. It returns ErrConflict if the username is taken.
 func (d *DB) InsertUser(ctx context.Context, u User) error {
-	return d.Tx(ctx, func(tx *sql.Tx) error { return insertUser(ctx, tx, u) })
+	return d.inTx(ctx, func(tx *sql.Tx) error { return insertUser(ctx, tx, u) })
+}
+
+// InsertFirstUser adds the first person with an account and signs in their phone or browser;
+// ErrNotFirst if someone has an account already.
+func (d *DB) InsertFirstUser(ctx context.Context, u User, dv Device, tokenHash []byte) error {
+	return d.inTx(ctx, func(tx *sql.Tx) error {
+		var n int
+		if err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM users").Scan(&n); err != nil {
+			return err
+		}
+		if n > 0 {
+			return ErrNotFirst
+		}
+		if err := insertUser(ctx, tx, u); err != nil {
+			return err
+		}
+		return insertDevice(ctx, tx, dv, tokenHash)
+	})
 }
 
 // UserByID returns one person.
 func (d *DB) UserByID(ctx context.Context, id string) (User, error) {
-	return scanUser(d.QueryRowContext(ctx, "SELECT "+userColumns+" FROM users WHERE id = ?", id))
+	return scanUser(d.pool.QueryRowContext(ctx, "SELECT "+userColumns+" FROM users WHERE id = $1", id))
 }
+
+// userByUsername finds a person on users_username.
+const userByUsername = "SELECT " + userColumns + " FROM users WHERE casefold(username) = casefold($1 COLLATE pg_c_utf8)"
 
 // UserByUsername finds a person by username, ignoring case.
 func (d *DB) UserByUsername(ctx context.Context, username string) (User, error) {
-	return scanUser(d.QueryRowContext(ctx, "SELECT "+userColumns+" FROM users WHERE username = ?", username))
+	return scanUser(d.pool.QueryRowContext(ctx, userByUsername, username))
 }
 
 // Users lists everyone, admins first, then by name.
 func (d *DB) Users(ctx context.Context) ([]User, error) {
-	rows, err := d.QueryContext(ctx, "SELECT "+userColumns+" FROM users ORDER BY role = 'member', name COLLATE NOCASE, id")
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []User
-	for rows.Next() {
-		u, err := scanUser(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, u)
-	}
-	return out, rows.Err()
+	return queryAll(ctx, d.pool, scanUser, "SELECT "+userColumns+" FROM users ORDER BY role = 'member', casefold(name), id")
 }
 
 // UserCount counts the people with an account.
 func (d *DB) UserCount(ctx context.Context) (int, error) {
 	var n int
-	err := d.QueryRowContext(ctx, "SELECT COUNT(*) FROM users").Scan(&n)
+	err := d.pool.QueryRowContext(ctx, "SELECT COUNT(*) FROM users").Scan(&n)
 	return n, err
 }
 
 // SetLogin gives a person a username and password hash. It returns ErrConflict if the
 // username belongs to someone else, and ErrNotFound if there is no such person.
 func (d *DB) SetLogin(ctx context.Context, userID, username, passwordHash string) error {
-	res, err := d.ExecContext(ctx, "UPDATE users SET username = ?, password_hash = ? WHERE id = ?",
+	res, err := d.pool.ExecContext(ctx, "UPDATE users SET username = $1, password_hash = $2 WHERE id = $3",
 		nullString(username), nullString(passwordHash), userID)
 	if isUniqueViolation(err) {
 		return ErrConflict
@@ -115,10 +125,10 @@ func (d *DB) SetLogin(ctx context.Context, userID, username, passwordHash string
 // DeleteUser removes a person together with their phones and open invites. Files they sent
 // stay in the library. It returns ErrLastAdmin for the last admin.
 func (d *DB) DeleteUser(ctx context.Context, id string) error {
-	return d.Tx(ctx, func(tx *sql.Tx) error {
+	return d.inTx(ctx, func(tx *sql.Tx) error {
 		var role string
-		err := tx.QueryRowContext(ctx, "SELECT role FROM users WHERE id = ?", id).Scan(&role)
-		if errors.Is(err, sql.ErrNoRows) {
+		err := tx.QueryRowContext(ctx, "SELECT role FROM users WHERE id = $1", id).Scan(&role)
+		if noRow(err) {
 			return ErrNotFound
 		}
 		if err != nil {
@@ -133,7 +143,10 @@ func (d *DB) DeleteUser(ctx context.Context, id string) error {
 				return ErrLastAdmin
 			}
 		}
-		_, err = tx.ExecContext(ctx, "DELETE FROM users WHERE id = ?", id)
+		if err := loseFolders(ctx, tx, id, ""); err != nil {
+			return err
+		}
+		_, err = tx.ExecContext(ctx, "DELETE FROM users WHERE id = $1", id)
 		return err
 	})
 }
@@ -160,17 +173,11 @@ const deviceColumns = "id, user_id, name, client, home_only, created_at, last_se
 
 func scanDevice(row interface{ Scan(...any) error }) (Device, error) {
 	var dv Device
-	var created, seen int64
-	var revoked sql.NullInt64
-	err := row.Scan(&dv.ID, &dv.UserID, &dv.Name, &dv.Client, &dv.HomeOnly, &created, &seen, &revoked)
-	if errors.Is(err, sql.ErrNoRows) {
+	err := row.Scan(&dv.ID, &dv.UserID, &dv.Name, &dv.Client, &dv.HomeOnly, &dv.CreatedAt, &dv.LastSeenAt, &dv.RevokedAt)
+	if noRow(err) {
 		return dv, ErrNotFound
 	}
-	if err != nil {
-		return dv, err
-	}
-	dv.CreatedAt, dv.LastSeenAt, dv.RevokedAt = fromMS(created), fromMS(seen), optTime(revoked)
-	return dv, nil
+	return dv, err
 }
 
 func insertDevice(ctx context.Context, tx *sql.Tx, dv Device, tokenHash []byte) error {
@@ -178,37 +185,34 @@ func insertDevice(ctx context.Context, tx *sql.Tx, dv Device, tokenHash []byte) 
 		dv.Client = ClientApp
 	}
 	_, err := tx.ExecContext(ctx,
-		"INSERT INTO devices (id, user_id, token_hash, name, client, home_only, created_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-		dv.ID, dv.UserID, tokenHash, dv.Name, dv.Client, dv.HomeOnly, ms(dv.CreatedAt), ms(dv.LastSeenAt))
+		"INSERT INTO devices (id, user_id, token_hash, name, client, home_only, created_at, last_seen_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+		dv.ID, dv.UserID, tokenHash, dv.Name, dv.Client, dv.HomeOnly, dv.CreatedAt, dv.LastSeenAt)
 	return err
 }
 
 // InsertDevice signs a phone or browser in for a person; only the token's hash is kept.
 func (d *DB) InsertDevice(ctx context.Context, dv Device, tokenHash []byte) error {
-	return d.Tx(ctx, func(tx *sql.Tx) error { return insertDevice(ctx, tx, dv, tokenHash) })
+	return d.inTx(ctx, func(tx *sql.Tx) error { return insertDevice(ctx, tx, dv, tokenHash) })
 }
 
 // DeviceByToken finds a phone or browser and its person by token hash. It doesn't judge
 // validity; callers check RevokedAt.
 func (d *DB) DeviceByToken(ctx context.Context, tokenHash []byte) (Device, User, error) {
-	row := d.QueryRowContext(ctx, `SELECT d.id, d.user_id, d.name, d.client, d.home_only, d.created_at, d.last_seen_at, d.revoked_at,
+	row := d.pool.QueryRowContext(ctx, `SELECT d.id, d.user_id, d.name, d.client, d.home_only, d.created_at, d.last_seen_at, d.revoked_at,
 			u.id, u.name, u.username, u.password_hash, u.role, u.created_at, u.created_by
-		FROM devices d JOIN users u ON u.id = d.user_id WHERE d.token_hash = ?`, tokenHash)
+		FROM devices d JOIN users u ON u.id = d.user_id WHERE d.token_hash = $1`, tokenHash)
 	var dv Device
 	var u User
-	var created, seen, uCreated int64
-	var revoked sql.NullInt64
 	var username, hash sql.NullString
-	err := row.Scan(&dv.ID, &dv.UserID, &dv.Name, &dv.Client, &dv.HomeOnly, &created, &seen, &revoked,
-		&u.ID, &u.Name, &username, &hash, &u.Role, &uCreated, &u.CreatedBy)
-	if errors.Is(err, sql.ErrNoRows) {
+	err := row.Scan(&dv.ID, &dv.UserID, &dv.Name, &dv.Client, &dv.HomeOnly, &dv.CreatedAt, &dv.LastSeenAt, &dv.RevokedAt,
+		&u.ID, &u.Name, &username, &hash, &u.Role, &u.CreatedAt, &u.CreatedBy)
+	if noRow(err) {
 		return dv, u, ErrNotFound
 	}
 	if err != nil {
 		return dv, u, err
 	}
-	dv.CreatedAt, dv.LastSeenAt, dv.RevokedAt = fromMS(created), fromMS(seen), optTime(revoked)
-	u.Username, u.PasswordHash, u.CreatedAt = username.String, hash.String, fromMS(uCreated)
+	u.Username, u.PasswordHash = username.String, hash.String
 	return dv, u, nil
 }
 
@@ -216,8 +220,8 @@ func (d *DB) DeviceByToken(ctx context.Context, tokenHash []byte) (Device, User,
 // at home is that phone's own (auth.HomeProof). ErrNotFound for unknown or signed-out phones.
 func (d *DB) DeviceTokenHash(ctx context.Context, id string) ([]byte, error) {
 	var hash []byte
-	err := d.QueryRowContext(ctx, "SELECT token_hash FROM devices WHERE id = ? AND revoked_at IS NULL", id).Scan(&hash)
-	if errors.Is(err, sql.ErrNoRows) {
+	err := d.pool.QueryRowContext(ctx, "SELECT token_hash FROM devices WHERE id = $1 AND revoked_at IS NULL", id).Scan(&hash)
+	if noRow(err) {
 		return nil, ErrNotFound
 	}
 	return hash, err
@@ -226,41 +230,33 @@ func (d *DB) DeviceTokenHash(ctx context.Context, id string) ([]byte, error) {
 // DevicesOf lists a person's phones and browsers that are still signed in, most recently used
 // first.
 func (d *DB) DevicesOf(ctx context.Context, userID string) ([]Device, error) {
-	rows, err := d.QueryContext(ctx, "SELECT "+deviceColumns+` FROM devices
-		WHERE user_id = ? AND revoked_at IS NULL ORDER BY last_seen_at DESC, id`, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []Device
-	for rows.Next() {
-		dv, err := scanDevice(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, dv)
-	}
-	return out, rows.Err()
+	return queryAll(ctx, d.pool, scanDevice, "SELECT "+deviceColumns+` FROM devices
+		WHERE user_id = $1 AND revoked_at IS NULL ORDER BY last_seen_at DESC, id`, userID)
 }
 
 // TouchDevice records that a phone was just used.
 func (d *DB) TouchDevice(ctx context.Context, id string, at time.Time) error {
-	_, err := d.ExecContext(ctx, "UPDATE devices SET last_seen_at = ? WHERE id = ?", ms(at), id)
+	_, err := d.pool.ExecContext(ctx, "UPDATE devices SET last_seen_at = $1 WHERE id = $2", at, id)
 	return err
 }
 
 // RevokeDevice signs a phone or browser out; its token stops working.
 func (d *DB) RevokeDevice(ctx context.Context, id string, at time.Time) error {
-	_, err := d.ExecContext(ctx, "UPDATE devices SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL", ms(at), id)
-	return err
+	return d.inTx(ctx, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, "UPDATE devices SET revoked_at = $1 WHERE id = $2 AND revoked_at IS NULL", at, id); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx, "DELETE FROM person_keys WHERE device_id = $1", id)
+		return err
+	})
 }
 
 // DeleteEndedDevices forgets phones and browsers that were signed out before revokedBefore,
 // and browsers nobody used since idleBefore; their keys can't work any more. Nothing refers to
 // a device by foreign key: files and invites keep the id as plain text.
 func (d *DB) DeleteEndedDevices(ctx context.Context, revokedBefore, idleBefore time.Time) (int64, error) {
-	res, err := d.ExecContext(ctx, `DELETE FROM devices WHERE (revoked_at IS NOT NULL AND revoked_at < ?)
-		OR (client = 'web' AND last_seen_at < ?)`, ms(revokedBefore), ms(idleBefore))
+	res, err := d.pool.ExecContext(ctx, `DELETE FROM devices WHERE (revoked_at IS NOT NULL AND revoked_at < $1)
+		OR (client = 'web' AND last_seen_at < $2)`, revokedBefore, idleBefore)
 	if err != nil {
 		return 0, err
 	}
@@ -279,7 +275,18 @@ type Invite struct {
 	UsedAt    *time.Time
 	DeviceID  string
 	RevokedAt *time.Time
-	Folders   []string // the folders a new member gets; only InsertInvite reads it
+	Folders   []string    // the folders a new member gets; only InsertInvite reads it
+	Keys      []InviteKey // keys locked with the link's secret; only InsertInvite reads it
+}
+
+// InviteKey is a key locked with the secret of an invite's link: a version of a folder's key,
+// the person's own key ("" and 0) for a new phone or browser, or the root's public key (Root),
+// for the new phone or browser to trust.
+type InviteKey struct {
+	FolderID string
+	Version  int
+	Root     bool
+	Locked   []byte
 }
 
 const inviteColumns = "id, name, role, user_id, created_by, created_at, expires_at, used_at, device_id, revoked_at"
@@ -287,31 +294,46 @@ const inviteColumns = "id, name, role, user_id, created_by, created_at, expires_
 func scanInvite(row interface{ Scan(...any) error }) (Invite, error) {
 	var in Invite
 	var userID, deviceID sql.NullString
-	var created, expires int64
-	var used, revoked sql.NullInt64
-	err := row.Scan(&in.ID, &in.Name, &in.Role, &userID, &in.CreatedBy, &created, &expires, &used, &deviceID, &revoked)
-	if errors.Is(err, sql.ErrNoRows) {
+	err := row.Scan(&in.ID, &in.Name, &in.Role, &userID, &in.CreatedBy, &in.CreatedAt, &in.ExpiresAt, &in.UsedAt, &deviceID, &in.RevokedAt)
+	if noRow(err) {
 		return in, ErrNotFound
 	}
 	if err != nil {
 		return in, err
 	}
 	in.UserID, in.DeviceID = userID.String, deviceID.String
-	in.CreatedAt, in.ExpiresAt, in.UsedAt, in.RevokedAt = fromMS(created), fromMS(expires), optTime(used), optTime(revoked)
 	return in, nil
 }
 
 // InsertInvite stores a new invite with the folders it gives; only the token's hash is kept.
 func (d *DB) InsertInvite(ctx context.Context, in Invite, tokenHash []byte) error {
-	return d.Tx(ctx, func(tx *sql.Tx) error {
-		_, err := tx.ExecContext(ctx, `INSERT INTO invites (id, token_hash, name, role, user_id, created_by, created_at, expires_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-			in.ID, tokenHash, in.Name, in.Role, nullString(in.UserID), in.CreatedBy, ms(in.CreatedAt), ms(in.ExpiresAt))
+	var personKey, root []byte // the person's own key, without a folder, and the root are kept with the invite
+	for _, k := range in.Keys {
+		switch {
+		case k.Root:
+			root = k.Locked
+		case k.FolderID == "":
+			personKey = k.Locked
+		}
+	}
+	return d.inTx(ctx, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, `INSERT INTO invites (id, token_hash, name, role, user_id, created_by, created_at, expires_at, person_key, root_locked)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+			in.ID, tokenHash, in.Name, in.Role, nullString(in.UserID), in.CreatedBy, in.CreatedAt, in.ExpiresAt, personKey, root)
 		if err != nil {
 			return err
 		}
 		for _, f := range in.Folders {
-			if _, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO invite_folders (invite_id, folder_id) VALUES (?, ?)", in.ID, f); err != nil {
+			if _, err := tx.ExecContext(ctx, "INSERT INTO invite_folders (invite_id, folder_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", in.ID, f); err != nil {
+				return err
+			}
+		}
+		for _, k := range in.Keys {
+			if k.Root || k.FolderID == "" {
+				continue
+			}
+			if _, err := tx.ExecContext(ctx, "INSERT INTO invite_keys (invite_id, folder_id, version, locked) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",
+				in.ID, k.FolderID, k.Version, k.Locked); err != nil {
 				return err
 			}
 		}
@@ -321,74 +343,82 @@ func (d *DB) InsertInvite(ctx context.Context, in Invite, tokenHash []byte) erro
 
 // InviteByToken finds an invite by token hash, whatever its state.
 func (d *DB) InviteByToken(ctx context.Context, tokenHash []byte) (Invite, error) {
-	return scanInvite(d.QueryRowContext(ctx, "SELECT "+inviteColumns+" FROM invites WHERE token_hash = ?", tokenHash))
+	return scanInvite(d.pool.QueryRowContext(ctx, "SELECT "+inviteColumns+" FROM invites WHERE token_hash = $1", tokenHash))
 }
 
 // OpenInvites lists invites that can still be used, newest first.
 func (d *DB) OpenInvites(ctx context.Context, now time.Time) ([]Invite, error) {
-	rows, err := d.QueryContext(ctx, "SELECT "+inviteColumns+` FROM invites
-		WHERE used_at IS NULL AND revoked_at IS NULL AND expires_at > ? ORDER BY created_at DESC, id`, ms(now))
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []Invite
-	for rows.Next() {
-		in, err := scanInvite(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, in)
-	}
-	return out, rows.Err()
-}
-
-// RevokeInvitesBy ends the open invites made by createdBy, e.g. an older first-start invite.
-func (d *DB) RevokeInvitesBy(ctx context.Context, createdBy string, at time.Time) error {
-	_, err := d.ExecContext(ctx, "UPDATE invites SET revoked_at = ? WHERE created_by = ? AND used_at IS NULL AND revoked_at IS NULL",
-		ms(at), createdBy)
-	return err
+	return queryAll(ctx, d.pool, scanInvite, "SELECT "+inviteColumns+` FROM invites
+		WHERE used_at IS NULL AND revoked_at IS NULL AND expires_at > $1 ORDER BY created_at DESC, id`, now)
 }
 
 // UseInvite accepts an invite in one transaction: it creates the person (unless the invite
 // adds a phone for someone) with the invite's folders, signs the phone in and marks the
 // invite used. It returns ErrConflict if the invite was used, revoked or expired in the
 // meantime.
-func (d *DB) UseInvite(ctx context.Context, inviteID string, u User, dv Device, tokenHash []byte, now time.Time) error {
-	return d.Tx(ctx, func(tx *sql.Tx) error {
-		res, err := tx.ExecContext(ctx, `UPDATE invites SET used_at = ?, device_id = ?
-			WHERE id = ? AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ?`, ms(now), dv.ID, inviteID, ms(now))
+func (d *DB) UseInvite(ctx context.Context, inviteID string, u User, dv Device, tokenHash []byte, now time.Time) ([]InviteKey, error) {
+	var keys []InviteKey
+	err := d.inTx(ctx, func(tx *sql.Tx) error {
+		keys = nil
+		// The person's own key and the root, locked with the link's secret, go to the new device once.
+		var personKey, root []byte
+		err := tx.QueryRowContext(ctx, `UPDATE invites SET used_at = $1, device_id = $2, person_key = NULL, root_locked = NULL
+			WHERE id = $3 AND used_at IS NULL AND revoked_at IS NULL AND expires_at > $4 RETURNING old.person_key, old.root_locked`,
+			now, dv.ID, inviteID, now).Scan(&personKey, &root)
+		if noRow(err) {
+			return ErrConflict
+		}
 		if err != nil {
 			return err
 		}
-		if n, _ := res.RowsAffected(); n == 0 {
-			return ErrConflict
+		if personKey != nil {
+			keys = append(keys, InviteKey{Locked: personKey})
+		}
+		if root != nil {
+			keys = append(keys, InviteKey{Root: true, Locked: root})
 		}
 		if u.ID != dv.UserID {
 			return errors.New("db: the phone must belong to the person the invite is for")
 		}
 		var exists int
-		if err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE id = ?", u.ID).Scan(&exists); err != nil {
+		if err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE id = $1", u.ID).Scan(&exists); err != nil {
 			return err
 		}
 		if exists == 0 { // a new person
 			if err := insertUser(ctx, tx, u); err != nil {
 				return err
 			}
-			if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO folder_people (folder_id, user_id)
-				SELECT i.folder_id, ? FROM invite_folders i JOIN folders f ON f.id = i.folder_id
-				WHERE i.invite_id = ? AND f.deleted_at IS NULL`, u.ID, inviteID); err != nil {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO folder_people (folder_id, user_id)
+				SELECT i.folder_id, $1 FROM invite_folders i JOIN folders f ON f.id = i.folder_id
+				WHERE i.invite_id = $2 AND f.deleted_at IS NULL ON CONFLICT DO NOTHING`, u.ID, inviteID); err != nil {
 				return err
 			}
 		}
+		// So do the folders' keys locked with it.
+		err = eachRow(ctx, tx, "SELECT folder_id, version, locked FROM invite_keys WHERE invite_id = $1 ORDER BY folder_id, version", []any{inviteID},
+			func(row scanner) error {
+				var k InviteKey
+				if err := row.Scan(&k.FolderID, &k.Version, &k.Locked); err != nil {
+					return err
+				}
+				keys = append(keys, k)
+				return nil
+			})
+		if err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, "DELETE FROM invite_keys WHERE invite_id = $1", inviteID); err != nil {
+			return err
+		}
 		return insertDevice(ctx, tx, dv, tokenHash)
 	})
+	return keys, err
 }
 
 // DeleteOldInvites drops invites that ended before before.
 func (d *DB) DeleteOldInvites(ctx context.Context, before time.Time) (int64, error) {
-	res, err := d.ExecContext(ctx, `DELETE FROM invites WHERE expires_at < ? OR used_at < ? OR revoked_at < ?`,
-		ms(before), ms(before), ms(before))
+	res, err := d.pool.ExecContext(ctx, `DELETE FROM invites WHERE expires_at < $1 OR used_at < $2 OR revoked_at < $3`,
+		before, before, before)
 	if err != nil {
 		return 0, err
 	}

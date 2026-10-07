@@ -24,6 +24,10 @@ data class UploadRow(
     /** The tus upload; once it's done, the file's id on the server. */
     val uploadId: String?,
     val bytes: Long,
+    /** Into an encrypted folder: the file's key and what goes with it, until it is sent (UploadSeal). */
+    val seal: String? = null,
+    /** Why it failed: "unchecked" when the server's word about its folder's keys can't be checked (UploadEngine), else the server's answer. */
+    val error: String? = null,
 ) {
     companion object {
         const val QUEUED = "queued"
@@ -58,6 +62,8 @@ data class UploadSnapshot(
     val total: Int,
     val done: Int,
     val failed: Int,
+    /** Of the failed, how many didn't go because the server's word about their folder's keys can't be checked. */
+    val unchecked: Int,
     val lost: Int,
     val bytesTotal: Long,
     val bytesDone: Long,
@@ -75,6 +81,7 @@ data class UploadSnapshot(
         "total" to total,
         "done" to done,
         "failed" to failed,
+        "unchecked" to unchecked,
         "lost" to lost,
         "bytes_total" to bytesTotal,
         "bytes_done" to bytesDone,
@@ -101,6 +108,7 @@ data class UploadSnapshot(
                 total = counted.size,
                 done = counted.count { it.state == UploadRow.DONE },
                 failed = counted.count { it.state == UploadRow.FAILED },
+                unchecked = counted.count { it.state == UploadRow.FAILED && it.error == UploadEngine.UNCHECKED },
                 lost = counted.count { it.state == UploadRow.LOST },
                 bytesTotal = counted.sumOf { it.file.size },
                 bytesDone = counted.sumOf { bytes(it) },
@@ -207,13 +215,18 @@ class UploadQueue(context: Context) {
 
     fun setUploadId(r: UploadRow, id: String?) = update(r, ContentValues().apply { put("upload_id", id) })
 
+    fun setSeal(r: UploadRow, seal: String?) = update(r, ContentValues().apply { put("seal", seal) })
+
     fun setBytes(r: UploadRow, bytes: Long) = update(r, ContentValues().apply { put("bytes", bytes) })
 
     fun finish(r: UploadRow, state: String, error: String? = null, uploadId: String? = r.uploadId) = update(r, ContentValues().apply {
         put("state", state)
         put("error", error)
         put("upload_id", uploadId)
-        if (state == UploadRow.DONE) put("bytes", r.file.size)
+        if (state == UploadRow.DONE) {
+            put("bytes", r.file.size)
+            putNull("seal") // the file's key isn't needed here any more
+        }
     })
 
     /** Stops the batches of [auth] until they're resumed, e.g. when a PIN ended. */
@@ -281,7 +294,10 @@ class UploadQueue(context: Context) {
     /** Cancels a batch; returns its unfinished files, whose uploads are to be removed. */
     fun cancel(batch: String): List<UploadRow> = db.writableDatabase.transaction {
         val open = rows(batch).filter { it.state == UploadRow.QUEUED || it.state == UploadRow.LOST }
-        update("uploads", ContentValues().apply { put("state", UploadRow.CANCELLED) }, "batch = ? AND state IN ('queued', 'lost')", arrayOf(batch))
+        update("uploads", ContentValues().apply {
+            put("state", UploadRow.CANCELLED)
+            putNull("seal")
+        }, "batch = ? AND state IN ('queued', 'lost')", arrayOf(batch))
         update("upload_batches", ContentValues().apply { put("state", "cancelled") }, "id = ?", arrayOf(batch))
         open
     }
@@ -313,6 +329,8 @@ class UploadQueue(context: Context) {
         state = c.getString(6),
         uploadId = if (c.isNull(7)) null else c.getString(7),
         bytes = c.getLong(8),
+        seal = if (c.isNull(9)) null else c.getString(9),
+        error = if (c.isNull(10)) null else c.getString(10),
     )
 
     private fun batch(c: Cursor) = UploadBatch(
@@ -325,7 +343,7 @@ class UploadQueue(context: Context) {
     )
 
     private companion object {
-        const val COLUMNS = "u.batch, u.seq, u.uri, u.name, u.size, u.mime, u.state, u.upload_id, u.bytes"
+        const val COLUMNS = "u.batch, u.seq, u.uri, u.name, u.size, u.mime, u.state, u.upload_id, u.bytes, u.seal, u.error"
         const val BATCH_COLUMNS = "id, auth, state, paused, created_at, folder"
     }
 }

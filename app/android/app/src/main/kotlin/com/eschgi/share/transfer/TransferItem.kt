@@ -1,10 +1,29 @@
 package com.eschgi.share.transfer
 
+import com.eschgi.share.e2ee.SealedFile
 import org.json.JSONArray
+import org.json.JSONObject
 
-/** A file from the library, as the Dart side hands it over (FileInfo.toJson). */
-data class FileRef(val id: String, val name: String, val size: Long, val mime: String, val kind: String) {
+/**
+ * A file from the library, as the Dart side hands it over (FileInfo.toJson): with the folder it
+ * lies in, and for an encrypted one its key sealed for the folder's key ([enc]). [size] is the
+ * plain size, what lands on the phone.
+ */
+data class FileRef(
+    val id: String,
+    val name: String,
+    val size: Long,
+    val mime: String,
+    val kind: String,
+    val folder: String = "",
+    val enc: SealedFile? = null,
+) {
     val isMedia: Boolean get() = kind == "photo" || kind == "video"
+
+    /** [enc] as the API has it, for TransferDb; null for a plain file. */
+    fun encJson(): String? = enc?.let {
+        JSONObject().put("version", it.version).put("key", it.key).put("header", it.header).put("plain_size", it.plainSize).toString()
+    }
 
     companion object {
         fun parseList(json: String?): List<FileRef> {
@@ -18,8 +37,16 @@ data class FileRef(val id: String, val name: String, val size: Long, val mime: S
                     size = o.optLong("size"),
                     mime = o.optString("mime").ifEmpty { "application/octet-stream" },
                     kind = o.optString("kind").ifEmpty { "document" },
+                    folder = o.optString("folder"),
+                    enc = SealedFile.of(o),
                 )
             }
+        }
+
+        /** A file as TransferDb keeps it: [enc] is [encJson]'s. */
+        fun of(id: String, name: String, size: Long, mime: String, kind: String, folder: String?, enc: String?): FileRef {
+            val sealed = enc?.let { SealedFile.of(JSONObject().put("id", id).put("folder", folder ?: "").put("size", size).put("enc", JSONObject(it))) }
+            return FileRef(id, name, size, mime, kind, folder ?: "", sealed)
         }
     }
 }

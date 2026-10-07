@@ -11,6 +11,7 @@ import { useRoute } from '../../router';
 import { storedTheme, type ThemeChoice } from '../../theme';
 import { got, useAdminData, type AdminData } from '../admin/data';
 import { FolderNameDialog, FolderPage, FoldersList } from '../admin/Folders';
+import { EncryptionSettings } from '../e2ee/Encryption';
 import { InviteDialog, PeopleGroup } from '../admin/People';
 import { NewPinDialog, PinsList } from '../admin/Pins';
 import { SelectAllTrash, TrashList, useTrash } from '../admin/Trash';
@@ -241,6 +242,9 @@ function SettingsList({ data, current }: { data: AdminData; current?: Page }) {
   const trashLine = storage ? (storage.trash_files === 0 ? t('trash.emptyShort') : tn('trash.summary', storage.trash_files, { size: formatBytes(storage.trash_bytes, lang) })) : '';
   const freeLine =
     storage && storage.total_bytes > 0 ? t('storage.free', { free: formatBytes(storage.free_bytes, lang), total: formatBytes(storage.total_bytes, lang) }) : '';
+  // A bucket has no free space to tell of: how much the library holds instead, and where it is.
+  const s3 = storage?.storage === 's3';
+  const usedLine = storage ? t('storage.used', { size: formatBytes(storage.bytes, lang) }) : '';
 
   const language = t(`lang.${lang}`);
   const languageRow = (
@@ -289,16 +293,17 @@ function SettingsList({ data, current }: { data: AdminData; current?: Page }) {
             {storage && (
               <div class="row">
                 <span class={`ri${hasProblem(storage.warnings) ? ' dang' : ''}`}>
-                  <Icon name="hdd" />
+                  <Icon name={s3 ? 'globe' : 'hdd'} />
                 </span>
                 <span class="rt">
                   <b>{t('storage.title')}</b>
-                  <span>{freeLine || t('storage.setOnServer')}</span>
+                  <span>{(s3 ? usedLine : freeLine) || t('storage.setOnServer')}</span>
                   <StorageWarnings warnings={storage.warnings} />
                 </span>
               </div>
             )}
           </div>
+          <EncryptionSettings />
           <div class="group">
             {languageRow}
             {themeRow}
@@ -333,11 +338,11 @@ function SettingsList({ data, current }: { data: AdminData; current?: Page }) {
               <div class="group">
                 <div class="row">
                   <span class={`ri${hasProblem(storage.warnings) ? ' dang' : ''}`}>
-                    <Icon name="hdd" />
+                    <Icon name={s3 ? 'globe' : 'hdd'} />
                   </span>
                   <span class="rt">
-                    <b class="mono">{storage.storage_dir}</b>
-                    <span>{[t('storage.setOnServer'), freeLine].filter(Boolean).join(' · ')}</span>
+                    <b class="mono">{s3 ? storage.s3_bucket : storage.storage_dir}</b>
+                    <span>{(s3 ? [hostOf(storage.s3_endpoint), t('storage.setOnServer'), usedLine] : [t('storage.setOnServer'), freeLine]).filter(Boolean).join(' · ')}</span>
                     <StorageWarnings warnings={storage.warnings} />
                   </span>
                 </div>
@@ -345,6 +350,7 @@ function SettingsList({ data, current }: { data: AdminData; current?: Page }) {
               </div>
             </>
           )}
+          <EncryptionSettings />
           <div class="group">{passwordRow}</div>
         </>
       ) : (
@@ -417,4 +423,13 @@ function StorageWarnings({ warnings }: { warnings?: StorageWarning[] }) {
       ))}
     </>
   );
+}
+
+/** The host of a bucket's endpoint, e.g. s3.eu-central-1.amazonaws.com. */
+function hostOf(endpoint: string): string {
+  try {
+    return new URL(endpoint).host;
+  } catch {
+    return endpoint;
+  }
 }

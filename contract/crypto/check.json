@@ -1,0 +1,47 @@
+{
+  "description": "A check, before a device passes keys on (docs/e2ee-plan.md). Each side has a one-time P-256 key pair. The asking device sends commitment = SHA-256(\"share-e2ee-v1/check\" || asker_key); the other side answers with answer_key; then the asking device reveals asker_key, for the answer it saw, which the other side checks against the commitment it saw before answering. Each side keeps what it saw then: the asking device makes its code from the answer it revealed for, so keys relayed later change neither code. Both show code: the first 4 bytes of SHA-256(\"share-e2ee-v1/code\" || asker_key || answer_key || public_key), read as a big-endian number, modulo 1000000, in 6 digits with leading zeros. public_key is the key that gets the keys: the waiting device's key, or the waiting person's key (65 bytes, uncompressed). After Allow, the asking device locks confirmed (UTF-8 JSON: the root, and for a device of its person the person's key pair) with confirm_key and the aad \"check:<check>\" (contract/crypto/lock.json has the format): HKDF-SHA256 of the ECDH secret (the shared point's x coordinate) of one side's one-time private key and the other side's one-time public key, salted with SHA-256(asker_key || answer_key || public_key), with \"share-e2ee-v1/confirm\" as info. Both sides make the same confirm_key. Binary values are base64url without padding.",
+  "cases": [
+    {
+      "name": "a new device's key",
+      "check": "0199a0c4-8f6e-7d2a-9b1c-3e5f7a9b1c3d",
+      "asker_private_key": "MNkGwm8W8ox2_26WtQNBa2PdLCtGxOzkr73VKjFGIuA",
+      "asker_key": "BIodHkybNNQ8NPRu2IXI1LpBNx9HhL1RcDnbpwvFEW0wsGhXKberu_-IHpePkQssMOuhD2NZsZLiwxoybnXefFw",
+      "answer_private_key": "KnW5EKWWfnlBcaxMSsKrt033k7E2HXhybcjJZd5o16o",
+      "answer_key": "BGiBRdW8QaMrG8wrcexDShfu4_rGGi74_b4cN2F_ksKiU617rC2d1oXFtFx9hVo9V3_enVuim3XilN_uPYDhMmw",
+      "public_key": "BOIqaxN46rKWJWEmQp0jkPg2h67pJk41dWq4HWjQKnIl6cOK5f11MbdxCrO0KWlgf3epNEa8AsBV2oc3M4-Qy3c",
+      "commitment": "a_UCs5qPjm209QiMZTNe-XwRbzzrKAWSL6XWaHs3hE8",
+      "code": "284971",
+      "confirm_key": "LjGxQu9Qcuvom6poTRtODbnVyckPUDNzHiziFJHUZ1Y",
+      "confirmation": "nOEPFlsBe7_UVq5lhKU3TVQSwDbTvnlu9HWArR-XMIXGL67U9Pke7ji87eUmtUPP6U0Nn5sUMEXjcTRkmVnTUNKqF6aBd6NwkrMsFUcrto0hOU4osGuQVytwc-BiKVcSAGu_GprvIHdkOB_dDeFmDXmVMTC_6uNIfhQPwmAI1_-O83Uqnq2rQHZzyv-ViKhUZWHI9yxKJHQR7bGL6OBNhc66Fo0TtoXz-1AibbOgUOKiVjObBJPbAAusu_hq2nRYmTpmmO1AeLpRezLF_rRzq4AJbhZhfZi1RnLDJflczQqa53DYkifedFhQ9tASEN3l-R3CzLPvN_UQ3hT4b6mtqN0130F19T-a9h8l-Htpb7yzVYGYRLVDPlIdUPcPPg_mdT-v3g6tZiwgCR9a",
+      "confirmed": "{\"root\":\"BN0a7ZmdaJ_hU35FUJ1h8m7ztVnAOsnvqMw_daTQj70kxHNHdZtJRDmVYS9Sxsz-mm7GxQuHLvdUJl1c8WLi9xM\",\"person\":{\"public_key\":\"BBCXNIbG43wS0fBME7_ls-qOkYHF0o-rhB_WneFqgF3R4shGmIULt-w6Xm6XHudkjuOHuBy6qumyi_7FJi2-NHQ\",\"private_key\":\"YAer99drb2ex7o9haiZbbZpKlcgfzEjEdmERvgnMa5Q\"}}"
+    },
+    {
+      "name": "another key, same one-time keys",
+      "check": "0199a0c4-8f6e-7d2a-9b1c-3e5f7a9b1c3d",
+      "asker_private_key": "MNkGwm8W8ox2_26WtQNBa2PdLCtGxOzkr73VKjFGIuA",
+      "asker_key": "BIodHkybNNQ8NPRu2IXI1LpBNx9HhL1RcDnbpwvFEW0wsGhXKberu_-IHpePkQssMOuhD2NZsZLiwxoybnXefFw",
+      "answer_private_key": "KnW5EKWWfnlBcaxMSsKrt033k7E2HXhybcjJZd5o16o",
+      "answer_key": "BGiBRdW8QaMrG8wrcexDShfu4_rGGi74_b4cN2F_ksKiU617rC2d1oXFtFx9hVo9V3_enVuim3XilN_uPYDhMmw",
+      "public_key": "BKsRghN51w7Y5ou_M__dndc_RQXnYHa8o4ZddRGzGJhi2NgXiNRcWkJqrq8BcwEi8P9JyR3q3Euy9ttpU_GPu9M",
+      "commitment": "a_UCs5qPjm209QiMZTNe-XwRbzzrKAWSL6XWaHs3hE8",
+      "code": "761157",
+      "confirm_key": "DRqCgF0za2l6WYhPSQjuQfx0nEyfQlNAalzyLTe6JZ8",
+      "confirmation": "tZbY7owac51rPa1pFg5gavTmFYjQJFnZYNtWAKfYkmsyJuhOwmMsfqEuQ0W5C4ZrHgExT9H3hNJ9w2kDuXpm7FsB6iLRPoOAGeobV-F5BJyqtBUUmm_LCRh1djurSrFBfBZMfjqyfgRHtAXAXBKxK5tqRX0WGrRAzV_rBfg8",
+      "confirmed": "{\"root\":\"BN0a7ZmdaJ_hU35FUJ1h8m7ztVnAOsnvqMw_daTQj70kxHNHdZtJRDmVYS9Sxsz-mm7GxQuHLvdUJl1c8WLi9xM\"}"
+    },
+    {
+      "name": "another answer",
+      "check": "0199a0c4-8f6e-7d2a-9b1c-3e5f7a9b1c3d",
+      "asker_private_key": "MNkGwm8W8ox2_26WtQNBa2PdLCtGxOzkr73VKjFGIuA",
+      "asker_key": "BIodHkybNNQ8NPRu2IXI1LpBNx9HhL1RcDnbpwvFEW0wsGhXKberu_-IHpePkQssMOuhD2NZsZLiwxoybnXefFw",
+      "answer_private_key": "PAzrGoeYKOGOUqeu2TDkl8eRt47vXpvV8ixryZLZmBw",
+      "answer_key": "BJ5xHGNq0Zg59_xSMX_wcYH3PdryrG6gI2pmuqxy4OFLFrhmVhfBn6oYS0bXVrHQDkBvzb3mSXnF1g50HqMqBmA",
+      "public_key": "BOIqaxN46rKWJWEmQp0jkPg2h67pJk41dWq4HWjQKnIl6cOK5f11MbdxCrO0KWlgf3epNEa8AsBV2oc3M4-Qy3c",
+      "commitment": "a_UCs5qPjm209QiMZTNe-XwRbzzrKAWSL6XWaHs3hE8",
+      "code": "819000",
+      "confirm_key": "eGuzNVeebux5NMNQFgxTuEo0KZ31_FOBq_-QhWgJQzU",
+      "confirmation": "Q4A5B1CBp2TwRtHxn_E_8CNneHGUGnFJeSD0SNDxGic4JQytj8m7XQF2p4GS3ZGh1aJgF2yyIxYAWz-JwAVxP0lE1ROJ9kyu5RosjKu6Z8sq0ROplrw9hRq4d3RsfaNB8W0GAIn3E5AX_VD5GzR6kaNjbdX5-rWRmZGfHbWumZdJyx2ImVoGEZTo8JFbSCqoJRnzL0cnUYmhfpSwja56DJN3Sokz-l2RPXpBf2PbxgFzA5V-8l7K5ZuttX99mGk6FW2zHLe9StuusQblDcQRxeW4THPfK4rjoB3rIAcCkqXdVUfRcHsd9ubjbIVgqWiAa-L86CMirLo6O9byPXmwBXkZTtjE09JY9gaqNqnzJ75EzabxYIW89bd9zYJMu6zz9G8LvsL88b_iG0Ei",
+      "confirmed": "{\"root\":\"BN0a7ZmdaJ_hU35FUJ1h8m7ztVnAOsnvqMw_daTQj70kxHNHdZtJRDmVYS9Sxsz-mm7GxQuHLvdUJl1c8WLi9xM\",\"person\":{\"public_key\":\"BBCXNIbG43wS0fBME7_ls-qOkYHF0o-rhB_WneFqgF3R4shGmIULt-w6Xm6XHudkjuOHuBy6qumyi_7FJi2-NHQ\",\"private_key\":\"YAer99drb2ex7o9haiZbbZpKlcgfzEjEdmERvgnMa5Q\"}}"
+    }
+  ]
+}

@@ -13,6 +13,8 @@ export interface ToastAction {
 export interface Toast {
   text: string;
   action?: ToastAction;
+  /** Stays until its action is used or another toast comes: a step that waits for a tap. */
+  sticky?: boolean;
 }
 
 export interface Account {

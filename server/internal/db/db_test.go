@@ -4,25 +4,27 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"os"
-	"path/filepath"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/eschgi/share/server/internal/db/pgtest"
 	"github.com/eschgi/share/server/internal/ids"
 )
 
 var t0 = time.Date(2026, 9, 27, 10, 0, 0, 0, time.UTC)
 
+// openTest opens a fresh, migrated database: a schema of its own on the PostgreSQL server in
+// SHARE_TEST_POSTGRES.
 func openTest(t *testing.T) *DB {
 	t.Helper()
-	dir := t.TempDir()
-	d, err := Open(filepath.Join(dir, "share.db"))
+	d, err := Open(context.Background(), pgtest.URL(t))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { d.Close() })
-	if err := d.Migrate(context.Background(), filepath.Join(dir, "backups")); err != nil {
+	if err := d.Migrate(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	return d
@@ -32,7 +34,7 @@ func openTest(t *testing.T) *DB {
 func testFolder(t *testing.T, d *DB, name string) string {
 	t.Helper()
 	f := Folder{ID: ids.New(), Name: name, Dir: name, CreatedBy: "cli", CreatedAt: t0}
-	if err := d.Tx(context.Background(), func(tx *sql.Tx) error { return insertFolder(context.Background(), tx, f) }); err != nil {
+	if err := d.inTx(context.Background(), func(tx *sql.Tx) error { return insertFolder(context.Background(), tx, f) }); err != nil {
 		t.Fatal(err)
 	}
 	return f.ID
@@ -40,27 +42,44 @@ func testFolder(t *testing.T, d *DB, name string) string {
 
 func TestMigrateIsIdempotentAndRefusesNewerDatabases(t *testing.T) {
 	ctx := context.Background()
-	dir := t.TempDir()
-	path := filepath.Join(dir, "share.db")
-	d, err := Open(path)
+	d := openTest(t)
+	if err := d.Migrate(ctx); err != nil {
+		t.Fatalf("second Migrate: %v", err)
+	}
+	migrations, err := loadMigrations()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer d.Close()
-	if err := d.Migrate(ctx, filepath.Join(dir, "backups")); err != nil {
+	if v, err := d.SchemaVersion(ctx); err != nil || v != len(migrations) {
+		t.Errorf("schema version %d, %v; want %d", v, err, len(migrations))
+	}
+	if err := d.SetMeta(ctx, "schema_version", "99"); err != nil {
 		t.Fatal(err)
 	}
-	if err := d.Migrate(ctx, filepath.Join(dir, "backups")); err != nil {
-		t.Fatalf("second Migrate: %v", err)
+	if err := d.Migrate(ctx); err == nil || !strings.Contains(err.Error(), "version 99") {
+		t.Fatalf("Migrate on a database newer than the program: %v", err)
 	}
-	if entries, _ := os.ReadDir(filepath.Join(dir, "backups")); len(entries) != 0 {
-		t.Errorf("a no-op migration made %d backups", len(entries))
-	}
-	if _, err := d.ExecContext(ctx, "PRAGMA user_version = 99"); err != nil {
-		t.Fatal(err)
-	}
-	if err := d.Migrate(ctx, filepath.Join(dir, "backups")); err == nil {
-		t.Fatal("Migrate accepted a database newer than the program")
+}
+
+// A server Share can't use says why, and the server doesn't wait for that to change.
+func TestUsable(t *testing.T) {
+	for _, tc := range []struct {
+		version  int
+		encoding string
+		want     string
+	}{
+		{180000, "UTF8", ""},
+		{190002, "UTF8", ""},
+		{170006, "UTF8", "it is PostgreSQL 17.6; Share needs 18 or newer"},
+		{180001, "LATIN1", "the database's encoding is LATIN1; Share needs UTF8"},
+	} {
+		err := usable(tc.version, tc.encoding)
+		if tc.want == "" && err != nil || tc.want != "" && fmt.Sprint(err) != tc.want {
+			t.Errorf("usable(%d, %s) = %v, want %q", tc.version, tc.encoding, err, tc.want)
+		}
+		if err != nil && Unreachable(fmt.Errorf("PostgreSQL at db/share: %w", err)) {
+			t.Errorf("%v counts as unreachable", err)
+		}
 	}
 }
 
@@ -74,6 +93,24 @@ func TestServerIDIsStable(t *testing.T) {
 	b, _ := d.ServerID(ctx)
 	if a != b {
 		t.Fatalf("ServerID changed from %q to %q", a, b)
+	}
+}
+
+func TestJobRuns(t *testing.T) {
+	d := openTest(t)
+	ctx := context.Background()
+	if at, err := d.JobRun(ctx, "empty the trash"); err != nil || !at.IsZero() {
+		t.Fatalf("a job that never ran: %v, %v", at, err)
+	}
+	when := t0.Add(90 * time.Minute)
+	if err := d.SetJobRun(ctx, "empty the trash", when); err != nil {
+		t.Fatal(err)
+	}
+	if at, err := d.JobRun(ctx, "empty the trash"); err != nil || !at.Equal(when) {
+		t.Errorf("after a run: %v, %v", at, err)
+	}
+	if at, _ := d.JobRun(ctx, "expire PINs and sessions"); !at.IsZero() {
+		t.Errorf("another job: %v", at)
 	}
 }
 
@@ -149,7 +186,13 @@ func TestSessionsAndMovingUploads(t *testing.T) {
 	if err := d.InsertReceiving(ctx, f); err != nil {
 		t.Fatal(err)
 	}
-	if n, _ := d.UnfinishedCount(ctx, oldS.ID, ""); n != 1 {
+	// An encrypted upload's key is sealed for its folder's key: it stays where it was going.
+	enc := File{ID: ids.New(), Name: "b.jpg", Size: 42, CreatedAt: t0, UpdatedAt: t0, PinID: oldPin.ID, PinSessionID: oldS.ID, FolderID: family,
+		Enc: &Enc{Version: 1, Key: []byte("sealed"), Header: []byte("header"), PlainSize: 10}}
+	if err := d.InsertReceiving(ctx, enc); err != nil {
+		t.Fatal(err)
+	}
+	if n, _ := d.UnfinishedCount(ctx, oldS.ID, ""); n != 2 {
 		t.Fatalf("UnfinishedCount = %d", n)
 	}
 	moved, err := d.MoveReceivingUploads(ctx, oldS.ID, newS.ID, newPin.ID, wedding, t0)
@@ -159,6 +202,12 @@ func TestSessionsAndMovingUploads(t *testing.T) {
 	after, _ := d.FileByID(ctx, f.ID)
 	if after.PinSessionID != newS.ID || after.PinID != newPin.ID || after.FolderID != wedding {
 		t.Fatalf("file after move: %+v", after)
+	}
+	if after, _ := d.FileByID(ctx, enc.ID); after.PinSessionID != oldS.ID || after.FolderID != family || after.Enc == nil || after.Enc.PlainSize != 10 {
+		t.Fatalf("the encrypted upload after the move: %+v", after)
+	}
+	if err := d.DeleteFileRow(ctx, enc.ID); err != nil {
+		t.Fatal(err)
 	}
 
 	// The old session has nothing receiving any more, so once revoked long enough it goes.

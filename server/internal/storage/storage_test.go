@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/eschgi/share/server/internal/db"
+	"github.com/eschgi/share/server/internal/db/dbtest"
 	"github.com/eschgi/share/server/internal/ids"
 )
 
@@ -76,6 +77,18 @@ func TestClassify(t *testing.T) {
 	}
 }
 
+func TestContentDisposition(t *testing.T) {
+	for name, want := range map[string]string{
+		"IMG_1.jpg":     `attachment; filename="IMG_1.jpg"; filename*=UTF-8''IMG_1.jpg`,
+		"Kündigung.pdf": `attachment; filename="K_ndigung.pdf"; filename*=UTF-8''K%C3%BCndigung.pdf`,
+		`a "b" c\d.txt`: `attachment; filename="a _b_ c_d.txt"; filename*=UTF-8''a%20%22b%22%20c%5Cd.txt`,
+	} {
+		if got := ContentDisposition(name); got != want {
+			t.Errorf("ContentDisposition(%q) = %s; want %s", name, got, want)
+		}
+	}
+}
+
 var t0 = time.Date(2026, 9, 27, 21, 30, 0, 0, time.UTC) // 23:30 in Rome: still the 27th there
 
 type fixture struct {
@@ -98,14 +111,7 @@ func newFixtureWith(t *testing.T, before func(d *db.DB, l Layout)) *fixture {
 	if err := Init(l); err != nil {
 		t.Fatal(err)
 	}
-	d, err := db.Open(l.DBPath())
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { d.Close() })
-	if err := d.Migrate(context.Background(), l.BackupDir()); err != nil {
-		t.Fatal(err)
-	}
+	d := dbtest.Open(t)
 	if before != nil {
 		before(d, l)
 	}

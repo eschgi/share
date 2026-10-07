@@ -10,8 +10,9 @@ describe('isAppPath', () => {
   it.each(routes.examples.not_found)('leaves %s, as the server does', (p) => {
     expect(isAppPath(p)).toBe(false);
   });
-  it('leaves the invite page and files', () => {
+  it('leaves the invite and setup pages, and files', () => {
     expect(isAppPath('/join')).toBe(false);
+    expect(isAppPath('/setup')).toBe(false);
     expect(isAppPath('/sw.js')).toBe(false);
     expect(isAppPath('/assets/index-3f2a.js')).toBe(false);
   });
@@ -24,6 +25,12 @@ describe('decide', () => {
     expect(decide('/sign-in', true, false)).toEqual({ view: 'account', redirect: '/library' });
     expect(decide('/send', true, false)).toEqual({ view: 'account' });
     expect(decide('/settings/people', true, false)).toEqual({ view: 'account' });
+  });
+  it('sets Share up first while nobody has an account, except with a PIN', () => {
+    expect(decide('/', false, false, true)).toEqual({ view: 'setup' });
+    expect(decide('/sign-in', false, false, true)).toEqual({ view: 'setup' });
+    expect(decide('/library', false, false, true)).toEqual({ view: 'setup' });
+    expect(decide('/', false, true, true)).toEqual({ view: 'pin' });
   });
   it('shows everyone else the PIN, or the sign-in first', () => {
     expect(decide('/', false, false)).toEqual({ view: 'pin' });

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'data/admin.dart';
 import 'data/api.dart';
 import 'data/folders.dart';
+import 'data/keys.dart';
 import 'data/library.dart';
 import 'data/pin.dart';
 import 'data/platform.dart';
@@ -30,6 +31,7 @@ class AppServices {
     folders = FolderStore(library: library, platform: platform);
     admin = AdminRepository(api: this.api);
     pin = PinRepository(api: this.api, platform: platform);
+    keys = KeysRepository(platform: platform, api: this.api);
   }
 
   final Platform platform;
@@ -42,6 +44,9 @@ class AppServices {
   late final FolderStore folders;
   late final AdminRepository admin;
   late final PinRepository pin;
+
+  /// End-to-end encryption on this phone (docs/e2ee-plan.md).
+  late final KeysRepository keys;
 
   /// The language the person picked, or null for the phone's.
   final language = ValueNotifier<String?>(null);
@@ -86,6 +91,9 @@ class Services extends InheritedWidget {
   /// For one-off reads, e.g. in initState or callbacks.
   static AppServices read(BuildContext context) => context.getInheritedWidgetOfExactType<Services>()!.services;
 
+  /// The same, where a widget may be shown without them, as in a few tests.
+  static AppServices? maybeRead(BuildContext context) => context.getInheritedWidgetOfExactType<Services>()?.services;
+
   @override
   bool updateShouldNotify(Services old) => old.services != services;
 }
@@ -104,10 +112,40 @@ class _ShareAppState extends State<ShareApp> {
   StreamSubscription<String>? _links;
   StreamSubscription<SharedFiles>? _shared;
 
+  /// The keys may have news: someone to seal for or to ask about, a key sealed for this phone, a
+  /// check to answer, a new version. So the app checks in when it comes back, and while it is in
+  /// front: every half minute, and every few seconds while a check runs or this phone waits for
+  /// keys (KeysState.pace).
+  late final _lifecycle = AppLifecycleListener(onResume: () => unawaited(_checkInKeys()));
+  Timer? _keysTimer;
+  Duration _keysWait = Duration.zero;
+
+  void _scheduleKeys() {
+    _keysTimer?.cancel();
+    _keysWait = widget.services.keys.state.pace;
+    _keysTimer = Timer(_keysWait, () async {
+      if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) await _checkInKeys();
+      if (mounted) _scheduleKeys();
+    });
+  }
+
+  /// Sooner when the keys say so, e.g. once this phone turns out to wait for them.
+  void _keysChanged() {
+    if (widget.services.keys.state.pace < _keysWait) _scheduleKeys();
+  }
+
+  Future<void> _checkInKeys() async {
+    final s = widget.services;
+    if (s.session.current is SignedInState) await s.keys.checkIn();
+  }
+
   @override
   void initState() {
     super.initState();
+    _lifecycle;
     final s = widget.services;
+    _scheduleKeys();
+    s.keys.addListener(_keysChanged);
     unawaited(s.start());
     _links = s.platform.links.listen(_open);
     _shared = s.platform.sharedChanges.listen(_sharedChanged);
@@ -118,6 +156,9 @@ class _ShareAppState extends State<ShareApp> {
   void dispose() {
     _links?.cancel();
     _shared?.cancel();
+    _lifecycle.dispose();
+    _keysTimer?.cancel();
+    widget.services.keys.removeListener(_keysChanged);
     super.dispose();
   }
 
@@ -134,7 +175,7 @@ class _ShareAppState extends State<ShareApp> {
       case final InviteLink link:
         _navigator.currentState?.push(MaterialPageRoute<void>(builder: (_) => InviteScreen(link: link)));
       case final PinLink link:
-        _navigator.currentState?.push(MaterialPageRoute<void>(builder: (_) => PinEntryScreen(server: link.server, code: link.code)));
+        _navigator.currentState?.push(MaterialPageRoute<void>(builder: (_) => PinEntryScreen(server: link.server, code: link.code, secret: link.secret, root: link.root)));
       case null:
         break;
     }

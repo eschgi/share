@@ -1,0 +1,21 @@
+{
+  "method": "GET",
+  "path": "/api/setup",
+  "auth": "while nobody has an account: a visitor at home, anyone in the first 15 minutes after the server started, or the setup link's secret in the header X-Share-Setup",
+  "status": 200,
+  "response": {
+    "ready": false,
+    "needs_admin": false,
+    "name": "Share",
+    "languages": ["en", "de", "it"],
+    "default_language": "en",
+    "storage_dir": "/data",
+    "exists": true,
+    "empty": true,
+    "fs_type": "ext4",
+    "total_bytes": 1000204886016,
+    "free_bytes": 998123456512,
+    "warnings": []
+  },
+  "notes": "While the storage folder on a drive isn't set up yet, share serve serves just this page's API, /healthz and the website's /setup; every other API call is 503 setting_up, every other page goes to /setup. Who isn't let in gets 403 setup_closed; the log shows <public_url>/setup#SECRET, with a secret made at this start, which the page sends in X-Share-Setup. exists and empty say what the folder holds; an empty folder may be a drive that isn't mounted. fs_type, total_bytes and free_bytes are the drive's, or those of the nearest folder above when the folder doesn't exist yet. warnings are share check's findings about that drive ({code, level, message}, codes from contract/storage_warnings.json). After the setup, the server answers as in setup_ready.json."
+}

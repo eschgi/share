@@ -3,6 +3,8 @@ import { ApiError, createPin, endPin, newPinCode, suggestPin, type PinInfo } fro
 import { Bold } from '../../components/Bits';
 import { Icon } from '../../components/Icon';
 import { QrCode } from '../../components/QrCode';
+import { SealError } from '../../e2ee/formats';
+import { keyring } from '../../e2ee/keyring';
 import { formatWhen } from '../../format';
 import { useI18n, type Lang } from '../../i18n';
 import { cleanPinInput, pinLength } from '../../pin';
@@ -31,6 +33,16 @@ export function CodeBoxes({ code }: { code: string }) {
   );
 }
 
+/** A PIN's link to hand on: for one that shows an encrypted folder, with its secret after a
+ * dot, which this browser opens with the folder's key; for one that only sends into a folder with
+ * keys, with the root's fingerprint, which guests' browsers check the folder's key with. */
+async function linkOf(p: PinInfo): Promise<string> {
+  const secret = await keyring.pinLinkSecret(p);
+  if (secret) return `${p.link}.${secret}`;
+  const root = p.shows_folder ? null : await keyring.pinLinkRoot(p.folder);
+  return root ? `${p.link}.${root}` : p.link;
+}
+
 type Asking = { kind: 'newCode' | 'end'; pin: PinInfo } | null;
 
 /** Screens 18 and 33: the PINs that work now, permanent ones first; and a new one (34). bare:
@@ -47,8 +59,12 @@ export function PinsList({ pins, onChanged, bare }: { pins: PinInfo[]; onChanged
   const shares = sharesLinks();
 
   const handOn = async (p: PinInfo) => {
-    if (shares) await shareText(t('pins.shareText', { link: p.link }));
-    else toast({ text: t((await copyText(p.link)) ? 'common.copied' : 'common.notCopied') });
+    const link = await linkOf(p);
+    if (shares) await shareText(t('pins.shareText', { link }));
+    else if (!(await copyText(link))) return toast({ text: t('common.notCopied') });
+    // Without the folder's key here, the link has no secret: guests see no encrypted files.
+    if (p.secret && link === p.link) toast({ text: t('pins.noKey') });
+    else if (!shares) toast({ text: t('common.copied') });
   };
 
   const change = async (a: NonNullable<Asking>) => {
@@ -191,12 +207,14 @@ function PinCard({ pin, folder, shares, onHandOn, onQr, onAsk }: CardProps) {
 /** A PIN as a QR code, for someone standing next to you. */
 function PinQr({ pin, onClose }: { pin: PinInfo; onClose: () => void }) {
   const { t } = useI18n();
+  const [link, setLink] = useState<string | null>(null);
+  useEffect(() => void linkOf(pin).then(setLink), [pin.id]);
   return (
     <Modal title={t('pins.scanToSend')} onClose={onClose}>
       <div class="pinqr">
-        <QrCode text={pin.link} label={pin.link} />
+        {link && <QrCode text={link} label={link} />}
         <CodeBoxes code={pin.code} />
-        <span class="small">{pin.link}</span>
+        <span class="small">{link ?? pin.link}</span>
       </div>
     </Modal>
   );
@@ -234,16 +252,23 @@ export function NewPinDialog({ folder, onCreated, onClose }: { folder?: string; 
     setBusy(true);
     setProblem(null);
     let pin: PinInfo;
+    let link: string;
     try {
-      pin = await createPin(kind, code, into, shows);
+      // A PIN that shows an encrypted folder brings the folder's keys, locked with a secret
+      // that only its link has.
+      const secret = shows ? await keyring.pinSecret(into) : null;
+      if (shows && !secret && folders.byId(into)?.key_version) throw new SealError("the folder's keys aren't here");
+      pin = await createPin(kind, code, into, shows, secret?.body);
+      link = secret ? `${pin.link}.${secret.secret}` : await linkOf(pin);
     } catch (e) {
       setBusy(false);
+      if (e instanceof SealError) return setProblem(t('keys.cantOpen'));
       if (!(e instanceof ApiError) || e.status === 0) return setProblem(t('common.offline'));
       return setProblem(t(e.code === 'pin_taken' ? 'pins.taken' : e.code === 'pin_format' ? 'pins.badCode' : 'common.failed'));
     }
     // Made: its link goes on, as the button says.
-    if (shares) await shareText(t('pins.shareText', { link: pin.link }));
-    else toast({ text: t((await copyText(pin.link)) ? 'pins.madeCopied' : 'pins.made', { code: pin.code }) });
+    if (shares) await shareText(t('pins.shareText', { link }));
+    else toast({ text: t((await copyText(link)) ? 'pins.madeCopied' : 'pins.made', { code: pin.code }) });
     onCreated(pin);
   };
 

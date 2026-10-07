@@ -1,0 +1,13 @@
+{
+  "method": "PUT",
+  "path": "/api/admin/settings",
+  "auth": "admin",
+  "status": 200,
+  "request": {
+    "new_folders_encrypted": true
+  },
+  "response": {
+    "new_folders_encrypted": true
+  },
+  "notes": "Changes the admins' settings; answers them as GET does."
+}

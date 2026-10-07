@@ -1,0 +1,14 @@
+{
+  "method": "POST",
+  "path": "/api/keys/checks",
+  "auth": "device",
+  "status": 201,
+  "request": {
+    "device": "d4ld5x2k7mbqz4bwdbyj6qsqxa",
+    "commitment": "dcUpIQMNjSSkzuhlFpKf7V68gSslWUgphSvsERtifcA"
+  },
+  "response": {
+    "id": "c1ld5x2k7mbqz4bwdbyj6qsqxa"
+  },
+  "notes": "A check before this device passes keys on (docs/e2ee-plan.md, contract/crypto/check.json): device, a device of this person in todo.devices, or user, a person in todo.people or todo.roots (only admins pass folder keys and the root's private key on to other people: 403 forbidden for a member); commitment, SHA-256 of share-e2ee-v1/check and the asking device's one-time public key. Only a device that holds its person's key may ask, and only one that is listed there: 404 not_found otherwise. A new check replaces this device's earlier one for the same device or person. Then the waiting side answers with its one-time key (keys_check_answer.json), this device reveals its own (keys_check_reveal.json), and both show the code; after the person compares them and allows, this device seals folder keys and the root's private key for a person with POST /api/keys/grants, and puts its confirmation on the check (keys_check_confirm.json), which hands on the root, and to a device of its person the person's key pair. The waiting side reads it and closes the check. DELETE /api/keys/checks/{id}, from either side, closes a check (204; 404 not_found). A check is good for 15 minutes."
+}

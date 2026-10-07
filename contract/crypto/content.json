@@ -1,0 +1,41 @@
+{
+  "description": "A file's contents, encrypted with file_key after header: \"SHE1\", the chunk size 65536 (4 bytes, big endian), a nonce prefix (7 bytes) and a zero byte. content_key is HKDF-SHA256 of the file key, salted with the header, with share-e2ee-v1/content as info. Chunk i is AES-256-GCM with content_key, no associated data, and the nonce prefix, i (4 bytes, big endian) and 1 for the last chunk, else 0. Every chunk holds 65536 bytes but the last, which holds the rest: 1 to 65536 bytes, or none in an empty file. A case's plaintext is size bytes, byte i being i mod 251; sha256 is that of all encrypted bytes, header included, and encrypted all of them for the small ones. Binary values are base64url without padding.",
+  "file_key": "A8ZByrsIVU9E3urS8YjN-3-Bk3gW-2a81zYR-A-n47A",
+  "header": "U0hFMQABAAD-JOCx--7VAA",
+  "content_key": "BrVPnjiml7uTYWRiP6TTnI4ZRmTR2Q7e6m4cTIY0l2U",
+  "cases": [
+    {
+      "size": 0,
+      "encrypted_size": 32,
+      "sha256": "edb330b3bf9e671f37bf6e2ce5603afee4b9e12e6b088dee9d4675eecd8580e0",
+      "encrypted": "U0hFMQABAAD-JOCx--7VAL0H83Bd-4h-yhv7KJ2JLNs"
+    },
+    {
+      "size": 1,
+      "encrypted_size": 33,
+      "sha256": "ebcc4336b2ad8a485afbe96fb5a45fbe42f9f9baf64937f948d8899058064df2",
+      "encrypted": "U0hFMQABAAD-JOCx--7VAFy57KbN4X_g3EOfB0OehOM4"
+    },
+    {
+      "size": 100,
+      "encrypted_size": 132,
+      "sha256": "1108fd6c4bd13d96a824cb1324315bc955c7da82191ba15b22e0c1ece0717080",
+      "encrypted": "U0hFMQABAAD-JOCx--7VAFwJCcwB-s0I9tzOLfrLrA7ztsg8EYO_3-Qk27t-eIKv4y254f0tAB04ot1BIXZJ6ZC-2YuFLhksIMeQNbU_lfJjgDi7YntGD6EeTGiFTsLcwjlVTh5pdtPEvIGnXGK6ybPdiwk2gSi_uBAnOYl-I6s78JZ5"
+    },
+    {
+      "size": 65536,
+      "encrypted_size": 65568,
+      "sha256": "a31ca148ae815b1a54eabf4b2fcb90cc31942aaa6c80ff94037175ac211053b3"
+    },
+    {
+      "size": 65537,
+      "encrypted_size": 65585,
+      "sha256": "cf7e8dc86ffdb3c1a0daca8573014710a43d8189afccc03c362b2d8d43f06fd3"
+    },
+    {
+      "size": 200000,
+      "encrypted_size": 200080,
+      "sha256": "ede7474c94c7b88cadb56893415ef0ee6b467c8a53b8aecb754f30070f5d22de"
+    }
+  ]
+}

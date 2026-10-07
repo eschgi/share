@@ -9,28 +9,19 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/eschgi/share/server/internal/app"
 	"github.com/eschgi/share/server/internal/auth"
 	"github.com/eschgi/share/server/internal/config"
 	"github.com/eschgi/share/server/internal/db"
 	"github.com/eschgi/share/server/internal/ids"
 	"github.com/eschgi/share/server/internal/localtls"
-	"github.com/eschgi/share/server/internal/storage"
 )
 
 // openDB opens and migrates the database of cfg, for the commands that work on it directly.
 // Like the server, it makes the first folder if there is none yet.
 func openDB(ctx context.Context, cfg *config.Config) (*db.DB, *auth.Service, error) {
-	layout := storage.Layout{StorageDir: cfg.StorageDir, DataDir: cfg.DataDir}
-	d, err := db.Open(layout.DBPath())
+	d, err := app.OpenDatabase(ctx, cfg, time.Now(), false)
 	if err != nil {
-		return nil, nil, err
-	}
-	if err := d.Migrate(ctx, layout.BackupDir()); err != nil {
-		d.Close()
-		return nil, nil, err
-	}
-	if _, err := storage.EnsureFirstFolder(ctx, d, cfg.StorageDir, cfg.Name, time.Now()); err != nil {
-		d.Close()
 		return nil, nil, err
 	}
 	return d, auth.NewService(d, time.Now), nil
@@ -65,6 +56,7 @@ func invite(args []string) error {
 	}
 	userID := ""
 	var into []string
+	var sees []db.Folder // what the invite opens, to refuse it for encrypted folders
 	switch {
 	case *forUser != "":
 		u, err := findUser(ctx, d, *forUser)
@@ -72,12 +64,30 @@ func invite(args []string) error {
 			return err
 		}
 		userID = u.ID
+		if u.Role == db.RoleAdmin {
+			sees, err = d.LiveFolders(ctx)
+		} else {
+			sees, err = d.FoldersOf(ctx, u.ID)
+		}
+		if err != nil {
+			return err
+		}
 	case *admin && len(names) > 0:
 		return errors.New("admins see every folder; leave out --folder")
-	case !*admin:
+	case *admin:
+		if sees, err = d.LiveFolders(ctx); err != nil {
+			return err
+		}
+	default:
 		if into, err = pickFolders(ctx, d, names); err != nil {
 			return err
 		}
+		if sees, err = d.FoldersByID(ctx, into); err != nil {
+			return err
+		}
+	}
+	if err := noEncrypted(sees, "invite"); err != nil {
+		return err
 	}
 	token, in, err := svc.CreateInvite(ctx, *name, role, userID, "cli", into, auth.InviteLifetime)
 	if err != nil {
@@ -121,7 +131,7 @@ func users(args []string) error {
 		return err
 	}
 	if len(list) == 0 {
-		fmt.Println("Nobody has an account yet. The server prints an invite for the first admin when it starts.")
+		fmt.Println("Nobody has an account yet: the first admin makes theirs on the server's setup page, whose link it logs when it starts.")
 		return nil
 	}
 	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)

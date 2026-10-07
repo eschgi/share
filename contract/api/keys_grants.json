@@ -1,0 +1,43 @@
+{
+  "method": "POST",
+  "path": "/api/keys/grants",
+  "auth": "device",
+  "status": 204,
+  "request": {
+    "devices": [
+      {
+        "device": "d4ld5x2k7mbqz4bwdbyj6qsqxa",
+        "sealed": "TceRPHMKeVt-C0-Qw7haW-7cK2BWWiSjDfwcVf5aKZJgL41p7shN3x5ssHV-_Cv-Qv1UrwTSg9tAConaP-CoLfQIfnkH300ePlDYXVPzAzeWc9zhctonWBg0bDic_cW73aKuedRqJPAWKstkyhl_KsM"
+      }
+    ],
+    "people": [
+      {
+        "folder": "f4mily5x2k7mbqz4bwdbyj6qsq",
+        "version": 1,
+        "user": "u7ld5x2k7mbqz4bwdbyj6qsqxa",
+        "sealed": "Z-F93MI0QSu227pGj4EalS5wqEFWurn57Se8ik0KH_jkxomvdvddddRku_ieIuRwE7eBfPHtCWfF0lPWR3qyYrIpC0yOsgdE86koEHdme2CaHQNWt8f9argHCqDn6iRSgIUKIZyZAAUEbgloamW1cmY"
+      }
+    ],
+    "recovery": [
+      {
+        "folder": "f4mily5x2k7mbqz4bwdbyj6qsq",
+        "version": 1,
+        "sealed": "8KJyJ5xaZmxVQBWmfQWtjy3hk7clGrfBFwzSZq5fLYAdY-oilA1npqxJEqlMmR9ZlTfphVPSVh6nP8KO3iSaxpXD7cQxglnixzd9zua5mZ5wJfhEpfOHXCYZtb_jsVSYeu2d9PTioqz-LjjkWg2nkV8"
+      }
+    ],
+    "pins": [
+      {
+        "pin": "p5ld5x2k7mbqz4bwdbyj6qsqxa",
+        "version": 2,
+        "locked": "QJ_QD6chALxcBx6zjimTM7jprwH-_O6hs2_yydceTPcPh5S73XrbGOgAXAal07JDEq5Bnp3XsXOznq6O"
+      }
+    ],
+    "roots": [
+      {
+        "user": "u8ev5x2k7mbqz4bwdbyj6qsqxa",
+        "sealed": "mfnTlTHuE1-D3S1ymkLGx6ryARujmLWeWTcJXlckCzT_QQmZu6bpNNAC0VNorV8vnk8TNAjLfox7EGgZy2WpjCejiBenKWWyRWj8SKpOavQNT76R4ltqagTdxP_NXaQyZLpnNPEBb-YobB3SF2eT4l0"
+      }
+    ]
+  },
+  "notes": "What this device sealed or locked from its to-do list (GET /api/keys): the person's key for one of their devices; a version of a folder's key for a person who sees the folder (the giver must see it too); for the recovery key; for a PIN link (the giver must hold that version); the newest root's private key for an admin who has a person key (roots: the giver must hold it, or be that admin). Any list may be empty or left out; at most 1000 keys at a time. Keys the server can't take any more, because the to-do list changed meanwhile, are left out; a key already there stays. 400 bad_request for wrong sizes."
+}

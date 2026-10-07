@@ -2,7 +2,8 @@
 
 # The Share server with its website, in a small image without a shell. The build stages run on
 # the builder's own platform and cross-compile, so arm64 images need no emulation. VERSION is
-# what `share version` and the About screens say.
+# what `share version` and the About screens say, from scripts/version.sh:
+# docker build --build-arg VERSION=$(scripts/version.sh) -t share .
 
 # The website, built once: it is the same on every platform.
 FROM --platform=$BUILDPLATFORM node:22-slim AS web
@@ -24,10 +25,11 @@ RUN test -f internal/webui/dist/index.html
 ARG TARGETOS TARGETARCH VERSION=dev
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
     go build -trimpath -ldflags "-s -w -X main.version=$VERSION" -o /out/share ./cmd/share
-# Where the files and the database go. A new volume mounted there takes its owner.
+# Where the files and their thumbnails go; the database runs in a container of its own. A new
+# volume mounted there takes its owner.
 RUN mkdir -p /out/data
 
-# No CA certificates needed: Share makes no connections of its own. /tmp is there for SQLite.
+# The image has the CA certificates, for a bucket or a database over https.
 FROM gcr.io/distroless/static-debian13:nonroot
 COPY --from=server /out/share /usr/local/bin/share
 COPY --from=server --chown=65532:65532 /out/data /data

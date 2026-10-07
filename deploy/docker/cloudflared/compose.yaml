@@ -1,19 +1,43 @@
-# Share behind a Cloudflare Tunnel: nothing to open in the firewall, no public address needed.
-# How to start: ../README.md. The tunnel's token goes into a file .env next to this one:
+# Share behind a Cloudflare Tunnel, with its database next to it: nothing to open in the
+# firewall, no public address needed. How to start: ../README.md. The tunnel's token and the
+# database's password go into a file .env next to this one:
 # TUNNEL_TOKEN=…
+# POSTGRES_PASSWORD=…
 services:
   share:
     image: ghcr.io/eschgi/share:latest
     restart: unless-stopped
     # Share gives running requests 20 seconds when it stops.
     stop_grace_period: 30s
+    environment:
+      # The database's password: config.json names the database without it.
+      PGPASSWORD: ${POSTGRES_PASSWORD:?put POSTGRES_PASSWORD=… into .env}
     volumes:
       - ./config.json:/config/config.json:ro
       - share:/data
+    depends_on:
+      db:
+        condition: service_healthy
     # For the app at home ("home_url"): the http port on this machine's address in the home
     # network only, never on every address.
     # ports:
     #   - "192.168.1.20:8080:8080"
+
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: share
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?put POSTGRES_PASSWORD=… into .env}
+      POSTGRES_DB: share
+    volumes:
+      # From PostgreSQL 18 on, the image keeps its data below /var/lib/postgresql, per version.
+      - db:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "share", "-d", "share"]
+      interval: 5s
+      retries: 10
+    # No ports: only Share reaches the database.
 
   cloudflared:
     image: cloudflare/cloudflared:latest
@@ -27,3 +51,4 @@ services:
 
 volumes:
   share:
+  db:

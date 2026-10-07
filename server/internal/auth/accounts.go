@@ -19,10 +19,8 @@ import (
 const (
 	// InviteLifetime is how long an invite works, once.
 	InviteLifetime = 24 * time.Hour
-	// FirstStart is who made the invite the server prints when nobody has an account yet.
-	FirstStart = "first-start"
-	// firstStartLifetime gives the owner a week to use the first invite.
-	firstStartLifetime = 7 * 24 * time.Hour
+	// Setup is who made the first admin, on the setup page.
+	Setup = "setup"
 )
 
 // Errors for accounts and invites. The API layer turns them into error codes.
@@ -35,6 +33,7 @@ var (
 	ErrPasswordWrong = errors.New("the current password is wrong")
 	ErrUsernameTaken = errors.New("that username is taken")
 	ErrDevicesOnly   = errors.New("only signed-in phones can do this")
+	ErrNotFirst      = errors.New("someone has an account already")
 )
 
 // WrongLoginError is a wrong username or password.
@@ -65,6 +64,7 @@ type SignedIn struct {
 	Token  string
 	User   db.User
 	Device db.Device
+	Keys   []db.InviteKey // from an invite: keys locked with its link's secret
 }
 
 // checkClient accepts the two kinds of devices: the app, and a browser.
@@ -186,9 +186,12 @@ func (s *Service) EndBrowserSession(ctx context.Context, r *http.Request) error 
 // give their name, role and, for a member, the folders they get (possibly none, but not nil);
 // to add a phone for someone with an account, give their user id. It returns ErrFolderGone
 // if one of the folders doesn't exist or is deleted.
-func (s *Service) CreateInvite(ctx context.Context, name, role, forUserID, createdBy string, folders []string, lifetime time.Duration) (string, db.Invite, error) {
+//
+// keys are locked with the secret of the invite's link: versions of the folders' keys for a new
+// person, or the person's own key for a new phone or browser.
+func (s *Service) CreateInvite(ctx context.Context, name, role, forUserID, createdBy string, folders []string, lifetime time.Duration, keys ...db.InviteKey) (string, db.Invite, error) {
 	now := s.Now()
-	in := db.Invite{ID: ids.New(), UserID: forUserID, CreatedBy: createdBy, CreatedAt: now, ExpiresAt: now.Add(lifetime)}
+	in := db.Invite{ID: ids.New(), UserID: forUserID, CreatedBy: createdBy, CreatedAt: now, ExpiresAt: now.Add(lifetime), Keys: keys}
 	if forUserID != "" {
 		u, err := s.DB.UserByID(ctx, forUserID)
 		if err != nil {
@@ -281,14 +284,15 @@ func (s *Service) AcceptInvite(ctx context.Context, r *http.Request, token, devi
 	}
 	deviceToken, hash := ids.NewToken(ids.PrefixDevice)
 	dv := newDevice(r, u.ID, deviceName, client, now)
-	if err := s.DB.UseInvite(ctx, in.ID, u, dv, hash, now); err != nil {
+	keys, err := s.DB.UseInvite(ctx, in.ID, u, dv, hash, now)
+	if err != nil {
 		if errors.Is(err, db.ErrConflict) {
 			return nil, ErrInviteUsed // someone was quicker, a moment ago
 		}
 		return nil, err
 	}
 	s.browserSignedIn(ctx, r, dv, now)
-	return &SignedIn{Token: deviceToken, User: u, Device: dv}, nil
+	return &SignedIn{Token: deviceToken, User: u, Device: dv, Keys: keys}, nil
 }
 
 // findInvite checks an invite token. Unknown tokens count against the caller's address, so
@@ -326,19 +330,51 @@ func (s *Service) findInvite(ctx context.Context, r *http.Request, token string)
 	return in, nil
 }
 
-// FirstStartInvite makes the invite for the first admin while nobody has an account, and
-// returns its token; once someone has, it returns "". An earlier first-start invite is
-// replaced, since only its hash was kept and it can't be shown again.
-func (s *Service) FirstStartInvite(ctx context.Context) (string, error) {
+// NoAccounts reports whether nobody has an account yet, so that the website offers to set
+// Share up.
+func (s *Service) NoAccounts(ctx context.Context) (bool, error) {
+	if s.hasAccounts.Load() {
+		return false, nil
+	}
 	n, err := s.DB.UserCount(ctx)
-	if err != nil || n > 0 {
-		return "", err
+	if err != nil {
+		return false, err
 	}
-	if err := s.DB.RevokeInvitesBy(ctx, FirstStart, s.Now()); err != nil {
-		return "", err
+	if n > 0 {
+		s.hasAccounts.Store(true)
 	}
-	token, _, err := s.CreateInvite(ctx, "Admin", db.RoleAdmin, "", FirstStart, nil, firstStartLifetime)
-	return token, err
+	return n == 0, nil
+}
+
+// FirstAdmin makes the first admin, with a username and password, and signs in the browser
+// that asked, on the setup page. It returns ErrNotFirst once someone has an account.
+func (s *Service) FirstAdmin(ctx context.Context, r *http.Request, name, username, password, deviceName string) (*SignedIn, error) {
+	if name = cleanName(name, ""); name == "" {
+		return nil, &InputError{"name", "is needed"}
+	}
+	username = strings.TrimSpace(username)
+	if err := CheckUsername(username); err != nil {
+		return nil, err
+	}
+	if err := checkPassword(password); err != nil {
+		return nil, err
+	}
+	hash, err := HashPassword(ctx, password)
+	if err != nil {
+		return nil, err
+	}
+	now := s.Now()
+	u := db.User{ID: ids.New(), Name: name, Username: username, PasswordHash: hash, Role: db.RoleAdmin, CreatedAt: now, CreatedBy: Setup}
+	token, keyHash := ids.NewToken(ids.PrefixDevice)
+	dv := newDevice(r, u.ID, deviceName, db.ClientWeb, now)
+	if err := s.DB.InsertFirstUser(ctx, u, dv, keyHash); errors.Is(err, db.ErrNotFirst) {
+		return nil, ErrNotFirst
+	} else if err != nil {
+		return nil, err
+	}
+	s.hasAccounts.Store(true)
+	s.browserSignedIn(ctx, r, dv, now)
+	return &SignedIn{Token: token, User: u, Device: dv}, nil
 }
 
 // SignOut signs the calling phone or browser out.
@@ -368,9 +404,18 @@ func CheckUsername(username string) error {
 	return nil
 }
 
+// checkPassword tells whether a password can be used: 8 to 200 characters.
+func checkPassword(password string) error {
+	if n := utf8.RuneCountInString(password); n < 8 || n > 200 {
+		return &InputError{"password", "needs at least 8 characters"}
+	}
+	return nil
+}
+
 // SetPassword gives the caller a username and password, for signing in on other phones and in
-// browsers. With a password already set, the current one is needed.
-func (s *Service) SetPassword(ctx context.Context, p *Principal, username, current, password string) error {
+// browsers. With a password already set, the current one is needed. lock is the person's key
+// locked with the new password; without one, a lock with the old password goes.
+func (s *Service) SetPassword(ctx context.Context, p *Principal, username, current, password string, lock []byte) error {
 	if p.Kind != KindDevice {
 		return ErrDevicesOnly
 	}
@@ -382,8 +427,8 @@ func (s *Service) SetPassword(ctx context.Context, p *Principal, username, curre
 	if err := CheckUsername(username); err != nil {
 		return err
 	}
-	if n := utf8.RuneCountInString(password); n < 8 || n > 200 {
-		return &InputError{"password", "needs at least 8 characters"}
+	if err := checkPassword(password); err != nil {
+		return err
 	}
 	if u.PasswordHash != "" {
 		now, key := s.Now(), "user:"+u.ID
@@ -410,6 +455,9 @@ func (s *Service) SetPassword(ctx context.Context, p *Principal, username, curre
 	if err := s.DB.SetLogin(ctx, u.ID, username, hash); errors.Is(err, db.ErrConflict) {
 		return ErrUsernameTaken
 	} else if err != nil {
+		return err
+	}
+	if err := s.DB.SetPasswordLock(ctx, u.ID, lock); err != nil && !errors.Is(err, db.ErrNoKey) {
 		return err
 	}
 	return nil
@@ -441,6 +489,10 @@ func (s *Service) ResetPassword(ctx context.Context, userID, username string) (s
 	if err := s.DB.SetLogin(ctx, u.ID, username, hash); errors.Is(err, db.ErrConflict) {
 		return "", "", ErrUsernameTaken
 	} else if err != nil {
+		return "", "", err
+	}
+	// Their key stays locked with the forgotten password; that lock opens nothing for them now.
+	if err := s.DB.SetPasswordLock(ctx, u.ID, nil); err != nil {
 		return "", "", err
 	}
 	for _, name := range []string{u.Username, username} {

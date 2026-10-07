@@ -1,7 +1,7 @@
 # Builds the website into the server, then the server for Linux on arm64 (e.g. a Raspberry Pi
 # or an ARM server) and on amd64. Output: dist\share-linux-arm64, dist\share-linux-amd64.
 #
-#   scripts\build-linux.ps1                    version from git
+#   scripts\build-linux.ps1                    version from VERSION and git (scripts/version.sh)
 #   scripts\build-linux.ps1 -Version 0.1.0
 param([string]$Version = "")
 
@@ -9,8 +9,8 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 
 if (-not $Version) {
-    $Version = (git -C $root describe --tags --always --dirty 2>$null)
-    if (-not $Version) { $Version = "dev" }
+    . "$PSScriptRoot\version.ps1"
+    $Version = Get-ShareVersion $root
 }
 
 Write-Host "Building the website"

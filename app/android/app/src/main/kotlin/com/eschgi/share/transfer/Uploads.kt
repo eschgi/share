@@ -3,8 +3,10 @@ package com.eschgi.share.transfer
 import android.content.Context
 import android.util.Log
 import androidx.core.net.toUri
+import com.eschgi.share.data.ServerStore
 import com.eschgi.share.net.RouteMonitor
 import com.eschgi.share.net.ServerConnection
+import com.eschgi.share.net.ServerInfo
 import java.io.IOException
 import java.util.UUID
 import java.util.concurrent.CopyOnWriteArraySet
@@ -65,14 +67,15 @@ object Uploads {
     private fun terminate(app: Context, auth: String, uploadIds: List<String>) {
         val (token, config) = Credentials.of(app, auth) ?: return
         val server = ServerConnection(config, token)
+        val storage = ServerInfo.of(config) { server.open(it, false, readTimeoutMs = 15_000) }?.storage ?: return
         for (id in uploadIds) {
             try {
-                val conn = server.open("/tus/$id", false, method = "DELETE")
-                conn.setRequestProperty("Tus-Resumable", "1.0.0")
+                val conn = server.open(if (storage == ServerInfo.Storage.S3) "/api/s3/uploads/$id" else "/tus/$id", false, method = "DELETE")
+                if (storage == ServerInfo.Storage.DISK) conn.setRequestProperty("Tus-Resumable", "1.0.0")
                 conn.responseCode
                 conn.disconnect()
             } catch (e: IOException) {
-                Log.i(TAG, "terminating $id: $e")
+                Log.i(TAG, "cancelling $id: $e")
             }
         }
     }
@@ -115,7 +118,8 @@ object Uploads {
     fun snapshots(context: Context, rate: UploadEngine.Rate? = null, local: Boolean? = null): List<UploadSnapshot> {
         val queue = UploadQueue(context)
         val live = UploadEngine.liveBytes()
-        val onLocal = local ?: RouteMonitor.current(context).isLocal
+        // Into a bucket the bytes go over the internet, wherever the phone is.
+        val onLocal = local ?: (RouteMonitor.current(context).isLocal && !ServerInfo.knownS3(ServerStore(context).config()))
         val sending = UploadEngine.currentBatch()
         return queue.recentBatches(System.currentTimeMillis() - RECENT_MS).map { b ->
             val rows = queue.rows(b.id)

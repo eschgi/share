@@ -2,6 +2,7 @@
 library;
 
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
@@ -78,6 +79,58 @@ void main() {
     await shot(tester, 'en/38-library-folder');
     await tester.tap(find.text('Family'));
     await shot(tester, 'en/39-choose-folder');
+  }));
+
+  // Keys passed on only with an OK (50 to 52): a phone that waits for its keys, with the code its
+  // other phone or browser shows; and the sheets that ask before passing them on.
+  testWidgets('keys: a phone waits for approval', (tester) => atTen(() async {
+    final server = folders()..thumb = Uint8List.fromList([1, 2, 3]);
+    for (final f in server.files.take(6)) {
+      f['has_thumb'] = true;
+      f['enc'] = {'version': 1, 'key': 'sealed-key', 'header': 'U0hFMQABAAA9p6lLxQCBAA'};
+    }
+    final platform = signedInPhone()
+      ..secrets['folder'] = family
+      ..sealedFolders = {for (final f in server.files) f['folder'] as String}
+      ..keysState = const KeysState(status: KeysStatus.waiting, encryptedFolders: 1, codes: [ShownCode(kind: 'device', from: 'Chrome · Windows', code: '482197')]);
+    await startApp(tester, platform, server);
+    await shot(tester, 'en/50-keys-waiting');
+  }));
+
+  testWidgets('keys: allowing a new browser', (tester) => atTen(() async {
+    final platform = signedInPhone()
+      ..secrets['folder'] = family
+      ..keysState = KeysState(status: KeysStatus.ready, encryptedFolders: 1, asks: [
+        KeyAsk(kind: 'device', id: 'd1', name: 'Chrome · Windows', client: 'web', since: DateTime(2026, 9, 30, 10, 3), code: '735041'),
+      ]);
+    await startApp(tester, platform, folders());
+    // Listed in the library; Show opens the sheet.
+    await shot(tester, 'en/51-keys-waiting-list');
+    await tester.tap(find.text('Show'));
+    await shot(tester, 'en/51-keys-allow-browser');
+  }));
+
+  testWidgets('keys: several wait for an OK', (tester) => atTen(() async {
+    final platform = signedInPhone()
+      ..secrets['folder'] = family
+      ..keysState = KeysState(status: KeysStatus.ready, encryptedFolders: 3, asks: [
+        KeyAsk(kind: 'device', id: 'd1', name: 'Chrome · Windows', client: 'web', since: DateTime(2026, 9, 30, 10, 3)),
+        const KeyAsk(kind: 'person', id: 'u1', name: 'Maria', folders: [family]),
+        const KeyAsk(kind: 'person', id: 'u2', name: 'Peter', folders: [family, wedding]),
+      ]);
+    await startApp(tester, platform, folders());
+    await shot(tester, 'en/51-keys-several');
+  }));
+
+  testWidgets('keys: allowing someone a new key', (tester) => atTen(() async {
+    final platform = signedInPhone()
+      ..secrets['folder'] = family
+      ..keysState = const KeysState(status: KeysStatus.ready, encryptedFolders: 3, asks: [
+        KeyAsk(kind: 'person', id: 'u1', name: 'Maria', folders: [family, wedding, kindergarten], code: '813552', keyChanged: true),
+      ]);
+    await startApp(tester, platform, folders());
+    await tester.tap(find.text('Show'));
+    await shot(tester, 'en/52-keys-allow-person');
   }));
 
   testWidgets('sign in', (tester) => atTen(() async {

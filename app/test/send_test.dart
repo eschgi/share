@@ -13,15 +13,17 @@ import 'support/fake_platform.dart';
 import 'support/fake_server.dart';
 import 'support/fonts.dart';
 
-UploadState sample({bool running = true, int lost = 0, String? paused, SendAuth auth = SendAuth.device, String? folder}) => UploadState(
+UploadState sample({bool running = true, int lost = 0, int failed = 0, int unchecked = 0, String? paused, SendAuth auth = SendAuth.device, String? folder}) => UploadState(
       batch: 'up-1',
       auth: auth,
       folder: folder,
       running: running,
       paused: paused,
       total: 5,
-      done: running ? 1 : 5 - lost,
+      done: running ? 1 : 5 - lost - failed,
       lost: lost,
+      failed: failed,
+      unchecked: unchecked,
       bytesTotal: 61280000,
       bytesDone: running ? 36380000 : 61280000,
       etaSeconds: running ? 125 : null,
@@ -169,6 +171,31 @@ void main() {
     expect(platform.picks.single, (PickWhat.documents, SendAuth.device), reason: 'the lost one is a document');
   });
 
+  testWidgets("files whose folder's keys can't be checked say so, signed in and with a PIN", (tester) async {
+    final platform = signedInPhone();
+    await startApp(tester, platform, FakeServer());
+    await tester.tap(find.text('Send').last);
+    await tester.pumpAndSettle();
+    platform.uploadEvents.add(sample(running: false, failed: 2, unchecked: 2));
+    await tester.pumpAndSettle();
+    expect(find.text("2 files couldn't be sent."), findsOneWidget);
+    expect(find.textContaining("Share couldn't check the keys of their folder"), findsOneWidget);
+    platform.uploadEvents.add(sample(running: false, failed: 1));
+    await tester.pumpAndSettle();
+    expect(find.textContaining("Share couldn't check the keys"), findsNothing, reason: 'failed otherwise');
+  });
+
+  testWidgets('a PIN link keeps what it carried after the code, and a typed PIN forgets it', (tester) async {
+    final platform = FakePlatform();
+    final server = FakeServer();
+    await startApp(tester, platform, server);
+    final fingerprint = 'R' * 22;
+    platform.linkEvents.add('https://share.example.com/#K7M2Q.$fingerprint');
+    await tester.pumpAndSettle();
+    expect(find.text('To share.example.com'), findsOneWidget);
+    expect(platform.pinLinks, [(null, fingerprint)]);
+  });
+
   testWidgets('without an account: the address, a wrong PIN, the right one, sending', (tester) async {
     final platform = FakePlatform();
     final server = FakeServer();
@@ -196,6 +223,7 @@ void main() {
     expect(platform.resumed, [SendAuth.pin]);
     final unlock = server.requests.lastWhere((r) => r.url.path == '/api/pin/unlock');
     expect(jsonDecode(unlock.body), {'code': 'K7M2Q', 'client': 'app'});
+    expect(platform.pinLinks, [(null, null)], reason: 'a typed PIN has nothing after its code');
 
     await tester.tap(find.text('Other files'));
     await tester.pumpAndSettle();

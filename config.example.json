@@ -5,6 +5,9 @@
     "listen": ":8080"
   },
   "storage_dir": "/srv/share",
+  "database": {
+    "postgres": "postgres://share:PASSWORD@localhost/share"
+  },
   "time_zone": "Europe/Rome",
   "languages": ["en", "de", "it"],
   "default_language": "en",

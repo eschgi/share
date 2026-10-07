@@ -27,11 +27,15 @@
           "height": 3024,
           "duration_ms": null,
           "has_thumb": true,
-          "from": "Maria"
+          "from": "Maria",
+          "enc": null
         },
-        "created_at": "2026-09-12T08:00:00Z"
+        "created_at": "2026-09-12T08:00:00Z",
+        "encrypted": false,
+        "key_version": null,
+        "plain_signature": "c92P2-zHd3OC2pYwL82DeaGdyy8Yck0kF4nP47GiCpj7ZfZzp72dpiifA9SHEA8JMOE9mQfHdlNwl9cyhDujSw"
       }
     ]
   },
-  "notes": "The folders the caller sees, the oldest first: admins every folder, members the ones they were given. files, bytes: what is in the library (not the trash); senders: how many people and PIN sessions sent them. people: who sees the folder: the admins, the members given it and open invites that give it. admins_only: no member sees it. cover: the newest photo or video with a thumbnail, as in /api/files, or null. The list changes with the library's version. A PIN session whose PIN shows its folder gets that folder; other PIN sessions 403 forbidden."
+  "notes": "The folders the caller sees, the oldest first: admins every folder, members the ones they were given. files, bytes: what is in the library (not the trash); senders: how many people and PIN sessions sent them. people: who sees the folder: the admins, the members given it and open invites that give it. admins_only: no member sees it. cover: the newest photo or video with a thumbnail, as in /api/files, or null. The list changes with the library's version. A PIN session whose PIN shows its folder gets that folder; other PIN sessions 403 forbidden. encrypted: new files must be encrypted; key_version: the newest version of its key, null if it was never encrypted. plain_signature: the root's plain statement for the folder (contract/crypto/sign.json: share-e2ee-v1/sign/plain, its newest version, 0 without one, and its name), without which phones and browsers send nothing plain into it once there is a root; null for a folder that is encrypted, or before the first recovery key."
 }

@@ -6,8 +6,10 @@ app sends with a PIN, like the website. Admins manage PINs, people and Recently 
 
 Flutter draws the screens. Kotlin (`android/app/src/main/kotlin`) does what has to work without
 them: the phone's key in the Android KeyStore, the choice between the local and the public
-address, and the transfers. Downloads and uploads (tus, in pieces) keep going when the app is
-closed and continue where they stopped.
+address, the transfers, and the keys of encrypted folders (`e2ee/`, see docs/e2ee-plan.md), which
+the transfers and the player use to encrypt and decrypt on the phone. Downloads and uploads (in pieces, by tus or straight into the server's
+S3 bucket) keep going when the app is closed and continue where they stopped. Links to a bucket
+are fetched without the phone's key, which goes only to Share.
 
 ## Running it
 
@@ -34,7 +36,8 @@ keyPassword=…
 Then `flutter build apk --flavor direct --release` makes
 `build/app/outputs/flutter-apk/app-direct-release.apk`, the file for the server's `app.apk_file`.
 Next to it, as `share.apk.json`, the server wants its version, the two parts of `version:` in
-`pubspec.yaml`: `{"version_code": 3, "version_name": "0.3.0"}`.
+`pubspec.yaml`: `{"version_code": 100, "version_name": "0.1.0"}`. That is Share's version, from
+`VERSION` (`scripts/version.sh`); CI's builds put in their own, e.g. `0.1.0-dev+abc1234`.
 
 ### Signed by GitHub Actions
 
@@ -59,22 +62,25 @@ gh secret set ANDROID_KEY_PASSWORD
 
 On Linux or macOS the first line is `base64 < share-release.jks | gh secret set ANDROID_KEYSTORE_BASE64`.
 
-Every push to `main` then leaves `share.apk` and `share.apk.json` as the artifact `share-apk` for
-a day, and a version tag puts them in the release. The key is only used for pushes to this
-repository, never for pull requests. Without the secrets, pushes still pass without an APK, and a
-tag fails rather than making a release without it.
+Every push to `main`, and every pull request from one of this repository's branches, then leaves
+`share.apk` and `share.apk.json` as the artifact `share-apk` for a week, and a version tag puts
+them in the release. A pull request from a fork never gets the key: GitHub doesn't hand secrets to
+it. Without the secrets, runs still pass without an APK, and a tag fails rather than making a
+release without it.
 
 ## Tests
 
 ```sh
 flutter analyze && flutter test
-(cd android && ./gradlew testDirectDebugUnitTest testPlayDebugUnitTest)
+flutter build apk --config-only              # once: makes android/gradlew, which isn't in the repository
+(cd android && ./gradlew testDirectDebugUnitTest testPlayDebugUnitTest lintDirectDebug)
 flutter test --run-skipped --tags golden     # screenshots, compared with docs/share-mockup
 ```
 
-The Dart tests run the screens against a fake server made from `contract/api`. The Kotlin unit
-tests download from a small local server and check the pinned TLS against real self-signed
-certificates. Both sides read `contract/app/platform.json`, which is what they hand each other.
+The Dart tests run the screens against a fake server made from `contract/api`, with a bucket of
+its own. The Kotlin unit tests send to and download from a small local server, which also plays
+the bucket, and check the pinned TLS against real self-signed certificates. Both sides read
+`contract/app/platform.json`, which is what they hand each other.
 
 The golden screenshots depend on the machine's font rendering, so they are skipped by default
 and not run in CI. After changing a screen, `--update-goldens` writes them again.

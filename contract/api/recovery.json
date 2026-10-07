@@ -1,0 +1,45 @@
+{
+  "method": "GET",
+  "path": "/api/recovery",
+  "auth": "admin",
+  "status": 200,
+  "response": {
+    "public_key": "BJicWfAcvj3jxAHtC-Uy58D8xHwHzzag6N4vxtMls9Kgolk5D-7jUUfaZSLcwLTfIA8yrT9MVCc0CMC7O-bRvq4",
+    "locked": "VLG2aTNhyayxLP2zZzzCm2K0XRNSZ9gi73tsgqH_Grs0L0229cflFtmlMIp-vUlknPKZ3USw6BXVxnlh",
+    "roots": [
+      {
+        "public_key": "BJicWfAcvj3jxAHtC-Uy58D8xHwHzzag6N4vxtMls9Kgolk5D-7jUUfaZSLcwLTfIA8yrT9MVCc0CMC7O-bRvq4",
+        "signature": null
+      }
+    ],
+    "folders": [
+      {
+        "folder": "f4mily5x2k7mbqz4bwdbyj6qsq",
+        "version": 1,
+        "public_key": "BD2by89bRJCssD8lt0C3_6ty_5oR7bv8NTJBzR_bExVcLwCpyG-mivDtV7cTpU0f_H-l4CGCrkBCaUfVWDdXH_M",
+        "signature": "efeWfQASZO7t7dOH2nf4cj_IGzknJoX4rhvx07izpdjD5XUVjcYKAMggO5HrCaW3TfYgoECHom-ywxwZEkyG8Q",
+        "sealed": "oErgrfectImc-M70fmLovXW60s7t9HSf4JLHRbhQz4-GhFwsaSSSmdv6akXJB0mnXxvkCh9wqFVVeVbRMEX0-MvcHFQXRaCPi2ayADEkcJ_eCTcj8m7ekRkBtWe7l4frUC-DgyLE5hBm25wvcD1nJDs"
+      }
+    ],
+    "sign": {
+      "folder_keys": [
+        {
+          "folder": "f4mily5x2k7mbqz4bwdbyj6qsq",
+          "version": 1,
+          "public_key": "BD2by89bRJCssD8lt0C3_6ty_5oR7bv8NTJBzR_bExVcLwCpyG-mivDtV7cTpU0f_H-l4CGCrkBCaUfVWDdXH_M",
+          "signature": "efeWfQASZO7t7dOH2nf4cj_IGzknJoX4rhvx07izpdjD5XUVjcYKAMggO5HrCaW3TfYgoECHom-ywxwZEkyG8Q",
+          "sealed": null
+        }
+      ],
+      "plain": [
+        {
+          "folder": "h0lidays5x2k7mbqz4bwdbyj6qs",
+          "version": 0,
+          "name": "Holidays",
+          "signature": "lTFjQjnKmQACiU3_dUf1UKXW4j55hjyMPwf1abSmTg4FMX_irKVrFEE6qmzsXjp-CLJWt2tcrmUyAcxKvdiBEQ"
+        }
+      ]
+    }
+  },
+  "notes": "The recovery key, which is the newest root: its public key and its private key locked with the recovery code (contract/crypto/recovery.json), the chain of roots as in GET /api/keys, and every version of every folder's key sealed for it. An admin who has the code opens all encrypted folders with it, e.g. on a new device. sign is what a new recovery code signs anew (PUT /api/recovery), after checking each signature under the newest root: every version of every folder's key (folder_keys, with its public key), and every folder that sends plain (plain: its newest version, 0 without one, and its name). Before the first recovery key, roots and folder_keys are empty, and plain lists every folder, deleted or not, without a signature: the first recovery key signs them all as plain. public_key and locked are null then."
+}

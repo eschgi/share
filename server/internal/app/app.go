@@ -6,11 +6,11 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -20,8 +20,10 @@ import (
 	"github.com/eschgi/share/server/internal/config"
 	"github.com/eschgi/share/server/internal/db"
 	"github.com/eschgi/share/server/internal/downloads"
+	"github.com/eschgi/share/server/internal/httpx"
 	"github.com/eschgi/share/server/internal/jobs"
 	"github.com/eschgi/share/server/internal/localtls"
+	"github.com/eschgi/share/server/internal/s3"
 	"github.com/eschgi/share/server/internal/storage"
 	"github.com/eschgi/share/server/internal/thumbs"
 	"github.com/eschgi/share/server/internal/upload"
@@ -34,8 +36,14 @@ type Options struct {
 	WaitForStorage bool // wait for the storage marker instead of failing (a drive may mount late)
 	Upload         *upload.Config
 	Version        string // the program's version, for the About screens; "dev" when empty
-	// CheckStorage looks at the drives for the admins' storage page; storage.Check when nil.
-	CheckStorage func() storage.Report
+	// Setup says who may make the first admin on the setup page, while nobody has an account;
+	// only visitors at home when nil.
+	Setup *Setup
+	// CheckStorage looks at the drives or the bucket for the admins' storage page;
+	// storage.Check or storage.CheckS3 when nil.
+	CheckStorage func(context.Context) storage.Report
+	// S3 is the bucket of the "s3" setting, opened by a test against its own server.
+	S3 *s3.Bucket
 }
 
 // App is a running server's parts.
@@ -44,9 +52,10 @@ type App struct {
 	DB     *db.DB
 	Lib    *storage.Library
 	Auth   *auth.Service
-	Upload *upload.Handler
+	Tus    *upload.TusHandler // nil when the files are in a bucket
+	S3     *s3.Bucket         // the bucket, nil when the files are on a drive
 	Thumbs *thumbs.Store
-	CRCs   *checksum.Store
+	CRCs   *checksum.Store // nil in a bucket: a ZIP needs the files on a drive
 	UI     *webui.UI
 	Local  *localtls.Loader // Share's own certificate on the https port; nil without one
 	// Handler answers on both ports, http and https.
@@ -54,6 +63,7 @@ type App struct {
 
 	now   func() time.Time
 	sched *jobs.Scheduler
+	setup *Setup
 
 	hintsMu sync.Mutex
 	hints   map[string]time.Time // when each hint about the proxy was last logged
@@ -66,35 +76,47 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 		now = time.Now
 	}
 	layout := storage.Layout{StorageDir: cfg.StorageDir, DataDir: cfg.DataDir}
-	if opts.WaitForStorage {
-		if err := storage.WaitForMarker(ctx, cfg.StorageDir, log.Printf); err != nil {
-			return nil, err
+	var bucket *s3.Bucket
+	var checkStorage func(context.Context) storage.Report
+	if cfg.S3 != nil {
+		if bucket = opts.S3; bucket == nil {
+			var err error
+			if bucket, err = s3.Open(cfg.S3, s3.Options{}); err != nil {
+				return nil, fmt.Errorf("s3: %w", err)
+			}
 		}
-	} else if _, err := os.Stat(filepath.Join(cfg.StorageDir, storage.MarkerName)); err != nil {
-		return nil, fmt.Errorf("%s isn't a Share storage folder (no %s); mount the drive or volume and run `share init`", cfg.StorageDir, storage.MarkerName)
+		// A bucket has no marker: it is ready when it answers, with a clock close to ours.
+		if opts.WaitForStorage {
+			if err := bucket.WaitReachable(ctx, log.Printf); err != nil {
+				return nil, fmt.Errorf("s3: %w", err)
+			}
+		}
+		checkStorage = func(ctx context.Context) storage.Report {
+			return storage.CheckS3(ctx, cfg.DataDir, bucket, cfg.Origins())
+		}
+	} else {
+		if opts.WaitForStorage {
+			if err := storage.WaitForMarker(ctx, cfg.StorageDir, log.Printf); err != nil {
+				return nil, err
+			}
+		} else if _, err := os.Stat(filepath.Join(cfg.StorageDir, storage.MarkerName)); err != nil {
+			return nil, fmt.Errorf("%s isn't a Share storage folder (no %s); mount the drive or volume and run `share init`", cfg.StorageDir, storage.MarkerName)
+		}
+		checkStorage = func(context.Context) storage.Report { return storage.Check(layout, cfg.MinFreeSpace()) }
 	}
-	report := storage.Check(layout, cfg.MinFreeSpace())
+	report := checkStorage(ctx)
 	for _, p := range report.Problems {
 		log.Printf("storage: problem: %s", p.Message)
 	}
 	for _, w := range report.Warnings {
 		log.Printf("storage: %s", w.Message)
 	}
-	checkStorage := opts.CheckStorage
-	if checkStorage == nil {
-		checkStorage = func() storage.Report { return storage.Check(layout, cfg.MinFreeSpace()) }
+	if opts.CheckStorage != nil {
+		checkStorage = opts.CheckStorage
 	}
 
-	d, err := db.Open(layout.DBPath())
+	d, err := OpenDatabase(ctx, cfg, now(), opts.WaitForStorage)
 	if err != nil {
-		return nil, err
-	}
-	if err := d.Migrate(ctx, layout.BackupDir()); err != nil {
-		d.Close()
-		return nil, err
-	}
-	if _, err := storage.EnsureFirstFolder(ctx, d, cfg.StorageDir, cfg.Name, now()); err != nil {
-		d.Close()
 		return nil, err
 	}
 	serverID, err := d.ServerID(ctx)
@@ -102,8 +124,10 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 		d.Close()
 		return nil, err
 	}
-	lib, err := storage.OpenLibrary(d, layout, cfg.Location, now, log.Printf)
-	if err != nil {
+	var lib *storage.Library
+	if bucket != nil {
+		lib = storage.OpenS3Library(d, bucket, layout, cfg.Location, now, log.Printf)
+	} else if lib, err = storage.OpenLibrary(d, layout, cfg.Location, now, log.Printf); err != nil {
 		d.Close()
 		return nil, err
 	}
@@ -118,18 +142,36 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 		upCfg = *opts.Upload
 	}
 	upCfg.MaxFileSize, upCfg.MinFreeSpace = maxFile, cfg.MinFreeSpace()
-	up, err := upload.New(upCfg, authSvc, lib, now)
-	if err != nil {
-		lib.Close()
-		d.Close()
-		return nil, err
+	if upCfg.ChunkSize == 0 {
+		upCfg.ChunkSize = cfg.ChunkSize()
 	}
-	th := &thumbs.Store{DB: d, Dir: layout.ThumbsDir(), Root: lib.Root(), Open: lib.Open, Now: now, Logf: log.Printf}
+	var tus *upload.TusHandler
+	if bucket == nil {
+		if tus, err = upload.NewTusHandler(upCfg, authSvc, lib, now); err != nil {
+			lib.Close()
+			d.Close()
+			return nil, err
+		}
+	}
+	openOriginal := func(ctx context.Context, f db.File) (io.ReadSeekCloser, error) { return lib.Open(ctx, f) }
+	th := &thumbs.Store{DB: d, Open: openOriginal, Now: now, Logf: log.Printf}
+	if bucket != nil {
+		th.Bucket = bucket // the thumbnails go next to the files
+	} else {
+		th.Dir = layout.ThumbsDir()
+	}
 	lib.OnPurged = th.Remove
-	crcs := &checksum.Store{DB: d, Root: lib.Root(), Open: lib.Open, Pace: checksum.Pace, Logf: log.Printf}
-	lib.OnReady = crcs.Wake
+	var crcs *checksum.Store
+	if bucket == nil {
+		crcs = &checksum.Store{DB: d, Root: lib.Root(), Open: lib.OpenFile, Pace: checksum.Pace, Logf: log.Printf}
+		lib.OnReady = crcs.Wake
+	}
 	dl := &downloads.Store{Now: now}
-	ui := webui.New(cfg)
+	bucketOrigin := ""
+	if bucket != nil {
+		bucketOrigin = bucket.Origin()
+	}
+	ui := webui.New(cfg, bucketOrigin)
 	if !ui.Built() {
 		log.Printf("webui: the website isn't built into this binary; serving a placeholder")
 	}
@@ -152,16 +194,27 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 	}
 	apiHandlers := &api.API{
 		Cfg: cfg, Auth: authSvc, ServerID: serverID, MaxFileSize: maxFile, Lib: lib, Thumbs: th, Local: local,
-		APK: &api.APK{Path: cfg.App.APKFile}, Downloads: dl, Checksums: crcs, Now: now, ServerVersion: version,
+		APK: &api.APK{Path: cfg.App.APKFile}, Downloads: dl, Checksums: crcs, S3: bucket, Now: now, ServerVersion: version,
 		CheckStorage: checkStorage,
 	}
 
 	mux := http.NewServeMux()
-	mux.Handle(upload.BasePath, up)
+	if tus != nil {
+		mux.Handle(upload.BasePath, tus)
+	} else {
+		mux.HandleFunc(upload.BasePath, func(w http.ResponseWriter, r *http.Request) {
+			httpx.WriteError(w, http.StatusNotFound, "not_found", "Files go into the bucket here, not over tus.")
+		})
+		upload.NewS3Handler(upCfg, authSvc, lib, now).Register(mux)
+	}
 	apiHandlers.Register(mux)
 	mux.Handle("/", ui)
 
-	a := &App{Cfg: cfg, DB: d, Lib: lib, Auth: authSvc, Upload: up, Thumbs: th, CRCs: crcs, UI: ui, Local: local, now: now}
+	a := &App{Cfg: cfg, DB: d, Lib: lib, Auth: authSvc, Tus: tus, S3: bucket, Thumbs: th, CRCs: crcs, UI: ui, Local: local, now: now, setup: opts.Setup}
+	if a.setup == nil {
+		a.setup = &Setup{}
+	}
+	a.registerSetup(mux, a.setup)
 	// Health checks get their answer however they arrive, also from a proxy that names no
 	// visitor. Everything else goes through the guard. Browsers may only change state from
 	// this site itself; the app sends no Origin.
@@ -172,10 +225,13 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*App, error) {
 	})
 	outer.Handle("/", a.guard(sameOrigin(mux)))
 	a.Handler = outer
-	a.sched = &jobs.Scheduler{Now: now, Logf: log.Printf, Tasks: []jobs.Task{
-		{Name: "reconcile uploads", Every: 5 * time.Minute, Run: func(ctx context.Context) error {
+	a.sched = &jobs.Scheduler{Now: now, Logf: log.Printf, Last: lastRun(d), Ran: recordRun(d), Tasks: []jobs.Task{
+		// Also at every start: it repairs what a stop in the middle of something left behind.
+		{Name: "reconcile uploads", Every: 5 * time.Minute, AtStart: true, Run: func(ctx context.Context) error {
 			authSvc.PruneLimits()
-			up.PruneQueues()
+			if tus != nil {
+				tus.PruneQueues()
+			}
 			dl.Prune()
 			return lib.Reconcile(ctx, cfg.IncompleteTTL())
 		}},
@@ -208,17 +264,47 @@ func (a *App) Close() error {
 	return errors.Join(a.Lib.Close(), a.DB.Close())
 }
 
-// Serve repairs what the last run left behind, then answers requests until ctx ends, and
-// shuts down gracefully: running requests get 20 seconds.
-func (a *App) Serve(ctx context.Context) error {
-	if err := a.Lib.Reconcile(ctx, a.Cfg.IncompleteTTL()); err != nil {
-		log.Printf("storage: reconcile: %v", err)
+// shutdownWait is how long running requests get when the server stops: 20 seconds, but 8 on
+// Cloud Run, which ends the process 10 seconds after asking it to stop.
+func shutdownWait() time.Duration {
+	if os.Getenv("K_SERVICE") != "" {
+		return 8 * time.Second
 	}
-	if token, err := a.Auth.FirstStartInvite(ctx); err != nil {
-		log.Printf("share: first-start invite: %v", err)
-	} else if token != "" {
-		log.Printf("share: nobody has an account yet. To become the admin, open this link on your phone or computer; it works once, for 7 days:")
-		log.Printf("share:   %s/join#%s", strings.TrimSuffix(a.Cfg.PublicURL, "/"), token)
+	return 20 * time.Second
+}
+
+// lastRun reads when a periodic job last ran from the database, so that a server that only
+// runs for minutes at a time still does its hourly and daily work.
+func lastRun(d *db.DB) func(context.Context, string) time.Time {
+	return func(ctx context.Context, name string) time.Time {
+		t, err := d.JobRun(ctx, name)
+		if err != nil {
+			log.Printf("jobs: %s: %v", name, err)
+		}
+		return t
+	}
+}
+
+// recordRun notes a run of a periodic job in the database.
+func recordRun(d *db.DB) func(context.Context, string, time.Time) {
+	return func(ctx context.Context, name string, at time.Time) {
+		if err := d.SetJobRun(ctx, name, at); err != nil {
+			log.Printf("jobs: %s: %v", name, err)
+		}
+	}
+}
+
+// Serve repairs what the last run left behind and does the housekeeping that is due, then
+// answers requests until ctx ends, and shuts down gracefully: running requests get some time
+// to finish (shutdownWait).
+func (a *App) Serve(ctx context.Context) error {
+	a.sched.RunDue(ctx)
+	if none, err := a.Auth.NoAccounts(ctx); err != nil {
+		log.Printf("share: %v", err)
+	} else if none {
+		log.Printf("share: nobody has an account yet: open %s to make the first admin; from outside the home network within %d minutes of this start, or later with this link:",
+			a.setup.Page(a.Cfg), int(SetupWindow/time.Minute))
+		log.Printf("share:   %s", a.setup.Link(a.Cfg))
 		log.Printf("share: or make an invite with your name: share invite --admin --name YOURNAME")
 	}
 
@@ -261,7 +347,9 @@ func (a *App) Serve(ctx context.Context) error {
 	}()
 	workers.Go(func() { a.sched.Run(jobsCtx) })
 	workers.Go(func() { a.Thumbs.Run(jobsCtx) })
-	workers.Go(func() { a.CRCs.Run(jobsCtx) })
+	if a.CRCs != nil {
+		workers.Go(func() { a.CRCs.Run(jobsCtx) })
+	}
 
 	errCh := make(chan error, len(servers))
 	for _, start := range starts {
@@ -273,7 +361,7 @@ func (a *App) Serve(ctx context.Context) error {
 	case <-ctx.Done():
 		log.Printf("share: shutting down")
 	}
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownWait())
 	defer cancel()
 	for _, s := range servers {
 		if serr := s.Shutdown(shutdownCtx); err == nil {

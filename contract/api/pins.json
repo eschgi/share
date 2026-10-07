@@ -15,7 +15,8 @@
         "files": 128,
         "phones": 6,
         "folder": "f4mily5x2k7mbqz4bwdbyj6qsq",
-        "shows_folder": false
+        "shows_folder": false,
+        "secret": null
       },
       {
         "id": "p4ld5x2k7mbqz4bwdbyj6qsqxa",
@@ -27,7 +28,8 @@
         "files": 45,
         "phones": 7,
         "folder": "f4mily5x2k7mbqz4bwdbyj6qsq",
-        "shows_folder": false
+        "shows_folder": false,
+        "secret": null
       }
     ]
   },

@@ -6,12 +6,15 @@
     "folder_missing": {"level": "problem", "meaning": ".uploads or .trash is missing from the storage folder; `share init` makes them."},
     "other_drive": {"level": "problem", "meaning": ".uploads or .trash is on another drive than the storage folder; finishing uploads needs one drive."},
     "not_a_drive": {"level": "problem", "meaning": "The storage folder is in memory, on the system's flash or inside a container, not on a drive or a volume."},
-    "data_unreadable": {"level": "problem", "meaning": "The data folder (database, thumbnails) can't be made or read."},
-    "data_unsafe": {"level": "problem", "meaning": "The data folder is on a network or FUSE drive, where the database isn't safe."},
-    "data_in_memory": {"level": "problem", "meaning": "The data folder is in memory or inside a container, and would be lost on restart or when the container is made anew."},
+    "data_unreadable": {"level": "problem", "meaning": "The data folder (thumbnails, the https port's own certificate) can't be made or read."},
+    "data_in_memory": {"level": "problem", "meaning": "The data folder is in memory or inside a container: its thumbnails and certificate would be lost on restart or when the container is made anew."},
     "drive_full": {"level": "problem", "meaning": "The storage drive has no more room than min_free_space_mib keeps free: uploads stop."},
     "fat32": {"level": "warning", "meaning": "The storage drive is FAT32: files over 4 GiB can't be stored."},
     "ignores_case": {"level": "warning", "meaning": "The storage drive is exFAT or NTFS: it ignores case in names and is slower than ext4."},
-    "low_space": {"level": "warning", "meaning": "Less than 1 GiB is left before uploads stop."}
+    "low_space": {"level": "warning", "meaning": "Less than 1 GiB is left before uploads stop."},
+    "s3_unreachable": {"level": "problem", "meaning": "The bucket (\"s3\") can't be reached: no network, a wrong endpoint, or trouble at the service."},
+    "s3_denied": {"level": "problem", "meaning": "The bucket refuses Share's keys: a wrong access key or secret, a key without rights to the bucket, or no such bucket."},
+    "s3_cors": {"level": "problem", "meaning": "The bucket's CORS rules don't let Share's pages send files to it and fetch them; `share check` prints the rules to set."},
+    "s3_clock_skew": {"level": "problem", "meaning": "This machine's clock is more than 5 minutes off the bucket's: links to the bucket fail, or end too soon."}
   }
 }

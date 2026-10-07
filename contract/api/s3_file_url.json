@@ -1,0 +1,11 @@
+{
+  "method": "GET",
+  "path": "/api/s3/files/q3ld5x2k7mbqz4bwdbyj6qsqxa/url",
+  "auth": "device",
+  "status": 200,
+  "response": {
+    "url": "https://share-files.s3.eu-central-1.amazonaws.com/share/files/q3ld5x2k7mbqz4bwdbyj6qsqxa?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIOSFODNN7EXAMPLE%2F20260927%2Feu-central-1%2Fs3%2Faws4_request&X-Amz-Date=20260927T100000Z&X-Amz-Expires=43200&X-Amz-SignedHeaders=host&response-content-disposition=attachment%3B%20filename%3D%22IMG_0001.jpg%22%3B%20filename%2A%3DUTF-8%27%27IMG_0001.jpg&response-content-type=image%2Fjpeg&X-Amz-Signature=…",
+    "expires_at": "2026-09-27T22:00:00Z"
+  },
+  "notes": "S3 mode only. A link that fetches the file from the bucket, named and typed as with /content; it answers Range. Fetch it exactly as it is, without the key or any other header but User-Agent: anyone who has it gets the file until expires_at, about 12 hours, even if the file is deleted meanwhile. The same people may ask as for /content: 404 not_found for a file the caller doesn't see."
+}

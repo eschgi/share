@@ -1,0 +1,21 @@
+{
+  "method": "GET",
+  "path": "/api/setup",
+  "auth": "none once someone has an account; until then as in setup.json",
+  "status": 200,
+  "response": {
+    "ready": true,
+    "needs_admin": true,
+    "name": "Share",
+    "languages": ["en", "de", "it"],
+    "default_language": "en",
+    "storage_dir": "",
+    "exists": false,
+    "empty": false,
+    "fs_type": "",
+    "total_bytes": 0,
+    "free_bytes": 0,
+    "warnings": []
+  },
+  "notes": "Once the storage folder is set up, or with the files in a bucket: ready, and needs_admin while nobody has an account; the page then makes the first admin with POST /api/setup/admin."
+}

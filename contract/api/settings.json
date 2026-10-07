@@ -1,0 +1,10 @@
+{
+  "method": "GET",
+  "path": "/api/admin/settings",
+  "auth": "admin",
+  "status": 200,
+  "response": {
+    "new_folders_encrypted": false
+  },
+  "notes": "The admins' settings for the whole server. new_folders_encrypted: a new folder starts encrypted, so the admin's device turns encryption on right after creating it."
+}

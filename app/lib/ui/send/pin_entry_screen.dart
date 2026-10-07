@@ -7,11 +7,16 @@ import '../admin/pins_screen.dart' show PinCodeField;
 import '../widgets.dart';
 
 /// Screen 1 of the website, in the app: the PIN that lets this phone send to [server]. With
-/// [code] (from a scanned PIN link) it unlocks right away.
+/// [code] (from a scanned PIN link) it unlocks right away; the link's [secret] opens a folder
+/// that is encrypted, for a PIN that shows it.
 class PinEntryScreen extends StatefulWidget {
-  const PinEntryScreen({super.key, required this.server, this.code});
+  const PinEntryScreen({super.key, required this.server, this.code, this.secret, this.root});
   final Uri server;
   final String? code;
+
+  /// What the PIN's link carried after the code: a secret, or the root's fingerprint.
+  final String? secret;
+  final String? root;
 
   @override
   State<PinEntryScreen> createState() => _PinEntryScreenState();
@@ -43,7 +48,8 @@ class _PinEntryScreenState extends State<PinEntryScreen> {
     });
     final navigator = Navigator.of(context);
     try {
-      await Services.read(context).pin.unlock(widget.server, _code.text);
+      final linked = _code.text == widget.code;
+      await Services.read(context).pin.unlock(widget.server, _code.text, secret: linked ? widget.secret : null, root: linked ? widget.root : null);
       navigator.popUntil((r) => r.isFirst);
     } on ApiException catch (e) {
       setState(() => _error = switch (e.code) {

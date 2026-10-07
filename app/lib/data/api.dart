@@ -77,6 +77,19 @@ class Api {
 
   ServerConfig? get config => _config;
 
+  final _storage = <String, Storage>{};
+
+  /// Where a server keeps its files, asked once: this phone's server over its route, or a
+  /// PIN's [server]. A failed answer isn't kept.
+  Future<Storage> storage({Uri? server}) async {
+    final base = server ?? _config?.publicUrl;
+    if (base == null) throw const NetworkException('no server');
+    final known = _storage[base.origin];
+    if (known != null) return known;
+    final info = server == null ? await get('/api/info') : await getFrom(server, '/api/info');
+    return _storage[base.origin] = Storage.parse(info['storage']);
+  }
+
   set config(ServerConfig? c) {
     _local?.close();
     _local = null;
@@ -130,6 +143,19 @@ class Api {
     return _request(_public, c.publicUrl, method, path, query: query, body: body);
   }
 
+  /// The bytes behind a link to the bucket, such as a photo at full size: asked exactly as the
+  /// link is (its query is signed), over the public client, without the phone's key. The
+  /// bucket's refusals say nothing about being signed in.
+  Future<Uint8List> s3Bytes(String link) async {
+    final uri = Uri.parse(link);
+    if (uri.scheme != 'https' && !(uri.scheme == 'http' && isHomeHost(uri.host))) {
+      throw const ApiException(0, 'insecure_link', 'plain http is only for a bucket at home');
+    }
+    final res = await _fetch(_public, http.Request('GET', uri));
+    if (res.statusCode != 200) throw ApiException(res.statusCode, 'unknown', res.reasonPhrase ?? '');
+    return res.bodyBytes;
+  }
+
   Future<http.Response> _request(http.Client client, Uri base, String method, String path,
       {Map<String, String>? query, Object? body, bool auth = true, String? bearer}) async {
     final uri = base.replace(path: path, queryParameters: query == null || query.isEmpty ? null : query);
@@ -140,9 +166,17 @@ class Api {
       req.headers['Content-Type'] = 'application/json';
       req.body = jsonEncode(body);
     }
-    http.Response res;
+    final res = await _fetch(client, req);
+    if (res.statusCode >= 200 && res.statusCode < 300) return res;
+    final error = _errorOf(res);
+    if (error.signedOut && auth && token != null) onSignedOut?.call();
+    throw error;
+  }
+
+  /// Sends a request; no answer in time, or none at all, is a NetworkException.
+  Future<http.Response> _fetch(http.Client client, http.BaseRequest req) async {
     try {
-      res = await http.Response.fromStream(await client.send(req).timeout(timeout)).timeout(timeout);
+      return await http.Response.fromStream(await client.send(req).timeout(timeout)).timeout(timeout);
     } on TimeoutException catch (e) {
       throw NetworkException(e);
     } on SocketException catch (e) {
@@ -152,10 +186,6 @@ class Api {
     } on http.ClientException catch (e) {
       throw NetworkException(e);
     }
-    if (res.statusCode >= 200 && res.statusCode < 300) return res;
-    final error = _errorOf(res);
-    if (error.signedOut && auth && token != null) onSignedOut?.call();
-    throw error;
   }
 
   static ApiException _errorOf(http.Response res) {

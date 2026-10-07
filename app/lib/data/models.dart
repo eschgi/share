@@ -59,19 +59,26 @@ class ServerInfo {
 
 /// A signed-in phone: the token is shown once, at sign-in.
 class SignedIn {
-  const SignedIn({required this.token, required this.user, required this.deviceId, required this.server});
+  const SignedIn({required this.token, required this.user, required this.deviceId, required this.server, this.keys = const [], this.root});
 
   factory SignedIn.fromJson(Json j) => SignedIn(
         token: _str(j['token']),
         user: User.fromJson(_obj(j['user'])),
         deviceId: _str(_obj(j['device'])['id']),
         server: ServerInfo.fromJson(_obj(j['server'])),
+        keys: [for (final k in _list(j['keys'])) if (k is Map) k.cast<String, dynamic>()],
+        root: j['root'] is String ? j['root'] as String : null,
       );
 
   final String token;
   final User user;
   final String deviceId;
   final ServerInfo server;
+
+  /// An accepted invite's keys, locked with the secret in its link (docs/e2ee-plan.md), and the
+  /// root the inviting device trusted, locked the same way.
+  final List<Json> keys;
+  final String? root;
 }
 
 class InvitePeek {
@@ -92,19 +99,30 @@ class InvitePeek {
   final bool addsPhone;
 }
 
+/// Where a server keeps the files: on its drive, sent over tus, or in a bucket (S3), where
+/// they are sent and fetched directly.
+enum Storage {
+  disk,
+  s3;
+
+  static Storage parse(Object? v) => v == 's3' ? s3 : disk;
+}
+
 /// /api/info: who the server is. Also the probe of the local address.
 class ServerIdentity {
-  const ServerIdentity({required this.serverId, required this.name, required this.chunkSize});
+  const ServerIdentity({required this.serverId, required this.name, required this.chunkSize, this.storage = Storage.disk});
 
   factory ServerIdentity.fromJson(Json j) => ServerIdentity(
         serverId: _str(j['server_id']),
         name: _str(j['name'], 'Share'),
         chunkSize: _int(j['chunk_size_bytes'], 20 << 20),
+        storage: Storage.parse(j['storage']),
       );
 
   final String serverId;
   final String name;
   final int chunkSize;
+  final Storage storage;
 }
 
 enum FileKind {
@@ -113,6 +131,21 @@ enum FileKind {
   document;
 
   static FileKind parse(Object? v) => switch (v) { 'photo' => photo, 'video' => video, _ => document };
+}
+
+/// How an encrypted file is stored (docs/e2ee-plan.md): its key sealed for version [version]
+/// of its folder's key, and the header its bytes start with. The file's size is what it is
+/// decrypted (contract/api/file_encrypted.json).
+class FileEnc {
+  const FileEnc({required this.version, required this.key, required this.header});
+
+  factory FileEnc.fromJson(Json j) => FileEnc(version: _int(j['version']), key: _str(j['key']), header: _str(j['header']));
+
+  final int version;
+  final String key;
+  final String header;
+
+  Json toJson() => {'version': version, 'key': key, 'header': header};
 }
 
 class FileInfo {
@@ -131,6 +164,7 @@ class FileInfo {
     this.durationMs,
     this.hasThumb = false,
     this.from,
+    this.enc,
   });
 
   factory FileInfo.fromJson(Json j) => FileInfo(
@@ -148,6 +182,7 @@ class FileInfo {
         durationMs: _intOrNull(j['duration_ms']),
         hasThumb: _bool(j['has_thumb']),
         from: j['from'] is String ? j['from'] as String : null,
+        enc: j['enc'] is Map ? FileEnc.fromJson(_obj(j['enc'])) : null,
       );
 
   final String id;
@@ -163,6 +198,9 @@ class FileInfo {
   final bool hasThumb;
   final String? from; // who sent it, if they have an account
 
+  /// Encrypted end to end: opened only on the family's phones and browsers.
+  final FileEnc? enc;
+
   /// "PDF" for report.pdf; empty without an extension.
   String get ext {
     final dot = name.lastIndexOf('.');
@@ -173,7 +211,19 @@ class FileInfo {
   bool get isAudio => kind == FileKind.document && (mime.startsWith('audio/') || _audioExt.contains(ext));
   static const _audioExt = {'MP3', 'M4A', 'AAC', 'WAV', 'OGG', 'OGA', 'OPUS', 'FLAC'};
 
-  Json toJson() => {'id': id, 'name': name, 'size': size, 'mime': mime, 'kind': kind.name, 'day': day};
+  /// What the Kotlin side gets (contract/app/platform.json files): with the folder and enc, so
+  /// that an encrypted file is decrypted on the way; enc's plain_size is the file's size, which
+  /// decryption needs to know where the file ends.
+  Json toJson() => {
+        'id': id,
+        'name': name,
+        'size': size,
+        'mime': mime,
+        'kind': kind.name,
+        'day': day,
+        'folder': folder,
+        'enc': enc == null ? null : {...enc!.toJson(), 'plain_size': size},
+      };
 }
 
 /// A folder of the library: what it holds and how many see it.
@@ -188,6 +238,8 @@ class FolderInfo {
     this.adminsOnly = false,
     this.cover,
     required this.createdAt,
+    this.encrypted = false,
+    this.keyVersion,
   });
 
   factory FolderInfo.fromJson(Json j) => FolderInfo(
@@ -200,6 +252,8 @@ class FolderInfo {
         adminsOnly: _bool(j['admins_only']),
         cover: j['cover'] is Map ? FileInfo.fromJson(_obj(j['cover'])) : null,
         createdAt: _time(j['created_at']) ?? DateTime.fromMillisecondsSinceEpoch(0),
+        encrypted: _bool(j['encrypted']),
+        keyVersion: _intOrNull(j['key_version']),
       );
 
   /// GET /api/folders: the folders the person sees, the oldest first.
@@ -213,6 +267,12 @@ class FolderInfo {
   final bool adminsOnly; // no member sees it
   final FileInfo? cover; // its newest photo or video with a thumbnail
   final DateTime createdAt;
+
+  /// New files into it are encrypted end to end (docs/e2ee-plan.md).
+  final bool encrypted;
+
+  /// The newest version of its key; null while it was never encrypted.
+  final int? keyVersion;
 }
 
 class DaySummary {
@@ -281,6 +341,7 @@ class PinInfo {
     this.phones = 0,
     this.folder = '',
     this.showsFolder = false,
+    this.secret,
   });
 
   factory PinInfo.fromJson(Json j) => PinInfo(
@@ -294,6 +355,7 @@ class PinInfo {
         phones: _int(j['phones']),
         folder: _str(j['folder']),
         showsFolder: _bool(j['shows_folder']),
+        secret: j['secret'] is Map ? (locked: _str(_obj(j['secret'])['locked']), version: _int(_obj(j['secret'])['version'])) : null,
       );
 
   final String id;
@@ -306,6 +368,24 @@ class PinInfo {
   final int phones; // browsers and phones that unlocked it
   final String folder; // the id of the folder it sends into
   final bool showsFolder; // guests with it also see and download the folder
+
+  /// For a PIN that shows an encrypted folder: its link's secret, locked with a key from that
+  /// version of the folder's key, so an admin's phone can hand on the whole link again.
+  final ({String locked, int version})? secret;
+
+  /// The PIN with its whole [link], secret and all, which needs no opening any more.
+  PinInfo withLink(String link) => PinInfo(
+        id: id,
+        code: code,
+        kind: kind,
+        createdAt: createdAt,
+        expiresAt: expiresAt,
+        link: link,
+        files: files,
+        phones: phones,
+        folder: folder,
+        showsFolder: showsFolder,
+      );
 }
 
 /// A signed-in phone of someone.
@@ -432,6 +512,9 @@ class NewInvite {
 
   final String link;
   final OpenInvite invite;
+
+  /// The invite with its whole [link], with the secret of the keys it brings after a dot.
+  NewInvite withLink(String link) => NewInvite(link: link, invite: invite);
 }
 
 class TrashedFile {
@@ -478,6 +561,9 @@ class TrashedFolder {
 
 class StorageInfo {
   const StorageInfo({
+    this.storage = Storage.disk,
+    this.s3Bucket = '',
+    this.s3Endpoint = '',
     required this.storageDir,
     this.totalBytes = 0,
     this.freeBytes = 0,
@@ -490,6 +576,9 @@ class StorageInfo {
   });
 
   factory StorageInfo.fromJson(Json j) => StorageInfo(
+        storage: Storage.parse(j['storage']),
+        s3Bucket: _str(j['s3_bucket']),
+        s3Endpoint: _str(j['s3_endpoint']),
         storageDir: _str(j['storage_dir']),
         totalBytes: _int(j['total_bytes']),
         freeBytes: _int(j['free_bytes']),
@@ -500,6 +589,11 @@ class StorageInfo {
         trashDays: _int(j['trash_days'], 30),
         warnings: [for (final w in _list(j['warnings'])) StorageWarning.fromJson(_obj(w))],
       );
+
+  final Storage storage;
+
+  /// With the files in a bucket: its name and the service's address; the drive's fields are empty.
+  final String s3Bucket, s3Endpoint;
 
   final String storageDir;
   final int totalBytes, freeBytes; // 0 if the server couldn't ask the drive

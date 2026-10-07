@@ -3,7 +3,8 @@
   "path": "/api/folders/w3dding5x2k7mbqz4bwdbyj6qs",
   "auth": "admin",
   "request": {
-    "name": "Hochzeit Anna & Marco"
+    "name": "Hochzeit Anna & Marco",
+    "plain_signature": "HiI_tBkCD3fMfC2ujzBygjD8u8Qha6RiHWVr_TYARd34-c2XTf_iBTUvZP7amqSTGQr9JTZxQgLFnFTUS2ISEw"
   },
   "status": 200,
   "response": {
@@ -15,7 +16,10 @@
     "people": 2,
     "admins_only": false,
     "cover": null,
-    "created_at": "2026-09-26T08:00:00Z"
+    "created_at": "2026-09-26T08:00:00Z",
+    "encrypted": false,
+    "key_version": null,
+    "plain_signature": "HiI_tBkCD3fMfC2ujzBygjD8u8Qha6RiHWVr_TYARd34-c2XTf_iBTUvZP7amqSTGQr9JTZxQgLFnFTUS2ISEw"
   },
-  "notes": "Renames a folder and its directory; the files move with it. Where the drive refuses for now (Windows, while a file in it is open), the server finishes later and serves the files meanwhile. 400 bad_request and 409 folder_name_taken as when creating; 409 folder_busy while the files of the previous rename are still moving; 404 not_found for no such folder."
+  "notes": "Renames a folder and its directory; the files move with it. Where the drive refuses for now (Windows, while a file in it is open), the server finishes later and serves the files meanwhile. 400 bad_request and 409 folder_name_taken as when creating; 409 folder_busy while the files of the previous rename are still moving; 404 not_found for no such folder. A folder that sends plain needs the root's plain statement for its new name (plain_signature, for its newest version), once there is a root; 400 bad_signature without it. An encrypted folder needs none."
 }

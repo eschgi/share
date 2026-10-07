@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.provider.DocumentsContract
+import android.provider.MediaStore
 import android.provider.OpenableColumns
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
@@ -112,6 +114,7 @@ object Outbox {
         }
         val root = File(app.filesDir, "outbox")
         if (root.apply { mkdirs() }.usableSpace - file.size < SPARE) return null
+        val modified = lastModified(app, uri) // while the sharing app still lends the file
         val dir = File(root, UUID.randomUUID().toString()).apply { mkdirs() }
         val copy = File(dir, safeName(file.name))
         try {
@@ -122,6 +125,8 @@ object Outbox {
             dir.deleteRecursively()
             throw e
         }
+        // The copy keeps the original's time; trim() still waits a week, as its folder is new.
+        modified?.let { copy.setLastModified(it) }
         return file.copy(uri = FileProvider.getUriForFile(app, "${app.packageName}.files", copy).toString())
     }
 
@@ -159,6 +164,33 @@ object Outbox {
         } else {
             runCatching { app.contentResolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
         }
+    }
+
+    /**
+     * When a picked or shared file was last changed, in ms since 1970, as far as the app it
+     * comes from says (an outbox copy keeps the original's); null when nobody does. Providers
+     * answer different columns, and some throw for ones they don't know.
+     */
+    fun lastModified(context: Context, uri: Uri): Long? {
+        val app = context.applicationContext
+        if (isCopy(app, uri)) return copyFile(app, uri)?.lastModified()?.takeIf { it > 0 }
+        if (uri.scheme == "file") return uri.path?.let { File(it).lastModified() }?.takeIf { it > 0 }
+        for ((column, toMs) in listOf(
+            DocumentsContract.Document.COLUMN_LAST_MODIFIED to 1L,
+            MediaStore.MediaColumns.DATE_MODIFIED to 1000L, // seconds
+            MediaStore.MediaColumns.DATE_TAKEN to 1L, // all the photo picker tells
+        )) {
+            val value = try {
+                app.contentResolver.query(uri, arrayOf(column), null, null, null)?.use { c ->
+                    val i = c.getColumnIndex(column)
+                    if (i >= 0 && c.moveToFirst() && !c.isNull(i)) c.getLong(i) else null
+                }
+            } catch (e: Exception) {
+                null
+            }
+            if (value != null && value > 0) return value * toMs
+        }
+        return null
     }
 
     fun isCopy(context: Context, uri: Uri): Boolean =

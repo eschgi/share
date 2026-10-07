@@ -1,6 +1,7 @@
 import { useState } from 'preact/hooks';
 import { ApiError, getMe, login } from '../api';
 import { thisBrowser } from '../browser';
+import { keyring } from '../e2ee/keyring';
 import { Stack } from '../components/Bits';
 import { Icon } from '../components/Icon';
 import { Page } from '../components/Page';
@@ -40,12 +41,15 @@ export function SignIn({ name, signedOut }: { name: string; signedOut: boolean }
       }
     }
     // The answer carries the cookie, but a browser that blocks cookies drops it silently.
+    let me;
     try {
-      await getMe();
+      me = await getMe();
     } catch {
       setBusy(false);
       return setProblem(t('signIn.noCookie'));
     }
+    // The password opens the keys of encrypted folders in a new browser.
+    await keyring.signedIn(me, password);
     setSignedInHint(true);
     location.replace(nextAfterSignIn(route.search));
   }

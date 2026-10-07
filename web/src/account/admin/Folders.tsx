@@ -1,14 +1,25 @@
-import { useState } from 'preact/hooks';
-import { ApiError, createFolder, deleteFolder, renameFolder, setFolderInvite, setFolderPerson, type FolderInfo, type People, type PinInfo } from '../../api';
+import { useEffect, useState } from 'preact/hooks';
+import {
+  ApiError,
+  deleteFolder,
+  getSettings,
+  setFolderInvite,
+  setFolderPerson,
+  type FolderInfo,
+  type People,
+  type PinInfo,
+} from '../../api';
+import { keyring, NeedsRoot } from '../../e2ee/keyring';
 import { Icon } from '../../components/Icon';
 import { formatTime, formatWhen, daysAgo } from '../../format';
 import { useI18n, type Lang } from '../../i18n';
-import { navigate } from '../../router';
+import { navigate, useRoute } from '../../router';
 import { Avatar, AvatarStack, Link, Row, Switch } from '../components/Bits';
 import { Confirm, Modal } from '../components/Modal';
 import { useAccount } from '../context';
+import { EncryptionSwitch } from '../e2ee/Encryption';
 import { whoSees } from '../folders/model';
-import { FolderCover, useFolderLines } from '../folders/Folders';
+import { FolderCover, FolderName, useFolderLines } from '../folders/Folders';
 import { refreshFolders } from '../folders/store';
 import { NewPinDialog, PinsList } from './Pins';
 
@@ -28,6 +39,7 @@ function inviteEnd(lang: Lang, when: string): string {
 
 /** What a folder's problem with a change is, in words. */
 function folderProblem(t: (key: string) => string, e: unknown): string {
+  if (e instanceof NeedsRoot) return t('encryption.needsRoot');
   if (!(e instanceof ApiError) || e.status === 0) return t('common.offline');
   switch (e.code) {
     case 'folder_name_taken':
@@ -59,7 +71,7 @@ export function FoldersList({ list, people, pins }: { list: FolderInfo[]; people
             <Link key={f.id} href={`/settings/folders/${f.id}`} class="row">
               <FolderCover folder={f} />
               <span class="rt">
-                <b>{f.name}</b>
+                <FolderName folder={f} />
                 <span>{line}</span>
               </span>
               {people && <AvatarStack people={whoSees(people, f.id)} />}
@@ -88,6 +100,7 @@ export function FolderPage({
 }) {
   const { t, lang } = useI18n();
   const { toast } = useAccount();
+  const route = useRoute();
   const lines = useFolderLines();
   /** Switches already turned, before the server's answer. */
   const [turned, setTurned] = useState<Map<string, boolean>>(new Map());
@@ -137,6 +150,9 @@ export function FolderPage({
             {lines.holds(folder.files, folder.bytes)} · {t('folders.since', { date: since(folder.created_at, lang) })}
           </span>
         </span>
+      </div>
+      <div class="group">
+        <EncryptionSwitch folder={folder} start={new URLSearchParams(route.search).has('encrypt')} onChanged={() => void onChanged()} />
       </div>
       <p class="glabel">{t('folders.whoSees')}</p>
       {people ? (
@@ -234,9 +250,15 @@ export function FolderPage({
 /** A new folder's name, or a new name for folder; a new folder opens its page. */
 export function FolderNameDialog({ folder, onClose }: { folder?: FolderInfo; onClose: () => void }) {
   const { t } = useI18n();
+  const { info } = useAccount();
   const [name, setName] = useState(folder?.name ?? '');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  /** A new folder's files encrypted: the admins' setting says by default. */
+  const [encrypt, setEncrypt] = useState(false);
+  useEffect(() => {
+    if (!folder) getSettings().then((s) => setEncrypt(s.new_folders_encrypted), () => {});
+  }, []);
 
   const save = async (e: Event) => {
     e.preventDefault();
@@ -244,10 +266,12 @@ export function FolderNameDialog({ folder, onClose }: { folder?: FolderInfo; onC
     setBusy(true);
     setProblem(null);
     try {
-      const made = folder ? await renameFolder(folder.id, name.trim()) : await createFolder(name.trim());
+      // Once there is a recovery key, it signs a folder that sends plain, under its name.
+      const made = folder ? await keyring.renameFolder(folder, name.trim()) : await keyring.createFolder(name.trim());
       await refreshFolders();
       onClose();
-      if (!folder) navigate(`/settings/folders/${made.id}`);
+      // Encrypting it asks once more, and the first time makes the recovery code.
+      if (!folder) navigate(`/settings/folders/${made.id}${encrypt ? '?encrypt=1' : ''}`);
     } catch (err) {
       setBusy(false);
       setProblem(folderProblem(t, err));
@@ -277,8 +301,15 @@ export function FolderNameDialog({ folder, onClose }: { folder?: FolderInfo; onC
             <Icon name="alert" />
             {problem}
           </p>
-        ) : (
+        ) : folder && info?.storage === 's3' ? null : (
+          // A bucket has no directories to rename with the folder.
           <p class="help">{t(folder ? 'folders.renameHelp' : 'folders.newHelp')}</p>
+        )}
+        {!folder && (
+          <label class="check">
+            <input type="checkbox" checked={encrypt} onChange={(e) => setEncrypt(e.currentTarget.checked)} />
+            {t('encryption.newFolder')}
+          </label>
         )}
         <div class="dbtns">
           <button type="button" class="tbtn" onClick={onClose}>

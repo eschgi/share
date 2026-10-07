@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/eschgi/share/server/internal/db"
+	"github.com/eschgi/share/server/internal/db/dbtest"
 	"github.com/eschgi/share/server/internal/ids"
 )
 
@@ -32,11 +33,9 @@ func oldFiles(t *testing.T, files map[string]string, ids map[string]string) func
 			id := newID()
 			ids[rel] = id
 			day, name, _ := strings.Cut(rel, "/")
-			if _, err := d.Exec(`INSERT INTO files (id, state, name, size, received, mime, kind, rel_path, upload_day,
-				created_at, updated_at, uploaded_at) VALUES (?, 'ready', ?, ?, ?, 'text/plain', 'document', ?, ?, 1, 1, 1)`,
-				id, name, len(content), len(content), rel, day); err != nil {
-				t.Fatal(err)
-			}
+			dbtest.Exec(t, d, `INSERT INTO files (id, state, name, size, received, mime, kind, rel_path, upload_day,
+				created_at, updated_at, uploaded_at) VALUES ($1, 'ready', $2, $3, $4, 'text/plain', 'document', $5, $6, 'epoch', 'epoch', 'epoch')`,
+				id, name, len(content), len(content), rel, day)
 		}
 	}
 }
@@ -169,9 +168,7 @@ func TestUploadsWhileOldDaysWaitAvoidTheirNames(t *testing.T) {
 		"2026-09-27/IMG_9.jpg": "by hand", // put there by hand: not in the database
 	}, map[string]string{}))
 	ctx := context.Background()
-	if _, err := fx.db.Exec("DELETE FROM files WHERE name = 'IMG_9.jpg'"); err != nil {
-		t.Fatal(err)
-	}
+	dbtest.Exec(t, fx.db, "DELETE FROM files WHERE name = 'IMG_9.jpg'")
 	var got []string
 	for _, name := range []string{"IMG_1.jpg", "IMG_9.jpg"} {
 		id := fx.receiving(t, name, "new", 3)
@@ -197,9 +194,7 @@ func TestATrashedFileStillAtTheOldPlaceIsNotForgotten(t *testing.T) {
 	fx := newFixtureWith(t, oldFiles(t, map[string]string{"2026-09-26/old.jpg": "old"}, ids))
 	ctx := context.Background()
 	// Deleted just before the upgrade: the row says trashed, the bytes didn't move yet.
-	if _, err := fx.db.Exec("UPDATE files SET state = 'trashed', deleted_at = 1 WHERE id = ?", ids["2026-09-26/old.jpg"]); err != nil {
-		t.Fatal(err)
-	}
+	dbtest.Exec(t, fx.db, "UPDATE files SET state = 'trashed', deleted_at = 'epoch' WHERE id = $1", ids["2026-09-26/old.jpg"])
 	if err := fx.lib.reconcileTrash(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -270,13 +265,13 @@ func (fx *fixture) readyIn(t *testing.T, folder db.Folder, name, content string)
 func TestRenameMovesTheDirectory(t *testing.T) {
 	fx := newFixture(t)
 	ctx := context.Background()
-	wedding, err := fx.lib.CreateFolder(ctx, "Wedding", "admin")
+	wedding, err := fx.lib.CreateFolder(ctx, NewFolder{Name: "Wedding", By: "admin"})
 	if err != nil || !fx.exists("Wedding") {
 		t.Fatalf("CreateFolder = %+v, %v", wedding, err)
 	}
 	f := fx.readyIn(t, wedding, "IMG_1.jpg", "one")
 
-	renamed, err := fx.lib.RenameFolder(ctx, wedding.ID, "Hochzeit")
+	renamed, err := fx.lib.RenameFolder(ctx, wedding.ID, "Hochzeit", nil)
 	if err != nil || renamed.Dir != "Hochzeit" || renamed.RenamingFrom != nil {
 		t.Fatalf("RenameFolder = %+v, %v", renamed, err)
 	}
@@ -287,15 +282,15 @@ func TestRenameMovesTheDirectory(t *testing.T) {
 		t.Fatalf("after the rename: %q", got)
 	}
 	// Only a change of case keeps the directory.
-	if again, err := fx.lib.RenameFolder(ctx, wedding.ID, "HOCHZEIT"); err != nil || again.Dir != "Hochzeit" || again.Name != "HOCHZEIT" {
+	if again, err := fx.lib.RenameFolder(ctx, wedding.ID, "HOCHZEIT", nil); err != nil || again.Dir != "Hochzeit" || again.Name != "HOCHZEIT" {
 		t.Fatalf("a change of case: %+v, %v", again, err)
 	}
 	for _, bad := range []string{"", "  ", "2026-09-27"} {
-		if _, err := fx.lib.RenameFolder(ctx, wedding.ID, bad); !errors.Is(err, ErrBadFolderName) {
+		if _, err := fx.lib.RenameFolder(ctx, wedding.ID, bad, nil); !errors.Is(err, ErrBadFolderName) {
 			t.Errorf("RenameFolder(%q): %v", bad, err)
 		}
 	}
-	if _, err := fx.lib.RenameFolder(ctx, wedding.ID, "share"); !errors.Is(err, db.ErrConflict) {
+	if _, err := fx.lib.RenameFolder(ctx, wedding.ID, "share", nil); !errors.Is(err, db.ErrConflict) {
 		t.Errorf("a name another folder has: %v", err)
 	}
 }
@@ -303,16 +298,16 @@ func TestRenameMovesTheDirectory(t *testing.T) {
 func TestRenameResumesAfterACrash(t *testing.T) {
 	fx := newFixture(t)
 	ctx := context.Background()
-	wedding, _ := fx.lib.CreateFolder(ctx, "Wedding", "admin")
+	wedding, _ := fx.lib.CreateFolder(ctx, NewFolder{Name: "Wedding", By: "admin"})
 	f := fx.readyIn(t, wedding, "IMG_1.jpg", "one")
 	// The rename reached the database, but the server stopped before the directory moved.
-	if _, err := fx.db.RenameFolder(ctx, wedding.ID, "Hochzeit", "Hochzeit"); err != nil {
+	if _, err := fx.db.RenameFolder(ctx, wedding.ID, "Hochzeit", "Hochzeit", nil); err != nil {
 		t.Fatal(err)
 	}
 	if got := fx.read(t, f.ID); got != "one" {
 		t.Fatalf("before the move: %q", got)
 	}
-	if _, err := fx.lib.RenameFolder(ctx, wedding.ID, "Matrimonio"); !errors.Is(err, db.ErrBusy) {
+	if _, err := fx.lib.RenameFolder(ctx, wedding.ID, "Matrimonio", nil); !errors.Is(err, db.ErrBusy) {
 		t.Fatalf("a second rename while the first is moving: %v", err)
 	}
 	if err := fx.lib.Reconcile(ctx, time.Hour); err != nil {
@@ -329,12 +324,10 @@ func TestRenameResumesAfterACrash(t *testing.T) {
 func TestDeletingAFolderTrashesItsFiles(t *testing.T) {
 	fx := newFixture(t)
 	ctx := context.Background()
-	wedding, _ := fx.lib.CreateFolder(ctx, "Wedding", "admin")
+	wedding, _ := fx.lib.CreateFolder(ctx, NewFolder{Name: "Wedding", By: "admin"})
 	a := fx.readyIn(t, wedding, "IMG_1.jpg", "one")
 	arriving := fx.receiving(t, "IMG_2.jpg", "two", 1)
-	if _, err := fx.db.Exec("UPDATE files SET folder_id = ? WHERE id = ?", wedding.ID, arriving); err != nil {
-		t.Fatal(err)
-	}
+	dbtest.Exec(t, fx.db, "UPDATE files SET folder_id = $1 WHERE id = $2", wedding.ID, arriving)
 
 	trashed, err := fx.lib.DeleteFolder(ctx, wedding.ID, "admin")
 	if err != nil || len(trashed) != 1 {
@@ -351,7 +344,7 @@ func TestDeletingAFolderTrashesItsFiles(t *testing.T) {
 	}
 
 	// Restoring a file brings the folder back, with a number if its name is taken now.
-	again, _ := fx.lib.CreateFolder(ctx, "wedding", "admin")
+	again, _ := fx.lib.CreateFolder(ctx, NewFolder{Name: "wedding", By: "admin"})
 	if again.Dir != "wedding (2)" {
 		t.Fatalf("the new folder's directory: %q; the deleted folder keeps its own", again.Dir)
 	}
@@ -378,13 +371,11 @@ func TestDeletingAFolderTrashesItsFiles(t *testing.T) {
 func TestReconcileFinishesADeletedFolder(t *testing.T) {
 	fx := newFixture(t)
 	ctx := context.Background()
-	wedding, _ := fx.lib.CreateFolder(ctx, "Wedding", "admin")
+	wedding, _ := fx.lib.CreateFolder(ctx, NewFolder{Name: "Wedding", By: "admin"})
 	a := fx.readyIn(t, wedding, "IMG_1.jpg", "one")
 	// An upload that was finishing while the folder went.
 	late := fx.receiving(t, "IMG_2.jpg", "two", 3)
-	if _, err := fx.db.Exec("UPDATE files SET folder_id = ? WHERE id = ?", wedding.ID, late); err != nil {
-		t.Fatal(err)
-	}
+	dbtest.Exec(t, fx.db, "UPDATE files SET folder_id = $1 WHERE id = $2", wedding.ID, late)
 	// The server stopped right after the folder was deleted in the database.
 	if _, err := fx.db.DeleteFolder(ctx, wedding.ID, "admin", t0); err != nil {
 		t.Fatal(err)
@@ -404,15 +395,15 @@ func TestMoveFilesToAnotherFolder(t *testing.T) {
 	fx := newFixture(t)
 	ctx := context.Background()
 	family := fx.folder
-	wedding, _ := fx.lib.CreateFolder(ctx, "Wedding", "admin")
-	kindergarten, _ := fx.lib.CreateFolder(ctx, "Kindergarten", "admin")
+	wedding, _ := fx.lib.CreateFolder(ctx, NewFolder{Name: "Wedding", By: "admin"})
+	kindergarten, _ := fx.lib.CreateFolder(ctx, NewFolder{Name: "Kindergarten", By: "admin"})
 	a := fx.readyIn(t, family, "IMG_1.jpg", "a")
 	fx.readyIn(t, wedding, "IMG_1.jpg", "taken")
 	b := fx.readyIn(t, kindergarten, "IMG_1.jpg", "b")
 	c := fx.readyIn(t, family, "Menu.pdf", "c")
 	before, _ := fx.db.LibraryVersion(ctx)
 
-	moved, err := fx.lib.MoveFiles(ctx, []string{a.ID, b.ID, c.ID}, wedding.ID)
+	moved, err := fx.lib.MoveFiles(ctx, []string{a.ID, b.ID, c.ID}, wedding.ID, nil)
 	if err != nil || len(moved) != 3 {
 		t.Fatalf("MoveFiles = %d files, %v", len(moved), err)
 	}
@@ -432,10 +423,10 @@ func TestMoveFilesToAnotherFolder(t *testing.T) {
 	if v, _ := fx.db.LibraryVersion(ctx); v == before {
 		t.Error("the library version didn't change")
 	}
-	if again, err := fx.lib.MoveFiles(ctx, []string{a.ID}, wedding.ID); err != nil || len(again) != 0 {
+	if again, err := fx.lib.MoveFiles(ctx, []string{a.ID}, wedding.ID, nil); err != nil || len(again) != 0 {
 		t.Fatalf("moving into the folder it's in: %d, %v", len(again), err)
 	}
-	if _, err := fx.lib.MoveFiles(ctx, []string{a.ID}, newID()); !errors.Is(err, db.ErrNotFound) {
+	if _, err := fx.lib.MoveFiles(ctx, []string{a.ID}, newID(), nil); !errors.Is(err, db.ErrNotFound) {
 		t.Fatalf("moving into no folder: %v", err)
 	}
 }
@@ -443,7 +434,7 @@ func TestMoveFilesToAnotherFolder(t *testing.T) {
 func TestMoveResumesAfterACrash(t *testing.T) {
 	fx := newFixture(t)
 	ctx := context.Background()
-	wedding, _ := fx.lib.CreateFolder(ctx, "Wedding", "admin")
+	wedding, _ := fx.lib.CreateFolder(ctx, NewFolder{Name: "Wedding", By: "admin"})
 	a := fx.readyIn(t, fx.folder, "IMG_1.jpg", "one")
 	b := fx.readyIn(t, fx.folder, "IMG_2.jpg", "two")
 	// The moves reached the database, but the server stopped before the bytes followed.

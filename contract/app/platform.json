@@ -1,5 +1,5 @@
 {
-  "notes": "What the app's Dart side and its Kotlin side hand each other over the platform channel (app/lib/data/platform.dart, app/android/app/src/main/kotlin/com/eschgi/share/platform/PlatformChannel.kt). Both sides' tests read this file. server_config is what server.save stores and the downloads read; files is the argument of transfer.download; the events arrive on com.eschgi.share/events. device_id is the phone's id on the server, for the proof it asks of a server over plain http (api/home_proof.json); public_verified says whether a public address over plain http passed that on this network. The upload event is the batch in upload_rows, with a few of its files: the last one sent, the one on its way and the next ones. Signed in, files go into a folder: upload.pick {what, auth, folder} and shared.send {auth, folder} name it, and the upload event says it (null with a PIN, which sends into its own). A batch whose folder is gone, or no longer the person's, is paused with folder_gone; upload.resume {auth, folder} sends it into the folder chosen instead. transfer.download, file.share, file.open and file.play take auth too: device (the default) with the phone's key over the route it picked, or pin for a PIN that shows its folder, with the PIN's key over the public address only; a PIN that ended fails only its own downloads. The transfer event is the batch in batch_items: skipped files don't count towards the totals. file.play {file} answers where the player plays a video or sound from: play_copy, a copy on the phone (saved, or fetched into the cache first over the https port at home, whose own certificate the player can't pin), or play_stream, the server with the phone's key; null if the fetch was cancelled. screen.awake {on} keeps the screen on while something plays.",
+  "notes": "What the app's Dart side and its Kotlin side hand each other over the platform channel (app/lib/data/platform.dart, app/android/app/src/main/kotlin/com/eschgi/share/platform/PlatformChannel.kt). Both sides' tests read this file. server_config is what server.save stores and the downloads read; files is the argument of transfer.download (and of file.share, file.open, file.play and the keys calls): each file with its folder and, for an encrypted one (docs/e2ee-plan.md), its enc as the API gives it plus plain_size, the file's size, which Kotlin decrypts it with; the events arrive on com.eschgi.share/events. device_id is the phone's id on the server, for the proof it asks of a server over plain http (api/home_proof.json); public_verified says whether a public address over plain http passed that on this network. The upload event is the batch in upload_rows, with a few of its files: the last one sent, the one on its way and the next ones. Signed in, files go into a folder: upload.pick {what, auth, folder} and shared.send {auth, folder} name it, and the upload event says it (null with a PIN, which sends into its own). A batch whose folder is gone, or no longer the person's, is paused with folder_gone; upload.resume {auth, folder} sends it into the folder chosen instead. transfer.download, file.share, file.open and file.play take auth too: device (the default) with the phone's key over the route it picked, or pin for a PIN that shows its folder, with the PIN's key over the public address only; a PIN that ended fails only its own downloads. The transfer event is the batch in batch_items: skipped files don't count towards the totals. file.play {file} answers where the player plays a video or sound from: play_copy, a copy on the phone (saved, or fetched into the cache first over the https port at home, whose own certificate the player can't pin), or play_stream, the server with the phone's key, or with the files in a bucket play_s3, the file's link there exactly as the server signed it (a query with escapes that must stay as they are) and no key; null if the fetch was cancelled. screen.awake {on} keeps the screen on while something plays. The keys for encrypted folders live in Kotlin (keys.sync, keys.thumb, keys.decrypt and the rest of keys.*); keys.sync {password, quiet} opens them, with the password just typed, or quietly for a check-in, which neither passes through loading nor changes the status when it fails; a keys event (keys_event) says where the phone stands: status off, loading, ready, waiting or failed; has_recovery; lacks_root, there is a recovery key but this phone doesn't hold its private key, which making folders, switching their encryption and renaming plain ones need (another admin passes it on with an OK); encrypted_folders, how many the person sees; open, the folder key versions open here as folder:version; asks, whom the phone would pass keys on to after a check (docs/e2ee-plan.md): a device of the person (kind device, its name, client app or web, since when it is signed in) or a person (kind person, name, the folders they wait for, root when they are an admin who gets the recovery key's private key too, key_changed when their key was checked here before and is new now), with code once the other side answered, null before; codes, the codes this phone shows for checks others ask (kind, from: the asking device's name, code); waits_for_folders, the person waits for keys of folders they see; pace, milliseconds until the next check-in. The library lists the asks; nothing opens by itself: keys.show {kind, id} opens one (Show), which starts its check, keys.hide {kind, id} closes it (Not now) and ends the check, keys.allow {kind, id} passes the keys on after the person compared the code, keys.deny {kind, id} signs a device out (Not me); each answers the state. Admins: keys.encrypt_folder {folder, key_version} turns a folder's encryption on with its key's next version, keys.switch_off {folder, key_version, name} off with the recovery key's plain statement, both answering the folder as JSON; keys.new_folder {name} and keys.renamed {folder: the folder as JSON, name} answer the body to POST /api/folders or PATCH /api/folders/{id} with, signed where it needs to be (api/folder_create.json). keys.invite_keys {folders} answers {secret, keys, root}, keys.person_key {secret, locked, root}, keys.from_invite {secret, keys, root} takes what an invite brought; keys.pin_secret {folder} answers {secret, body}, keys.pin_link_secret {folder, locked, version} the secret of a PIN that shows its folder, keys.pin_link_root {folder} the root's fingerprint for the link of a PIN that only sends into a folder with keys, or null. keys.pin_link {secret, root}, after a PIN is unlocked, keeps what its link carried after the code (or forgets it, for a typed code), which the PIN's uploads check the folder's key with, and opens the folder with the secret. A keys call fails with sealed while a key isn't open here, needs_root while this phone doesn't hold the recovery key's private key, offline without an answer, or the server's error code. An upload that fails because the server's word about its folder's keys can't be checked has the error unchecked, and the upload event counts those among the failed as unchecked.",
   "server_config": {
     "public_url": "https://share.example.com",
     "local_url": "https://192.168.8.1:8443",
@@ -16,7 +16,9 @@
       "size": 1000,
       "mime": "image/jpeg",
       "kind": "photo",
-      "day": "2026-09-30"
+      "day": "2026-09-30",
+      "folder": "f4mily5x2k7mbqz4bwdbyj6qsq",
+      "enc": null
     },
     {
       "id": "bbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -24,7 +26,14 @@
       "size": 2000,
       "mime": "video/mp4",
       "kind": "video",
-      "day": "2026-09-30"
+      "day": "2026-09-30",
+      "folder": "f4mily5x2k7mbqz4bwdbyj6qsq",
+      "enc": {
+        "version": 1,
+        "key": "qxJuq98kaSY0zUgmZsONrFvuCearm1viz1SS9BKjvRRDXtgTO6lSt_VKNmTYSZiBhKEiMIp9Qt47mr3Vk1bo6YCLF4XMO07noALk4oF0rErxsurgjgGEKE5BPwWqehoqtm9h3TU66YGwPWOvvI4CmK0",
+        "header": "U0hFMQABAAA9p6lLxQCBAA",
+        "plain_size": 2000
+      }
     },
     {
       "id": "cccccccccccccccccccccccccc",
@@ -32,7 +41,9 @@
       "size": 500,
       "mime": "application/pdf",
       "kind": "document",
-      "day": "2026-09-29"
+      "day": "2026-09-29",
+      "folder": "f4mily5x2k7mbqz4bwdbyj6qsq",
+      "enc": null
     },
     {
       "id": "dddddddddddddddddddddddddd",
@@ -40,7 +51,9 @@
       "size": 700,
       "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       "kind": "document",
-      "day": "2026-09-29"
+      "day": "2026-09-29",
+      "folder": "f4mily5x2k7mbqz4bwdbyj6qsq",
+      "enc": null
     }
   ],
   "batch_items": [
@@ -147,6 +160,7 @@
     "total": 5,
     "done": 1,
     "failed": 1,
+    "unchecked": 0,
     "lost": 1,
     "bytes_total": 61280000,
     "bytes_done": 36380000,
@@ -203,5 +217,56 @@
       "Authorization": "Bearer shd_0123456789abcdefghijklmnopqrstuvwxyzABCDEFG",
       "User-Agent": "Share-Android/0.3.0"
     }
+  },
+  "play_s3": {
+    "uri": "https://share-files.s3.eu-central-1.amazonaws.com/share/files/bbbbbbbbbbbbbbbbbbbbbbbbbb?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIOSFODNN7EXAMPLE%2F20261005%2Feu-central-1%2Fs3%2Faws4_request&X-Amz-Date=20261005T101500Z&X-Amz-Expires=43200&X-Amz-SignedHeaders=host&response-content-disposition=attachment%3B%20filename%3D%22VID_0412.mp4%22%3B%20filename%2A%3DUTF-8%27%27VID_0412.mp4&response-content-type=video%2Fmp4&X-Amz-Signature=3f1c9e0a5b7d2c4e6f8091a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6",
+    "headers": {
+      "User-Agent": "Share-Android/0.3.0"
+    }
+  },
+  "keys_event": {
+    "type": "keys",
+    "status": "ready",
+    "has_recovery": true,
+    "lacks_root": false,
+    "encrypted_folders": 1,
+    "open": [
+      "f4mily5x2k7mbqz4bwdbyj6qsq:1"
+    ],
+    "asks": [
+      {
+        "kind": "device",
+        "id": "d4ld5x2k7mbqz4bwdbyj6qsqxa",
+        "name": "Chrome · Windows",
+        "client": "web",
+        "since": "2026-10-06T17:11:11.191Z",
+        "folders": [],
+        "root": false,
+        "code": "735041",
+        "key_changed": false
+      },
+      {
+        "kind": "person",
+        "id": "u7ld5x2k7mbqz4bwdbyj6qsqxa",
+        "name": "Maria",
+        "client": null,
+        "since": null,
+        "folders": [
+          "f4mily5x2k7mbqz4bwdbyj6qsq"
+        ],
+        "root": true,
+        "code": null,
+        "key_changed": true
+      }
+    ],
+    "codes": [
+      {
+        "kind": "person",
+        "from": "Chrome · Windows",
+        "code": "813552"
+      }
+    ],
+    "waits_for_folders": false,
+    "pace": 5000
   }
 }

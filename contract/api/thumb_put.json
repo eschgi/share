@@ -8,5 +8,5 @@
   },
   "status": 204,
   "response": null,
-  "notes": "For the uploader, within 24 hours of the upload, or an admin. width, height (pixels) and duration_ms describe the original file; each is optional. Replaces any thumbnail the file has. Photos that get none within 2 minutes get one from the server, if it can read them (JPEG, PNG, GIF). Errors: bad_thumbnail, bad_request, forbidden (too late), not_found (no such file in the library, or not the caller's), too_large, unsupported_media_type."
+  "notes": "For the uploader, within 24 hours of the upload, or an admin. width, height (pixels) and duration_ms describe the original file; each is optional. Replaces any thumbnail the file has. Photos that get none within 2 minutes get one from the server, if it can read them (JPEG, PNG, GIF). Errors: bad_thumbnail, bad_request, forbidden (too late), not_found (no such file in the library, or not the caller's), too_large, unsupported_media_type. An encrypted file's thumbnail comes sealed with a key from its file key (contract/crypto/lock.json), as application/octet-stream, at most 512 KiB before sealing; the server only checks its size, and sends it back the same way. A sealed one for a plain file, or a plain one for an encrypted file, is 400 bad_thumbnail."
 }

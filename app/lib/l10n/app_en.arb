@@ -123,6 +123,10 @@
   "joinLocked": "Too many tries. Wait a few minutes and try again.",
   "scanNotAnInvite": "That code isn't a Share invite.",
   "scanUnavailable": "Scanning needs Google Play services. Paste the invite link instead.",
+  "scanPreparing": "Getting the scanner ready…",
+  "scanInstalling": "The scanner is still being installed on this phone. Try again in a minute, or paste the invite link.",
+  "scanOutdated": "Scanning needs a newer version of Google Play services. Paste the invite link instead.",
+  "scanFailed": "The scanner didn't open. Paste the invite link instead.",
   "pasteInvite": "Paste invite link",
   "pasteInviteHint": "https://share.example.com/join#…",
   "libraryTitle": "Library",
@@ -578,13 +582,16 @@
   "storageWarnFolderMissing": "Folders inside the storage folder are missing. Run share init on the server.",
   "storageWarnOtherDrive": "Parts of the storage folder are on another drive, so uploads can't finish.",
   "storageWarnNotADrive": "The files are in memory, on the system's flash or inside a container, not on a drive or a volume.",
-  "storageWarnDataUnreadable": "The data folder, with the database and thumbnails, can't be read.",
-  "storageWarnDataUnsafe": "The database is on a network or FUSE drive, where it isn't safe. Set data_dir to a local disk.",
-  "storageWarnDataInMemory": "The database is in memory or inside a container, and would be lost when the server restarts or the container is made anew.",
+  "storageWarnDataUnreadable": "The data folder, with the thumbnails and the certificate, can't be read.",
+  "storageWarnDataInMemory": "The data folder is in memory or inside a container: its thumbnails and certificate would be lost when the server restarts or the container is made anew.",
   "storageWarnDriveFull": "The drive is full: uploads have stopped. Make some room, for example by emptying Recently deleted.",
   "storageWarnFat32": "The drive is FAT32: files over 4 GB can't be stored.",
   "storageWarnIgnoresCase": "The drive is exFAT or NTFS: it ignores capitals in names and is slower than ext4.",
   "storageWarnLowSpace": "Less than 1 GB is left before uploads stop.",
+  "storageWarnS3Unreachable": "The bucket can't be reached: no network, a wrong address in config.json, or trouble at the storage service.",
+  "storageWarnS3Denied": "The bucket refuses Share's keys, or doesn't exist. Check the bucket and the keys in config.json.",
+  "storageWarnS3Cors": "The bucket doesn't let Share's pages send and fetch files. Set its CORS rules; share check prints them.",
+  "storageWarnS3ClockSkew": "The server's clock is more than 5 minutes off: links to the bucket fail, or end too soon.",
   "storageWarnUnknown": "The server found something to look at. Run share check there.",
   "storageFree": "{free} free of {total}",
   "@storageFree": {
@@ -734,6 +741,23 @@
       }
     }
   },
+  "inviteNoKeysWaiting": "{name} wouldn't get the keys of the encrypted folders from this invite: this phone still waits for your OK itself, so {name} would wait for your OK with a code too.",
+  "@inviteNoKeysWaiting": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "inviteNoKeysFailed": "{name} wouldn't get the keys of the encrypted folders from this invite: they couldn't be loaded on this phone, so {name} would wait for your OK with a code. Try again in a moment.",
+  "@inviteNoKeysFailed": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "inviteCreateAnyway": "Make it anyway",
   "inviteWorksOnce": "Works once · expires in 24 h",
   "inviteSendLink": "Send as a link instead",
   "inviteShareText": "{name}, this invite signs you in to Share. It works once, for 24 hours: {link}",
@@ -1022,6 +1046,8 @@
       }
     }
   },
+  "sendUnchecked": "Some files weren't sent: Share couldn't check the keys of their folder, so it couldn't be sure they stay private. Tell an admin.",
+  "sendUncheckedGuest": "Some files weren't sent: Share couldn't check the keys of the folder this PIN sends into, so it couldn't be sure they stay private. Tell whoever gave you the PIN.",
   "sendFailedCount": "{count, plural, =1{1 file couldn't be sent.} other{{count} files couldn't be sent.}}",
   "@sendFailedCount": {
     "placeholders": {
@@ -1177,5 +1203,158 @@
   "themeLight": "Light",
   "@themeLight": {
     "description": "The heading above the light themes."
-  }
+  },
+  "encryptionTitle": "End-to-end encryption",
+  "encryptionEncrypted": "End-to-end encrypted",
+  "encryptionSwitch": "Encrypt new files",
+  "encryptionSwitchOn": "Only the family's phones and browsers can open them",
+  "encryptionSwitchOff": "New files are stored as they are",
+  "encryptionNeedsRoot": "This phone can't do that yet: it needs the recovery key, which another admin passes on with an OK, or the recovery code.",
+  "encryptionNoKeysHere": "This phone doesn't have the keys yet",
+  "encryptionOn": "New files in {folder} are now encrypted",
+  "@encryptionOn": {
+    "placeholders": {
+      "folder": {
+        "type": "String"
+      }
+    }
+  },
+  "encryptionAskTitle": "Encrypt new files in {folder}?",
+  "@encryptionAskTitle": {
+    "placeholders": {
+      "folder": {
+        "type": "String"
+      }
+    }
+  },
+  "encryptionAskBody": "From now on, files sent into this folder are encrypted on the phone or browser that sends them. Only the people who see the folder can open them; the server and its storage can't. Files already in it stay as they are.",
+  "encryptionAskFirst": "From now on, files sent into this folder are encrypted on the phone or browser that sends them, and only the people who see the folder can open them. Files already in it stay as they are. First comes the recovery code: keep it safe, it opens every encrypted folder should all phones and browsers be lost.",
+  "encryptionTurnOn": "Encrypt",
+  "encryptionOffTitle": "Stop encrypting new files in {folder}?",
+  "@encryptionOffTitle": {
+    "placeholders": {
+      "folder": {
+        "type": "String"
+      }
+    }
+  },
+  "encryptionOffBody": "New files are then stored as they are. Encrypted files stay encrypted, and the family's phones and browsers still open them.",
+  "encryptionTurnOff": "Stop encrypting",
+  "encryptionNewFolders": "Encrypt new folders",
+  "encryptionNewFoldersSub": "New folders encrypt their files from the start",
+  "encryptionNewFolder": "Encrypt its files end to end",
+  "encryptionMoveIntoPlain": "Encrypted files only move into an encrypted folder. Turn encryption on there first.",
+  "keysStartOver": "Start over",
+  "keysStartOverTitle": "Start over with new keys?",
+  "keysStartOverBody": "Only if none of your other phones or browsers will come back. This phone gets new keys, and encrypted folders open here once someone else who sees them allows it, or with the recovery code.",
+  "keysCantOpen": "This phone can't open encrypted files yet.",
+  "keysWaitingTitle": "Waiting for approval",
+  "keysWaiting": "Allow this phone on one of your other phones or browsers: open Share there and choose Show.",
+  "keysSameCode": "It shows this code there too:",
+  "keysAdminTitle": "Waiting for an admin",
+  "keysAdmin": "Encrypted folders open here once an admin allows it.",
+  "keysAdminCode": "Your key is new. An admin opens your folders for it: tell them this code.",
+  "keysAskPhone": "A new phone wants your keys",
+  "keysAskBrowser": "A new browser wants your keys",
+  "keysSignedInMinutes": "{minutes, plural, =0{Signed in just now} =1{Signed in 1 minute ago} other{Signed in {minutes} minutes ago}}",
+  "@keysSignedInMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "keysSignedInHours": "{hours, plural, =1{Signed in 1 hour ago} other{Signed in {hours} hours ago}}",
+  "@keysSignedInHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "keysSignedInDays": "{days, plural, =1{Signed in 1 day ago} other{Signed in {days} days ago}}",
+  "@keysSignedInDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "keysShowsPhone": "Does it show this code?",
+  "keysShowsBrowser": "Does it show this code?",
+  "keysWaitCode": "Waiting for the code…",
+  "keysNotMePhone": "Another code, or you didn't just sign in? Tap <b>Not me</b>: that phone is signed out and gets nothing.",
+  "keysNotMeBrowser": "Another code, or you didn't just sign in? Tap <b>Not me</b>: that browser is signed out and gets nothing.",
+  "keysNotMe": "Not me",
+  "keysAllow": "Allow",
+  "keysPersonTitle": "{name} is waiting for folders",
+  "@keysPersonTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "keysPersonFirst": "Once you allow it, these folders open for {name}:",
+  "@keysPersonFirst": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "keysPersonRoot": "As an admin, {name} also gets the recovery key, which confirms folders and their keys.",
+  "@keysPersonRoot": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "keysPersonNew": "{name}'s key is new: the old one was lost. Once you allow it, these folders open for {name} again:",
+  "@keysPersonNew": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "keysPersonCode": "Ask {name} for the code on their screen:",
+  "@keysPersonCode": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "keysPersonHelp": "Another code? Tap <b>Not now</b>, and nothing is passed on.",
+  "keysNotNow": "Not now",
+  "keysLaterTitle": "Waiting for your OK",
+  "keysShow": "Show",
+  "recoveryTitle": "Recovery code",
+  "recoveryLead": "With this code an admin opens every encrypted folder again, should all phones and browsers be lost. It is shown only now: write it down, and keep it somewhere safe, away from this phone.",
+  "recoveryCopy": "Copy",
+  "recoveryCopied": "Recovery code copied",
+  "recoveryKept": "I wrote it down",
+  "recoveryDone": "Done",
+  "recoveryOpened": "{count, plural, =1{1 encrypted folder opened} other{{count} encrypted folders opened}}",
+  "@recoveryOpened": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "recoveryWrong": "That isn't the recovery code.",
+  "recoveryUseTitle": "Use the recovery code",
+  "recoveryUseLead": "Type the recovery code you wrote down. Every encrypted folder then opens on this phone.",
+  "recoveryCode": "Recovery code",
+  "recoveryUse": "Use the recovery code",
+  "recoveryMade": "Made. A new one replaces it",
+  "recoveryNone": "Made when the first folder is encrypted",
+  "recoveryNewTitle": "Make a new recovery code?",
+  "recoveryNewBody": "The old code then stops working. Keep the new one safe.",
+  "recoveryNewButton": "New code",
+  "viewerLocked": "This file is encrypted, and this phone doesn't have its key yet.",
+  "pinsNoKey": "Without its key: this phone can't open the folder's, so guests won't see its encrypted files."
 }

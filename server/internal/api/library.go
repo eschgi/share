@@ -1,9 +1,11 @@
 package api
 
 import (
+	"bytes"
 	"encoding/base64"
 	"errors"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"slices"
@@ -15,6 +17,7 @@ import (
 	"github.com/eschgi/share/server/internal/db"
 	"github.com/eschgi/share/server/internal/httpx"
 	"github.com/eschgi/share/server/internal/ids"
+	"github.com/eschgi/share/server/internal/storage"
 )
 
 // FileInfo is a file in the library.
@@ -33,6 +36,16 @@ type FileInfo struct {
 	DurationMS *int64    `json:"duration_ms"`
 	HasThumb   bool      `json:"has_thumb"`
 	From       *string   `json:"from"` // who sent it, if they have an account; null for a PIN
+	Enc        *EncInfo  `json:"enc"`  // how it is encrypted; null for a plain file
+}
+
+// EncInfo is how a file is encrypted: the version of its folder's key that its file key is
+// sealed for, that sealed key, and the header its contents start with. The file's size is
+// the plain size; what is stored is bigger by the header and 16 bytes per 64 KiB.
+type EncInfo struct {
+	Version int `json:"version"`
+	Key     B64 `json:"key"`
+	Header  B64 `json:"header"`
 }
 
 func fileInfo(f db.File, names map[string]string) FileInfo {
@@ -40,6 +53,9 @@ func fileInfo(f db.File, names map[string]string) FileInfo {
 		ID: f.ID, Folder: f.FolderID, Name: f.Name, Size: f.Size, Mime: f.Mime, Kind: f.Kind, Day: f.UploadDay, UpdatedAt: f.UpdatedAt,
 		Width: f.Width, Height: f.Height, DurationMS: f.DurationMS,
 		HasThumb: f.Thumb == db.ThumbClient || f.Thumb == db.ThumbServer,
+	}
+	if e := f.Enc; e != nil {
+		info.Size, info.Enc = e.PlainSize, &EncInfo{Version: e.Version, Key: e.Key, Header: e.Header}
 	}
 	if f.UploadedAt != nil {
 		info.UploadedAt = *f.UploadedAt
@@ -281,13 +297,24 @@ func (a *API) file(w http.ResponseWriter, r *http.Request) {
 }
 
 // content sends a file as it was uploaded. Downloads resume with Range (and If-Range, the ETag
-// being the file id), and nothing along the way may cache or change them.
+// being the file id), and nothing along the way may cache or change them. From a bucket a
+// browser goes on to a link there; the app asks for the link itself (fileURL).
 func (a *API) content(w http.ResponseWriter, r *http.Request) {
 	_, f, ok := a.readyFile(w, r)
 	if !ok {
 		return
 	}
-	file, err := a.Lib.Open(r.Context(), f)
+	if a.S3 != nil {
+		// A redirect would take the phone's key along to the bucket: media players send their
+		// headers again after one.
+		if r.Header.Get("Authorization") != "" {
+			httpx.WriteError(w, http.StatusConflict, "s3_use_url", "The file is in a bucket: ask /api/s3/files/{id}/url for its link and fetch that without your key.")
+			return
+		}
+		a.redirectToBucket(w, r, f)
+		return
+	}
+	file, err := a.Lib.OpenFile(r.Context(), f)
 	if errors.Is(err, os.ErrNotExist) {
 		httpx.WriteError(w, http.StatusNotFound, "not_found", "The file is missing on the server's drive.")
 		return
@@ -304,10 +331,10 @@ func (a *API) content(w http.ResponseWriter, r *http.Request) {
 	}
 	h := w.Header()
 	h.Set("Content-Type", f.Mime)
-	if f.Mime == "" {
+	if f.Mime == "" || f.Enc != nil { // encrypted bytes are of no type
 		h.Set("Content-Type", "application/octet-stream")
 	}
-	h.Set("Content-Disposition", contentDisposition(f.Name))
+	h.Set("Content-Disposition", storage.ContentDisposition(f.Name))
 	h.Set("Cache-Control", "private, no-store, no-transform")
 	h.Set("Content-Security-Policy", "sandbox")
 	h.Set("X-Content-Type-Options", "nosniff")
@@ -324,8 +351,21 @@ func (a *API) thumb(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusNotFound, "not_found", "This file has no thumbnail.")
 		return
 	}
-	file, err := os.Open(a.Thumbs.Path(f.ID))
-	if errors.Is(err, os.ErrNotExist) {
+	etag := `"` + f.ID + "-" + strconv.FormatInt(f.UpdatedAt.UnixMilli(), 36) + `"`
+	cached := func() {
+		h := w.Header()
+		h.Set("Cache-Control", "private, max-age=86400")
+		h.Set("ETag", etag)
+	}
+	// A thumbnail the browser has already is confirmed from the row alone, without reading
+	// it: in a bucket that would be a request there.
+	if etagMatches(r.Header.Get("If-None-Match"), etag) {
+		cached()
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+	data, err := a.Thumbs.Read(r.Context(), f.ID)
+	if errors.Is(err, fs.ErrNotExist) {
 		httpx.WriteError(w, http.StatusNotFound, "not_found", "This file has no thumbnail.")
 		return
 	}
@@ -333,42 +373,24 @@ func (a *API) thumb(w http.ResponseWriter, r *http.Request) {
 		internal(w, "thumbnail", err)
 		return
 	}
-	defer file.Close()
-	h := w.Header()
-	h.Set("Content-Type", "image/jpeg")
-	h.Set("Cache-Control", "private, max-age=86400")
-	h.Set("X-Content-Type-Options", "nosniff")
-	h.Set("ETag", `"`+f.ID+"-"+strconv.FormatInt(f.UpdatedAt.UnixMilli(), 36)+`"`)
-	http.ServeContent(w, r, "", f.UpdatedAt, file)
+	cached()
+	if f.Enc != nil {
+		w.Header().Set("Content-Type", "application/octet-stream") // sealed
+	} else {
+		w.Header().Set("Content-Type", "image/jpeg")
+	}
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	http.ServeContent(w, r, "", f.UpdatedAt, bytes.NewReader(data))
 }
 
-// contentDisposition makes the file save under its own name: an ASCII stand-in for old
-// clients, and the real name as UTF-8 (RFC 6266).
-func contentDisposition(name string) string {
-	var ascii, enc strings.Builder
-	for _, c := range name {
-		if c < 0x20 || c > 0x7E || c == '"' || c == '\\' {
-			ascii.WriteByte('_')
-		} else {
-			ascii.WriteRune(c)
+// etagMatches reports whether an If-None-Match header names etag, compared weakly.
+func etagMatches(header, etag string) bool {
+	for _, t := range strings.Split(header, ",") {
+		if t = strings.TrimSpace(t); t == "*" || strings.TrimPrefix(t, "W/") == etag {
+			return true
 		}
 	}
-	for _, b := range []byte(name) {
-		if isAttrChar(b) {
-			enc.WriteByte(b)
-		} else {
-			enc.WriteString("%" + strings.ToUpper(strconv.FormatInt(int64(b)|0x100, 16)[1:]))
-		}
-	}
-	return `attachment; filename="` + ascii.String() + `"; filename*=UTF-8''` + enc.String()
-}
-
-func isAttrChar(b byte) bool {
-	switch {
-	case 'a' <= b && b <= 'z', 'A' <= b && b <= 'Z', '0' <= b && b <= '9':
-		return true
-	}
-	return strings.IndexByte("!#$&+-.^_`|~", b) >= 0
+	return false
 }
 
 // writeTimeout is how long one piece of a download may take to go out. The server has no

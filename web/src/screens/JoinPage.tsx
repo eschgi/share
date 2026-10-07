@@ -8,6 +8,8 @@ import { QrCode } from '../components/QrCode';
 import { formatBytes, formatWhen } from '../format';
 import { setSignedInHint } from '../hint';
 import { I18nContext, isLang, languages, makeI18n, pickLanguage, storeLanguage, storedLanguage, type Lang } from '../i18n';
+import { keysFromInvite } from '../e2ee/keyring';
+import { intentLink, secretFromHash, tokenFromHash } from '../joinlink';
 
 type State =
   | { kind: 'loading' }
@@ -22,22 +24,6 @@ const problems: Record<string, string> = {
   invite_locked: 'join.locked',
 };
 
-/** The invite token from the link: <server>/join#shi_… */
-export function tokenFromHash(hash: string): string | null {
-  const t = decodeURIComponent(hash.replace(/^#/, ''));
-  return /^shi_[A-Za-z0-9_-]{20,}$/.test(t) ? t : null;
-}
-
-/**
- * The link that hands the invite to the installed app. Chrome opens the app with
- * <scheme>://join?server=…&token=…, or, without the app, comes back to this page.
- */
-export function intentLink(app: AppInfo, server: string, token: string): string {
-  const q = new URLSearchParams({ server, token }).toString();
-  const fallback = encodeURIComponent(`${server}/join#${token}`);
-  return `intent://join?${q}#Intent;scheme=${app.link_scheme};package=${app.android_package};S.browser_fallback_url=${fallback};end`;
-}
-
 /**
  * Screens 9 and 23: what an invite link opens when the app isn't installed yet. On Android it
  * leads to the app, on a computer to the app on an Android phone, by QR code; and everywhere it
@@ -46,6 +32,8 @@ export function intentLink(app: AppInfo, server: string, token: string): string 
 export function JoinPage() {
   // Read the token before it leaves the address bar, so it doesn't stay in the history.
   const token = useMemo(() => tokenFromHash(location.hash), []);
+  const secret = useMemo(() => secretFromHash(location.hash), []);
+  const link = token ? `${location.origin}/join#${token}${secret ? '.' + secret : ''}` : '';
   const [info, setInfo] = useState<Info | null>(null);
   const [lang, setLang] = useState<Lang>(() => pickLanguage(languages, storedLanguage(), navigator.languages, 'en'));
   const [state, setState] = useState<State>({ kind: 'loading' });
@@ -93,19 +81,23 @@ export function JoinPage() {
     if (!navigator.cookieEnabled) return setJoinProblem(t('join.noCookie'));
     setJoining(true);
     setJoinProblem(null);
+    let joined;
     try {
-      await acceptInvite(token, thisBrowser());
+      joined = await acceptInvite(token, thisBrowser());
     } catch (e) {
       setJoining(false);
       if (e instanceof ApiError && problems[e.code]) return setState({ kind: 'problem', key: problems[e.code] });
       return setJoinProblem(t(e instanceof ApiError && e.status > 0 ? 'join.failed' : 'pin.network'));
     }
+    let me;
     try {
-      await getMe();
+      me = await getMe();
     } catch {
       setJoining(false);
       return setJoinProblem(t('join.cookieLost'));
     }
+    // The keys the link's secret unlocks become this browser's; without them it waits for others.
+    await keysFromInvite(me, secret, joined.keys, joined.root).catch(() => {});
     setSignedInHint(true);
     location.replace('/library');
   }
@@ -211,7 +203,7 @@ export function JoinPage() {
                 {t('join.download')}
               </a>
               {token && (
-                <a class="btn link" href={intentLink(app, location.origin, token)}>
+                <a class="btn link" href={intentLink(app, location.origin, token, secret)}>
                   {t('join.already', { name: peek.name })}
                 </a>
               )}
@@ -224,7 +216,7 @@ export function JoinPage() {
           {scan && (
             <>
               <div class="qrcard">
-                <QrCode text={`${location.origin}/join#${token}`} label={t('join.qrLabel')} />
+                <QrCode text={link} label={t('join.qrLabel')} />
                 <b>{t('join.scan')}</b>
                 <span class="exp">
                   <Icon name="clock" />

@@ -1,0 +1,88 @@
+{
+  "description": "What Share locks with a key: a random nonce (12 bytes), then AES-256-GCM's ciphertext and tag, with aad (UTF-8) as associated data. A link's secret gives the key with HKDF-SHA256 (no salt, purpose as info, 32 bytes), and so does a private key's scalar: a folder key's for its PIN links' secrets, a person key's for their note (JSON: the root and the newest version of each folder's key their devices have seen). A password lock starts with a salt (16 bytes) and PBKDF2's iterations (4 bytes, big endian); PBKDF2-HMAC-SHA256 of the password's UTF-8 bytes gives the key. A thumbnail is locked with HKDF-SHA256 of the file key (no salt, share-e2ee-v1/thumb as info) and no aad. Binary values are base64url without padding.",
+  "secrets": [
+    {
+      "name": "a folder key, locked with an invite link's secret",
+      "purpose": "share-e2ee-v1/invite",
+      "secret": "YIqtXTRGTH5TV9Grp8vitXuTpfc8VKBz6GaGaq5P9Hg",
+      "key": "YZWLQOYdKLplFpAz-gqJC0OtiI3bjZm5f1urQlcgx78",
+      "aad": "folder:w3dding5x2k7mbqz4bwdbyj6qs:1",
+      "plaintext": "ubfI-7glw-TsNCYdyosIGWzEDAl1nYpXgTOknicSF8c",
+      "locked": "YCdHeg0TVEZOcaP5pz8q0NcU8EJdpv5BnFj9OJeKUVsdSVwpLO2xuFs515GXzqz7kVkS8VL4NvlM0a6V"
+    },
+    {
+      "name": "a person key, locked with the secret of an invite for a new phone",
+      "purpose": "share-e2ee-v1/invite",
+      "secret": "-UBuwPk89GNOkZ377FaoEHSK6SyEtQwnqQ25wZkxSsI",
+      "key": "MPcte6uq424Y-goytRLEDw-YDEbVq06eDyvevyqHugg",
+      "aad": "person:u7ld5x2k7mbqz4bwdbyj6qsqxa",
+      "plaintext": "mXCeNGKKIvKqwzbchetWszJUFVungNbHj7eLIu-3YlQ",
+      "locked": "IonQz8pBi69PeRbtntpLToy-D4wyz6H4fG5D07DlyW4qPnIGHRyygbLfUb-Nri-2uS02yoFjDVSoeDbw"
+    },
+    {
+      "name": "the root, locked with an invite link's secret",
+      "purpose": "share-e2ee-v1/invite",
+      "secret": "NtytkX5glIlLSbVmlgyORtliAxehdtJealGTh5jpJWM",
+      "key": "c3sNUezwL2p2Fr2wfvxzgPwroKcuzrdkoQYdVmPPs0U",
+      "aad": "root",
+      "plaintext": "BGA5lnxaWcW1KKjSDjwPSPLqXoY7rFXPt4YsOwcq5uGxc3otr4cmw0AevFoBhN09soFB2CjPcLx4_0agD9vfMO8",
+      "locked": "uKv_LB3oxxjEhycvg1xtXI9bEVFV2EId1DVp26-4_bdqPcI0optEgHcz96ohy_K3miWqxALSXppfcUKLMsktau0QsRcRbwCnBNHKyBUr3D68-aMJcCPKwoTmpb0Z"
+    },
+    {
+      "name": "a folder key, locked with a PIN link's secret",
+      "purpose": "share-e2ee-v1/pin",
+      "secret": "XgtawWASY8doTmdxnMpS3T5cWiVq6kSsrddBUOCVjW4",
+      "key": "Uy0WlsLnFsuGkpsX5g5TmezI1ZSOS_Qh3aQIWTese1w",
+      "aad": "folder:w3dding5x2k7mbqz4bwdbyj6qs:1",
+      "plaintext": "ubfI-7glw-TsNCYdyosIGWzEDAl1nYpXgTOknicSF8c",
+      "locked": "2EjERgqz7penjaEOgs1EuSIVqlRxxgoxInMjulpiv_ZfLHUJEoS_6TAOGto9abwWM82_YKzkEj6gK_wN"
+    },
+    {
+      "name": "the root, locked with a PIN link's secret",
+      "purpose": "share-e2ee-v1/pin",
+      "secret": "XgtawWASY8doTmdxnMpS3T5cWiVq6kSsrddBUOCVjW4",
+      "key": "Uy0WlsLnFsuGkpsX5g5TmezI1ZSOS_Qh3aQIWTese1w",
+      "aad": "root",
+      "plaintext": "BGA5lnxaWcW1KKjSDjwPSPLqXoY7rFXPt4YsOwcq5uGxc3otr4cmw0AevFoBhN09soFB2CjPcLx4_0agD9vfMO8",
+      "locked": "9IxiYu6hoicFv4uQDxscKZYBbEtm2pj5eBTljubkQLc2LWbzEvfUlBGCROKQ_ff39jPOII4HHGcYilRD1YBfRD9Ej9P3j99-ocd-4U8ixbgQe_iCSj58-DpUpswI"
+    },
+    {
+      "name": "a PIN link's secret, locked with a key from the folder's private key",
+      "purpose": "share-e2ee-v1/pin-secret",
+      "secret": "ubfI-7glw-TsNCYdyosIGWzEDAl1nYpXgTOknicSF8c",
+      "key": "PYsLXGHy_qRlLVozG3axC2nIt2gUgG6Qa2qbjOPGw8k",
+      "aad": "folder:w3dding5x2k7mbqz4bwdbyj6qs:1",
+      "plaintext": "XgtawWASY8doTmdxnMpS3T5cWiVq6kSsrddBUOCVjW4",
+      "locked": "2kOutIZDfai-7k_t6nFM18pIbFFn-ElTeSERZiP7enlE0P2wwCzHI7ER-jTaE-BIYWKMnh7Wg9Cc9Ugk"
+    },
+    {
+      "name": "a person's note, locked with a key from their private key",
+      "purpose": "share-e2ee-v1/note",
+      "secret": "mXCeNGKKIvKqwzbchetWszJUFVungNbHj7eLIu-3YlQ",
+      "key": "bxTXRjO6uC7TCPvluue24N6js_uPTUQNURT1g2WHhdU",
+      "aad": "note:u7ld5x2k7mbqz4bwdbyj6qsqxa",
+      "plaintext": "eyJyb290IjoiQkdBNWxueGFXY1cxS0tqU0Rqd1BTUExxWG9ZN3JGWFB0NFlzT3djcTV1R3hjM290cjRjbXcwQWV2Rm9CaE4wOXNvRkIyQ2pQY0x4NF8wYWdEOXZmTU84IiwiZm9sZGVycyI6eyJ3M2RkaW5nNXgyazdtYnF6NGJ3ZGJ5ajZxcyI6MX19",
+      "locked": "5wXGoW0HYY9lkUc5xUe2HgBXb471a6MAe2-uePV-mRvPrmVErC-4SeKY7tUijIExMBLVYcY5BM1GIecdnJFJ5-LorHPGpK40NzpCJffP2kC-VYvrzD6yK-3vts956Oap2jAvUXHUbHUmtmjiq3bOo4RwYwEEA24qap9NQu0FgkeTj-lpX6T0s60wxEGRRRQWg65pBTjcIueMUpsE0lWdSt-JMUBoVVpX4Q"
+    }
+  ],
+  "passwords": [
+    {
+      "password": "correct horse",
+      "aad": "person:u7ld5x2k7mbqz4bwdbyj6qsqxa",
+      "plaintext": "mXCeNGKKIvKqwzbchetWszJUFVungNbHj7eLIu-3YlQ",
+      "locked": "EQnuChK78XGnUnqISIx6gQAJJ8CHk-MvyhTeurrXhwYEfYngM3wW1gzMGdYlEF8LwJ2y9K_o2sK8nc-ntZiSaB07O-7FhyFkq4RqNymAcMU"
+    },
+    {
+      "password": "Grüße, Ünal ✓ 日本",
+      "aad": "person:u7ld5x2k7mbqz4bwdbyj6qsqxa",
+      "plaintext": "mXCeNGKKIvKqwzbchetWszJUFVungNbHj7eLIu-3YlQ",
+      "locked": "WtPYNXBF3a_0zPzU8QU3EwAJJ8CdpA5cdAdKfh3cevTvmrrKrHHs4x-4NVqmgBPJQTypoPXBL--S1GS3d4-yNRBguG0_df_f9lq1m0VDln4"
+    }
+  ],
+  "thumb": {
+    "file_key": "A8ZByrsIVU9E3urS8YjN-3-Bk3gW-2a81zYR-A-n47A",
+    "thumb_key": "7kuEwEWN3A8iEzOTMRrFkMcecFqRqyhWZlfrGHlvbYU",
+    "plaintext": "_9j_4CBhIHRodW1ibmFpbCdzIEpQRUcgYnl0ZXMg_9k",
+    "sealed": "qigJzXw3MKuuFgGsEMaB958RNbqsjmTyAW3kj3sPpoXjfSWRg8gL62CURVAVm9a26Nbhq_RrKgi_y4ui"
+  }
+}

@@ -2,7 +2,7 @@
 # Windows on ARM (windows/arm64). Output: dist\share-windows-amd64.exe,
 # dist\share-windows-arm64.exe.
 #
-#   scripts\build-windows.ps1                    version from git
+#   scripts\build-windows.ps1                    version from VERSION and git (scripts/version.sh)
 #   scripts\build-windows.ps1 -Version 0.1.0
 param([string]$Version = "")
 
@@ -10,8 +10,8 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 
 if (-not $Version) {
-    $Version = (git -C $root describe --tags --always --dirty 2>$null)
-    if (-not $Version) { $Version = "dev" }
+    . "$PSScriptRoot\version.ps1"
+    $Version = Get-ShareVersion $root
 }
 
 Write-Host "Building the website"
