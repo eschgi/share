@@ -800,6 +800,37 @@
   .ddlg .qrcard{background:var(--s2);margin-top:4px}
   .wb > .drow{flex:none;margin-top:4px}
   .wb > .route + .grid,.wb > .bytes + .grid{margin-top:16px}
+  /* ---------- sending automatically: a day's new photos go to a folder by themselves ---------- */
+  .card.auto{margin-top:14px}
+  .card.auto .ah{display:flex;gap:14px;align-items:flex-start}
+  .card.auto .at{flex:1;min-width:0}
+  .card.auto .at b{display:block;font-size:16px;font-weight:600}
+  .card.auto .at span{display:block;font-size:13.5px;line-height:1.45;color:var(--text-2);margin-top:3px}
+  .card.auto > p{margin:12px 0 0;font-size:14px;line-height:1.5;color:var(--text-2)}
+  .card.auto > .btn{margin-top:14px}
+  .card.auto .btnrow{margin-top:16px}
+  .card.auto .btnrow .btn{height:46px;font-size:15px}
+  .card.auto + .lead{margin-top:20px}
+  .autoban{display:flex;gap:12px;align-items:center;background:var(--accent-soft);border-radius:16px;padding:8px 6px 8px 14px;margin:4px 12px 8px;flex:none}
+  .autoban .live{width:10px;height:10px;border-radius:50%;background:var(--accent-text);flex:none}
+  .autoban .at{flex:1;min-width:0;padding:4px 0}
+  .autoban .at b{display:block;font-size:14.5px;font-weight:600;color:var(--accent-text)}
+  .autoban .at span{display:block;font-size:12.5px;color:var(--text-2);margin-top:1px}
+  .phone.lock{background:#0F0C0A}
+  .lockbg{position:absolute;inset:0;background:radial-gradient(130% 70% at 25% 0%,#4A3527 0%,#211913 55%,#0F0C0A 100%)}
+  .phone.lock > :not(.lockbg){position:relative}
+  .lockclock{text-align:center;margin-top:54px;font-family:var(--serif);font-size:84px;font-weight:700;line-height:1;flex:none}
+  .lockdate{text-align:center;font-size:16px;color:var(--text-2);margin-top:10px;flex:none}
+  .ntf{margin:0 12px;background:rgba(40,33,28,.94);border-radius:26px;padding:14px 18px 12px;flex:none}
+  .ntf .nh{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-3)}
+  .ntf .nh .ic{width:16px;height:16px;color:var(--accent-text)}
+  .ntf b{display:block;font-size:15px;font-weight:600;margin-top:8px;line-height:1.35}
+  .ntf p{margin:3px 0 0;font-size:13.5px;line-height:1.45;color:var(--text-2)}
+  .ntf .nbar{height:4px;border-radius:2px;background:var(--s3);margin-top:12px;overflow:hidden}
+  .ntf .nbar i{display:block;height:100%;background:var(--accent)}
+  .ntf .nacts{display:flex;gap:22px;margin-top:12px;font-size:14px;font-weight:600;color:var(--accent-text)}
+  .lockdate + .ntf{margin-top:44px}
+  .lockhint{text-align:center;font-size:13px;color:var(--text-3);margin:18px 0 6px;flex:none}
 </style>
 </head>
 <body>
@@ -857,6 +888,9 @@
   <symbol id="i-log-out" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></symbol>
   <symbol id="i-palette" viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></symbol>
   <symbol id="i-radio" viewBox="0 0 24 24"><path d="M16.247 7.761a6 6 0 0 1 0 8.478"/><path d="M19.075 4.933a10 10 0 0 1 0 14.134"/><path d="M4.925 19.067a10 10 0 0 1 0-14.134"/><path d="M7.753 16.239a6 6 0 0 1 0-8.478"/><circle cx="12" cy="12" r="2"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/></symbol>
 </svg>
 
 <div class="page">
@@ -1849,6 +1883,59 @@
     </div>
   </section>
 
+  <section class="sec" id="automatic">
+    <div class="sec-head">
+      <div class="sec-tag">Proposal · automatic</div>
+      <h2>Today's photos, sent by themselves</h2>
+      <p>For a day others should see as it happens, a wedding, a trip, a child's birthday: turned on in the morning, every photo and video taken with the camera goes to the chosen folder on its own, and at midnight it stops by itself. Nothing has to be picked or remembered, and in an encrypted folder the photos go up encrypted, as always. The others see them arrive, and the sender can still take one back the same day. Only the app can do this: Android lets it see new photos once the person allows it, while a browser never sees a phone's gallery.</p>
+    </div>
+    <p class="sub-h">Stefan's phone</p>
+    <div class="board">
+
+      <div class="slot">
+        <h3><span class="n">61</span>Send automatically <span class="badge proposal">proposal</span></h3>
+        <p class="cap">A card on the Send tab, under picking by hand. It's for one day, not for good: what goes to the others stays a choice made that morning, not a setting forgotten for months.</p>
+        <div class="phone" data-shot="61-auto-offer"><div class="sb" data-time="9:12"></div><div class="ab"><h2>Send</h2><span class="av sm acc">S</span></div><div class="scroll pad"><p class="lead sm">No PIN needed while you're signed in.</p><div class="picks"><div class="pick"><span data-i="images"></span><b>Photos &amp; videos</b></div><div class="pick"><span data-i="file"></span><b>Other files</b></div></div><div class="card auto"><div class="ah"><span class="ri acc"><span data-i="camera"></span></span><div class="at"><b>Send automatically</b><span>For a day others should see as it happens: a wedding, a trip, a birthday.</span></div></div><p>Photos and videos you take from now on go to a folder by themselves, until midnight.</p><div class="btn tonal sm"><span data-i="camera"></span>Turn on for today</div></div><div class="note slim"><span data-i="smartphone"></span><p>Keeps going in the background, even if you close the app.</p></div></div><nav class="nav" data-on="send"></nav><div class="gest"></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">62</span>For which folder, until when <span class="badge proposal">proposal</span></h3>
+        <p class="cap">The folder open in the library comes first. Tonight is the default; Longer suits a trip. Big videos can wait for Wi-Fi, and only the camera's own photos count. The first time, Android asks for access to photos and videos; only "Allow all" lets Share see new ones, so the app says so before Android asks.</p>
+        <div class="phone" data-shot="62-auto-setup"><div class="sb" data-time="9:12"></div><div class="ab"><h2>Send</h2><span class="av sm acc">S</span></div><div class="scroll pad"><p class="lead sm">No PIN needed while you're signed in.</p><div class="picks"><div class="pick"><span data-i="images"></span><b>Photos &amp; videos</b></div><div class="pick"><span data-i="file"></span><b>Other files</b></div></div></div><nav class="nav" data-on="send"></nav><div class="gest"></div><div class="scrim"></div><div class="sheet"><div class="grip"></div><h3>Send automatically</h3><div class="label t0">Into</div><div class="fsel"><span class="fcov ph t6"><span data-i="image"></span></span><div class="rt"><b>Wedding Anna &amp; Marco</b><span>412 files · 9 people</span></div><span data-i="chev" class="down"></span></div><div class="label">Until</div><div class="opts"><div class="opt on"><span data-i="clock"></span><i class="radio"></i><b>Tonight</b><span class="sub">Until midnight</span></div><div class="opt"><span data-i="calendar"></span><i class="radio"></i><b>Longer</b><span class="sub">For a trip</span></div></div><div class="swrow"><div class="rt"><b>Videos too</b><span>Big ones wait for Wi-Fi.</span></div><span class="sw on"></span></div><div class="swrow"><div class="rt"><b>Only from the camera</b><span>No screenshots, nothing other apps saved.</span></div><span class="sw on"></span></div><div class="note slim"><span data-i="users"></span><p>Only what you take from now on. The 9 people in this folder see it as it arrives.</p></div><div class="btn primary mt20"><span data-i="camera"></span>Start for today</div></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">63</span>While it's on <span class="badge proposal">proposal</span></h3>
+        <p class="cap">A line over the library says it's on, how much went and until when. A new photo joins the queue a few seconds after it's taken, also on mobile data, and shows up under Today. Pause holds it until Stefan goes on, for a while nobody needs to see.</p>
+        <div class="phone" data-shot="63-auto-on"><div class="sb" data-time="15:40"></div><div class="ab"><h2 class="fpick"><span class="t">Wedding Anna &amp; Marco</span><span data-i="chev" class="down"></span></h2><span class="ib"><span data-i="search"></span></span><span class="av sm acc">S</span></div><div class="autoban"><span class="live"></span><div class="at"><b>Sending automatically</b><span>38 photos, 2 videos today · until midnight</span></div><span class="tbtn">Pause</span></div><div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div><div class="scroll"><div class="day"><div><h4>Today</h4><div class="meta">40 files · 610 MB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p6/u70 p2/q p9 p4 v3@0:24 p1 p7 p5 p8 p3 p10 p2 p6 p9 v4@0:41 p1 p5 p8 p3 p7"></div></div><nav class="nav" data-on="library"></nav><div class="gest"></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">64</span>With the app closed <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Android wakes Share when a photo is taken, and one notification stays while the day runs, with Pause and Stop. It is quiet: one for the day, not one per photo.</p>
+        <div class="phone lock" data-shot="64-auto-notification"><div class="lockbg"></div><div class="sb" data-time="15:42"></div><div class="lockclock">15:42</div><div class="lockdate">Saturday, 10 October</div><div class="ntf"><div class="nh"><span data-i="images"></span><span translate="no">Share</span><span>· now</span></div><b>Sending automatically to Wedding Anna &amp; Marco</b><p>39 photos, 2 videos today · until midnight</p><div class="nbar"><i style="width:64%"></i></div><div class="nacts"><span>Pause</span><span>Stop for today</span></div></div><div class="grow"></div><div class="lockhint">Swipe up to open</div><div class="gest"></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">65</span>Not this one <span class="badge proposal">proposal</span></h3>
+        <p class="cap">A photo that shouldn't be there: its sender takes it back, the same day, without asking an admin. It goes to Recently deleted, where admins can still bring it back for 30 days.</p>
+        <div class="phone viewer" data-shot="65-auto-take-back"><div class="sb" data-time="15:50"></div><div class="vtop"><span class="ib"><span data-i="back"></span></span><div class="vt"><b>Today</b><span>15:48 · sent automatically</span></div><span class="ib"><span data-i="more"></span></span></div><div class="vphoto"></div><div class="vbottom"><div class="film" data-tiles="p2 p5 p1/c p7 p3"></div><div class="vmeta">20261010_154802.jpg · 5.1 MB · 4080 × 3072</div><div class="vactions"><div><span data-i="download"></span>Download</div><div><span data-i="share"></span>Share</div><div><span data-i="undo"></span>Take back</div></div></div><div class="gest"></div><div class="scrim"></div><div class="sheet"><div class="grip"></div><h3>Take this photo back?</h3><p class="lead sm">It leaves Wedding Anna &amp; Marco for everyone. You can do this today, for photos this phone sent by itself.</p><div class="btnrow"><div class="btn outline">Keep it</div><div class="btn primary"><span data-i="undo"></span>Take back</div></div></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">66</span>The day after <span class="badge proposal">proposal</span></h3>
+        <p class="cap">At midnight it stops by itself and says what went. Turning it on again is one tap, so nothing runs on by mistake.</p>
+        <div class="phone" data-shot="66-auto-ended"><div class="sb" data-time="8:30"></div><div class="ab"><h2>Send</h2><span class="av sm acc">S</span></div><div class="scroll pad"><div class="card auto"><div class="ah"><span class="ri ok"><span data-i="check"></span></span><div class="at"><b>Sent automatically yesterday</b><span>86 photos and 4 videos went to Wedding Anna &amp; Marco. It stopped at midnight.</span></div></div><div class="btnrow"><div class="btn outline sm">OK</div><div class="btn tonal sm"><span data-i="camera"></span>Again today</div></div></div><p class="lead sm">No PIN needed while you're signed in.</p><div class="picks"><div class="pick"><span data-i="images"></span><b>Photos &amp; videos</b></div><div class="pick"><span data-i="file"></span><b>Other files</b></div></div></div><nav class="nav" data-on="send"></nav><div class="gest"></div></div>
+      </div>
+
+    </div>
+    <p class="sub-h">Everyone else in the folder</p>
+    <div class="board">
+
+      <div class="slot">
+        <h3><span class="n">67</span>Watching them arrive <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Maria has the folder open: a line says who is sending, and new photos slide in under Today, with a short note. The website shows the same line and photos to everyone with an account.</p>
+        <div class="phone" data-shot="67-auto-others"><div class="sb" data-time="15:45"></div><div class="ab"><h2 class="fpick"><span class="t">Wedding Anna &amp; Marco</span><span data-i="chev" class="down"></span></h2><span class="ib"><span data-i="search"></span></span><span class="av sm tan">M</span></div><div class="autoban"><span class="live"></span><div class="at"><b>Stefan is sending today's photos</b><span>They show up here as he takes them</span></div></div><div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div><div class="scroll"><div class="day"><div><h4>Today</h4><div class="meta">41 files · 626 MB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p6 p2 p9 p4 v3@0:24 p1 p7 p5 p8 p3 p10 p2 p6 p9 v4@0:41 p1"></div><div class="day"><div><h4>Yesterday</h4><div class="meta">45 files · 620 MB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p4 p7 p9 v5@1:15"></div></div><nav class="nav" data-on="library"></nav><div class="gest"></div><div class="toast"><span data-i="images"></span><span>3 new photos from Stefan</span></div></div>
+      </div>
+
+    </div>
+  </section>
+
 </div>
 
 <script>
@@ -1943,6 +2030,170 @@
   // English is written in the markup. T maps each English string to [German, Italian]; elements marked
   // data-tr are translated as a whole, because their inline markup sits at a different place in each language.
   const T = {
+      "Send automatically": [
+          "Automatisch senden",
+          "Invio automatico"
+      ],
+      "For a day others should see as it happens: a wedding, a trip, a birthday.": [
+          "Für einen Tag, den andere gleich miterleben sollen: eine Hochzeit, eine Reise, einen Geburtstag.",
+          "Per un giorno che gli altri devono vivere in diretta: un matrimonio, un viaggio, un compleanno."
+      ],
+      "Photos and videos you take from now on go to a folder by themselves, until midnight.": [
+          "Fotos und Videos, die du ab jetzt machst, landen von selbst in einem Ordner, bis Mitternacht.",
+          "Le foto e i video che scatti da ora vanno da soli in una cartella, fino a mezzanotte."
+      ],
+      "Turn on for today": [
+          "Für heute einschalten",
+          "Attiva per oggi"
+      ],
+      "Into": [
+          "Wohin",
+          "Dove"
+      ],
+      "412 files · 9 people": [
+          "412 Dateien · 9 Personen",
+          "412 file · 9 persone"
+      ],
+      "Until": [
+          "Bis wann",
+          "Fino a quando"
+      ],
+      "Tonight": [
+          "Heute",
+          "Oggi"
+      ],
+      "Until midnight": [
+          "Bis Mitternacht",
+          "Fino a mezzanotte"
+      ],
+      "Longer": [
+          "Länger",
+          "Più a lungo"
+      ],
+      "For a trip": [
+          "Für eine Reise",
+          "Per un viaggio"
+      ],
+      "Videos too": [
+          "Auch Videos",
+          "Anche i video"
+      ],
+      "Big ones wait for Wi-Fi.": [
+          "Große warten auf WLAN.",
+          "Quelli grandi aspettano il Wi-Fi."
+      ],
+      "Only from the camera": [
+          "Nur von der Kamera",
+          "Solo dalla fotocamera"
+      ],
+      "No screenshots, nothing other apps saved.": [
+          "Keine Screenshots, nichts, was andere Apps gespeichert haben.",
+          "Niente screenshot, niente di ciò che hanno salvato altre app."
+      ],
+      "Only what you take from now on. The 9 people in this folder see it as it arrives.": [
+          "Nur was du ab jetzt aufnimmst. Die 9 Personen in diesem Ordner sehen es, sobald es ankommt.",
+          "Solo ciò che scatti da ora. Le 9 persone di questa cartella lo vedono appena arriva."
+      ],
+      "Start for today": [
+          "Für heute starten",
+          "Avvia per oggi"
+      ],
+      "Sending automatically": [
+          "Sendet automatisch",
+          "Invio automatico in corso"
+      ],
+      "38 photos, 2 videos today · until midnight": [
+          "Heute 38 Fotos, 2 Videos · bis Mitternacht",
+          "Oggi 38 foto, 2 video · fino a mezzanotte"
+      ],
+      "Pause": [
+          "Pause",
+          "Pausa"
+      ],
+      "40 files · 610 MB": [
+          "40 Dateien · 610 MB",
+          "40 file · 610 MB"
+      ],
+      "Saturday, 10 October": [
+          "Samstag, 10. Oktober",
+          "Sabato 10 ottobre"
+      ],
+      "· now": [
+          "· jetzt",
+          "· ora"
+      ],
+      "Sending automatically to Wedding Anna & Marco": [
+          "Sendet automatisch an Hochzeit Anna & Marco",
+          "Invio automatico a Matrimonio Anna & Marco"
+      ],
+      "39 photos, 2 videos today · until midnight": [
+          "Heute 39 Fotos, 2 Videos · bis Mitternacht",
+          "Oggi 39 foto, 2 video · fino a mezzanotte"
+      ],
+      "Stop for today": [
+          "Für heute beenden",
+          "Ferma per oggi"
+      ],
+      "Swipe up to open": [
+          "Zum Öffnen nach oben wischen",
+          "Scorri verso l'alto per aprire"
+      ],
+      "15:48 · sent automatically": [
+          "15:48 · automatisch gesendet",
+          "15:48 · inviata in automatico"
+      ],
+      "20261010_154802.jpg · 5.1 MB · 4080 × 3072": [
+          "20261010_154802.jpg · 5,1 MB · 4080 × 3072",
+          "20261010_154802.jpg · 5,1 MB · 4080 × 3072"
+      ],
+      "Take back": [
+          "Zurücknehmen",
+          "Ritira"
+      ],
+      "Take this photo back?": [
+          "Dieses Foto zurücknehmen?",
+          "Ritirare questa foto?"
+      ],
+      "It leaves Wedding Anna & Marco for everyone. You can do this today, for photos this phone sent by itself.": [
+          "Es verschwindet für alle aus Hochzeit Anna & Marco. Das geht heute, für Fotos, die dieses Handy von selbst gesendet hat.",
+          "Sparisce per tutti da Matrimonio Anna & Marco. Puoi farlo oggi, per le foto che questo telefono ha inviato da solo."
+      ],
+      "Keep it": [
+          "Behalten",
+          "Tienila"
+      ],
+      "Sent automatically yesterday": [
+          "Gestern automatisch gesendet",
+          "Inviate in automatico ieri"
+      ],
+      "86 photos and 4 videos went to Wedding Anna & Marco. It stopped at midnight.": [
+          "86 Fotos und 4 Videos gingen an Hochzeit Anna & Marco. Um Mitternacht hat es aufgehört.",
+          "86 foto e 4 video sono andati a Matrimonio Anna & Marco. Si è fermato a mezzanotte."
+      ],
+      "OK": [
+          "OK",
+          "OK"
+      ],
+      "Again today": [
+          "Heute wieder",
+          "Anche oggi"
+      ],
+      "Stefan is sending today's photos": [
+          "Stefan sendet die Fotos von heute",
+          "Stefan sta inviando le foto di oggi"
+      ],
+      "They show up here as he takes them": [
+          "Sie erscheinen hier, sobald er sie macht",
+          "Compaiono qui man mano che le scatta"
+      ],
+      "41 files · 626 MB": [
+          "41 Dateien · 626 MB",
+          "41 file · 626 MB"
+      ],
+      "3 new photos from Stefan": [
+          "3 neue Fotos von Stefan",
+          "3 nuove foto da Stefan"
+      ],
       "12 selected": [
           "12 ausgewählt",
           "12 selezionati"
