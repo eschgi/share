@@ -200,6 +200,20 @@ func TestDecodeBytes(t *testing.T) {
 	}
 }
 
+// Phones' full-size photos get a thumbnail from the server too: 50 MP from a Pixel's HI RES
+// mode, 48 MP from an iPhone, 64 MP from others (issue #2).
+func TestPhonePhotosAreNotTooLarge(t *testing.T) {
+	for _, tc := range []struct{ w, h int }{{8160, 6144}, {8064, 6048}, {9248, 6936}} {
+		h, err := readJPEGHeader(bytes.NewReader(frameOnly(false, tc.w, tc.h, 0x22, 0x11, 0x11)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if int64(tc.w)*int64(tc.h) > maxPixels || h.decodeBytes() > maxDecodeBytes {
+			t.Errorf("%d×%d, %d MB to decode: too large for a thumbnail", tc.w, tc.h, h.decodeBytes()>>20)
+		}
+	}
+}
+
 // A thumbnail's folder is named after the id's last two characters: an id starts with the time
 // it was made, so its first ones would put years of thumbnails into one folder.
 func TestPathUsesTheRandomEndOfTheID(t *testing.T) {

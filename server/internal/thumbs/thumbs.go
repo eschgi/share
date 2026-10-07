@@ -42,9 +42,11 @@ const (
 	// delay gives the uploader time to send a thumbnail before the server makes one.
 	delay = 2 * time.Minute
 	// maxDecodeBytes is the most memory decoding one photo may take; a small machine has little.
+	// A phone's 50 MP photo takes 72 MB.
 	maxDecodeBytes = 128 << 20
-	// maxPixels keeps the decoding time reasonable on a small machine's processor.
-	maxPixels = 40_000_000
+	// maxPixels keeps the decoding time reasonable on a small machine's processor: an Intel N150
+	// decodes a phone's 50 MP photo in about a second.
+	maxPixels = 100_000_000
 	// tries is how often a photo is tried again after a read error before it is given up.
 	tries = 3
 	batch = 20

@@ -6,7 +6,9 @@ import { sealedThumb, type FileSeal } from './e2ee/upload';
 
 const side = 512; // the longer side, in pixels
 const quality = 0.8;
-const maxPixels = 40_000_000; // bigger photos take too much memory to decode on a phone
+// Phones take photos of up to 200 MP. A computer's browser decodes that many pixels in about a
+// second, with 4 bytes each; Chrome on a phone decodes big photos smaller when memory is short.
+const maxPixels = 200_000_000;
 const videoTimeout = 15_000;
 
 export interface Thumb {
