@@ -19,8 +19,12 @@ class FakePlatform implements Platform {
   final downloads = <List<FileInfo>>[];
   final shared = <List<FileInfo>>[];
   Set<String> saved = {};
+  /// What a scan gives: [scanned], or [scanProblem] when the scanner doesn't open; with
+  /// [scanWait], only once that completes.
   String? scanned;
-  bool scanWorks = true;
+  ScanProblem? scanProblem;
+  Future<void>? scanWait;
+  int scans = 0;
   String? launchLink;
 
   /// What shareFiles and openFile throw, if anything.
@@ -74,7 +78,9 @@ class FakePlatform implements Platform {
 
   @override
   Future<String?> scanCode() async {
-    if (!scanWorks) throw const ScanUnavailable();
+    scans++;
+    if (scanWait != null) await scanWait;
+    if (scanProblem != null) throw ScanUnavailable(scanProblem!);
     return scanned;
   }
 

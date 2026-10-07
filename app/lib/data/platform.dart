@@ -171,8 +171,14 @@ class UploadState {
   int get current => (done + failed + lost + 1).clamp(1, total == 0 ? 1 : total);
 }
 
+/// Why the code scanner didn't open: no Google Play services, its module still on the way, Play
+/// services too old, or something else.
+enum ScanProblem { noPlayServices, installing, outdated, failed }
+
+/// The code scanner didn't open, and says why; the person pastes the link instead.
 class ScanUnavailable implements Exception {
-  const ScanUnavailable();
+  const ScanUnavailable([this.problem = ScanProblem.noPlayServices]);
+  final ScanProblem problem;
 }
 
 /// Sharing or opening a file didn't work: it couldn't be fetched, or no app takes it.
@@ -358,8 +364,8 @@ abstract class Platform {
   Future<String?> initialLink();
   Stream<String> get links;
 
-  /// Scans a QR code; null when the person backed out. Throws [ScanUnavailable] without
-  /// Google Play services.
+  /// Scans a QR code; null when the person backed out. Throws [ScanUnavailable] when the scanner
+  /// doesn't open, e.g. without Google Play services, or while its module is being installed.
   Future<String?> scanCode();
 
   Future<void> openUrl(String url);
@@ -592,8 +598,12 @@ class ChannelPlatform implements Platform {
     try {
       return await _channel.invokeMethod<String>('scan');
     } on PlatformException catch (e) {
-      if (e.code == 'unavailable') throw const ScanUnavailable();
-      return null;
+      throw ScanUnavailable(switch (e.code) {
+        'unavailable' => ScanProblem.noPlayServices,
+        'installing' => ScanProblem.installing,
+        'outdated' => ScanProblem.outdated,
+        _ => ScanProblem.failed,
+      });
     } on MissingPluginException {
       throw const ScanUnavailable();
     }
