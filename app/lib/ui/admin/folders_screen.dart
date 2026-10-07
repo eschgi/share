@@ -5,6 +5,7 @@ import '../../app.dart';
 import '../../data/api.dart';
 import '../../data/folders.dart';
 import '../../data/models.dart';
+import '../../data/platform.dart';
 import '../../l10n/app_localizations.dart';
 import '../encryption.dart';
 import '../folders.dart';
@@ -16,6 +17,8 @@ import 'pins_screen.dart';
 
 /// What went wrong with a change to a folder, in words.
 String folderProblem(AppLocalizations t, Object e) => switch (e) {
+      KeysException(code: 'needs_root') => t.encryptionNeedsRoot,
+      KeysException(code: 'offline') => t.commonOffline,
       ApiException(code: 'folder_name_taken') => t.folderNameTaken,
       ApiException(code: 'bad_request') => t.folderNameBad,
       ApiException(code: 'folder_busy') => t.folderBusy,
@@ -394,7 +397,10 @@ class _FolderNameDialogState extends State<FolderNameDialog> {
     });
     try {
       final f = widget.folder;
-      final made = f == null ? await services.admin.createFolder(name) : await services.admin.renameFolder(f.id, name);
+      // Once there is a recovery key, it signs a folder that sends plain, under its name.
+      final made = f == null
+          ? await services.admin.createFolder(await services.platform.newFolderBody(name))
+          : await services.admin.renameFolder(f.id, await services.platform.renameBody(f, name));
       await services.folders.load();
       if (mounted) Navigator.pop(context, (folder: made, encrypt: f == null && _encrypt));
     } on Exception catch (e) {

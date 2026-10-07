@@ -54,22 +54,24 @@ class AdminRepository {
 
   /// An invite for someone new; a member gets [folders], an admin sees every folder. With the
   /// encrypted folders' [keys], locked with the secret its link gets (Platform.inviteKeys).
-  Future<NewInvite> invite(String name, Role role, {List<String> folders = const [], List<Json> keys = const []}) async => NewInvite.fromJson(await api.post(
-      '/api/invites', {'name': name.trim(), 'role': role.name, if (role == Role.member) 'folders': folders, if (keys.isNotEmpty) 'keys': keys}));
+  Future<NewInvite> invite(String name, Role role, {List<String> folders = const [], List<Json> keys = const [], String? root}) async => NewInvite.fromJson(await api.post(
+      '/api/invites', {'name': name.trim(), 'role': role.name, if (role == Role.member) 'folders': folders, if (keys.isNotEmpty) 'keys': keys, 'root': ?root}));
 
   /// An invite that adds a phone for someone who has an account; for one's own, with one's key
   /// locked with the secret its link gets (Platform.personKeyForInvite).
-  Future<NewInvite> invitePhone(String userId, {String? personKey}) async =>
-      NewInvite.fromJson(await api.post('/api/users/$userId/invites', {'person_key': ?personKey}));
+  Future<NewInvite> invitePhone(String userId, {String? personKey, String? root}) async =>
+      NewInvite.fromJson(await api.post('/api/users/$userId/invites', {'person_key': ?personKey, 'root': ?root}));
 
   Future<void> withdrawInvite(String id) => api.delete('/api/invites/$id');
 
-  /// A new folder, which only admins see at first. Throws ApiException folder_name_taken, or
-  /// bad_request for a name that won't do.
-  Future<FolderInfo> createFolder(String name) async => FolderInfo.fromJson(await api.post('/api/folders', {'name': name.trim()}));
+  /// A new folder, which only admins see at first: [body] is what the keys made of its name,
+  /// signed once there is a recovery key (Platform.newFolderBody). Throws ApiException
+  /// folder_name_taken, or bad_request for a name that won't do.
+  Future<FolderInfo> createFolder(Json body) async => FolderInfo.fromJson(await api.post('/api/folders', body));
 
-  /// Also throws ApiException folder_busy while the files of the last rename are still moving.
-  Future<FolderInfo> renameFolder(String id, String name) async => FolderInfo.fromJson(await api.patch('/api/folders/$id', {'name': name.trim()}));
+  /// A new name, as the keys made it (Platform.renameBody). Also throws ApiException folder_busy
+  /// while the files of the last rename are still moving.
+  Future<FolderInfo> renameFolder(String id, Json body) async => FolderInfo.fromJson(await api.patch('/api/folders/$id', body));
 
   /// Its files go to Recently deleted and its PINs end; returns how many files went. Throws
   /// ApiException last_folder for the last one.

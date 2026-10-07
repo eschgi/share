@@ -1,16 +1,15 @@
 import { useEffect, useState } from 'preact/hooks';
 import {
   ApiError,
-  createFolder,
   deleteFolder,
   getSettings,
-  renameFolder,
   setFolderInvite,
   setFolderPerson,
   type FolderInfo,
   type People,
   type PinInfo,
 } from '../../api';
+import { keyring, NeedsRoot } from '../../e2ee/keyring';
 import { Icon } from '../../components/Icon';
 import { formatTime, formatWhen, daysAgo } from '../../format';
 import { useI18n, type Lang } from '../../i18n';
@@ -40,6 +39,7 @@ function inviteEnd(lang: Lang, when: string): string {
 
 /** What a folder's problem with a change is, in words. */
 function folderProblem(t: (key: string) => string, e: unknown): string {
+  if (e instanceof NeedsRoot) return t('encryption.needsRoot');
   if (!(e instanceof ApiError) || e.status === 0) return t('common.offline');
   switch (e.code) {
     case 'folder_name_taken':
@@ -266,7 +266,8 @@ export function FolderNameDialog({ folder, onClose }: { folder?: FolderInfo; onC
     setBusy(true);
     setProblem(null);
     try {
-      const made = folder ? await renameFolder(folder.id, name.trim()) : await createFolder(name.trim());
+      // Once there is a recovery key, it signs a folder that sends plain, under its name.
+      const made = folder ? await keyring.renameFolder(folder, name.trim()) : await keyring.createFolder(name.trim());
       await refreshFolders();
       onClose();
       // Encrypting it asks once more, and the first time makes the recovery code.

@@ -372,14 +372,16 @@ export function InviteDialog({ forPerson, onClose }: { forPerson?: Person; onClo
       let made: NewInvite;
       if (forPerson) {
         const own = forPerson.id === me.user.id ? await keyring.personKeyForInvite() : null;
-        made = await inviteDevice(forPerson.id, own?.locked);
+        made = await inviteDevice(forPerson.id, own?.locked, own?.root);
         if (own) made = { ...made, link: `${made.link}.${own.secret}` };
       } else {
+        // The root goes along whenever this browser trusts one, so the new person's phone or
+        // browser checks the folders' keys with it.
         const encrypted = list.filter((f) => f.key_version !== null).map((f) => f.id);
         const gets = role === 'admin' ? encrypted : given.filter((id) => encrypted.includes(id));
-        const keys = gets.length > 0 && keyring.status === 'ready' ? await keyring.inviteKeys(gets) : null;
-        made = await createInvite(who, role, given, keys?.keys);
-        if (keys?.keys.length) made = { ...made, link: `${made.link}.${keys.secret}` };
+        const keys = keyring.status === 'ready' ? await keyring.inviteKeys(gets) : null;
+        made = await createInvite(who, role, given, keys?.keys, keys?.root);
+        if (keys?.keys.length || keys?.root) made = { ...made, link: `${made.link}.${keys.secret}` };
       }
       setInvite(made);
     } catch (e) {

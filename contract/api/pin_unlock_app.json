@@ -15,7 +15,8 @@
       "expires_at": "2026-09-28T10:00:00Z",
       "folder_name": "Wedding Anna & Marco",
       "shows_folder": true,
-      "encrypt": null
+      "folder_key": null,
+      "roots": []
     },
     "moved_uploads": 0,
     "server": {

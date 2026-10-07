@@ -5,7 +5,22 @@
   "status": 204,
   "request": {
     "public_key": "BDFd7tK2QVrRZrz2n06pEn0s4mnWwHMpoCwDQAlpsw3HgIs9goITXuTJqEqXthFqua8KJEYlir4vdPHCNN_EPt8",
-    "locked": "MPydzR58EYjpXELeTEXN1otL4bkMrzrois8hbvIr3jCIApOGUBlA28DvZbbhU-LhpuYNUqkBTZWdHiSF"
+    "locked": "MPydzR58EYjpXELeTEXN1otL4bkMrzrois8hbvIr3jCIApOGUBlA28DvZbbhU-LhpuYNUqkBTZWdHiSF",
+    "signature": "NH74M0_E0TE7dzhDwuNLG_Offpwv5Tl8aumqDvKYJexkDTYG-Zgkag21Dy9kc-W24lC7HP8U7ipUMC-n74a_dw",
+    "sealed": "CE-quWDWX_xUcSsbABRHFFlr9OIfj_bCNWFbxNJP0s1uFgy0eTJfiutyMVJdvOV5B6FpP8-gxGcKYAh2EM3rD0ExvxDmm1ZcRVX19J0LQ7-3sFHsRkwAuMGY6s6i8vEQBtM7G3m39Hf0xmLKQOlu0H4",
+    "folder_keys": [
+      {
+        "folder": "f4mily5x2k7mbqz4bwdbyj6qsq",
+        "version": 1,
+        "signature": "Ie1_LgLN7r1N0rHFJps8U9xRdVzIyJgUgzJkwCg_aBCmCHuNi1Mp-m3iGvwSQ58VNRhrf_21-HIsOyJqdZ7krA"
+      }
+    ],
+    "plain": [
+      {
+        "folder": "h0lidays5x2k7mbqz4bwdbyj6qs",
+        "signature": "PL-J2Maqwh_H10tLR5FEX0G8QjJwPy8-PCdI4uiUMFMQZUD-PoGGO6bOGad2_QkaAXni0TvXcupfCuBLOx4MMA"
+      }
+    ]
   },
-  "notes": "Makes the recovery key, or a new one (a new code): made on the admin's device, its private key locked with the recovery code that device shows once. A new one drops everything sealed for the old one; the admins' devices seal the folder keys for it again (todo.recovery)."
+  "notes": "Makes the recovery key, or a new one (a new code): made on the admin's device, its private key locked with the recovery code that device shows once, and sealed for the admin's person key (share-e2ee-v1/root, aad root). signature: the newest root's signature of it (share-e2ee-v1/sign/root and its public key), null for the first. folder_keys and plain: everything GET /api/recovery lists under sign, signed by the new key; the server takes it only complete (409 key_outdated when the list changed meanwhile: sign again what it lists now). A new one drops everything sealed for the old one, and the old one's private key; the admins' devices seal the folder keys for it again (todo.recovery), and other admins get its private key from one who holds it (todo.roots). Errors: 400 bad_signature, 409 no_key for an admin without a person key."
 }

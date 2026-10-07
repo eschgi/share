@@ -73,6 +73,8 @@
   "sending.failed.other": "{n} file non sono stati inviati.",
   "sending.retry": "Riprova",
   "sending.tooLarge": "{name} è troppo grande da inviare.",
+  "sending.unchecked": "Alcuni file non sono stati inviati: Share non ha potuto controllare le chiavi della loro cartella, quindi non può garantire che restino privati. Avvisa un admin.",
+  "sending.uncheckedGuest": "Alcuni file non sono stati inviati: Share non ha potuto controllare le chiavi della cartella di questo PIN, quindi non può garantire che restino privati. Avvisa chi ti ha dato il PIN.",
 
   "welcome.title": "Riprendiamo da qui",
   "welcome.lead": "L'invio si è interrotto. Non si è perso niente.",

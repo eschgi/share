@@ -26,15 +26,33 @@ class KeyringTest {
         var publicKey: String? = null
         val sealed = HashMap<String, String>() // the person's key, by device
         var lock: String? = null
+        var note: String? = null
     }
 
-    private class Pin(val folder: String, val secretSealed: String, val secretVersion: Int, val locked: MutableMap<Int, String>)
+    private class Pin(val folder: String, val secretLocked: String, val secretVersion: Int, val root: String?, val locked: MutableMap<Int, String>)
+
+    /** A version of a folder's key, with the root's signature. */
+    private class Version(val publicKey: String, var signature: String)
+
+    /** A folder: its name, its key's versions, and whether it is encrypted or else its plain statement. */
+    private class Folder(var name: String) {
+        val versions = ArrayList<Version>()
+        var encrypted = false
+        var plain: String? = null
+
+        fun info(id: String): JSONObject = JSONObject().put("id", id).put("name", name).put("encrypted", encrypted)
+            .put("key_version", if (versions.isEmpty()) JSONObject.NULL else versions.size).put("plain_signature", plain ?: JSONObject.NULL)
+    }
+
+    /** A root key: its public key, the one before's signature, and its private key locked with its code. */
+    private class Root(val publicKey: String, val signature: String?, val locked: String)
 
     /** A check: the device that asks, the device or person it is for, and what it relays. */
     private class Check(val asker: String, val device: String?, val user: String?, var commitment: String) {
         var answer: String? = null
         var answeredBy: String? = null
         var reveal: String? = null
+        var confirmation: String? = null
     }
 
     /** The server: what it keeps, and who asks. */
@@ -43,10 +61,10 @@ class KeyringTest {
         var pinCaller: String? = null
         val devices = HashMap<String, Pair<String, String?>>() // device -> user, public key
         val people = HashMap<String, Person>()
-        val folders = HashMap<String, MutableList<String>>() // folder -> public keys by version - 1
-        val encrypted = HashSet<String>()
+        val folders = LinkedHashMap<String, Folder>()
         val sealed = HashMap<String, String>() // folder:version:user
-        var recovery: Pair<String, String>? = null
+        var roots = ArrayList<Root>()
+        val rootGrants = HashMap<String, String>() // user -> the newest root's private key, sealed
         val recoverySealed = HashMap<String, String>() // folder:version
         val pins = HashMap<String, Pin>()
         val rekey = HashSet<String>()
@@ -65,27 +83,30 @@ class KeyringTest {
         require(method == "GET" && path == "/api/pin/keys")
         val p = Fake.pins[Fake.pinCaller] ?: throw KeysApiError(401, "unauthorized", "")
         val keys = JSONArray()
-        p.locked.forEach { (v, locked) -> keys.put(JSONObject().put("version", v).put("public_key", Fake.folders[p.folder]!![v - 1]).put("locked", locked)) }
-        JSONObject().put("folder", p.folder).put("keys", keys)
+        p.locked.forEach { (v, locked) -> keys.put(JSONObject().put("version", v).put("public_key", Fake.folders[p.folder]!!.versions[v - 1].publicKey).put("locked", locked)) }
+        JSONObject().put("folder", p.folder).put("keys", keys).put("root", p.root ?: JSONObject.NULL)
     }
 
     private fun sees(p: Person, folder: String) = p.admin || folder in p.folders
 
-    private fun versions() = Fake.folders.flatMap { (f, keys) -> keys.mapIndexed { i, k -> Triple(f, i + 1, k) } }
+    private fun versions() = Fake.folders.flatMap { (f, folder) -> folder.versions.mapIndexed { i, k -> Triple(f, i + 1, k) } }
+
+    private fun rootsJson() = JSONArray(Fake.roots.map { JSONObject().put("public_key", it.publicKey).put("signature", it.signature ?: JSONObject.NULL) })
 
     private fun serve(method: String, path: String, body: JSONObject?): JSONObject {
         if (Fake.offline) throw IOException("no answer")
         val (user, device) = Fake.caller ?: throw KeysApiError(401, "unauthorized", "")
         val p = Fake.people[user]!!
         fun held(folder: String, version: Int, who: String = user) = Fake.sealed.containsKey("$folder:$version:$who")
+        fun active(q: Person) = q.sealed.keys.any { Fake.devices.containsKey(it) && it !in Fake.away }
         when ("$method $path") {
             "GET /api/keys" -> {
                 val mine = versions().filter { sees(p, it.first) }
                 val folders = JSONArray()
-                mine.forEach { (f, v, k) -> folders.put(JSONObject().put("folder", f).put("version", v).put("public_key", k).put("sealed", Fake.sealed["$f:$v:$user"] ?: JSONObject.NULL)) }
+                mine.forEach { (f, v, k) -> folders.put(JSONObject().put("folder", f).put("version", v).put("public_key", k.publicKey).put("signature", k.signature).put("sealed", Fake.sealed["$f:$v:$user"] ?: JSONObject.NULL)) }
                 val todoDevices = JSONArray()
                 if (p.publicKey != null) {
-                    Fake.devices.filter { (id, d) -> d.first == user && d.second != null && id !in p.sealed }.forEach { (id, d) ->
+                    Fake.devices.filter { (id, d) -> d.first == user && d.second != null && id !in p.sealed && Fake.checks.values.none { it.device == id && it.confirmation != null } }.forEach { (id, d) ->
                         todoDevices.put(
                             JSONObject().put("id", id).put("public_key", Fake.swapped[id] ?: d.second).put("name", id).put("client", "app")
                                 .put("created_at", "2026-10-06T10:00:00Z").put("active", id !in Fake.away),
@@ -95,41 +116,49 @@ class KeyringTest {
                 val todoPeople = JSONArray() // only admins pass folder keys on to other people
                 for ((f, v, _) in mine.filter { p.admin && held(it.first, it.second) }) {
                     Fake.people.filter { (u, q) -> u != user && q.publicKey != null && sees(q, f) && !held(f, v, u) }
-                        .forEach { (u, q) ->
-                            val active = q.sealed.keys.any { Fake.devices.containsKey(it) && it !in Fake.away }
-                            todoPeople.put(JSONObject().put("folder", f).put("version", v).put("user", u).put("name", u).put("public_key", q.publicKey).put("active", active))
-                        }
+                        .forEach { (u, q) -> todoPeople.put(JSONObject().put("folder", f).put("version", v).put("user", u).put("name", u).put("public_key", q.publicKey).put("active", active(q))) }
+                }
+                val holdsRoot = Fake.rootGrants.containsKey(user)
+                val todoRoots = JSONArray()
+                if (p.admin && holdsRoot) {
+                    Fake.people.filter { (u, q) -> u != user && q.admin && q.publicKey != null && !Fake.rootGrants.containsKey(u) }
+                        .forEach { (u, q) -> todoRoots.put(JSONObject().put("user", u).put("name", u).put("public_key", q.publicKey).put("active", active(q))) }
                 }
                 val todoRecovery = JSONArray()
-                if (p.admin && Fake.recovery != null) {
+                if (Fake.roots.isNotEmpty()) {
                     mine.filter { held(it.first, it.second) && !Fake.recoverySealed.containsKey("${it.first}:${it.second}") }
                         .forEach { (f, v, _) -> todoRecovery.put(JSONObject().put("folder", f).put("version", v)) }
                 }
                 val todoPins = JSONArray()
                 for ((id, pin) in Fake.pins) {
-                    for (v in 1..Fake.folders[pin.folder]!!.size) {
+                    for (v in 1..Fake.folders[pin.folder]!!.versions.size) {
                         if (v !in pin.locked && held(pin.folder, v) && held(pin.folder, pin.secretVersion)) {
-                            todoPins.put(JSONObject().put("pin", id).put("folder", pin.folder).put("version", v).put("secret_version", pin.secretVersion).put("secret_sealed", pin.secretSealed))
+                            todoPins.put(JSONObject().put("pin", id).put("folder", pin.folder).put("version", v).put("secret_version", pin.secretVersion).put("secret_locked", pin.secretLocked))
                         }
                     }
                 }
-                val todo = JSONObject().put("devices", todoDevices).put("people", todoPeople).put("recovery", todoRecovery)
-                    .put("rekey", JSONArray(if (p.admin) Fake.rekey.toList() else emptyList())).put("pins", todoPins)
+                val todo = JSONObject().put("devices", todoDevices).put("people", todoPeople).put("roots", todoRoots).put("recovery", todoRecovery)
+                    .put("rekey", JSONArray(if (holdsRoot) Fake.rekey.toList() else emptyList())).put("pins", todoPins)
                 val checks = JSONArray()
                 for ((id, c) in Fake.checks) {
                     if (c.asker != device && c.device != device && !(c.user == user && (c.answeredBy == null || c.answeredBy == device) && device in p.sealed)) continue
                     checks.put(
                         JSONObject().put("id", id).put("asking", c.asker == device).put("device", c.device ?: JSONObject.NULL).put("user", c.user ?: JSONObject.NULL)
                             .put("from", c.asker).put("commitment", c.commitment).put("answer", c.answer ?: JSONObject.NULL)
-                            .put("answered", c.answeredBy == device).put("reveal", c.reveal ?: JSONObject.NULL),
+                            .put("answered", c.answeredBy == device).put("reveal", c.reveal ?: JSONObject.NULL).put("confirmation", c.confirmation ?: JSONObject.NULL),
                     )
                 }
                 return JSONObject()
                     .put("checks", checks)
                     .put("device_key", Fake.devices[device]!!.second ?: JSONObject.NULL)
-                    .put("person", JSONObject().put("public_key", p.publicKey ?: JSONObject.NULL).put("sealed", p.sealed[device] ?: JSONObject.NULL).put("password_lock", p.lock ?: JSONObject.NULL).put("held_by", p.sealed.keys.count { Fake.devices.containsKey(it) }))
+                    .put(
+                        "person",
+                        JSONObject().put("public_key", p.publicKey ?: JSONObject.NULL).put("sealed", p.sealed[device] ?: JSONObject.NULL).put("password_lock", p.lock ?: JSONObject.NULL)
+                            .put("held_by", p.sealed.keys.count { Fake.devices.containsKey(it) }).put("note", p.note ?: JSONObject.NULL),
+                    )
                     .put("folders", folders)
-                    .put("recovery_key", if (p.admin) Fake.recovery?.first ?: JSONObject.NULL else JSONObject.NULL)
+                    .put("roots", rootsJson())
+                    .put("root_sealed", Fake.rootGrants[user] ?: JSONObject.NULL)
                     .put("todo", todo)
             }
             "PUT /api/keys/device" -> {
@@ -142,6 +171,8 @@ class KeyringTest {
                 if (startOver) {
                     p.sealed.clear()
                     p.lock = null
+                    p.note = null
+                    Fake.rootGrants.remove(user)
                     Fake.sealed.keys.removeIf { it.endsWith(":$user") }
                 }
                 p.publicKey = body.getString("public_key")
@@ -150,6 +181,10 @@ class KeyringTest {
             "PUT /api/keys/password-lock" -> {
                 if (p.publicKey == null) throw conflict("no_key")
                 p.lock = body!!.getString("password_lock")
+            }
+            "PUT /api/keys/note" -> {
+                if (p.publicKey == null) throw conflict("no_key")
+                p.note = body!!.getString("note")
             }
             "POST /api/keys/grants" -> {
                 val g = body!!
@@ -162,6 +197,9 @@ class KeyringTest {
                     .forEach { Fake.sealed["${it.getString("folder")}:${it.getInt("version")}:${it.getString("user")}"] = it.getString("sealed") }
                 g.getJSONArray("recovery").objects().forEach { Fake.recoverySealed["${it.getString("folder")}:${it.getInt("version")}"] = it.getString("sealed") }
                 g.getJSONArray("pins").objects().forEach { Fake.pins[it.getString("pin")]!!.locked[it.getInt("version")] = it.getString("locked") }
+                // The root's private key only for an admin, from themselves or an admin who holds it.
+                g.getJSONArray("roots").objects().filter { Fake.people[it.getString("user")]?.admin == true && (it.getString("user") == user || (p.admin && Fake.rootGrants.containsKey(user))) }
+                    .forEach { Fake.rootGrants[it.getString("user")] = it.getString("sealed") }
             }
             "POST /api/keys/checks" -> {
                 val target = body!!.optString("device").ifEmpty { null }
@@ -176,34 +214,52 @@ class KeyringTest {
                 return JSONObject().put("id", id)
             }
             "PUT /api/recovery" -> {
-                Fake.recovery = body!!.getString("public_key") to body.getString("locked")
+                val b = body!!
+                if (Fake.roots.isEmpty() != b.isNull("signature")) throw KeysApiError(400, "bad_signature", "the chain")
+                Fake.roots.add(Root(b.getString("public_key"), b.str("signature"), b.getString("locked")))
+                Fake.rootGrants.clear()
+                Fake.rootGrants[user] = b.getString("sealed")
+                b.getJSONArray("folder_keys").objects().forEach { Fake.folders[it.getString("folder")]!!.versions[it.getInt("version") - 1].signature = it.getString("signature") }
+                b.getJSONArray("plain").objects().forEach { Fake.folders[it.getString("folder")]!!.plain = it.getString("signature") }
                 Fake.recoverySealed.clear()
             }
             "GET /api/recovery" -> {
                 val folders = JSONArray()
                 Fake.recoverySealed.forEach { (k, sealed) ->
                     val (f, v) = k.split(':')
-                    folders.put(JSONObject().put("folder", f).put("version", v.toInt()).put("public_key", Fake.folders[f]!![v.toInt() - 1]).put("sealed", sealed))
+                    val version = Fake.folders[f]!!.versions[v.toInt() - 1]
+                    folders.put(JSONObject().put("folder", f).put("version", v.toInt()).put("public_key", version.publicKey).put("signature", version.signature).put("sealed", sealed))
                 }
-                return JSONObject().put("public_key", Fake.recovery?.first ?: JSONObject.NULL).put("locked", Fake.recovery?.second ?: JSONObject.NULL).put("folders", folders)
+                val keys = JSONArray()
+                versions().forEach { (f, v, k) -> keys.put(JSONObject().put("folder", f).put("version", v).put("public_key", k.publicKey).put("signature", k.signature)) }
+                val plain = JSONArray()
+                Fake.folders.filter { (_, f) -> Fake.roots.isEmpty() || (f.plain != null && !f.encrypted) }
+                    .forEach { (id, f) -> plain.put(JSONObject().put("folder", id).put("version", f.versions.size).put("name", f.name).put("signature", f.plain ?: JSONObject.NULL)) }
+                val newest = Fake.roots.lastOrNull()
+                return JSONObject().put("public_key", newest?.publicKey ?: JSONObject.NULL).put("locked", newest?.locked ?: JSONObject.NULL)
+                    .put("roots", rootsJson()).put("folders", folders).put("sign", JSONObject().put("folder_keys", keys).put("plain", plain))
             }
             else -> {
-                Regex("/api/keys/checks/([^/]+)(/answer|/reveal)?").matchEntire(path)?.let { m ->
+                Regex("/api/keys/checks/([^/]+)(/answer|/reveal|/confirm)?").matchEntire(path)?.let { m ->
                     val c = Fake.checks[m.groupValues[1]] ?: throw KeysApiError(404, "not_found", "no such check")
                     when ("$method ${m.groupValues[2]}") {
                         "PUT /answer" -> {
                             if (c.reveal != null || !(c.device == device || (c.user == user && (c.answeredBy == null || c.answeredBy == device) && device in p.sealed))) {
                                 throw KeysApiError(404, "not_found", "no such check")
                             }
-                            c.answer = body!!.getString("nonce")
+                            c.answer = body!!.getString("key")
                             c.answeredBy = device
                         }
                         "PUT /reveal" -> {
                             if (c.asker != device) throw KeysApiError(404, "not_found", "no such check")
                             if (c.answer != body!!.getString("answer") || c.reveal != null) throw KeysApiError(409, "not_answered", "nothing to reveal for")
-                            val nonce = body.getString("nonce")
-                            require(E2ee.b64u(E2ee.commitment(E2ee.fromB64u(nonce))) == c.commitment) { "not the nonce committed to" }
-                            c.reveal = nonce
+                            val key = body.getString("key")
+                            require(E2ee.b64u(E2ee.commitment(E2ee.fromB64u(key))) == c.commitment) { "not the key committed to" }
+                            c.reveal = key
+                        }
+                        "PUT /confirm" -> {
+                            if (c.asker != device || c.reveal == null || c.confirmation != null) throw KeysApiError(409, "not_answered", "not revealed")
+                            c.confirmation = body!!.getString("confirmation")
                         }
                         "DELETE " -> Fake.checks.remove(m.groupValues[1])
                         else -> error("no $method $path")
@@ -220,37 +276,43 @@ class KeyringTest {
                     return JSONObject()
                 }
                 val m = Regex("/api/folders/([^/]+)/(encryption|keys)").matchEntire(path) ?: error("no $method $path")
-                val folder = m.groupValues[1]
-                val keys = Fake.folders.getValue(folder)
+                val id = m.groupValues[1]
+                val folder = Fake.folders.getValue(id)
+                val b = body!!
                 if (m.groupValues[2] == "encryption") {
-                    val on = body!!.getBoolean("encrypted")
-                    if (on && keys.isEmpty()) {
-                        val key = body.optJSONObject("key") ?: throw conflict("no_key")
-                        keys += key.getString("public_key")
-                        Fake.sealed["$folder:1:$user"] = key.getString("sealed")
-                        Fake.recoverySealed["$folder:1"] = key.getString("recovery_sealed")
+                    if (b.getBoolean("encrypted")) {
+                        if (Fake.roots.isEmpty()) throw conflict("no_key")
+                        val key = b.getJSONObject("key")
+                        folder.versions += Version(key.getString("public_key"), key.getString("signature"))
+                        Fake.sealed["$id:${folder.versions.size}:$user"] = key.getString("sealed")
+                        Fake.recoverySealed["$id:${folder.versions.size}"] = key.getString("recovery_sealed")
+                        folder.encrypted = true
+                        folder.plain = null
+                    } else {
+                        folder.encrypted = false
+                        folder.plain = b.getString("plain_signature")
                     }
-                    if (on) Fake.encrypted += folder else Fake.encrypted -= folder
-                    return JSONObject().put("id", folder).put("encrypted", on).put("key_version", if (keys.isEmpty()) JSONObject.NULL else keys.size)
+                    return folder.info(id)
                 }
-                val version = body!!.getInt("version")
-                if (version != keys.size + 1) throw conflict("key_outdated")
-                keys += body.getString("public_key")
-                Fake.sealed["$folder:$version:$user"] = body.getString("sealed")
-                Fake.recoverySealed["$folder:$version"] = body.getString("recovery_sealed")
-                Fake.rekey -= folder
+                val version = b.getInt("version")
+                if (version != folder.versions.size + 1) throw conflict("key_outdated")
+                folder.versions += Version(b.getString("public_key"), b.getString("signature"))
+                Fake.sealed["$id:$version:$user"] = b.getString("sealed")
+                Fake.recoverySealed["$id:$version"] = b.getString("recovery_sealed")
+                Fake.rekey -= id
             }
         }
         return JSONObject()
     }
 
     /** A phone's keyring, with its own device key store. */
-    private class Phone(val account: Account, val ring: Keyring)
+    private class Phone(val account: Account, val ring: Keyring, val store: DeviceKeyStore)
 
     private fun phone(user: String, device: String): Phone {
         Fake.devices[device] = user to null
         val keys = HashMap<String, KeyPair>()
         val checked = HashMap<String, Map<String, String>>()
+        val kept = HashMap<String, Pins>()
         val store = object : DeviceKeyStore {
             override fun load(deviceId: String) = keys[deviceId]
 
@@ -263,9 +325,18 @@ class KeyringTest {
             override fun trust(deviceId: String, trusted: Map<String, String>) {
                 checked[deviceId] = trusted
             }
+
+            override fun pins(deviceId: String) = kept[deviceId] ?: Pins()
+
+            override fun keepPins(deviceId: String, pins: Pins) {
+                kept[deviceId] = pins
+            }
         }
-        return Phone(Account(user, device, admin = Fake.people[user]!!.admin), Keyring(api, store))
+        return Phone(Account(user, device, admin = Fake.people[user]!!.admin), Keyring(api, store), store)
     }
+
+    /** A phone that was there before, with a keyring started anew: what it keeps comes back. */
+    private fun Phone.reopened() = Phone(account, Keyring(api, store), store)
 
     private fun Phone.sync(password: String? = null) {
         Fake.caller = account.userId to account.deviceId
@@ -298,11 +369,12 @@ class KeyringTest {
     private fun file(folder: String, seal: Pair<ByteArray, JSONObject>) =
         SealedFile("file1", folder, seal.second.getInt("version"), seal.second.getString("key"), seal.second.getString("header"), 1000)
 
+    /** A folder as GET /api/folders describes it. */
+    private fun info(id: String) = Fake.folders.getValue(id).info(id)
+
     companion object {
         init {
-            Fake.folders["f1"] = mutableListOf()
-            Fake.folders["f2"] = mutableListOf()
-            Fake.folders["plain"] = mutableListOf()
+            for (id in listOf("f1", "f2", "plain")) Fake.folders[id] = Folder(id)
             Fake.people["ada"] = Person(true, HashSet())
             Fake.people["max"] = Person(false, hashSetOf("f1"))
             Fake.people["eve"] = Person(false, hashSetOf("f1"))
@@ -310,6 +382,10 @@ class KeyringTest {
         }
 
         private var a1: Phone? = null
+        private var a2: Phone? = null
+
+        /** The phone that holds Ada's newest person key, after the recovery code gave her one. */
+        private var ada: Phone? = null
         private var code = ""
         private var fileKey = ByteArray(0)
         private var seal: Pair<ByteArray, JSONObject>? = null
@@ -339,19 +415,24 @@ class KeyringTest {
     }
 
     @Test
-    fun b_recoveryKeyThenFolderKeyWhichSealsFiles() {
+    fun b_recoveryKeyWhichSignsEveryFolderAsPlainThenFolderKeyWhichSealsFiles() {
         val a = a1!!
-        assertThrows(E2eeException::class.java) { a.call { encryptFolder("f1", null) } }
+        // Before any root, every folder sends plain.
+        assertNull(a.ring.sendKey(info("plain")))
+        assertThrows(NeedsRoot::class.java) { a.call { encryptFolder("f1", null) } }
         code = a.call { makeRecovery() }
         assertTrue(Regex("([0-9A-Z]{4}-){7}[0-9A-Z]{4}").matches(code))
         assertTrue(a.ring.hasRecovery())
+        assertTrue(Fake.rootGrants.containsKey("ada"))
+        assertTrue(Fake.folders.values.all { it.plain != null })
         a.call { encryptFolder("f1", null) }
-        assertEquals(1, Fake.folders["f1"]!!.size)
+        assertEquals(1, Fake.folders["f1"]!!.versions.size)
+        assertNull(Fake.folders["f1"]!!.plain)
         assertTrue(Fake.recoverySealed.containsKey("f1:1"))
         assertTrue(a.ring.hasFolderKey("f1", 1))
-        val target = a.ring.encryptFor("f1")!!
+        val target = a.ring.sendKey(info("f1"))!!
         assertEquals(1, target.version)
-        assertNull(a.ring.encryptFor("plain"))
+        assertNull(a.ring.sendKey(info("plain")))
         seal = sealFor(target)
         fileKey = seal!!.first
         assertArrayEquals(fileKey, a.ring.fileKey(file("f1", seal!!)))
@@ -359,7 +440,7 @@ class KeyringTest {
 
     @Test
     fun c_anotherPhoneWaitsUntilOneWithTheKeyPassesItOnAfterACheck() {
-        val a2 = phone("ada", "a2")
+        val a2 = phone("ada", "a2").also { Companion.a2 = it }
         a2.sync()
         assertEquals(Keyring.Status.WAITING, a2.ring.status)
         assertThrows(E2eeException::class.java) { a2.ring.fileKey(file("f1", seal!!)) }
@@ -531,7 +612,9 @@ class KeyringTest {
         assertFalse(m1.ring.waitsForFolders())
         a1!!.call { encryptFolder("f2", null) }
         m1.sync()
-        assertNull(m1.ring.encryptFor("f2"))
+        assertFalse(m1.ring.hasFolderKey("f2", 1))
+        // His phone checks f1's key with the root the check handed on.
+        assertEquals(1, m1.ring.sendKey(info("f1"))!!.version)
     }
 
     @Test
@@ -601,19 +684,21 @@ class KeyringTest {
 
     @Test
     fun g_anInviteLinksSecretBringsTheFolderKeys() {
-        val (secret, locked) = a1!!.call { inviteKeys(listOf("f1")) }
-        val keys = locked.objects().map { it.put("public_key", Fake.folders[it.getString("folder")]!![it.getInt("version") - 1]) }
+        val (secret, locked, root) = a1!!.call { inviteKeys(listOf("f1")) }
+        assertNotNull(root)
+        val keys = locked.objects().map { k -> Fake.folders[k.getString("folder")]!!.versions[k.getInt("version") - 1].let { k.put("public_key", it.publicKey).put("signature", it.signature) } }
         assertEquals(listOf("f1"), keys.map { it.getString("folder") })
         Fake.people["eva"] = Person(false, hashSetOf("f1"))
         val e1 = phone("eva", "e1")
-        e1.call { fromInvite(e1.account, secret, keys) }
+        e1.call { fromInvite(e1.account, secret, keys, root) }
         e1.sync()
         assertArrayEquals(fileKey, e1.ring.fileKey(file("f1", seal!!)))
+        assertEquals(1, e1.ring.sendKey(info("f1"))!!.version)
         // A link with another secret: the phone waits for the family.
         Fake.people["leo"] = Person(false, hashSetOf("f1"))
         val l1 = phone("leo", "l1")
         val other = a1!!.ring.inviteKeys(listOf("f2")).first
-        l1.call { fromInvite(l1.account, other, keys) }
+        l1.call { fromInvite(l1.account, other, keys, root) }
         l1.sync()
         assertEquals(Keyring.Status.READY, l1.ring.status)
         assertFalse(l1.ring.hasFolderKey("f1", 1))
@@ -638,10 +723,10 @@ class KeyringTest {
 
     @Test
     fun h_anInviteBringsThePersonsOwnKeyToTheirNewPhone() {
-        val (secret, locked) = a1!!.call { personKeyForInvite() }!!
+        val (secret, locked, root) = a1!!.call { personKeyForInvite() }!!
         val a5 = phone("ada", "a5")
-        val own = JSONObject().put("folder", JSONObject.NULL).put("version", 0).put("public_key", Fake.people["ada"]!!.publicKey).put("locked", locked)
-        a5.call { fromInvite(a5.account, secret, listOf(own)) }
+        val own = JSONObject().put("folder", JSONObject.NULL).put("version", 0).put("public_key", Fake.people["ada"]!!.publicKey).put("signature", JSONObject.NULL).put("locked", locked)
+        a5.call { fromInvite(a5.account, secret, listOf(own), root) }
         a5.sync()
         assertEquals(Keyring.Status.READY, a5.ring.status)
         assertTrue(a5.ring.hasFolderKey("f2", 1))
@@ -652,17 +737,22 @@ class KeyringTest {
         val a = a1!!
         val (secret, body) = a.call { pinSecret("f1") }!!
         assertEquals(listOf(1), body.getJSONArray("keys").objects().map { it.getInt("version") })
-        Fake.pins["p1"] = Pin("f1", body.getString("sealed"), body.getInt("version"), body.getJSONArray("keys").objects().associate { it.getInt("version") to it.getString("locked") }.toMutableMap())
-        assertEquals(secret, a.ring.pinLinkSecret("f1", body.getString("sealed"), body.getInt("version")))
+        Fake.pins["p1"] = Pin("f1", body.getString("locked"), body.getInt("version"), body.getString("root"), body.getJSONArray("keys").objects().associate { it.getInt("version") to it.getString("locked") }.toMutableMap())
+        assertEquals(secret, a.ring.pinLinkSecret("f1", body.getString("locked"), body.getInt("version")))
         assertNull(a.ring.pinSecret("plain"))
         Fake.pinCaller = "p1"
         val guest = Keyring(api, object : DeviceKeyStore {
             override fun load(deviceId: String): KeyPair? = null
 
             override fun save(deviceId: String, pair: KeyPair) {}
+
+            override fun pins(deviceId: String) = Pins()
+
+            override fun keepPins(deviceId: String, pins: Pins) {}
         })
         assertEquals(1, guest.openPinKeys(pinApi, secret))
         assertArrayEquals(fileKey, guest.fileKey(file("f1", seal!!)))
+        assertNotNull(guest.guestRoot)
         assertEquals(0, guest.openPinKeys(pinApi, a.ring.pinSecret("f1")!!.first))
     }
 
@@ -670,8 +760,8 @@ class KeyringTest {
     fun j_aNewFolderKeyVersionWhenAskedWhichThePinAndRecoveryGetToo() {
         Fake.rekey += "f1"
         a1!!.sync()
-        assertEquals(2, Fake.folders["f1"]!!.size)
-        assertEquals(2, a1!!.ring.encryptFor("f1")!!.version)
+        assertEquals(2, Fake.folders["f1"]!!.versions.size)
+        assertEquals(2, a1!!.ring.sendKey(info("f1"))!!.version)
         assertTrue(Fake.recoverySealed.containsKey("f1:2"))
         assertTrue(Fake.pins["p1"]!!.locked.containsKey(2))
         assertTrue(Fake.sealed.containsKey("f1:2:max"))
@@ -699,7 +789,7 @@ class KeyringTest {
         val next = a1!!.call { makeRecovery() }
         assertTrue(next != code)
         assertEquals(setOf("f1:1", "f1:2", "f2:1"), Fake.recoverySealed.keys)
-        val a7 = phone("ada", "a7")
+        val a7 = phone("ada", "a7").also { ada = it }
         a7.sync()
         assertThrows(E2eeException::class.java) { a7.call { useRecoveryCode(code) } }
         assertEquals(3, a7.call { useRecoveryCode(next) })
@@ -717,5 +807,145 @@ class KeyringTest {
         assertEquals(a1!!.ring.pace(), s["pace"])
         assertEquals(a1!!.ring.asks.map { it.id }, (s["asks"] as List<*>).map { (it as Map<*, *>)["id"] })
         assertEquals(emptyList<Any>(), s["codes"])
+    }
+    @Test
+    fun n_refusesToSendWhereTheServersWordAboutAFoldersKeysCantBeChecked() {
+        val a = ada!!
+        a.sync()
+        assertEquals(Keyring.Status.READY, a.ring.status)
+        val f1 = Fake.folders["f1"]!!
+        // A version the root didn't sign: version 1's signature, for a key named version 3.
+        f1.versions += Version(f1.versions[0].publicKey, f1.versions[0].signature)
+        a.checkIn()
+        assertThrows(SendRefused::class.java) { a.ring.sendKey(info("f1")) }
+        f1.versions.removeAt(2)
+        // Fewer versions than this phone saw: back to one a removed person may hold.
+        val v2 = f1.versions.removeAt(1)
+        a.checkIn()
+        assertThrows(SendRefused::class.java) { a.ring.sendKey(info("f1")) }
+        f1.versions += v2
+        // Switched off without the root's plain statement: still encrypted, which the server takes.
+        f1.encrypted = false
+        a.checkIn()
+        assertEquals(2, a.ring.sendKey(info("f1"))!!.version)
+        f1.encrypted = true
+        // A folder nobody signed as plain, one with another folder's statement, and a plain folder
+        // under another name: nothing goes in.
+        Fake.folders["new"] = Folder("new")
+        a.checkIn()
+        assertThrows(SendRefused::class.java) { a.ring.sendKey(info("new")) }
+        Fake.folders["new"]!!.plain = Fake.folders["plain"]!!.plain
+        assertThrows(SendRefused::class.java) { a.ring.sendKey(info("new")) }
+        Fake.folders.remove("new")
+        Fake.folders["plain"]!!.name = "f1"
+        assertThrows(SendRefused::class.java) { a.ring.sendKey(info("plain")) }
+        Fake.folders["plain"]!!.name = "plain"
+        assertNull(a.ring.sendKey(info("plain")))
+    }
+
+    @Test
+    fun o_sealsNothingForARecoveryKeyTheServerSwapsAndLocksNothingForASecretItCantOpen() {
+        val a = ada!!
+        val own = Hpke.generateKeyPair()
+        Fake.roots.add(Root(E2ee.b64u(own.publicKey), E2ee.b64u(ByteArray(64)), ""))
+        Fake.recoverySealed.clear()
+        try {
+            a.checkIn()
+            assertTrue(Fake.recoverySealed.isEmpty())
+        } finally {
+            Fake.roots.removeAt(Fake.roots.size - 1)
+        }
+        a.checkIn()
+        assertEquals(setOf("f1:1", "f1:2", "f2:1"), Fake.recoverySealed.keys)
+
+        // Anyone can seal a secret for a folder's public key: a PIN with one gets nothing locked.
+        val secret = ByteArray(32) { 5 }
+        val sealed = E2ee.sealKey(E2ee.fromB64u(Fake.folders["f1"]!!.versions[0].publicKey), E2ee.PURPOSE_PIN, E2ee.folderContext("f1", 1), secret)
+        Fake.pins["p2"] = Pin("f1", E2ee.b64u(sealed), 1, null, HashMap())
+        a.checkIn()
+        assertTrue(Fake.pins["p2"]!!.locked.isEmpty())
+        assertEquals(2, Fake.pins["p1"]!!.locked.size)
+        Fake.pins.remove("p2")
+    }
+
+    @Test
+    fun p_trustsTheRootOfThePersonsNoteOnANewPhoneNotOneTheServerNames() {
+        val a = ada!!
+        a.sync("correct horse battery")
+        assertNotNull(Fake.people["ada"]!!.note)
+        // The server names a root of its own, which signs a version of f1's key of its own.
+        val own = Hpke.generateKeyPair()
+        val next = Hpke.generateKeyPair()
+        val kept = Fake.roots
+        val f1 = Fake.folders["f1"]!!
+        Fake.roots = arrayListOf(Root(E2ee.b64u(own.publicKey), null, ""))
+        f1.versions += Version(E2ee.b64u(next.publicKey), E2ee.b64u(E2ee.sign(own.privateKey, E2ee.folderKeyMessage("f1", 3, next.publicKey))))
+        val a8 = phone("ada", "a8")
+        try {
+            a8.sync("correct horse battery")
+            assertEquals(Keyring.Status.READY, a8.ring.status)
+            assertThrows(SendRefused::class.java) { a8.ring.sendKey(info("f1")) }
+        } finally {
+            Fake.roots = kept
+            f1.versions.removeAt(2)
+        }
+        a8.checkIn()
+        assertEquals(2, a8.ring.sendKey(info("f1"))!!.version)
+    }
+
+    @Test
+    fun q_followsTheChainOfRootsToANewRecoveryKeyAlsoOnAPhoneThatWaitsForItsPersonsKey() {
+        val a = a2!!.reopened()
+        a.sync()
+        assertEquals(Keyring.Status.WAITING, a.ring.status)
+        assertEquals(2, a.ring.sendKey(info("f1"))!!.version)
+    }
+
+    @Test
+    fun r_passesTheRecoveryKeysPrivateKeyOnToAnotherAdminWithAnOkWhoThenSignsFolders() {
+        Fake.people["kim"] = Person(true, HashSet())
+        val k1 = phone("kim", "k1")
+        k1.sync()
+        assertTrue(k1.ring.lacksRoot())
+        assertThrows(NeedsRoot::class.java) { k1.ring.newFolder("garden") }
+        val a = ada!!
+        a.checkIn()
+        assertTrue(a.ring.asks.first { it.id == "kim" }.root)
+        approve(a, k1, "person", "kim")
+        assertTrue(Fake.rootGrants.containsKey("kim"))
+        k1.sync()
+        assertFalse(k1.ring.lacksRoot())
+        val body = k1.ring.newFolder("garden")
+        val id = body.getString("id")
+        Fake.folders[id] = Folder("garden").also { it.plain = body.getString("plain_signature") }
+        a.checkIn()
+        assertNull(a.ring.sendKey(info(id)))
+        // Renamed with a new plain statement, it still sends plain; renamed by the server alone, not.
+        val renamed = k1.ring.renamed(info(id), "allotment")
+        Fake.folders[id]!!.name = "allotment"
+        Fake.folders[id]!!.plain = renamed.getString("plain_signature")
+        assertNull(a.ring.sendKey(info(id)))
+        Fake.folders[id]!!.name = "f1"
+        assertThrows(SendRefused::class.java) { a.ring.sendKey(info(id)) }
+    }
+
+    @Test
+    fun s_aGuestWithALinkThatNamesTheRootSendsOnlyForKeysItSigned() {
+        val r = E2ee.fromB64u(Fake.roots.last().publicKey)
+        val f1 = Fake.folders["f1"]!!
+        val key = { v: Version, encrypted: Boolean -> JSONObject().put("folder", "f1").put("version", 2).put("public_key", v.publicKey).put("signature", v.signature).put("encrypted", encrypted) }
+        val session = JSONObject().put("folder_key", key(f1.versions[1], false)).put("roots", rootsJson())
+        val fp = E2ee.b64u(E2ee.fingerprint(E2ee.fromB64u(Fake.roots.first().publicKey)))
+        // Following the chain from the first root, with its fingerprint or itself: encrypted, even switched off.
+        assertEquals(2, Keyring.guestKey(session, true, fp, null)!!.version)
+        assertEquals(2, Keyring.guestKey(session, true, null, r)!!.version)
+        // Typed: the server's word.
+        assertNull(Keyring.guestKey(session, false, null, null))
+        assertEquals(2, Keyring.guestKey(JSONObject(session.toString()).put("folder_key", key(f1.versions[1], true)), false, null, null)!!.version)
+        // A key of the server's own, another root's fingerprint, no key at all.
+        val swapped = JSONObject(session.toString()).put("folder_key", key(Version(f1.versions[0].publicKey, f1.versions[1].signature), false))
+        assertThrows(SendRefused::class.java) { Keyring.guestKey(swapped, true, fp, null) }
+        assertThrows(SendRefused::class.java) { Keyring.guestKey(session, true, E2ee.b64u(E2ee.fingerprint(Hpke.generateKeyPair().publicKey)), null) }
+        assertThrows(SendRefused::class.java) { Keyring.guestKey(JSONObject(session.toString()).put("folder_key", JSONObject.NULL), true, fp, null) }
     }
 }

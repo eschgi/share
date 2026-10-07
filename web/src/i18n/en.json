@@ -73,6 +73,8 @@
   "sending.failed.other": "{n} files couldn't be sent.",
   "sending.retry": "Try again",
   "sending.tooLarge": "{name} is too large to send.",
+  "sending.unchecked": "Some files weren't sent: Share couldn't check the keys of their folder, so it couldn't be sure they stay private. Tell an admin.",
+  "sending.uncheckedGuest": "Some files weren't sent: Share couldn't check the keys of the folder this PIN sends into, so it couldn't be sure they stay private. Tell whoever gave you the PIN.",
 
   "welcome.title": "Welcome back",
   "welcome.lead": "Your last upload was interrupted. Nothing is lost.",

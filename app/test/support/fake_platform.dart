@@ -326,25 +326,57 @@ class FakePlatform implements Platform {
   @override
   Future<String?> passwordLock(String password) async => keysState.ready ? 'lock-$password' : null;
 
+  /// The root this phone trusts, locked with a link's secret; null while it trusts none.
+  String? lockedRoot = 'locked-root';
+
+  /// The root's fingerprint in a PIN link (22 characters).
+  final rootFingerprint = 'R' * 22;
+
   @override
-  Future<({String secret, List<Json> keys})> inviteKeys(List<String>? folders) async {
+  Future<({String secret, List<Json> keys, String? root})> inviteKeys(List<String>? folders) async {
     keyCalls.add('invite ${folders?.join(',')}');
     final open = [for (final f in folders ?? encryptedFolders.toList()) if (encryptedFolders.contains(f) && !sealedFolders.contains(f)) f];
-    return (secret: linkSecret, keys: [for (final f in open) {'folder': f, 'version': 1, 'locked': 'locked-$f'}]);
+    return (secret: linkSecret, keys: [for (final f in open) {'folder': f, 'version': 1, 'locked': 'locked-$f'}], root: lockedRoot);
   }
 
   @override
-  Future<({String secret, String locked})?> personKeyForInvite() async => keysState.ready ? (secret: linkSecret, locked: 'locked-person') : null;
+  Future<({String secret, String locked, String? root})?> personKeyForInvite() async =>
+      keysState.ready ? (secret: linkSecret, locked: 'locked-person', root: lockedRoot) : null;
 
   @override
   Future<({String secret, Json body})?> pinSecret(String folder) async {
     if (!encryptedFolders.contains(folder)) return null;
     keyCalls.add('pin $folder');
-    return (secret: linkSecret, body: {'sealed': 'sealed-secret', 'version': 1, 'keys': const []});
+    return (secret: linkSecret, body: {'locked': 'locked-secret', 'version': 1, 'root': 'locked-root', 'keys': const []});
   }
 
   @override
-  Future<String?> pinLinkSecret(String folder, String sealed, int version) async => sealedFolders.contains(folder) ? null : linkSecret;
+  Future<String?> pinLinkSecret(String folder, String locked, int version) async => sealedFolders.contains(folder) ? null : linkSecret;
+
+  @override
+  Future<String?> pinLinkRoot(String folder) async => encryptedFolders.contains(folder) ? rootFingerprint : null;
+
+  @override
+  Future<Json> switchOff(FolderInfo folder) async {
+    keyCalls.add('switch off ${folder.id}');
+    return {'id': folder.id, 'encrypted': false, 'key_version': folder.keyVersion};
+  }
+
+  /// Making folders and switching them needs the recovery key here (Kotlin's needs_root).
+  bool lacksRoot = false;
+
+  @override
+  Future<Json> newFolderBody(String name) async {
+    if (lacksRoot) throw const KeysException('needs_root');
+    keyCalls.add('new folder $name');
+    return {'name': name, 'plain_signature': 'signed-$name'};
+  }
+
+  @override
+  Future<Json> renameBody(FolderInfo folder, String name) async {
+    keyCalls.add('rename ${folder.id} $name');
+    return {'name': name, if (!folder.encrypted) 'plain_signature': 'signed-$name'};
+  }
 
   @override
   Future<List<Json>> moveKeys(List<FileInfo> files, String target) async {
@@ -352,22 +384,23 @@ class FakePlatform implements Platform {
     return [for (final f in files) {'id': f.id, 'version': 1, 'key': 'moved-${f.id}'}];
   }
 
-  final invitesOpened = <(String?, List<Json>)>[];
+  final invitesOpened = <(String?, List<Json>, String?)>[];
 
   @override
-  Future<KeysState> keysFromInvite(String? secret, List<Json> keys) async {
-    invitesOpened.add((secret, keys));
+  Future<KeysState> keysFromInvite(String? secret, List<Json> keys, String? root) async {
+    invitesOpened.add((secret, keys, root));
     return keysState;
   }
 
-  final pinSecrets = <String?>[];
+  /// What each PIN's link carried, as pinLink kept it: (secret, root); (null, null) forgets.
+  final pinLinks = <(String?, String?)>[];
 
   @override
-  Future<int> openPinKeys(String secret) async {
-    pinSecrets.add(secret);
-    return 1;
+  Future<int> pinLink({String? secret, String? root}) async {
+    pinLinks.add((secret, root));
+    return secret == null ? 0 : 1;
   }
 
   @override
-  Future<void> forgetPinKeys() async => pinSecrets.add(null);
+  Future<void> forgetPinKeys() async => pinLinks.add((null, null));
 }

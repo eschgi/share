@@ -15,7 +15,9 @@ CREATE TABLE job_runs (
 
 -- A person. Their key (docs/e2ee-plan.md): the public key, and the private key locked with
 -- their password. Their phones and browsers have keys of their own; the person's private key
--- is sealed for each of them in person_keys.
+-- is sealed for each of them in person_keys. Their note holds the root and the newest version
+-- of each folder's key their phones and browsers have seen, locked with a key from their
+-- private key, for their next phone or browser.
 CREATE TABLE users (
   id            UUID PRIMARY KEY,
   name          TEXT COLLATE pg_c_utf8 NOT NULL,
@@ -25,7 +27,8 @@ CREATE TABLE users (
   created_at    TIMESTAMPTZ(3) NOT NULL,
   created_by    TEXT COLLATE pg_c_utf8 NOT NULL, -- a user id, 'cli' or 'first-start'
   public_key    BYTEA,
-  password_lock BYTEA
+  password_lock BYTEA,
+  note          BYTEA
 );
 CREATE UNIQUE INDEX users_username ON users (casefold(username));
 
@@ -42,7 +45,10 @@ CREATE TABLE folders (
   seq           BIGINT GENERATED ALWAYS AS IDENTITY,
   -- New files are encrypted; and a new key version is due because someone lost the folder.
   encrypted     BOOLEAN NOT NULL DEFAULT FALSE,
-  rekey         BOOLEAN NOT NULL DEFAULT FALSE
+  rekey         BOOLEAN NOT NULL DEFAULT FALSE,
+  -- The root's signature that the folder sends plain, for its newest key version (0 without
+  -- one) and its name; phones and browsers send nothing plain without it, once there is a root.
+  plain_signature BYTEA
 );
 CREATE UNIQUE INDEX folders_dir ON folders (casefold(dir));
 CREATE UNIQUE INDEX folders_live_name ON folders (casefold(name)) WHERE deleted_at IS NULL;
@@ -57,10 +63,12 @@ CREATE TABLE pins (
   ended_at       TIMESTAMPTZ(3),
   folder_id      UUID REFERENCES folders (id) ON DELETE SET NULL,
   shows_folder   BOOLEAN NOT NULL DEFAULT FALSE,
-  -- The secret of the link of a PIN that shows an encrypted folder, sealed for a version of the
-  -- folder's key, so that later versions can be locked for it too (pin_keys).
-  secret_sealed  BYTEA,
-  secret_version INTEGER
+  -- The secret of the link of a PIN that shows an encrypted folder, locked with a key from a
+  -- version of the folder's private key, so that later versions can be locked for it too
+  -- (pin_keys); and the root, locked with the secret.
+  secret_locked  BYTEA,
+  secret_version INTEGER,
+  root_locked    BYTEA
 );
 CREATE INDEX pins_by_folder ON pins (folder_id);
 
@@ -102,8 +110,10 @@ CREATE TABLE invites (
   device_id  UUID,
   revoked_at TIMESTAMPTZ(3),
   -- The person's own key locked with the secret of the link, for a new phone or browser of
-  -- someone who has an account; it goes out once (docs/e2ee-plan.md).
-  person_key BYTEA
+  -- someone who has an account; it goes out once (docs/e2ee-plan.md). The root, locked the same
+  -- way, for the new phone or browser to trust.
+  person_key  BYTEA,
+  root_locked BYTEA
 );
 
 CREATE TABLE folder_people (
@@ -182,12 +192,32 @@ CREATE TABLE person_keys (
   created_at TIMESTAMPTZ(3) NOT NULL
 );
 
--- An encrypted folder's key pairs: version 1, and a new one each time someone loses the
--- folder. recovery_sealed is the private key sealed for the recovery key.
+-- The root key, which is the recovery key, in the order they were made: each signed by the one
+-- before, and its private key locked with the recovery code, until a newer one comes. The newest
+-- signs the folders' keys and plain statements (docs/e2ee-plan.md).
+CREATE TABLE roots (
+  seq        INTEGER PRIMARY KEY,
+  public_key BYTEA NOT NULL,
+  signature  BYTEA,
+  locked     BYTEA,
+  created_at TIMESTAMPTZ(3) NOT NULL
+);
+
+-- The newest root's private key, sealed for an admin's person key.
+CREATE TABLE root_grants (
+  user_id    UUID PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
+  sealed     BYTEA NOT NULL,
+  created_at TIMESTAMPTZ(3) NOT NULL
+);
+
+-- An encrypted folder's key pairs: version 1, and a new one each time someone loses the folder
+-- or encryption is turned on again, each signed by the root. recovery_sealed is the private key
+-- sealed for the recovery key.
 CREATE TABLE folder_keys (
   folder_id       UUID NOT NULL REFERENCES folders (id) ON DELETE CASCADE,
   version         INTEGER NOT NULL,
   public_key      BYTEA NOT NULL,
+  signature       BYTEA NOT NULL,
   recovery_sealed BYTEA,
   created_by      TEXT COLLATE pg_c_utf8 NOT NULL,
   created_at      TIMESTAMPTZ(3) NOT NULL,
@@ -222,3 +252,25 @@ CREATE TABLE pin_keys (
   locked  BYTEA NOT NULL,
   PRIMARY KEY (pin_id, version)
 );
+
+-- Checks before keys are passed on (docs/e2ee-plan.md, contract/crypto/check.json): a device
+-- with keys asks the device or person that gets them to show the same code. The server only
+-- relays the commitment, the two one-time keys and the confirmation; a check is good for 15
+-- minutes.
+CREATE TABLE key_checks (
+  id           UUID PRIMARY KEY,
+  asker        UUID NOT NULL REFERENCES devices (id) ON DELETE CASCADE,
+  device_id    UUID REFERENCES devices (id) ON DELETE CASCADE, -- a device of the asker's person, waiting for the person's key
+  user_id      UUID REFERENCES users (id) ON DELETE CASCADE,   -- another person, waiting for folder keys
+  commitment   BYTEA NOT NULL,
+  answer       BYTEA,                                          -- the waiting side's one-time key
+  answered_by  UUID REFERENCES devices (id) ON DELETE CASCADE,
+  reveal       BYTEA,                                          -- the asker's one-time key, after the answer
+  confirmation BYTEA,                                          -- what the asker hands on after Allow
+  created_at   TIMESTAMPTZ(3) NOT NULL,
+  CHECK ((device_id IS NULL) <> (user_id IS NULL))
+);
+CREATE UNIQUE INDEX key_checks_device ON key_checks (asker, device_id) WHERE device_id IS NOT NULL;
+CREATE UNIQUE INDEX key_checks_user ON key_checks (asker, user_id) WHERE user_id IS NOT NULL;
+CREATE INDEX key_checks_for_device ON key_checks (device_id);
+CREATE INDEX key_checks_for_user ON key_checks (user_id);

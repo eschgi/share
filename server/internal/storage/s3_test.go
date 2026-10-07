@@ -296,7 +296,7 @@ func TestS3LibraryChangesOnlyRows(t *testing.T) {
 		}
 	}
 	calls := len(fx.fake.Calls())
-	other, err := fx.lib.CreateFolder(ctx, "Holidays", "admin")
+	other, err := fx.lib.CreateFolder(ctx, NewFolder{Name: "Holidays", By: "admin"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -307,7 +307,7 @@ func TestS3LibraryChangesOnlyRows(t *testing.T) {
 		t.Errorf("after the move: folder %s, moved from %q", got.FolderID, got.MovedFrom)
 	}
 	for _, name := range []string{"Summer", "Winter"} {
-		renamed, err := fx.lib.RenameFolder(ctx, other.ID, name)
+		renamed, err := fx.lib.RenameFolder(ctx, other.ID, name, nil)
 		if err != nil || renamed.RenamingFrom != nil {
 			t.Fatalf("renaming to %s: %+v, %v", name, renamed, err)
 		}

@@ -26,12 +26,48 @@ class E2eeTest {
     // Checks (check.json).
 
     @Test
-    fun checksCommitAndMakeCodesAsTheVectorsDo() {
+    fun checksCommitMakeCodesAndConfirmAsTheVectorsDo() {
         for (c in contract("crypto/check.json").cases("cases")) {
             val name = c.getString("name")
-            assertEquals(name, c.getString("commitment"), E2ee.b64u(E2ee.commitment(c.bytes("asker_nonce"))))
-            assertEquals(name, c.getString("code"), E2ee.checkCode(c.bytes("asker_nonce"), c.bytes("answer_nonce"), c.bytes("public_key")))
+            val (asker, answer, pub) = Triple(c.bytes("asker_key"), c.bytes("answer_key"), c.bytes("public_key"))
+            assertEquals(name, c.getString("commitment"), E2ee.b64u(E2ee.commitment(asker)))
+            assertEquals(name, c.getString("code"), E2ee.checkCode(asker, answer, pub))
+            val asking = E2ee.confirmKey(c.bytes("asker_private_key"), answer, asker, answer, pub)
+            val waiting = E2ee.confirmKey(c.bytes("answer_private_key"), asker, asker, answer, pub)
+            assertEquals(name, c.getString("confirm_key"), E2ee.b64u(asking))
+            assertEquals(name, c.getString("confirm_key"), E2ee.b64u(waiting))
+            assertEquals(name, c.getString("confirmed"), String(E2ee.unlock(waiting, E2ee.checkContext(c.getString("check")), c.bytes("confirmation"))))
         }
+    }
+
+    // Signatures (sign.json).
+
+    @Test
+    fun signaturesOfTheVectorsVerifyAndTheirMessagesAreMadeTheSame() {
+        val v = contract("crypto/sign.json")
+        val pub = v.bytes("public_key")
+        assertEquals(v.getString("fingerprint"), E2ee.b64u(E2ee.fingerprint(pub)))
+        for (c in v.cases("verify")) {
+            val name = c.getString("name")
+            val m = when {
+                c.has("folder_key") -> E2ee.folderKeyMessage(c.getString("folder"), c.getInt("version"), c.bytes("folder_key"))
+                c.has("folder_name") -> E2ee.plainMessage(c.getString("folder"), c.getInt("version"), c.getString("folder_name"))
+                else -> E2ee.rootMessage(c.bytes("new_root"))
+            }
+            assertEquals(name, c.getString("message"), E2ee.b64u(m))
+            assertTrue(name, E2ee.verify(pub, m, c.bytes("signature")))
+        }
+        for (c in v.cases("refuse")) assertFalse(c.getString("name"), E2ee.verify(pub, c.bytes("message"), c.bytes("signature")))
+        // What Kotlin signs is r and s too, and verifies anywhere.
+        val m = E2ee.plainMessage("0199a0c4-8f6e-7d2a-9b1c-3e5f7a9b1c3d", 0, "Família")
+        repeat(20) {
+            val sig = E2ee.sign(v.bytes("private_key"), m)
+            assertEquals(64, sig.size)
+            assertTrue(E2ee.verify(pub, m, sig))
+            assertFalse(E2ee.verify(pub, E2ee.plainMessage("0199a0c4-8f6e-7d2a-9b1c-3e5f7a9b1c3d", 0, "Familia"), sig))
+        }
+        assertFalse(E2ee.verify(pub, m, ByteArray(63)))
+        assertFalse(E2ee.verify(pub.copyOfRange(1, 65), m, E2ee.sign(v.bytes("private_key"), m)))
     }
 
     // Sealed keys (seal.json).

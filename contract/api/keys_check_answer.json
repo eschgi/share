@@ -4,7 +4,7 @@
   "auth": "device",
   "status": 204,
   "request": {
-    "nonce": "fKuQ6SQrmvowkR4hYNV1-HHNVugpf4r-lywDUv1RZZI"
+    "key": "BMr3zjJNINbxC_npe1ANm-2iYxbntp6w0-Qpo8nbOJ5nndgy1HkukDcKZvCEKGJbHyY_-LnQ5TEK4o_XwawJqtY"
   },
-  "notes": "The waiting side's nonce, 32 random bytes, after it saw the commitment: from the device the check is for, or from a device of the person it is for that holds their key (then the check is listed to that device only). It may answer again until the asking device revealed its nonce. 404 not_found for anyone else, or a check that is revealed or closed; 400 bad_request for another size."
+  "notes": "The waiting side's one-time public key (65 bytes), after it saw the commitment: from the device the check is for, or from a device of the person it is for that holds their key (then the check is listed to that device only). It keeps the private key in memory until it reads the confirmation. It may answer again until the asking device revealed its key. 404 not_found for anyone else, or a check that is revealed or closed; 400 bad_request for something that isn't a P-256 key."
 }

@@ -25,17 +25,20 @@ type Folder struct {
 	Encrypted    bool // new files must be encrypted
 	Rekey        bool // someone lost the folder: its key needs a new version
 	KeyVersion   int  // the newest version of its key; 0 if it was never encrypted
+	// PlainSignature is the root's signature that the folder sends plain, for KeyVersion and
+	// Name; nil without one.
+	PlainSignature []byte
 }
 
 const folderColumns = "id, name, dir, renaming_from, created_by, created_at, deleted_at, deleted_by"
 
 // folderSelect is what a folder is read with: its columns and its newest key version.
-const folderSelect = folderColumns + ", encrypted, rekey, (SELECT COALESCE(MAX(version), 0) FROM folder_keys WHERE folder_id = id)"
+const folderSelect = folderColumns + ", encrypted, rekey, (SELECT COALESCE(MAX(version), 0) FROM folder_keys WHERE folder_id = id), plain_signature"
 
 func scanFolder(row interface{ Scan(...any) error }) (Folder, error) {
 	var f Folder
 	var renaming, deletedBy sql.NullString
-	err := row.Scan(&f.ID, &f.Name, &f.Dir, &renaming, &f.CreatedBy, &f.CreatedAt, &f.DeletedAt, &deletedBy, &f.Encrypted, &f.Rekey, &f.KeyVersion)
+	err := row.Scan(&f.ID, &f.Name, &f.Dir, &renaming, &f.CreatedBy, &f.CreatedAt, &f.DeletedAt, &deletedBy, &f.Encrypted, &f.Rekey, &f.KeyVersion, &f.PlainSignature)
 	if noRow(err) {
 		return f, ErrNotFound
 	}
@@ -108,12 +111,41 @@ func (d *DB) EnsureFirstFolder(ctx context.Context, f Folder, now time.Time) (Fo
 	return folders[0], made, nil
 }
 
-// InsertFolder stores a new folder. It returns ErrConflict if a live folder has its name, or
-// any folder its directory.
-func (d *DB) InsertFolder(ctx context.Context, f Folder) error {
+// InsertFolder stores a new folder. Once there is a root, the root signs it: encrypted, with key
+// as its key's first version, or plain, with f.PlainSignature. It returns ErrConflict if a live
+// folder has its name, or any folder its directory or its id; ErrBadSignature for a signature
+// that doesn't verify, or neither or both of them once there is a root; ErrNoKey for a key
+// without a root.
+func (d *DB) InsertFolder(ctx context.Context, f Folder, key *NewFolderKey) error {
 	return d.inTx(ctx, func(tx *sql.Tx) error {
 		if err := insertFolder(ctx, tx, f); err != nil {
 			return err
+		}
+		if key != nil {
+			if f.PlainSignature != nil {
+				return ErrBadSignature
+			}
+			if err := insertFolderKey(ctx, tx, *key, f.CreatedAt); err != nil {
+				return err
+			}
+			if _, err := tx.ExecContext(ctx, "UPDATE folders SET encrypted = $1 WHERE id = $2", true, f.ID); err != nil {
+				return err
+			}
+		} else {
+			if f.PlainSignature == nil {
+				if _, err := newestRoot(ctx, tx); !errors.Is(err, ErrNoKey) {
+					if err == nil {
+						err = ErrBadSignature
+					}
+					return err
+				}
+			}
+			if err := checkPlain(ctx, tx, f.ID, 0, f.Name, f.PlainSignature); err != nil {
+				return err
+			}
+			if _, err := tx.ExecContext(ctx, "UPDATE folders SET plain_signature = $1 WHERE id = $2", f.PlainSignature, f.ID); err != nil {
+				return err
+			}
 		}
 		return bumpLibraryVersion(ctx, tx)
 	})
@@ -321,15 +353,26 @@ var ErrLastFolder = errors.New("the last folder can't go")
 var ErrBusy = errors.New("the folder's files are still being moved")
 
 // RenameFolder gives a live folder a new name and, if dir differs from its directory, a new
-// directory; the old one is noted until the files are moved over (FinishRelocation). It
+// directory; the old one is noted until the files are moved over (FinishRelocation). A folder
+// that sends plain needs the root's plain statement for the new name, once there is a root. It
 // returns ErrNotFound for no such live folder, ErrConflict if a live folder has the name or
-// any folder the directory, and ErrBusy while an earlier move isn't finished.
-func (d *DB) RenameFolder(ctx context.Context, id, name, dir string) (Folder, error) {
+// any folder the directory, ErrBusy while an earlier move isn't finished, and ErrBadSignature
+// for a plain statement that doesn't verify.
+func (d *DB) RenameFolder(ctx context.Context, id, name, dir string, plain []byte) (Folder, error) {
 	var out Folder
 	err := d.inTx(ctx, func(tx *sql.Tx) error {
 		f, err := scanFolder(tx.QueryRowContext(ctx, "SELECT "+folderSelect+" FROM folders WHERE id = $1 AND deleted_at IS NULL", id))
 		if err != nil {
 			return err
+		}
+		if !f.Encrypted {
+			if err := checkPlain(ctx, tx, f.ID, f.KeyVersion, name, plain); err != nil {
+				return err
+			}
+			if _, err := tx.ExecContext(ctx, "UPDATE folders SET plain_signature = $1 WHERE id = $2", plain, f.ID); err != nil {
+				return err
+			}
+			f.PlainSignature = plain
 		}
 		if dir != f.Dir {
 			if f.RenamingFrom != nil {

@@ -175,7 +175,7 @@ class _ShareAppState extends State<ShareApp> {
       case final InviteLink link:
         _navigator.currentState?.push(MaterialPageRoute<void>(builder: (_) => InviteScreen(link: link)));
       case final PinLink link:
-        _navigator.currentState?.push(MaterialPageRoute<void>(builder: (_) => PinEntryScreen(server: link.server, code: link.code, secret: link.secret)));
+        _navigator.currentState?.push(MaterialPageRoute<void>(builder: (_) => PinEntryScreen(server: link.server, code: link.code, secret: link.secret, root: link.root)));
       case null:
         break;
     }

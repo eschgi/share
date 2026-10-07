@@ -23,15 +23,28 @@ export interface Session {
   folder_name: string | null;
   /** The PIN also shows what is in its folder. */
   shows_folder: boolean;
-  /** The key new files into the folder are encrypted for; null while it is plain. */
-  encrypt: EncryptKey | null;
+  /** The newest version of the folder's key, whenever it has one; null if it was never
+   * encrypted. */
+  folder_key: SessionKey | null;
+  /** The chain of roots, the first first, which signs the folder's key. */
+  roots: RootInfo[];
 }
 
-/** The newest version of an encrypted folder's key, which uploads seal their file keys for. */
-export interface EncryptKey {
+/** The newest version of a folder's key, signed by the root, which uploads seal their file keys
+ * for: while encrypted says so, and always for a guest whose link names the root. */
+export interface SessionKey {
   folder: string;
   version: number;
   public_key: string;
+  signature: string;
+  /** New files into the folder must be encrypted. */
+  encrypted: boolean;
+}
+
+/** A root key, signed by the one before (null for the first); the newest is the recovery key. */
+export interface RootInfo {
+  public_key: string;
+  signature: string | null;
 }
 
 export class ApiError extends Error {
@@ -224,17 +237,20 @@ export const getMe = () => request<Me>('GET', '/api/me');
 export const login = (username: string, password: string, deviceName: string) =>
   request<Me>('POST', '/api/auth/login', { username, password, device_name: deviceName, client: 'web' });
 
-/** A key locked with the secret of an invite's link: a version of a folder's key, or the
- * person's own key (folder null). */
+/** A key locked with the secret of an invite's link: a version of a folder's key, signed by the
+ * root, or the person's own key (folder null). */
 export interface InviteKey {
   folder: string | null;
   version: number;
   public_key: string;
+  signature: string | null;
   locked: string;
 }
 
+/** Accepting an invite also brings the keys locked with its link's secret, and the root locked
+ * the same way; none without them. */
 export const acceptInvite = (token: string, deviceName: string) =>
-  request<Me & { keys: InviteKey[] }>('POST', '/api/invites/accept', { token, device_name: deviceName, client: 'web' });
+  request<Me & { keys: InviteKey[]; root: string | null }>('POST', '/api/invites/accept', { token, device_name: deviceName, client: 'web' });
 
 export const logout = () => request<void>('POST', '/api/auth/logout', {});
 
@@ -360,15 +376,23 @@ export interface FolderInfo {
   encrypted: boolean;
   /** The newest version of its key; null if it was never encrypted. */
   key_version: number | null;
+  /** The root's signature that it sends plain, for its newest version and its name; null without
+   * one. */
+  plain_signature: string | null;
 }
 
 /** The folders this person sees, the oldest first. */
 export const getFolders = () => request<{ folders: FolderInfo[] }>('GET', '/api/folders');
 
 /** Admins: a new folder, which only admins see until people are given it. */
-export const createFolder = (name: string) => request<FolderInfo>('POST', '/api/folders', { name });
+/** A new folder; once there is a root, with its id and the root's signature of it: its first key,
+ * or its plain statement. */
+export const createFolder = (name: string, signed?: { id: string; key?: NewFolderKey; plain_signature?: string }) =>
+  request<FolderInfo>('POST', '/api/folders', { name, ...signed });
 /** Admins: renames a folder, and its directory on the server's drive. */
-export const renameFolder = (id: string, name: string) => request<FolderInfo>('PATCH', `/api/folders/${encodeURIComponent(id)}`, { name });
+/** A new name; a folder that sends plain needs the root's plain statement for it. */
+export const renameFolder = (id: string, name: string, plain_signature?: string) =>
+  request<FolderInfo>('PATCH', `/api/folders/${encodeURIComponent(id)}`, { name, plain_signature });
 /** Admins: deletes a folder; its files go to Recently deleted, and its PINs stop. */
 export const deleteFolder = (id: string) => request<{ changed: number }>('DELETE', `/api/folders/${encodeURIComponent(id)}`);
 /** Admins: gives someone a folder, or takes it away. */
@@ -490,17 +514,19 @@ export interface PinInfo {
   folder: string;
   /** Guests with it also see and download what is in the folder. */
   shows_folder: boolean;
-  /** For a PIN that shows an encrypted folder: its link's secret, sealed for that version of
-   * the folder's key, so admins' devices can show the whole link again. */
-  secret: { sealed: string; version: number } | null;
+  /** For a PIN that shows an encrypted folder: its link's secret, locked with a key from that
+   * version of the folder's key, so admins' devices can show the whole link again. */
+  secret: { locked: string; version: number } | null;
 }
 
 export const getPins = () => request<{ pins: PinInfo[] }>('GET', '/api/pins');
 export const suggestPin = () => request<{ code: string }>('GET', '/api/pins/suggest');
-/** What the secret of a PIN link that shows an encrypted folder brings. */
+/** What the secret of a PIN link that shows an encrypted folder brings: itself, locked with a key
+ * from a version of the folder's key, the root and the folder's keys, locked with it. */
 export interface PinSecret {
-  sealed: string;
+  locked: string;
   version: number;
+  root: string;
   keys: { version: number; locked: string }[];
 }
 
@@ -558,12 +584,13 @@ export interface LockedFolderKey {
   locked: string;
 }
 
-export const createInvite = (name: string, role: Role, folders: string[], keys?: LockedFolderKey[]) =>
-  request<NewInvite>('POST', '/api/invites', { name, role, folders: role === 'member' ? folders : undefined, keys: keys?.length ? keys : undefined });
+/** root: the root this browser trusts, locked with the link's secret too. */
+export const createInvite = (name: string, role: Role, folders: string[], keys?: LockedFolderKey[], root?: string) =>
+  request<NewInvite>('POST', '/api/invites', { name, role, folders: role === 'member' ? folders : undefined, keys: keys?.length ? keys : undefined, root });
 /** An invite for another phone or browser of someone; personKey, their key locked with the
- * link's secret, when it is the caller's own. */
-export const inviteDevice = (userId: string, personKey?: string) =>
-  request<NewInvite>('POST', `/api/users/${encodeURIComponent(userId)}/invites`, { person_key: personKey });
+ * link's secret, when it is the caller's own, and root, the root, locked the same way. */
+export const inviteDevice = (userId: string, personKey?: string, root?: string) =>
+  request<NewInvite>('POST', `/api/users/${encodeURIComponent(userId)}/invites`, { person_key: personKey, root });
 export const withdrawInvite = (id: string) => request<void>('DELETE', `/api/invites/${encodeURIComponent(id)}`);
 
 export interface TrashedFile extends FileInfo {
@@ -588,9 +615,15 @@ export const purgeFiles = (ids: string[]) => request<{ changed: number }>('POST'
 /** What this browser can open, and what it can seal for others. */
 export interface KeysAnswer {
   device_key: string | null;
-  person: { public_key: string | null; sealed: string | null; password_lock: string | null; held_by: number };
-  folders: { folder: string; version: number; public_key: string; sealed: string | null }[];
-  recovery_key: string | null;
+  /** note: what the person's phones and browsers keep for the next one, locked with a key from
+   * the person's private key. */
+  person: { public_key: string | null; sealed: string | null; password_lock: string | null; held_by: number; note: string | null };
+  /** Every version of the keys of the folders the person sees, signed by the newest root. */
+  folders: { folder: string; version: number; public_key: string; signature: string; sealed: string | null }[];
+  /** The chain of roots, the first first; the newest is the recovery key. */
+  roots: RootInfo[];
+  /** The newest root's private key, sealed for the person, for an admin who holds it. */
+  root_sealed: string | null;
   todo: {
     /** The person's devices that lack their key: passed on only after a check, which needs the
      * device active (seen in the last 15 minutes) to answer it. */
@@ -598,9 +631,11 @@ export interface KeysAnswer {
     /** People who lack a version of a folder's key: passed on after a check, which needs one of
      * their devices active, or at once for a key checked here before. */
     people: { folder: string; version: number; user: string; name: string; public_key: string; active: boolean }[];
+    /** Admins who lack the root's private key, the same way. */
+    roots: { user: string; name: string; public_key: string; active: boolean }[];
     recovery: { folder: string; version: number }[];
     rekey: string[];
-    pins: { pin: string; folder: string; version: number; secret_version: number; secret_sealed: string }[];
+    pins: { pin: string; folder: string; version: number; secret_version: number; secret_locked: string }[];
   };
   checks: KeyCheck[];
 }
@@ -617,14 +652,19 @@ export interface KeyCheck {
   answer: string | null;
   answered: boolean;
   reveal: string | null;
+  confirmation: string | null;
 }
 
 export const openCheck = (target: { device: string } | { user: string }, commitment: string) =>
   request<{ id: string }>('POST', '/api/keys/checks', { ...target, commitment });
-export const answerCheck = (id: string, nonce: string) => request<void>('PUT', `/api/keys/checks/${encodeURIComponent(id)}/answer`, { nonce });
-/** Reveals the nonce committed to, for the answer seen, which the code is made from. */
-export const revealCheck = (id: string, nonce: string, answer: string) =>
-  request<void>('PUT', `/api/keys/checks/${encodeURIComponent(id)}/reveal`, { nonce, answer });
+/** Answers with this side's one-time key. */
+export const answerCheck = (id: string, key: string) => request<void>('PUT', `/api/keys/checks/${encodeURIComponent(id)}/answer`, { key });
+/** Reveals the one-time key committed to, for the answer seen, which the code is made from. */
+export const revealCheck = (id: string, key: string, answer: string) =>
+  request<void>('PUT', `/api/keys/checks/${encodeURIComponent(id)}/reveal`, { key, answer });
+/** After Allow: what only the waiting side opens. */
+export const confirmCheck = (id: string, confirmation: string) =>
+  request<void>('PUT', `/api/keys/checks/${encodeURIComponent(id)}/confirm`, { confirmation });
 export const closeCheck = (id: string) => request<void>('DELETE', `/api/keys/checks/${encodeURIComponent(id)}`);
 
 export const getKeys = () => request<KeysAnswer>('GET', '/api/keys');
@@ -632,6 +672,7 @@ export const putDeviceKey = (public_key: string) => request<void>('PUT', '/api/k
 export const putPersonKey = (public_key: string, sealed: string, start_over = false) =>
   request<void>('PUT', '/api/keys/person', { public_key, sealed, start_over: start_over || undefined });
 export const putPasswordLock = (password_lock: string) => request<void>('PUT', '/api/keys/password-lock', { password_lock });
+export const putNote = (note: string) => request<void>('PUT', '/api/keys/note', { note });
 
 /** What this browser sealed or locked from its to-do list. */
 export interface Grants {
@@ -639,31 +680,53 @@ export interface Grants {
   people: { folder: string; version: number; user: string; sealed: string }[];
   recovery: { folder: string; version: number; sealed: string }[];
   pins: { pin: string; version: number; locked: string }[];
+  roots: { user: string; sealed: string }[];
 }
 
 export const postGrants = (g: Grants) => request<void>('POST', '/api/keys/grants', g);
 
-/** A version of a folder's key, made here: sealed for this person and for the recovery key. */
+/** A version of a folder's key, made here: signed by the root, sealed for this person and for the
+ * recovery key. */
 export interface NewFolderKey {
   public_key: string;
+  signature: string;
   sealed: string;
   recovery_sealed: string;
 }
 
-export const setFolderEncryption = (folder: string, encrypted: boolean, key?: NewFolderKey) =>
-  request<FolderInfo>('PUT', `/api/folders/${encodeURIComponent(folder)}/encryption`, { encrypted, key });
+/** On, with the folder key's next version; off, with the root's plain statement. */
+export const setFolderEncryption = (folder: string, change: { encrypted: true; key: NewFolderKey } | { encrypted: false; plain_signature: string }) =>
+  request<FolderInfo>('PUT', `/api/folders/${encodeURIComponent(folder)}/encryption`, change);
 export const postFolderKey = (folder: string, version: number, key: NewFolderKey) =>
   request<void>('POST', `/api/folders/${encodeURIComponent(folder)}/keys`, { version, ...key });
 
-/** Admins: the recovery key, and the folder keys sealed for it. */
+/** Admins: the recovery key, which is the newest root, the folder keys sealed for it, and what a
+ * new one signs anew. */
 export interface Recovery {
   public_key: string | null;
   locked: string | null;
-  folders: { folder: string; version: number; public_key: string; sealed: string }[];
+  roots: RootInfo[];
+  folders: { folder: string; version: number; public_key: string; signature: string; sealed: string }[];
+  sign: {
+    folder_keys: { folder: string; version: number; public_key: string; signature: string }[];
+    /** Folders that send plain: their newest version and name; without a signature before the
+     * first recovery key. */
+    plain: { folder: string; version: number; name: string; signature: string | null }[];
+  };
+}
+
+/** A new recovery key, signed by the one before, with everything it signs anew. */
+export interface NewRecovery {
+  public_key: string;
+  locked: string;
+  signature: string | null;
+  sealed: string;
+  folder_keys: { folder: string; version: number; signature: string }[];
+  plain: { folder: string; signature: string }[];
 }
 
 export const getRecovery = () => request<Recovery>('GET', '/api/recovery');
-export const putRecovery = (public_key: string, locked: string) => request<void>('PUT', '/api/recovery', { public_key, locked });
+export const putRecovery = (r: NewRecovery) => request<void>('PUT', '/api/recovery', r);
 
 /** Admins: the settings for the whole server. */
 export interface Settings {
@@ -673,10 +736,11 @@ export interface Settings {
 export const getSettings = () => request<Settings>('GET', '/api/admin/settings');
 export const putSettings = (s: Settings) => request<Settings>('PUT', '/api/admin/settings', s);
 
-/** A PIN that shows its folder: the folder's keys, locked with its link's secret. */
+/** A PIN that shows its folder: the folder's keys and the root, locked with its link's secret. */
 export interface PinKeys {
   folder: string;
   keys: { version: number; public_key: string; locked: string }[];
+  root: string | null;
 }
 
 export const getPinKeys = () => request<PinKeys>('GET', '/api/pin/keys');

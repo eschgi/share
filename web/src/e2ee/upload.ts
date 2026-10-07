@@ -6,7 +6,7 @@
 import { b64u, fromB64u, randomBytes, type Bytes } from './bytes';
 import { ContentCipher, encryptedSize, encryptedSlice, newHeader } from './content';
 import { folderContext, purposes, sealKey, sealThumb } from './formats';
-import type { FolderPublicKey } from './keyring';
+import type { FolderPublicKey } from './trust';
 
 /** What an upload keeps of its encryption, as JSON in its meta (e2ee): the file key, never sent,
  * and what the server gets. lastModified tells whether a file picked again is the same one. */

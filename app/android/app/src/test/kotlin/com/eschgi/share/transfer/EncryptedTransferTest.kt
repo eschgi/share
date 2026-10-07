@@ -7,7 +7,9 @@ import com.eschgi.share.e2ee.E2ee
 import com.eschgi.share.e2ee.EncryptingSource
 import com.eschgi.share.e2ee.FolderPublicKey
 import com.eschgi.share.e2ee.Hpke
+import com.eschgi.share.e2ee.Keyring
 import com.eschgi.share.e2ee.Keys
+import com.eschgi.share.e2ee.SendRefused
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.After
@@ -16,6 +18,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -248,20 +251,16 @@ class EncryptedTransferTest {
     }
 
     @Test
-    fun theFolderKeyToEncryptForComesFromTheServer() {
+    fun theFolderKeyToEncryptForIsWhatTheKeysSayOfTheServersWord() {
         val pair = Hpke.generateKeyPair()
         val pub = E2ee.b64u(pair.publicKey)
-        var session = JSONObject().put("kind", "pin").put("encrypt", JSONObject.NULL)
+        var session = JSONObject().put("kind", "pin").put("folder_key", JSONObject.NULL).put("roots", JSONArray())
         val api = TestServer { req, res ->
             val body = when (req.path) {
                 "/api/session" -> session
                 "/api/folders" -> JSONObject().put(
                     "folders",
-                    JSONArray().put(JSONObject().put("id", "f1").put("encrypted", true)).put(JSONObject().put("id", "plain").put("encrypted", false)),
-                )
-                "/api/keys" -> JSONObject().put(
-                    "folders",
-                    JSONArray().put(JSONObject().put("folder", "f1").put("version", 1).put("public_key", pub)).put(JSONObject().put("folder", "f1").put("version", 3).put("public_key", pub)),
+                    JSONArray().put(JSONObject().put("id", "f1").put("name", "f1").put("encrypted", true)).put(JSONObject().put("id", "plain").put("name", "plain").put("encrypted", false)),
                 )
                 else -> return@TestServer res.send(404)
             }
@@ -269,11 +268,22 @@ class EncryptedTransferTest {
         }
         try {
             val open = { path: String -> URL("http://127.0.0.1:${api.port}$path").openConnection() as HttpURLConnection }
-            assertEquals(3, UploadSeal.target(Credentials.DEVICE, "f1", open)!!.version)
-            assertNull(UploadSeal.target(Credentials.DEVICE, "plain", open))
-            assertNull(UploadSeal.target(Credentials.PIN, null, open))
-            session = session.put("encrypt", JSONObject().put("folder", "w3d").put("version", 2).put("public_key", pub))
-            val pin = UploadSeal.target(Credentials.PIN, null, open)!!
+            // Someone signed in: the folder as the list describes it goes to the keys, which decide.
+            val asked = ArrayList<String>()
+            val signedIn = { f: JSONObject ->
+                asked += f.getString("id")
+                if (f.getBoolean("encrypted")) FolderPublicKey("f1", 3, pair.publicKey) else null
+            }
+            val guest = { s: JSONObject -> Keyring.guestKey(s, false, null, null) }
+            assertEquals(3, UploadSeal.target(Credentials.DEVICE, "f1", open, signedIn, guest)!!.version)
+            assertNull(UploadSeal.target(Credentials.DEVICE, "plain", open, signedIn, guest))
+            assertNull(UploadSeal.target(Credentials.DEVICE, "gone", open, signedIn, guest))
+            assertEquals(listOf("f1", "plain"), asked)
+            assertThrows(SendRefused::class.java) { UploadSeal.target(Credentials.DEVICE, "f1", open, { throw SendRefused("unsigned") }, guest) }
+            // A guest: the session's key, while the folder is encrypted.
+            assertNull(UploadSeal.target(Credentials.PIN, null, open, signedIn, guest))
+            session = session.put("folder_key", JSONObject().put("folder", "w3d").put("version", 2).put("public_key", pub).put("signature", E2ee.b64u(ByteArray(64))).put("encrypted", true))
+            val pin = UploadSeal.target(Credentials.PIN, null, open, signedIn, guest)!!
             assertEquals("w3d", pin.folder)
             assertEquals(2, pin.version)
         } finally {

@@ -78,13 +78,14 @@ type PinInfo struct {
 	Folder    string     `json:"folder"`     // the id of the folder it sends into
 	// ShowsFolder: guests with it also see and download what is in the folder.
 	ShowsFolder bool `json:"shows_folder"`
-	// Secret: for a PIN that shows an encrypted folder, its link's secret sealed for version
-	// version of the folder's key, so that an admin's device can make the whole link again.
+	// Secret: for a PIN that shows an encrypted folder, its link's secret locked with a key from
+	// version version of the folder's key, so that an admin's device can make the whole link
+	// again.
 	Secret *PinSecretInfo `json:"secret"`
 }
 
 type PinSecretInfo struct {
-	Sealed  B64 `json:"sealed"`
+	Locked  B64 `json:"locked"`
 	Version int `json:"version"`
 }
 
@@ -94,7 +95,7 @@ func (a *API) pinInfo(p db.Pin, s db.PinStat) PinInfo {
 		Link: a.Cfg.PublicURL + "/#" + p.Code, Files: s.Files, Phones: s.Phones, Folder: p.FolderID, ShowsFolder: p.ShowsFolder,
 	}
 	if p.Secret != nil {
-		info.Secret = &PinSecretInfo{Sealed: p.Secret.Sealed, Version: p.Secret.Version}
+		info.Secret = &PinSecretInfo{Locked: p.Secret.Locked, Version: p.Secret.Version}
 	}
 	return info
 }
@@ -158,11 +159,13 @@ type createPinRequest struct {
 	Secret *pinSecretRequest `json:"secret,omitempty"`
 }
 
-// pinSecretRequest is the secret of the link of a PIN that shows an encrypted folder, sealed
-// for a version of the folder's key, and the folder's keys locked with it.
+// pinSecretRequest is the secret of the link of a PIN that shows an encrypted folder, locked
+// with a key from a version of the folder's private key, and the root and the folder's keys
+// locked with it.
 type pinSecretRequest struct {
-	Sealed  B64 `json:"sealed"`
+	Locked  B64 `json:"locked"`
 	Version int `json:"version"`
+	Root    B64 `json:"root"`
 	Keys    []struct {
 		Version int `json:"version"`
 		Locked  B64 `json:"locked"`
@@ -173,7 +176,7 @@ type pinSecretRequest struct {
 func (a *API) pinSecret(w http.ResponseWriter, r *http.Request, folderID string, req *pinSecretRequest) (*db.PinSecret, bool) {
 	ctx := r.Context()
 	versions := []int{req.Version}
-	out := &db.PinSecret{Sealed: req.Sealed, Version: req.Version}
+	out := &db.PinSecret{Locked: req.Locked, Version: req.Version, Root: req.Root}
 	for _, k := range req.Keys {
 		if len(k.Locked) != lockedKeySize {
 			badKey(w, "locked key")
@@ -182,8 +185,12 @@ func (a *API) pinSecret(w http.ResponseWriter, r *http.Request, folderID string,
 		versions = append(versions, k.Version)
 		out.Keys = append(out.Keys, db.PinKey{Version: k.Version, Locked: k.Locked})
 	}
-	if len(req.Sealed) != sealedKeySize {
-		badKey(w, "sealed secret")
+	if len(req.Locked) != lockedKeySize {
+		badKey(w, "locked secret")
+		return nil, false
+	}
+	if len(req.Root) != lockedRootSize {
+		badKey(w, "locked root")
 		return nil, false
 	}
 	for _, v := range versions {
@@ -521,17 +528,33 @@ type newInviteRequest struct {
 	Role    string   `json:"role"`
 	Folders []string `json:"folders"` // the folders a member gets, possibly none; needed for a member
 	// Keys: the versions of the keys of the encrypted folders the person gets, locked with the
-	// secret of the invite's link.
+	// secret of the invite's link; and Root, the root, locked with it too.
 	Keys []struct {
 		Folder  string `json:"folder"`
 		Version int    `json:"version"`
 		Locked  B64    `json:"locked"`
 	} `json:"keys,omitempty"`
+	Root B64 `json:"root,omitempty"`
 }
 
-// invitePhoneRequest may bring the person's key, locked with the secret of the invite's link.
+// invitePhoneRequest may bring the person's key and the root, locked with the secret of the
+// invite's link.
 type invitePhoneRequest struct {
 	PersonKey B64 `json:"person_key,omitempty"`
+	Root      B64 `json:"root,omitempty"`
+}
+
+// inviteRoot is the root locked with an invite link's secret, as an invite's key; false for a
+// malformed one.
+func inviteRoot(w http.ResponseWriter, root []byte) ([]db.InviteKey, bool) {
+	if root == nil {
+		return nil, true
+	}
+	if len(root) != lockedRootSize {
+		badKey(w, "root")
+		return nil, false
+	}
+	return []db.InviteKey{{Root: true, Locked: root}}, true
 }
 
 // NewInvite is a fresh invite. The token and the link are shown only now; the server keeps
@@ -570,7 +593,11 @@ func (a *API) invite(w http.ResponseWriter, r *http.Request) {
 		}
 		keys = append(keys, db.InviteKey{FolderID: k.Folder, Version: k.Version, Locked: k.Locked})
 	}
-	a.newInvite(w, r, p, req.Name, req.Role, "", req.Folders, keys)
+	root, ok := inviteRoot(w, req.Root)
+	if !ok {
+		return
+	}
+	a.newInvite(w, r, p, req.Name, req.Role, "", req.Folders, append(keys, root...))
 }
 
 func (a *API) invitePhone(w http.ResponseWriter, r *http.Request) {
@@ -590,7 +617,11 @@ func (a *API) invitePhone(w http.ResponseWriter, r *http.Request) {
 		}
 		keys = []db.InviteKey{{Locked: req.PersonKey}}
 	}
-	a.newInvite(w, r, p, "", "", r.PathValue("id"), nil, keys)
+	root, ok := inviteRoot(w, req.Root)
+	if !ok {
+		return
+	}
+	a.newInvite(w, r, p, "", "", r.PathValue("id"), nil, append(keys, root...))
 }
 
 func (a *API) newInvite(w http.ResponseWriter, r *http.Request, p *auth.Principal, name, role, forUser string, folders []string, keys []db.InviteKey) {

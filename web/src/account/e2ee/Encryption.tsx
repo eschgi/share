@@ -2,13 +2,13 @@
 // recovery code, what a browser without its keys can do, and the checks before keys are passed on.
 import './e2ee.css';
 import { useEffect, useState } from 'preact/hooks';
-import { ApiError, getSettings, putSettings, setFolderEncryption, type FolderInfo } from '../../api';
+import { ApiError, getSettings, putSettings, type FolderInfo } from '../../api';
 import { Bold } from '../../components/Bits';
 import { Icon } from '../../components/Icon';
 import { QrCode } from '../../components/QrCode';
 import { SealError } from '../../e2ee/formats';
 import { useKeyring } from '../../e2ee/hooks';
-import { keyring, type Ask, type ShownCode } from '../../e2ee/keyring';
+import { keyring, NeedsRoot, type Ask, type ShownCode } from '../../e2ee/keyring';
 import { useI18n, type I18n } from '../../i18n';
 import { Row, Switch } from '../components/Bits';
 import { Confirm, Modal } from '../components/Modal';
@@ -146,7 +146,7 @@ export function EncryptionSwitch({ folder, start, onChanged }: { folder: FolderI
       setStep(null);
       toast({ text: t('encryption.on', { folder: folder.name }) });
     } catch (e) {
-      setProblem(t(e instanceof ApiError && e.status === 0 ? 'common.offline' : 'common.failed'));
+      setProblem(t(e instanceof NeedsRoot ? 'encryption.needsRoot' : e instanceof ApiError && e.status === 0 ? 'common.offline' : 'common.failed'));
     }
     setBusy(false);
   };
@@ -155,12 +155,12 @@ export function EncryptionSwitch({ folder, start, onChanged }: { folder: FolderI
     setBusy(true);
     setProblem(null);
     try {
-      await setFolderEncryption(folder.id, false);
+      await keyring.switchOff(folder);
       await refreshFolders();
       onChanged();
       setStep(null);
     } catch (e) {
-      setProblem(t(e instanceof ApiError && e.status === 0 ? 'common.offline' : 'common.failed'));
+      setProblem(t(e instanceof NeedsRoot ? 'encryption.needsRoot' : e instanceof ApiError && e.status === 0 ? 'common.offline' : 'common.failed'));
     }
     setBusy(false);
   };
@@ -403,6 +403,7 @@ function KeysAsk({ ask }: { ask: Ask }) {
               </span>
             ))}
           </div>
+          {ask.root && <p class="modal-text">{t('keys.personRoot', { name: ask.name })}</p>}
           <p class="label">{t('keys.personCode', { name: ask.name })}</p>
           {code}
           <p class="help">

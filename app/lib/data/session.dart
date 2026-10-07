@@ -147,7 +147,7 @@ class SessionRepository {
     final signedIn = SignedIn.fromJson(res);
     await _signedIn(link.server, identity, signedIn);
     // The keys the link's secret opens: the folders', or the person's own for a new phone.
-    unawaited(platform.keysFromInvite(link.secret, signedIn.keys).then<void>((_) {}, onError: (Object _) => _syncKeys()));
+    unawaited(platform.keysFromInvite(link.secret, signedIn.keys, signedIn.root).then<void>((_) {}, onError: (Object _) => _syncKeys()));
   }
 
   Future<void> _signedIn(Uri server, ServerIdentity identity, SignedIn s) async {

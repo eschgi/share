@@ -22,7 +22,8 @@
       "client": "web",
       "home_only": false
     },
-    "keys": []
+    "keys": [],
+    "root": null
   },
   "notes": "Accepting an invite in a browser: the key comes as a cookie, as in login_web.json. An invite with adds_phone signs this browser in as that person. The same errors as invite_accept.json and invite_errors.json. keys as in invite_accept.json."
 }

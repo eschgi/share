@@ -34,10 +34,13 @@ export function CodeBoxes({ code }: { code: string }) {
 }
 
 /** A PIN's link to hand on: for one that shows an encrypted folder, with its secret after a
- * dot, which this browser opens with the folder's key. */
+ * dot, which this browser opens with the folder's key; for one that only sends into a folder with
+ * keys, with the root's fingerprint, which guests' browsers check the folder's key with. */
 async function linkOf(p: PinInfo): Promise<string> {
   const secret = await keyring.pinLinkSecret(p);
-  return secret ? `${p.link}.${secret}` : p.link;
+  if (secret) return `${p.link}.${secret}`;
+  const root = p.shows_folder ? null : await keyring.pinLinkRoot(p.folder);
+  return root ? `${p.link}.${root}` : p.link;
 }
 
 type Asking = { kind: 'newCode' | 'end'; pin: PinInfo } | null;
@@ -204,7 +207,7 @@ function PinCard({ pin, folder, shares, onHandOn, onQr, onAsk }: CardProps) {
 /** A PIN as a QR code, for someone standing next to you. */
 function PinQr({ pin, onClose }: { pin: PinInfo; onClose: () => void }) {
   const { t } = useI18n();
-  const [link, setLink] = useState<string | null>(pin.secret ? null : pin.link);
+  const [link, setLink] = useState<string | null>(null);
   useEffect(() => void linkOf(pin).then(setLink), [pin.id]);
   return (
     <Modal title={t('pins.scanToSend')} onClose={onClose}>
@@ -256,7 +259,7 @@ export function NewPinDialog({ folder, onCreated, onClose }: { folder?: string; 
       const secret = shows ? await keyring.pinSecret(into) : null;
       if (shows && !secret && folders.byId(into)?.key_version) throw new SealError("the folder's keys aren't here");
       pin = await createPin(kind, code, into, shows, secret?.body);
-      link = secret ? `${pin.link}.${secret.secret}` : pin.link;
+      link = secret ? `${pin.link}.${secret.secret}` : await linkOf(pin);
     } catch (e) {
       setBusy(false);
       if (e instanceof SealError) return setProblem(t('keys.cantOpen'));

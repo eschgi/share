@@ -1,7 +1,8 @@
 // Share's end-to-end encryption formats (docs/e2ee-plan.md, contract/crypto): sealed keys,
-// locks, password locks, thumbnails and the recovery code. File contents are in content.ts.
+// locks, password locks, signatures, thumbnails, the recovery code and checks. File contents are
+// in content.ts.
 import { b64u, concat, fromB64u, randomBytes, u32, utf8, type Bytes } from './bytes';
-import { ecdh, open, seal, SealError, type Ephemeral } from './hpke';
+import { dh, ecdh, open, seal, SealError, type Ephemeral } from './hpke';
 
 export { SealError };
 
@@ -14,8 +15,12 @@ export const purposes = {
   invite: 'share-e2ee-v1/invite',
   pin: 'share-e2ee-v1/pin',
   recovery: 'share-e2ee-v1/recovery',
+  root: 'share-e2ee-v1/root',
+  note: 'share-e2ee-v1/note',
+  pinSecret: 'share-e2ee-v1/pin-secret',
   check: 'share-e2ee-v1/check',
   code: 'share-e2ee-v1/code',
+  confirm: 'share-e2ee-v1/confirm',
 } as const;
 
 /** What a folder key, and a file key sealed for it, are bound to. */
@@ -23,6 +28,13 @@ export const folderContext = (folderId: string, version: number) => utf8(`folder
 /** What a person's private key is bound to. */
 export const personContext = (userId: string) => utf8(`person:${userId}`);
 export const recoveryContext = utf8('recovery');
+/** What the root's private key is bound to when sealed for an admin, and its public key when
+ * locked with an invite's or a PIN's link. */
+export const rootContext = utf8('root');
+/** What a person's note is bound to. */
+export const noteContext = (userId: string) => utf8(`note:${userId}`);
+/** What a check's confirmation is bound to. */
+export const checkContext = (id: string) => utf8(`check:${id}`);
 
 /** A key pair: the private key for WebCrypto, its public key as sent, and its 32-byte scalar
  * when it may be sealed for others (never for a device key). */
@@ -128,6 +140,51 @@ export async function openThumb(fileKey: Bytes, sealed: Bytes): Promise<Bytes> {
   return unlock(await thumbKey(fileKey), new Uint8Array(0), sealed);
 }
 
+/** The key a person's note is locked with, from their private key. */
+export const noteKey = (personRaw: Bytes) => secretKey(personRaw, purposes.note);
+
+/** The key a PIN link's secret is locked with, from a version of the folder's private key: only
+ * someone who holds it can make one. */
+export const pinSecretKey = (folderRaw: Bytes) => secretKey(folderRaw, purposes.pinSecret);
+
+// What the root, which is the recovery key, signs (contract/crypto/sign.json): ECDSA on P-256 with
+// SHA-256, which WebCrypto gives as r‖s, Share's format.
+
+const ecdsa = { name: 'ECDSA', namedCurve: 'P-256' } as const;
+const ecdsaSHA256 = { name: 'ECDSA', hash: 'SHA-256' } as const;
+
+/** A version of a folder's key. */
+export const folderKeyMessage = (folder: string, version: number, publicKey: Bytes) =>
+  concat(utf8('share-e2ee-v1/sign/folder-key'), folderContext(folder, version), publicKey);
+/** A folder that sends plain: never encrypted (version 0) or switched off, under its name. */
+export const plainMessage = (folder: string, version: number, name: string) =>
+  concat(utf8('share-e2ee-v1/sign/plain'), folderContext(folder, version), utf8(`\n${name}`));
+/** The key of a new recovery code, signed with the old one. */
+export const rootMessage = (publicKey: Bytes) => concat(utf8('share-e2ee-v1/sign/root'), publicKey);
+
+/** Signs message with a private key's scalar and its public key: 64 bytes, r and s. */
+export async function sign(raw: Bytes, publicKey: Bytes, message: Bytes): Promise<Bytes> {
+  const jwk = { kty: 'EC', crv: 'P-256', d: b64u(raw), x: b64u(publicKey.subarray(1, 33)), y: b64u(publicKey.subarray(33)) };
+  const key = await crypto.subtle.importKey('jwk', jwk, ecdsa, false, ['sign']);
+  return new Uint8Array(await crypto.subtle.sign(ecdsaSHA256, key, message));
+}
+
+/** Whether signature is publicKey's signature of message. */
+export async function verify(publicKey: Bytes, message: Bytes, signature: Bytes): Promise<boolean> {
+  if (signature.length !== 64) return false;
+  try {
+    const key = await crypto.subtle.importKey('raw', publicKey, ecdsa, false, ['verify']);
+    return await crypto.subtle.verify(ecdsaSHA256, key, signature, message);
+  } catch {
+    return false;
+  }
+}
+
+/** The root's fingerprint in a PIN's link: the first 16 bytes of SHA-256. */
+export async function fingerprint(publicKey: Bytes): Promise<Bytes> {
+  return new Uint8Array(await crypto.subtle.digest('SHA-256', publicKey)).subarray(0, 16);
+}
+
 // The recovery code: 20 random bytes as 32 characters of Crockford's base32, in groups of four.
 
 const crockford = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
@@ -178,18 +235,30 @@ export function newRecoveryCode(): { secret: Bytes; code: string } {
 }
 
 // A check before keys are passed on (contract/crypto/check.json): the asking device commits to
-// a nonce, the waiting side answers with its own, then the nonce is revealed, and both screens
-// show the code.
+// a one-time key, the waiting side answers with its own, then the asking device reveals its key,
+// and both screens show the code. After Allow, the asking device hands on what only the waiting
+// side opens, with a key from the secret the two one-time keys make.
 
-export const checkNonceSize = 32;
-
-/** What the asking device sends before its nonce. */
-export async function commitment(nonce: Bytes): Promise<Bytes> {
-  return new Uint8Array(await crypto.subtle.digest('SHA-256', concat(utf8(purposes.check), nonce)));
+/** A one-time key pair for a check; its private key never leaves the page. */
+export async function oneTimeKey(): Promise<{ privateKey: CryptoKey; publicKey: Bytes }> {
+  const pair = (await crypto.subtle.generateKey(ecdh, false, ['deriveBits'])) as CryptoKeyPair;
+  return { privateKey: pair.privateKey, publicKey: new Uint8Array(await crypto.subtle.exportKey('raw', pair.publicKey)) };
 }
 
-/** The 6 digits both screens show, from both nonces and the public key that gets the keys. */
-export async function checkCode(askerNonce: Bytes, answerNonce: Bytes, publicKey: Bytes): Promise<string> {
-  const h = new Uint8Array(await crypto.subtle.digest('SHA-256', concat(utf8(purposes.code), askerNonce, answerNonce, publicKey)));
+/** What the asking device sends before its one-time key. */
+export async function commitment(key: Bytes): Promise<Bytes> {
+  return new Uint8Array(await crypto.subtle.digest('SHA-256', concat(utf8(purposes.check), key)));
+}
+
+/** The 6 digits both screens show, from both one-time keys and the public key that gets the keys. */
+export async function checkCode(askerKey: Bytes, answerKey: Bytes, publicKey: Bytes): Promise<string> {
+  const h = new Uint8Array(await crypto.subtle.digest('SHA-256', concat(utf8(purposes.code), askerKey, answerKey, publicKey)));
   return String(new DataView(h.buffer).getUint32(0) % 1_000_000).padStart(6, '0');
+}
+
+/** The key the asking device's confirmation is locked with: from one side's one-time private key
+ * and the other side's public key, the same on both sides. */
+export async function confirmKey(privateKey: CryptoKey, otherKey: Bytes, askerKey: Bytes, answerKey: Bytes, publicKey: Bytes): Promise<Bytes> {
+  const salt = new Uint8Array(await crypto.subtle.digest('SHA-256', concat(askerKey, answerKey, publicKey)));
+  return hkdf(await dh(privateKey, otherKey), salt, purposes.confirm);
 }

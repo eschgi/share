@@ -200,28 +200,44 @@ The design and the formats are in [docs/e2ee-plan.md](docs/e2ee-plan.md).
   someone who can change the server's database can't slip in a phone or a person of their own. A
   member whose key is lost, with no phone or browser left that holds it and no password that opens
   it, gets a new one by itself, which an admin then allows.
+- **Signed by the recovery key.** The recovery key signs every key of every encrypted folder, and
+  every decision that a folder sends plain, under its name. Phones and browsers check that before
+  they send, and keep what they saw: a folder whose key it didn't sign, or with fewer keys than
+  before, gets nothing, and the page or the app says so; a folder switched off without its
+  signature still gets encrypted files. So someone who can change the database can't switch a
+  folder's encryption off, name a key of their own for it, or pass another folder off under its
+  name; nor get folder keys sealed for a recovery key or a PIN secret of their own. Admins' phones
+  and browsers hold the recovery key too, passed on with an OK like folder keys, and only they make
+  folders, switch encryption and rename folders that send plain; an admin's phone that doesn't
+  hold it yet says so.
 - **The recovery code.** The first encrypted folder shows its admin a recovery code, once: written
   down or printed, it opens every encrypted folder again should all phones and browsers be lost.
-  A new one can be made in the settings, which ends the old one.
+  A new one can be made in the settings, which ends the old one: the old recovery key signs the new
+  one, which signs everything anew, and the other admins get it with an OK.
 - **PINs.** Guests with a PIN send into an encrypted folder encrypted, and can't read anything back.
-  A PIN that also shows an encrypted folder needs its whole link, which carries a secret after a
-  dot that opens the folder; the code alone sends, and shows encrypted files as locked.
+  A PIN's link into an encrypted folder names the recovery key after a dot, which the guest's
+  browser or phone checks the folder's key with. A PIN that also shows an encrypted folder needs
+  its whole link, which carries a secret after the dot that opens the folder; the code alone sends,
+  and shows encrypted files as locked.
 - **What stays possible.** Videos play and seek, downloads, "one by one" and saving into a folder
   give the original files, decrypted on the device. ZIPs leave encrypted files out; they download
   one by one instead. Encrypted files move only into a folder that has a key: one that is
   encrypted, or was. The command line has no keys: `share invite` and `share pin create --show`
   refuse encrypted folders and point to the app or the website, and `share pin new-code` leaves the
-  whole link of a PIN that shows one to them.
+  whole link of a PIN that shows one to them. `share pin create` into an encrypted folder prints a
+  link that names the recovery key as the database has it.
 - **What it doesn't protect:** the names and other details above; files someone already downloaded;
   anyone holding the whole link of a PIN that shows an encrypted folder, by design (its secret stays
   in the guest's browser until the PIN is forgotten there); a server that was taken over and sends
   browsers changed website code, since the website comes from the server, while the app's code
-  doesn't. Someone who can change the database can switch a folder's encryption off, or name a key
-  of their own as the folder's newest one: new files are then sent plain, or encrypted for that
-  key; the files encrypted before stay safe. The recovery key and the links of PINs that show a
-  folder still get its keys without a check, so a database someone changed could also name a
-  recovery key or a PIN secret of their own. A password opens the keys, so they are as safe as the
-  password, which the server sees at sign-in.
+  doesn't. Where a phone or browser has nothing to check the database with, it takes its word: a
+  guest who types a PIN's code instead of opening its link, or has a link made while the folder was
+  plain; a phone or browser used before the recovery key was made, which takes the first one the
+  server names; and one signed in for the first time with only the password, if the database also
+  brings back an older note of that person's and leaves out a folder's newest keys. Someone who can
+  change the database can also hide a folder, so that files go into another one, plain if that one
+  is. A password opens the keys, so they are as safe as the password, which the server sees at
+  sign-in.
 
 ## Security
 

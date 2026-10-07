@@ -5,11 +5,16 @@ import rfc from '../../contract/crypto/hpke_rfc9180.json';
 import lockVectors from '../../contract/crypto/lock.json';
 import recoveryVectors from '../../contract/crypto/recovery.json';
 import sealVectors from '../../contract/crypto/seal.json';
+import signVectors from '../../contract/crypto/sign.json';
 import { b64u, concat, fromB64u, utf8, type Bytes } from '../src/e2ee/bytes';
 import { chunkSize, cipherRange, ContentCipher, decryptChunks, decryptFile, decryptStream, encryptedSize, encryptedSlice, headerSize, newHeader } from '../src/e2ee/content';
 import {
   checkCode,
+  checkContext,
   commitment,
+  confirmKey,
+  fingerprint,
+  folderKeyMessage,
   formatRecoveryCode,
   generateKeyPair,
   importPrivateKey,
@@ -20,13 +25,17 @@ import {
   parseRecoveryCode,
   passwordLock,
   passwordUnlock,
+  plainMessage,
   purposes,
   recoveryContext,
+  rootMessage,
   sealKey,
   sealThumb,
   secretKey,
+  sign,
   thumbKey,
   unlock,
+  verify,
 } from '../src/e2ee/formats';
 
 const hex = (s: string) => new Uint8Array(s.match(/../g)!.map((b) => parseInt(b, 16))) as Bytes;
@@ -212,11 +221,46 @@ describe('the recovery code', () => {
   });
 });
 
+/** A one-time private key of the check vectors, for ECDH. */
+async function ecdhKey(raw: string, publicKey: string): Promise<CryptoKey> {
+  return importPrivateKey(fromB64u(raw), fromB64u(publicKey));
+}
+
 describe('checks', () => {
-  it('commit and make codes as the vectors do', async () => {
+  it('commit, make codes and confirm as the vectors do', async () => {
     for (const c of checkVectors.cases) {
-      expect(b64u(await commitment(fromB64u(c.asker_nonce))), c.name).toBe(c.commitment);
-      expect(await checkCode(fromB64u(c.asker_nonce), fromB64u(c.answer_nonce), fromB64u(c.public_key)), c.name).toBe(c.code);
+      const [asker, answer, pub] = [fromB64u(c.asker_key), fromB64u(c.answer_key), fromB64u(c.public_key)];
+      expect(b64u(await commitment(asker)), c.name).toBe(c.commitment);
+      expect(await checkCode(asker, answer, pub), c.name).toBe(c.code);
+      const asking = await confirmKey(await ecdhKey(c.asker_private_key, c.asker_key), answer, asker, answer, pub);
+      const waiting = await confirmKey(await ecdhKey(c.answer_private_key, c.answer_key), asker, asker, answer, pub);
+      expect(b64u(asking), c.name).toBe(c.confirm_key);
+      expect(b64u(waiting), c.name).toBe(c.confirm_key);
+      expect(new TextDecoder().decode(await unlock(waiting, checkContext(c.check), fromB64u(c.confirmation))), c.name).toBe(c.confirmed);
     }
+  });
+});
+
+describe('signatures', () => {
+  const pub = fromB64u(signVectors.public_key);
+  const messageOf = (c: { folder?: string; version?: number; folder_key?: string; folder_name?: string; new_root?: string }) =>
+    c.folder_key ? folderKeyMessage(c.folder!, c.version!, fromB64u(c.folder_key)) : c.folder_name !== undefined ? plainMessage(c.folder!, c.version!, c.folder_name) : rootMessage(fromB64u(c.new_root!));
+
+  it('make the vectors\' messages and verify their signatures', async () => {
+    expect(b64u(await fingerprint(pub))).toBe(signVectors.fingerprint);
+    for (const c of signVectors.verify) {
+      expect(b64u(messageOf(c)), c.name).toBe(c.message);
+      expect(await verify(pub, messageOf(c), fromB64u(c.signature)), c.name).toBe(true);
+    }
+    for (const c of signVectors.refuse) expect(await verify(pub, fromB64u(c.message), fromB64u(c.signature)), c.name).toBe(false);
+  });
+
+  it('sign what Go verifies the same way: r and s, 64 bytes', async () => {
+    const m = plainMessage('0199a0c4-8f6e-7d2a-9b1c-3e5f7a9b1c3d', 0, 'Família');
+    const sig = await sign(fromB64u(signVectors.private_key), pub, m);
+    expect(sig.length).toBe(64);
+    expect(await verify(pub, m, sig)).toBe(true);
+    expect(await verify(pub, plainMessage('0199a0c4-8f6e-7d2a-9b1c-3e5f7a9b1c3d', 0, 'Familia'), sig)).toBe(false);
+    expect(await verify(pub.subarray(1), m, sig)).toBe(false);
   });
 });

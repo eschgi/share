@@ -73,6 +73,8 @@
   "sending.failed.other": "{n} Dateien konnten nicht gesendet werden.",
   "sending.retry": "Nochmal versuchen",
   "sending.tooLarge": "{name} ist zu groß zum Senden.",
+  "sending.unchecked": "Einige Dateien wurden nicht gesendet: Share konnte die Schlüssel ihres Ordners nicht prüfen und daher nicht sicherstellen, dass sie privat bleiben. Sag es einem Admin.",
+  "sending.uncheckedGuest": "Einige Dateien wurden nicht gesendet: Share konnte die Schlüssel des Ordners dieser PIN nicht prüfen und daher nicht sicherstellen, dass sie privat bleiben. Sag es der Person, die dir die PIN gegeben hat.",
 
   "welcome.title": "Willkommen zurück",
   "welcome.lead": "Das Senden wurde unterbrochen. Es ist nichts verloren.",

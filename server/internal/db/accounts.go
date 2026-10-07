@@ -280,10 +280,12 @@ type Invite struct {
 }
 
 // InviteKey is a key locked with the secret of an invite's link: a version of a folder's key,
-// or the person's own key ("" and 0) for a new phone or browser.
+// the person's own key ("" and 0) for a new phone or browser, or the root's public key (Root),
+// for the new phone or browser to trust.
 type InviteKey struct {
 	FolderID string
 	Version  int
+	Root     bool
 	Locked   []byte
 }
 
@@ -305,16 +307,19 @@ func scanInvite(row interface{ Scan(...any) error }) (Invite, error) {
 
 // InsertInvite stores a new invite with the folders it gives; only the token's hash is kept.
 func (d *DB) InsertInvite(ctx context.Context, in Invite, tokenHash []byte) error {
-	var personKey []byte // the person's own key, without a folder, is kept with the invite
+	var personKey, root []byte // the person's own key, without a folder, and the root are kept with the invite
 	for _, k := range in.Keys {
-		if k.FolderID == "" {
+		switch {
+		case k.Root:
+			root = k.Locked
+		case k.FolderID == "":
 			personKey = k.Locked
 		}
 	}
 	return d.inTx(ctx, func(tx *sql.Tx) error {
-		_, err := tx.ExecContext(ctx, `INSERT INTO invites (id, token_hash, name, role, user_id, created_by, created_at, expires_at, person_key)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-			in.ID, tokenHash, in.Name, in.Role, nullString(in.UserID), in.CreatedBy, in.CreatedAt, in.ExpiresAt, personKey)
+		_, err := tx.ExecContext(ctx, `INSERT INTO invites (id, token_hash, name, role, user_id, created_by, created_at, expires_at, person_key, root_locked)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+			in.ID, tokenHash, in.Name, in.Role, nullString(in.UserID), in.CreatedBy, in.CreatedAt, in.ExpiresAt, personKey, root)
 		if err != nil {
 			return err
 		}
@@ -324,7 +329,7 @@ func (d *DB) InsertInvite(ctx context.Context, in Invite, tokenHash []byte) erro
 			}
 		}
 		for _, k := range in.Keys {
-			if k.FolderID == "" {
+			if k.Root || k.FolderID == "" {
 				continue
 			}
 			if _, err := tx.ExecContext(ctx, "INSERT INTO invite_keys (invite_id, folder_id, version, locked) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",
@@ -355,11 +360,11 @@ func (d *DB) UseInvite(ctx context.Context, inviteID string, u User, dv Device, 
 	var keys []InviteKey
 	err := d.inTx(ctx, func(tx *sql.Tx) error {
 		keys = nil
-		// The person's own key, locked with the link's secret, goes to the new device once.
-		var personKey []byte
-		err := tx.QueryRowContext(ctx, `UPDATE invites SET used_at = $1, device_id = $2, person_key = NULL
-			WHERE id = $3 AND used_at IS NULL AND revoked_at IS NULL AND expires_at > $4 RETURNING old.person_key`,
-			now, dv.ID, inviteID, now).Scan(&personKey)
+		// The person's own key and the root, locked with the link's secret, go to the new device once.
+		var personKey, root []byte
+		err := tx.QueryRowContext(ctx, `UPDATE invites SET used_at = $1, device_id = $2, person_key = NULL, root_locked = NULL
+			WHERE id = $3 AND used_at IS NULL AND revoked_at IS NULL AND expires_at > $4 RETURNING old.person_key, old.root_locked`,
+			now, dv.ID, inviteID, now).Scan(&personKey, &root)
 		if noRow(err) {
 			return ErrConflict
 		}
@@ -368,6 +373,9 @@ func (d *DB) UseInvite(ctx context.Context, inviteID string, u User, dv Device, 
 		}
 		if personKey != nil {
 			keys = append(keys, InviteKey{Locked: personKey})
+		}
+		if root != nil {
+			keys = append(keys, InviteKey{Root: true, Locked: root})
 		}
 		if u.ID != dv.UserID {
 			return errors.New("db: the phone must belong to the person the invite is for")

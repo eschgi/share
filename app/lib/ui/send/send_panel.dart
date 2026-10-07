@@ -220,6 +220,7 @@ class _Progress extends StatelessWidget {
           _Notice(icon: AppIcons.clock, text: t.sendPaused, action: (t.sendGoOn, onGoOn)),
         if (s.lost > 0) _Notice(icon: AppIcons.alert, text: t.sendLostCount(s.lost), action: (t.sendPickAgain, onPickAgain)),
         if (s.failed > 0) _Notice(icon: AppIcons.alert, text: t.sendFailedCount(s.failed), danger: true),
+        if (s.unchecked > 0) _Notice(icon: AppIcons.lock, text: s.auth == SendAuth.pin ? t.sendUncheckedGuest : t.sendUnchecked, danger: true),
         if (s.running)
           Align(
             alignment: Alignment.centerRight,

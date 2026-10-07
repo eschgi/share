@@ -17,7 +17,7 @@ import { PendingSend, SendInto } from './SendInto';
 export function SendTab() {
   const { t } = useI18n();
   const { info } = useAccount();
-  const { state, snapshot, rejected, pending } = useSender();
+  const { state, snapshot, rejected, refused, pending } = useSender();
   const folders = useFolders();
   const [online, setOnline] = useState(navigator.onLine);
   useEffect(() => {
@@ -64,6 +64,7 @@ export function SendTab() {
           snapshot={snapshot!}
           online={online}
           rejected={rejected}
+          refused={refused ? 'account' : null}
           onFiles={(files) => sendFiles(files)}
           onSkipGhosts={skipGhosts}
           onRetry={retryFailed}

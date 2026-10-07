@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import contract from '../../contract/pin_codes.json';
-import { cleanPinInput, normalizePin, pinAlphabet, pinFromHash, pinLength, pinSecretFromHash } from '../src/pin';
+import { cleanPinInput, normalizePin, pinAlphabet, pinFromHash, pinLength, pinRootFromHash, pinSecretFromHash } from '../src/pin';
 
 describe('PIN rules', () => {
   it('uses the same alphabet and length as the server', () => {
@@ -30,5 +30,14 @@ describe('PIN rules', () => {
     expect(pinSecretFromHash('#K7M2Q')).toBeNull();
     expect(pinSecretFromHash(`#K7M2Q.${secret.slice(2)}`)).toBeNull();
     expect(pinSecretFromHash(`#.${secret}`)).toBeNull();
+  });
+
+  it("reads the root's fingerprint of a PIN link that only sends into a folder with keys", () => {
+    const fp = 'y'.repeat(21) + 'Q';
+    expect(pinFromHash(`#K7M2Q.${fp}`)).toBe('K7M2Q');
+    expect(pinRootFromHash(`#K7M2Q.${fp}`)).toBe(fp);
+    expect(pinSecretFromHash(`#K7M2Q.${fp}`)).toBeNull();
+    expect(pinRootFromHash(`#K7M2Q.${'x'.repeat(43)}`)).toBeNull();
+    expect(pinRootFromHash('#K7M2Q')).toBeNull();
   });
 });

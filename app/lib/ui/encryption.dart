@@ -20,6 +20,7 @@ import 'widgets.dart';
 
 String _keysProblem(AppLocalizations t, Object e) => switch (e) {
       KeysException(code: 'offline') || NetworkException() => t.commonOffline,
+      KeysException(code: 'needs_root') => t.encryptionNeedsRoot,
       _ => t.commonFailed,
     };
 
@@ -410,6 +411,10 @@ class _KeyAskSheetState extends State<KeyAskSheet> {
               const SizedBox(height: 14),
               if (ask.isPerson) ...[
                 Text(ask.keyChanged ? t.keysPersonNew(ask.name) : t.keysPersonFirst(ask.name), style: TextStyle(fontSize: 15, color: c.text2, height: 1.5)),
+                if (ask.root) ...[
+                  const SizedBox(height: 8),
+                  Text(t.keysPersonRoot(ask.name), style: TextStyle(fontSize: 15, color: c.text2, height: 1.5)),
+                ],
                 const SizedBox(height: 12),
                 Wrap(spacing: 8, runSpacing: 8, children: [
                   for (final id in ask.folders) _FolderTag(name: services.folders.byId(id)?.name ?? '…'),
@@ -566,7 +571,7 @@ class _EncryptionRowState extends State<EncryptionRow> {
     if (!await _confirm(icon: AppIcons.lockOpen, title: t.encryptionOffTitle(f.name), body: t.encryptionOffBody, yes: t.encryptionTurnOff) || !mounted) return;
     setState(() => _busy = true);
     try {
-      await services.api.put('/api/folders/${f.id}/encryption', {'encrypted': false});
+      await services.platform.switchOff(f);
       await services.folders.load();
     } on Exception catch (e) {
       messenger.showSnackBar(SnackBar(content: Text(_keysProblem(t, e))));

@@ -6,7 +6,7 @@ import Uppy, { type Body, type Meta, type UppyFile } from '@uppy/core';
 import GoldenRetriever, { type GoldenRetrieverOptions } from '@uppy/golden-retriever';
 import Tus from '@uppy/tus';
 import { errorCode, type Info } from './api';
-import type { FolderPublicKey } from './e2ee/keyring';
+import { SendRefused, type FolderPublicKey } from './e2ee/trust';
 import { encOf, encryptingReader, newSeal, parseSeal, remember } from './e2ee/upload';
 import type { Shared } from './inbox';
 import S3Upload, { abortS3Upload } from './s3upload';
@@ -52,8 +52,11 @@ export interface UploaderEvents {
   /** A file shared from another app was sent, or given up: it can leave the inbox. */
   onSharedGone?(key: number): void;
   /** The key a folder's new files are encrypted for (signed in: the folder said; a PIN: its
-   * own); null while it is plain. */
-  encryptFor?(folder: string | undefined): FolderPublicKey | null;
+   * own), signed by the root; null while they go plain. Throws SendRefused when nothing may go
+   * into the folder: what the server says about its keys can't be checked. */
+  encryptFor?(folder: string | undefined): Promise<FolderPublicKey | null>;
+  /** Files weren't sent: what the server says about their folder's keys can't be checked. */
+  onRefused?(): void;
   /** The folder's key changed meanwhile (a new version, or it was encrypted): ask again. */
   refreshKeys?(): Promise<void>;
   /** Nothing is on its way any more, and some files didn't go. */
@@ -190,20 +193,38 @@ export class Uploader {
     }
 
     // Into an encrypted folder, each file gets its key just before its upload starts, and keeps
-    // it across tries and a closed page.
-    this.uppy.addPreProcessor(async (ids) => {
+    // it across tries and a closed page. A file whose folder's keys can't be checked fails here,
+    // and leaves the batch; trying it again checks again.
+    this.uppy.addPreProcessor(async (ids, uploadID) => {
+      const refused: string[] = [];
       for (const id of ids) {
         const f = this.uppy.getFile(id);
         if (!f || !(f.data instanceof Blob)) continue;
         let seal = parseSeal(f.meta.e2ee);
         if (!seal) {
-          const target = events.encryptFor?.(typeof f.meta.folder === 'string' ? f.meta.folder : undefined) ?? null;
+          let target: FolderPublicKey | null = null;
+          try {
+            target = (await events.encryptFor?.(typeof f.meta.folder === 'string' ? f.meta.folder : undefined)) ?? null;
+          } catch (e) {
+            if (!(e instanceof SendRefused)) throw e;
+            refused.push(id);
+            continue;
+          }
           if (!target) continue;
           seal = await newSeal(target, f.data.size, String(f.meta.lastModified ?? ''));
           this.uppy.setFileMeta(id, { e2ee: JSON.stringify(seal), enc: JSON.stringify(encOf(seal)) });
         }
         remember(f.data, seal);
       }
+      if (refused.length === 0) return;
+      const { currentUploads } = this.uppy.getState();
+      const upload = currentUploads[uploadID];
+      if (upload) this.uppy.setState({ currentUploads: { ...currentUploads, [uploadID]: { ...upload, fileIDs: upload.fileIDs.filter((id) => !refused.includes(id)) } } });
+      for (const id of refused) {
+        const f = this.uppy.getFile(id);
+        if (f) this.uppy.emit('upload-error', f, new Error("the folder's keys can't be checked"));
+      }
+      events.onRefused?.();
     });
 
     this.uppy.on('file-added', (file) => {

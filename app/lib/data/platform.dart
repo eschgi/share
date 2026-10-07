@@ -128,6 +128,7 @@ class UploadState {
     required this.total,
     required this.done,
     this.failed = 0,
+    this.unchecked = 0,
     this.lost = 0,
     required this.bytesTotal,
     required this.bytesDone,
@@ -147,6 +148,7 @@ class UploadState {
       total: n('total'),
       done: n('done'),
       failed: n('failed'),
+      unchecked: n('unchecked'),
       lost: n('lost'),
       bytesTotal: n('bytes_total'),
       bytesDone: n('bytes_done'),
@@ -162,6 +164,10 @@ class UploadState {
   final bool running;
   final String? paused; // pin_ended, signed_out, folder_gone or user
   final int total, done, failed, lost;
+
+  /// Of the failed, how many didn't go because the server's word about their folder's keys can't
+  /// be checked (docs/e2ee-plan.md).
+  final int unchecked;
   final int bytesTotal, bytesDone;
   final int? etaSeconds;
   final bool local;
@@ -223,6 +229,7 @@ class KeysState {
   const KeysState({
     this.status = KeysStatus.off,
     this.hasRecovery = false,
+    this.lacksRoot = false,
     this.encryptedFolders = 0,
     this.open = const {},
     this.asks = const [],
@@ -234,6 +241,7 @@ class KeysState {
   factory KeysState.fromMap(Map<Object?, Object?> m) => KeysState(
         status: KeysStatus.values.asNameMap()[m['status']] ?? KeysStatus.off,
         hasRecovery: m['has_recovery'] == true,
+        lacksRoot: m['lacks_root'] == true,
         encryptedFolders: (m['encrypted_folders'] as num?)?.toInt() ?? 0,
         open: {for (final o in (m['open'] as List? ?? const [])) if (o is String) o},
         asks: [for (final a in (m['asks'] as List? ?? const [])) if (a is Map) KeyAsk.fromMap(a)],
@@ -246,6 +254,10 @@ class KeysState {
 
   /// The server has a recovery key, which the first encrypted folder makes.
   final bool hasRecovery;
+
+  /// There is a recovery key, but this phone doesn't hold its private key, which making folders,
+  /// switching their encryption and renaming plain ones need: another admin passes it on.
+  final bool lacksRoot;
 
   /// How many encrypted folders the person sees.
   final int encryptedFolders;
@@ -276,7 +288,7 @@ class KeysState {
 /// the same code (docs/e2ee-plan.md): a phone or browser of the person that waits for their key,
 /// or another person who waits for folder keys. [code] is null until the other side answered.
 class KeyAsk {
-  const KeyAsk({required this.kind, required this.id, required this.name, this.client, this.since, this.folders = const [], this.code, this.keyChanged = false});
+  const KeyAsk({required this.kind, required this.id, required this.name, this.client, this.since, this.folders = const [], this.root = false, this.code, this.keyChanged = false});
 
   factory KeyAsk.fromMap(Map<Object?, Object?> m) => KeyAsk(
         kind: m['kind'] as String? ?? '',
@@ -285,6 +297,7 @@ class KeyAsk {
         client: m['client'] as String?,
         since: DateTime.tryParse(m['since'] as String? ?? ''),
         folders: [for (final f in (m['folders'] as List? ?? const [])) if (f is String) f],
+        root: m['root'] == true,
         code: m['code'] as String?,
         keyChanged: m['key_changed'] == true,
       );
@@ -298,8 +311,10 @@ class KeyAsk {
   final String? client;
   final DateTime? since;
 
-  /// A person: the folders they wait for.
+  /// A person: the folders they wait for, and whether they get the recovery key's private key
+  /// too, as an admin.
   final List<String> folders;
+  final bool root;
   final String? code;
 
   /// A person whose key was checked on this phone before, and is new now: the old one was lost.
@@ -462,27 +477,43 @@ abstract class Platform {
   /// The person's key locked with a new password; null while it isn't open here.
   Future<String?> passwordLock(String password);
 
-  /// Every version of the keys of [folders] (all encrypted ones with null), locked with a new
-  /// secret for an invite's link.
-  Future<({String secret, List<Json> keys})> inviteKeys(List<String>? folders);
+  /// Every version of the keys of [folders] (all encrypted ones with null), and the root this
+  /// phone trusts, locked with a new secret for an invite's link.
+  Future<({String secret, List<Json> keys, String? root})> inviteKeys(List<String>? folders);
 
-  /// This person's key, locked with a new secret for an invite for another of their phones.
-  Future<({String secret, String locked})?> personKeyForInvite();
+  /// This person's key and the root, locked with a new secret for an invite for another of their
+  /// phones.
+  Future<({String secret, String locked, String? root})?> personKeyForInvite();
 
   /// What a PIN that shows an encrypted [folder] needs: its link's secret, and the body's secret.
   Future<({String secret, Json body})?> pinSecret(String folder);
 
   /// The secret of a PIN's link, opened with its folder's key; null without that key.
-  Future<String?> pinLinkSecret(String folder, String sealed, int version);
+  Future<String?> pinLinkSecret(String folder, String locked, int version);
+
+  /// What follows the code in the link of a PIN that only sends into [folder], one with keys: the
+  /// root's fingerprint, which guests check its key with; null otherwise.
+  Future<String?> pinLinkRoot(String folder);
+
+  /// Admins: turns encryption off for [folder], with the recovery key's plain statement.
+  Future<Json> switchOff(FolderInfo folder);
+
+  /// Admins: what to create a folder called [name] with, signed once there is a recovery key.
+  Future<Json> newFolderBody(String name);
+
+  /// Admins: what to rename [folder] to [name] with, signed for a folder that sends plain.
+  Future<Json> renameBody(FolderInfo folder, String name);
 
   /// Admins moving encrypted files into [target]: their keys, sealed for its newest key.
   Future<List<Json>> moveKeys(List<FileInfo> files, String target);
 
-  /// Right after accepting an invite: the keys its link's [secret] opens.
-  Future<KeysState> keysFromInvite(String? secret, List<Json> keys);
+  /// Right after accepting an invite: the keys its link's [secret] opens, and the [root] to trust.
+  Future<KeysState> keysFromInvite(String? secret, List<Json> keys, String? root);
 
-  /// A PIN guest opens the folder the PIN shows with its link's secret; how many keys opened.
-  Future<int> openPinKeys(String secret);
+  /// After a PIN is unlocked: what its link carried after the code (the [secret] of a PIN that
+  /// shows an encrypted folder, which opens it, or the [root]'s fingerprint), kept for its
+  /// uploads to check the folder's key with, or forgotten for a typed code; how many keys opened.
+  Future<int> pinLink({String? secret, String? root});
   Future<void> forgetPinKeys();
 }
 
@@ -747,15 +778,19 @@ class ChannelPlatform implements Platform {
   Future<String?> passwordLock(String password) => _keysCall<String>('keys.password_lock', {'password': password});
 
   @override
-  Future<({String secret, List<Json> keys})> inviteKeys(List<String>? folders) async {
+  Future<({String secret, List<Json> keys, String? root})> inviteKeys(List<String>? folders) async {
     final m = await _keysCall<Map<Object?, Object?>>('keys.invite_keys', {'folders': folders}) ?? const {};
-    return (secret: m['secret'] as String? ?? '', keys: [for (final k in jsonDecode(m['keys'] as String? ?? '[]') as List) (k as Map).cast<String, dynamic>()]);
+    return (
+      secret: m['secret'] as String? ?? '',
+      keys: [for (final k in jsonDecode(m['keys'] as String? ?? '[]') as List) (k as Map).cast<String, dynamic>()],
+      root: m['root'] as String?,
+    );
   }
 
   @override
-  Future<({String secret, String locked})?> personKeyForInvite() async {
+  Future<({String secret, String locked, String? root})?> personKeyForInvite() async {
     final m = await _keysCall<Map<Object?, Object?>>('keys.person_key');
-    return m == null ? null : (secret: m['secret'] as String? ?? '', locked: m['locked'] as String? ?? '');
+    return m == null ? null : (secret: m['secret'] as String? ?? '', locked: m['locked'] as String? ?? '', root: m['root'] as String?);
   }
 
   @override
@@ -765,8 +800,27 @@ class ChannelPlatform implements Platform {
   }
 
   @override
-  Future<String?> pinLinkSecret(String folder, String sealed, int version) =>
-      _keysCall<String>('keys.pin_link_secret', {'folder': folder, 'sealed': sealed, 'version': version});
+  Future<String?> pinLinkSecret(String folder, String locked, int version) =>
+      _keysCall<String>('keys.pin_link_secret', {'folder': folder, 'locked': locked, 'version': version});
+
+  @override
+  Future<String?> pinLinkRoot(String folder) => _keysCall<String>('keys.pin_link_root', {'folder': folder});
+
+  @override
+  Future<Json> switchOff(FolderInfo folder) async =>
+      jsonDecode(await _keysCall<String>('keys.switch_off', {'folder': folder.id, 'key_version': ?folder.keyVersion, 'name': folder.name}) ?? '{}') as Json;
+
+  @override
+  Future<Json> newFolderBody(String name) async => jsonDecode(await _keysCall<String>('keys.new_folder', {'name': name}) ?? '{}') as Json;
+
+  @override
+  Future<Json> renameBody(FolderInfo folder, String name) async => jsonDecode(
+        await _keysCall<String>('keys.renamed', {
+              'folder': jsonEncode({'id': folder.id, 'name': folder.name, 'encrypted': folder.encrypted, 'key_version': folder.keyVersion}),
+              'name': name,
+            }) ??
+            '{}',
+      ) as Json;
 
   @override
   Future<List<Json>> moveKeys(List<FileInfo> files, String target) async {
@@ -775,11 +829,11 @@ class ChannelPlatform implements Platform {
   }
 
   @override
-  Future<KeysState> keysFromInvite(String? secret, List<Json> keys) async =>
-      KeysState.fromMap(await _keysCall<Map<Object?, Object?>>('keys.from_invite', {'secret': ?secret, 'keys': jsonEncode(keys)}) ?? const {});
+  Future<KeysState> keysFromInvite(String? secret, List<Json> keys, String? root) async =>
+      KeysState.fromMap(await _keysCall<Map<Object?, Object?>>('keys.from_invite', {'secret': ?secret, 'keys': jsonEncode(keys), 'root': ?root}) ?? const {});
 
   @override
-  Future<int> openPinKeys(String secret) async => await _keysCall<int>('keys.open_pin', {'secret': secret}) ?? 0;
+  Future<int> pinLink({String? secret, String? root}) async => await _keysCall<int>('keys.pin_link', {'secret': secret, 'root': root}) ?? 0;
 
   @override
   Future<void> forgetPinKeys() => _keysCall('keys.forget_pin');

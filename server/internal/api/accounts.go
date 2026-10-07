@@ -74,46 +74,59 @@ type SignedInResponse struct {
 // signedIn answers a login or an accepted invite. A browser gets its key as an HttpOnly
 // cookie, never in the body, and loses its PIN cookie: what it sent with the PIN is the
 // person's now. An accepted invite also brings the keys locked for its link.
-func (a *API) signedIn(w http.ResponseWriter, r *http.Request, s *auth.SignedIn, keys []InviteKeyInfo) {
+func (a *API) signedIn(w http.ResponseWriter, r *http.Request, s *auth.SignedIn, invited *Invited) {
 	if s.Device.Client == db.ClientWeb {
 		auth.SetAccountCookie(w, r, s.Token)
 		auth.ClearSessionCookie(w, r)
 		me := Me{User: userInfo(s.User), Device: deviceInfo(s.Device)}
-		if keys == nil {
+		if invited == nil {
 			httpx.WriteJSON(w, http.StatusOK, me)
 		} else {
 			httpx.WriteJSON(w, http.StatusOK, struct {
 				Me
-				Keys []InviteKeyInfo `json:"keys"`
-			}{me, keys})
+				*Invited
+			}{me, invited})
 		}
 		return
 	}
 	res := SignedInResponse{Token: s.Token, User: userInfo(s.User), Device: deviceInfo(s.Device), Server: a.server()}
-	if keys == nil {
+	if invited == nil {
 		httpx.WriteJSON(w, http.StatusOK, res)
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, struct {
 		SignedInResponse
-		Keys []InviteKeyInfo `json:"keys"`
-	}{res, keys})
+		*Invited
+	}{res, invited})
+}
+
+// Invited is what an accepted invite brings, locked with the secret of its link: keys, and the
+// root for the new phone or browser to trust; null without one.
+type Invited struct {
+	Keys []InviteKeyInfo `json:"keys"`
+	Root B64             `json:"root"`
 }
 
 // InviteKeyInfo is a key locked with the secret of an invite's link: a version of a folder's
-// key, or the person's own key (folder null) for a new phone or browser, with its public key.
+// key, with the root's signature, or the person's own key (folder null) for a new phone or
+// browser, with its public key.
 type InviteKeyInfo struct {
 	Folder    *string `json:"folder"`
 	Version   int     `json:"version"`
 	PublicKey B64     `json:"public_key"`
+	Signature B64     `json:"signature"`
 	Locked    B64     `json:"locked"`
 }
 
-// inviteKeys describes the keys an accepted invite brought.
-func (a *API) inviteKeys(ctx context.Context, s *auth.SignedIn) ([]InviteKeyInfo, error) {
-	out := []InviteKeyInfo{}
+// invited describes the keys an accepted invite brought.
+func (a *API) invited(ctx context.Context, s *auth.SignedIn) (*Invited, error) {
+	out := &Invited{Keys: []InviteKeyInfo{}}
 	for _, k := range s.Keys {
 		info := InviteKeyInfo{Version: k.Version, Locked: k.Locked}
+		if k.Root {
+			out.Root = k.Locked
+			continue
+		}
 		if k.FolderID == "" {
 			keys, err := a.Auth.DB.KeysOf(ctx, s.User.ID, s.Device.ID)
 			if err != nil {
@@ -129,9 +142,9 @@ func (a *API) inviteKeys(ctx context.Context, s *auth.SignedIn) ([]InviteKeyInfo
 				return nil, err
 			}
 			folder := k.FolderID
-			info.Folder, info.PublicKey = &folder, fk.PublicKey
+			info.Folder, info.PublicKey, info.Signature = &folder, fk.PublicKey, fk.Signature
 		}
-		out = append(out, info)
+		out.Keys = append(out.Keys, info)
 	}
 	return out, nil
 }
@@ -224,12 +237,12 @@ func (a *API) acceptInvite(w http.ResponseWriter, r *http.Request) {
 	var input *auth.InputError
 	switch {
 	case err == nil:
-		keys, err := a.inviteKeys(r.Context(), res)
+		invited, err := a.invited(r.Context(), res)
 		if err != nil {
 			internal(w, "invite keys", err)
 			return
 		}
-		a.signedIn(w, r, res, keys)
+		a.signedIn(w, r, res, invited)
 	case errors.As(err, &input):
 		httpx.WriteError(w, http.StatusBadRequest, "bad_request", "The "+input.Field+" "+input.Problem+".")
 	default:

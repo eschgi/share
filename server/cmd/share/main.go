@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"flag"
 	"fmt"
@@ -18,6 +19,7 @@ import (
 	"github.com/eschgi/share/server/internal/auth"
 	"github.com/eschgi/share/server/internal/config"
 	"github.com/eschgi/share/server/internal/db"
+	"github.com/eschgi/share/server/internal/e2ee"
 	"github.com/eschgi/share/server/internal/storage"
 )
 
@@ -289,8 +291,7 @@ func pin(args []string) error {
 		if err != nil {
 			return err
 		}
-		printPin(cfg, p)
-		return nil
+		return printPin(ctx, cfg, d, p)
 	case "list":
 		pins, err := d.Pins(ctx)
 		if err != nil {
@@ -336,25 +337,38 @@ func pin(args []string) error {
 			return err
 		}
 		fmt.Printf("PIN %s has ended. Its replacement:\n", p.Code)
-		printPin(cfg, fresh)
-		return nil
+		return printPin(ctx, cfg, d, fresh)
 	}
 	return fmt.Errorf("unknown pin command %q", sub)
 }
 
-func printPin(cfg *config.Config, p db.Pin) {
+func printPin(ctx context.Context, cfg *config.Config, d *db.DB, p db.Pin) error {
 	fmt.Printf("PIN:   %s\n", p.Code)
-	if p.Secret != nil {
+	link := strings.TrimSuffix(cfg.PublicURL, "/") + "/#" + p.Code
+	switch f, err := d.FolderByID(ctx, p.FolderID); {
+	case err != nil:
+		return err
+	case p.Secret != nil:
 		// Its folder is encrypted: the whole link carries a secret that only a key of the folder
 		// opens, which the command line hasn't got. The code alone sends, and shows locked files.
-		fmt.Println("Link:  in the app or on the website, with the secret that opens the encrypted folder; the code alone only sends")
-	} else {
-		fmt.Printf("Link:  %s/#%s\n", strings.TrimSuffix(cfg.PublicURL, "/"), p.Code)
+		link = "in the app or on the website, with the secret that opens the encrypted folder; the code alone only sends"
+	case f.KeyVersion > 0:
+		// Into a folder with keys, the link names the recovery key, which guests' browsers check
+		// the folder's key against (docs/e2ee-plan.md). The command line takes it from the database.
+		root, _, err := d.RecoveryKey(ctx)
+		if err != nil {
+			return err
+		}
+		if root != nil {
+			link += "." + base64.RawURLEncoding.EncodeToString(e2ee.Fingerprint(root))
+		}
 	}
+	fmt.Printf("Link:  %s\n", link)
 	fmt.Printf("Works: %s\n", status(cfg, p))
 	if p.ShowsFolder {
 		fmt.Println("Guests with it also see and download what is in its folder.")
 	}
+	return nil
 }
 
 func status(cfg *config.Config, p db.Pin) string {

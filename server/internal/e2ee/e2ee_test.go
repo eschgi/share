@@ -39,11 +39,14 @@ func readVectors(t *testing.T, name string, v any) {
 
 func writeVectors(t *testing.T, name string, v any) {
 	t.Helper()
-	b, err := json.MarshalIndent(v, "", "  ")
-	if err != nil {
+	var b bytes.Buffer
+	e := json.NewEncoder(&b)
+	e.SetEscapeHTML(false) // the descriptions' <folder> stay readable
+	e.SetIndent("", "  ")
+	if err := e.Encode(v); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(vectorPath(name), append(b, '\n'), 0o644); err != nil {
+	if err := os.WriteFile(vectorPath(name), b.Bytes(), 0o644); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -302,17 +305,26 @@ type recoveryVectors struct {
 	Lock        map[string]string `json:"lock"`
 }
 
-// checkVectors are contract/crypto/check.json: a check's commitment and code.
+// checkCase is a check of contract/crypto/check.json: both one-time key pairs, the key that gets
+// the keys, and what each side makes of them.
+type checkCase struct {
+	Name          string `json:"name"`
+	Check         string `json:"check"`
+	AskerPrivate  string `json:"asker_private_key"`
+	AskerKey      string `json:"asker_key"`
+	AnswerPrivate string `json:"answer_private_key"`
+	AnswerKey     string `json:"answer_key"`
+	PublicKey     string `json:"public_key"`
+	Commitment    string `json:"commitment"`
+	Code          string `json:"code"`
+	ConfirmKey    string `json:"confirm_key"`
+	Confirmation  string `json:"confirmation"`
+	Confirmed     string `json:"confirmed"`
+}
+
 type checkVectors struct {
-	Description string `json:"description"`
-	Cases       []struct {
-		Name        string `json:"name"`
-		AskerNonce  string `json:"asker_nonce"`
-		AnswerNonce string `json:"answer_nonce"`
-		PublicKey   string `json:"public_key"`
-		Commitment  string `json:"commitment"`
-		Code        string `json:"code"`
-	} `json:"cases"`
+	Description string      `json:"description"`
+	Cases       []checkCase `json:"cases"`
 }
 
 func TestCheckVectors(t *testing.T) {
@@ -322,16 +334,125 @@ func TestCheckVectors(t *testing.T) {
 		t.Fatal("no cases")
 	}
 	for _, c := range cv.Cases {
-		na, nw, pub := unb64(t, c.AskerNonce), unb64(t, c.AnswerNonce), unb64(t, c.PublicKey)
-		if len(na) != NonceSize || len(nw) != NonceSize || CheckPublicKey(pub) != nil {
-			t.Errorf("%s: not a nonce or a key", c.Name)
+		ka, kw, pub := unb64(t, c.AskerKey), unb64(t, c.AnswerKey), unb64(t, c.PublicKey)
+		if CheckPublicKey(ka) != nil || CheckPublicKey(kw) != nil || CheckPublicKey(pub) != nil {
+			t.Errorf("%s: not a key", c.Name)
 		}
-		if b64.EncodeToString(Commitment(na)) != c.Commitment {
+		if b64.EncodeToString(Commitment(ka)) != c.Commitment {
 			t.Errorf("%s: commitment", c.Name)
 		}
-		if got := CheckCode(na, nw, pub); got != c.Code {
+		if got := CheckCode(ka, kw, pub); got != c.Code {
 			t.Errorf("%s: code %s, not %s", c.Name, got, c.Code)
 		}
+		asking, err := ConfirmKey(unb64(t, c.AskerPrivate), kw, ka, kw, pub)
+		if err != nil || b64.EncodeToString(asking) != c.ConfirmKey {
+			t.Errorf("%s: the asking side's confirm key: %v", c.Name, err)
+		}
+		waiting, err := ConfirmKey(unb64(t, c.AnswerPrivate), ka, ka, kw, pub)
+		if err != nil || b64.EncodeToString(waiting) != c.ConfirmKey {
+			t.Errorf("%s: the waiting side's confirm key: %v", c.Name, err)
+		}
+		if got, err := Unlock(waiting, CheckContext(c.Check), unb64(t, c.Confirmation)); err != nil || string(got) != c.Confirmed {
+			t.Errorf("%s: confirmation %q, %v", c.Name, got, err)
+		}
+	}
+}
+
+// signCase is a signature of contract/crypto/sign.json, with the message it signs.
+type signCase struct {
+	Name       string  `json:"name"`
+	Folder     string  `json:"folder,omitempty"`
+	Version    *int    `json:"version,omitempty"`
+	FolderKey  string  `json:"folder_key,omitempty"`
+	FolderName *string `json:"folder_name,omitempty"`
+	NewRoot    string  `json:"new_root,omitempty"`
+	Message    string  `json:"message"`
+	Signature  string  `json:"signature"`
+}
+
+type signVectors struct {
+	Description string     `json:"description"`
+	PrivateKey  string     `json:"private_key"`
+	PublicKey   string     `json:"public_key"`
+	Fingerprint string     `json:"fingerprint"`
+	Verify      []signCase `json:"verify"`
+	Refuse      []signCase `json:"refuse"`
+}
+
+// message is the message a case says it signs, made from its parts.
+func (c signCase) message(t *testing.T) []byte {
+	t.Helper()
+	switch {
+	case c.FolderKey != "":
+		return FolderKeyMessage(c.Folder, *c.Version, unb64(t, c.FolderKey))
+	case c.FolderName != nil:
+		return PlainMessage(c.Folder, *c.Version, *c.FolderName)
+	case c.NewRoot != "":
+		return RootMessage(unb64(t, c.NewRoot))
+	}
+	t.Fatalf("%s: no message", c.Name)
+	return nil
+}
+
+func TestSignVectors(t *testing.T) {
+	var sv signVectors
+	readVectors(t, "sign.json", &sv)
+	public := unb64(t, sv.PublicKey)
+	if pub, _ := PublicKey(unb64(t, sv.PrivateKey)); !bytes.Equal(pub, public) {
+		t.Error("public key")
+	}
+	if b64.EncodeToString(Fingerprint(public)) != sv.Fingerprint {
+		t.Error("fingerprint")
+	}
+	if len(sv.Verify) == 0 || len(sv.Refuse) == 0 {
+		t.Fatal("no cases")
+	}
+	for _, c := range sv.Verify {
+		m := c.message(t)
+		if b64.EncodeToString(m) != c.Message {
+			t.Errorf("%s: message", c.Name)
+		}
+		if !Verify(public, m, unb64(t, c.Signature)) {
+			t.Errorf("%s: doesn't verify", c.Name)
+		}
+	}
+	for _, c := range sv.Refuse {
+		if Verify(public, unb64(t, c.Message), unb64(t, c.Signature)) {
+			t.Errorf("%s verifies", c.Name)
+		}
+	}
+}
+
+func TestSign(t *testing.T) {
+	priv, pub := GenerateKey()
+	m := PlainMessage("0199a0c4-8f6e-7d2a-9b1c-3e5f7a9b1c3d", 0, "Família")
+	sig, err := Sign(priv, m)
+	if err != nil || len(sig) != SignatureSize || !Verify(pub, m, sig) {
+		t.Fatalf("sign: %x, %v", sig, err)
+	}
+	other, otherPub := GenerateKey()
+	otherSig, _ := Sign(other, m)
+	flipped := bytes.Clone(sig)
+	flipped[10] ^= 1
+	for name, ok := range map[string]bool{
+		"another key's signature": Verify(pub, m, otherSig),
+		"another public key":      Verify(otherPub, m, sig),
+		"another name":            Verify(pub, PlainMessage("0199a0c4-8f6e-7d2a-9b1c-3e5f7a9b1c3d", 0, "Familia"), sig),
+		"another version":         Verify(pub, PlainMessage("0199a0c4-8f6e-7d2a-9b1c-3e5f7a9b1c3d", 1, "Família"), sig),
+		"a flipped bit":           Verify(pub, m, flipped),
+		"cut short":               Verify(pub, m, sig[:63]),
+		"no key":                  Verify(pub[:64], m, sig),
+	} {
+		if ok {
+			t.Errorf("%s verifies", name)
+		}
+	}
+	// The version ends before the name: a name starting with a digit isn't another version's.
+	if bytes.Equal(PlainMessage("f", 1, "2x"), PlainMessage("f", 12, "x")) {
+		t.Error("version and name run together")
+	}
+	if _, err := Sign(pub, m); err == nil {
+		t.Error("signs with a public key")
 	}
 }
 
@@ -450,6 +571,9 @@ func writeNewVectors(t *testing.T) {
 	folder.Name = "a folder's private key for a person"
 	person := sealed(devicePriv, devicePub, PurposePerson, PersonContext(userID), personPriv)
 	person.Name = "a person's private key for one of their browsers"
+	rootPriv, rootPub := GenerateKey()
+	root := sealed(personPriv, personPub, PurposeRoot, RootContext, rootPriv)
+	root.Name = "the recovery key's private key for an admin's person key"
 	otherFolder, otherPurpose, flipped := file, file, file
 	otherFolder.Name, otherFolder.AAD = "the file key, opened as if for version 2", string(FolderContext(folderID, 2))
 	otherPurpose.Name, otherPurpose.Purpose = "the file key, opened as a folder key", PurposeFolder
@@ -458,27 +582,38 @@ func writeNewVectors(t *testing.T) {
 	flipped.Name, flipped.Sealed = "the file key with its last bit flipped", enc(fb)
 	writeVectors(t, "seal.json", sealVectors{
 		Description: "Keys Share seals with HPKE (contract/crypto/hpke_rfc9180.json has the suite): sealed is the encapsulated key (65 bytes), then the ciphertext; purpose is HPKE's info, aad its associated data, both as UTF-8. Every case in open opens with private_key to plaintext, whose public key is public_key; none in refuse opens. Binary values are base64url without padding.",
-		Open:        []sealCase{file, folder, person},
+		Open:        []sealCase{file, folder, person, root},
 		Refuse:      []sealCase{otherFolder, otherPurpose, flipped},
 	})
 
 	var secrets []secretCase
+	note := []byte(`{"root":"` + enc(rootPub) + `","folders":{"` + folderID + `":1}}`)
+	pinSecret := make([]byte, 32)
+	rand.Read(pinSecret)
 	for _, c := range []struct {
 		name, purpose string
+		secret        []byte // a new one without
 		aad, pt       []byte
 	}{
-		{"a folder key, locked with an invite link's secret", PurposeInvite, FolderContext(folderID, 1), folderPriv},
-		{"a person key, locked with the secret of an invite for a new phone", PurposeInvite, PersonContext(userID), personPriv},
-		{"a folder key, locked with a PIN link's secret", PurposePin, FolderContext(folderID, 1), folderPriv},
+		{"a folder key, locked with an invite link's secret", PurposeInvite, nil, FolderContext(folderID, 1), folderPriv},
+		{"a person key, locked with the secret of an invite for a new phone", PurposeInvite, nil, PersonContext(userID), personPriv},
+		{"the root, locked with an invite link's secret", PurposeInvite, nil, RootContext, rootPub},
+		{"a folder key, locked with a PIN link's secret", PurposePin, pinSecret, FolderContext(folderID, 1), folderPriv},
+		{"the root, locked with a PIN link's secret", PurposePin, pinSecret, RootContext, rootPub},
+		{"a PIN link's secret, locked with a key from the folder's private key", PurposePinSecret, folderPriv, FolderContext(folderID, 1), pinSecret},
+		{"a person's note, locked with a key from their private key", PurposeNote, personPriv, NoteContext(userID), note},
 	} {
-		secret := make([]byte, 32)
-		rand.Read(secret)
+		secret := c.secret
+		if secret == nil {
+			secret = make([]byte, 32)
+			rand.Read(secret)
+		}
 		key := SecretKey(secret, c.purpose)
 		secrets = append(secrets, secretCase{Name: c.name, Purpose: c.purpose, Secret: enc(secret), Key: enc(key), AAD: string(c.aad), Plaintext: enc(c.pt), Locked: enc(Lock(key, c.aad, c.pt))})
 	}
 	jpeg := []byte("\xff\xd8\xff\xe0 a thumbnail's JPEG bytes \xff\xd9")
 	writeVectors(t, "lock.json", lockVectors{
-		Description: "What Share locks with a key: a random nonce (12 bytes), then AES-256-GCM's ciphertext and tag, with aad (UTF-8) as associated data. A link's secret gives the key with HKDF-SHA256 (no salt, purpose as info, 32 bytes). A password lock starts with a salt (16 bytes) and PBKDF2's iterations (4 bytes, big endian); PBKDF2-HMAC-SHA256 of the password's UTF-8 bytes gives the key. A thumbnail is locked with HKDF-SHA256 of the file key (no salt, share-e2ee-v1/thumb as info) and no aad. Binary values are base64url without padding.",
+		Description: "What Share locks with a key: a random nonce (12 bytes), then AES-256-GCM's ciphertext and tag, with aad (UTF-8) as associated data. A link's secret gives the key with HKDF-SHA256 (no salt, purpose as info, 32 bytes), and so does a private key's scalar: a folder key's for its PIN links' secrets, a person key's for their note (JSON: the root and the newest version of each folder's key their devices have seen). A password lock starts with a salt (16 bytes) and PBKDF2's iterations (4 bytes, big endian); PBKDF2-HMAC-SHA256 of the password's UTF-8 bytes gives the key. A thumbnail is locked with HKDF-SHA256 of the file key (no salt, share-e2ee-v1/thumb as info) and no aad. Binary values are base64url without padding.",
 		Secrets:     secrets,
 		Passwords: []passwordCase{
 			{Password: "correct horse", AAD: string(PersonContext(userID)), Plaintext: enc(personPriv), Locked: enc(PasswordLock("correct horse", PersonContext(userID), personPriv))},
@@ -518,5 +653,79 @@ func writeNewVectors(t *testing.T) {
 		Key:         enc(key),
 		Lock:        map[string]string{"private_key": enc(recoveryPriv), "public_key": enc(recoveryPub), "locked": enc(Lock(key, RecoveryContext, recoveryPriv))},
 	})
+	writeSignVectors(t, rootPriv, rootPub, folderID, folderPub)
+	writeCheckVectors(t, devicePub, personPub)
 	_ = ecdh.P256
+}
+
+func writeSignVectors(t *testing.T, rootPriv, rootPub []byte, folderID string, folderPub []byte) {
+	enc := b64.EncodeToString
+	signed := func(name string, c signCase) signCase {
+		c.Name = name
+		m := c.message(t)
+		sig, err := Sign(rootPriv, m)
+		if err != nil {
+			t.Fatal(err)
+		}
+		c.Message, c.Signature = enc(m), enc(sig)
+		return c
+	}
+	v := func(n int) *int { return &n }
+	s := func(n string) *string { return &n }
+	_, newRoot := GenerateKey()
+	key := signed("version 1 of a folder's key", signCase{Folder: folderID, Version: v(1), FolderKey: enc(folderPub)})
+	plain := signed("a folder that was never encrypted, under a name starting with a digit", signCase{Folder: folderID, Version: v(0), FolderName: s("2026 Ürlaub ✓")})
+	off := signed("a folder switched off after version 3", signCase{Folder: folderID, Version: v(3), FolderName: s("Family")})
+	next := signed("the key of a new recovery code, signed with the old one", signCase{NewRoot: enc(newRoot)})
+	refuse := func(name string, c signCase, m []byte) signCase {
+		return signCase{Name: name, Message: enc(m), Signature: c.Signature}
+	}
+	flipped := unb64(t, key.Signature)
+	flipped[40] ^= 1
+	writeVectors(t, "sign.json", signVectors{
+		Description: "What the root key (the recovery key) signs: ECDSA on P-256 with SHA-256 of the message, the signature as r and s, 32 bytes each, big endian. A version of a folder's key: \"share-e2ee-v1/sign/folder-key\", then \"folder:<folder>:<version>\", then its public key (65 bytes). A folder that sends plain: \"share-e2ee-v1/sign/plain\", then \"folder:<folder>:<its newest version, 0 if none>\", a newline and its name (UTF-8). The key of a new recovery code: \"share-e2ee-v1/sign/root\", then its public key, signed with the old one. Every case in verify verifies with public_key, and its message is made from its parts as above; none in refuse verifies. fingerprint is the first 16 bytes of SHA-256 of the public key, which a PIN's link carries. ECDSA signs with a random nonce: signing again gives other bytes that verify too. Binary values are base64url without padding.",
+		PrivateKey:  enc(rootPriv),
+		PublicKey:   enc(rootPub),
+		Fingerprint: enc(Fingerprint(rootPub)),
+		Verify:      []signCase{key, plain, off, next},
+		Refuse: []signCase{
+			refuse("the folder key's signature, for version 2", key, FolderKeyMessage(folderID, 2, folderPub)),
+			refuse("the plain statement, for another name", off, PlainMessage(folderID, 3, "Family ")),
+			refuse("the plain statement, for a newer version", off, PlainMessage(folderID, 4, "Family")),
+			refuse("the folder key's signature, as a plain statement", key, PlainMessage(folderID, 1, "")),
+			{Name: "the folder key's signature with a flipped bit", Message: key.Message, Signature: enc(flipped)},
+		},
+	})
+}
+
+func writeCheckVectors(t *testing.T, devicePub, personPub []byte) {
+	enc := b64.EncodeToString
+	const checkID = "0199a0c4-8f6e-7d2a-9b1c-3e5f7a9b1c3d"
+	askerPriv, askerKey := GenerateKey()
+	answerPriv, answerKey := GenerateKey()
+	otherPriv, otherKey := GenerateKey()
+	_, rootPub := GenerateKey()
+	made := func(name string, answerPriv, answerKey, public []byte, confirmed string) checkCase {
+		k, err := ConfirmKey(askerPriv, answerKey, askerKey, answerKey, public)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return checkCase{
+			Name: name, Check: checkID,
+			AskerPrivate: enc(askerPriv), AskerKey: enc(askerKey), AnswerPrivate: enc(answerPriv), AnswerKey: enc(answerKey), PublicKey: enc(public),
+			Commitment: enc(Commitment(askerKey)), Code: CheckCode(askerKey, answerKey, public),
+			ConfirmKey: enc(k), Confirmation: enc(Lock(k, CheckContext(checkID), []byte(confirmed))), Confirmed: confirmed,
+		}
+	}
+	personPriv, personPub2 := GenerateKey()
+	device := `{"root":"` + enc(rootPub) + `","person":{"public_key":"` + enc(personPub2) + `","private_key":"` + enc(personPriv) + `"}}`
+	person := `{"root":"` + enc(rootPub) + `"}`
+	writeVectors(t, "check.json", checkVectors{
+		Description: "A check, before a device passes keys on (docs/e2ee-plan.md). Each side has a one-time P-256 key pair. The asking device sends commitment = SHA-256(\"share-e2ee-v1/check\" || asker_key); the other side answers with answer_key; then the asking device reveals asker_key, for the answer it saw, which the other side checks against the commitment it saw before answering. Each side keeps what it saw then: the asking device makes its code from the answer it revealed for, so keys relayed later change neither code. Both show code: the first 4 bytes of SHA-256(\"share-e2ee-v1/code\" || asker_key || answer_key || public_key), read as a big-endian number, modulo 1000000, in 6 digits with leading zeros. public_key is the key that gets the keys: the waiting device's key, or the waiting person's key (65 bytes, uncompressed). After Allow, the asking device locks confirmed (UTF-8 JSON: the root, and for a device of its person the person's key pair) with confirm_key and the aad \"check:<check>\" (contract/crypto/lock.json has the format): HKDF-SHA256 of the ECDH secret (the shared point's x coordinate) of one side's one-time private key and the other side's one-time public key, salted with SHA-256(asker_key || answer_key || public_key), with \"share-e2ee-v1/confirm\" as info. Both sides make the same confirm_key. Binary values are base64url without padding.",
+		Cases: []checkCase{
+			made("a new device's key", answerPriv, answerKey, devicePub, device),
+			made("another key, same one-time keys", answerPriv, answerKey, personPub, person),
+			made("another answer", otherPriv, otherKey, devicePub, device),
+		},
+	})
 }

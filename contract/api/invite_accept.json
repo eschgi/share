@@ -30,8 +30,9 @@
       ]
     },
     "keys": [
-      {"folder": "f4mily5x2k7mbqz4bwdbyj6qsq", "version": 1, "public_key": "BA7xcg0LvJENgGcBAe6KmLqsTx8ps6QbHLnA3smWI2NGtqauPu-Eq1huFR-CqFjNpbtE5koBwWw8iqYC2MaRom4", "locked": "W3DX2JPdSjU4ZtdzslsPTQ07WMt-LzcATEQ6Ymu5gyDHiCI72rcFAZZGLXoblogsGApvqVzvssKHVyZ4"}
-    ]
+      {"folder": "f4mily5x2k7mbqz4bwdbyj6qsq", "version": 1, "public_key": "BA7xcg0LvJENgGcBAe6KmLqsTx8ps6QbHLnA3smWI2NGtqauPu-Eq1huFR-CqFjNpbtE5koBwWw8iqYC2MaRom4", "signature": "Qkqv6K_N2eMvpjuqJd45pLsvIRKI2Da-SwduINavm_8D_kbVJRXfy8_jzkPTc75v8yPL4EFb2Tt85cGMkPttqw", "locked": "W3DX2JPdSjU4ZtdzslsPTQ07WMt-LzcATEQ6Ymu5gyDHiCI72rcFAZZGLXoblogsGApvqVzvssKHVyZ4"}
+    ],
+    "root": "XeNuo1CnHljRmMyi_EOwco2cv_wicK26cYktSzMthVtAX3VDm0dl4yGTfYw8kDziMbNdIRJupqH0dmMAuGzu3gs5JH_OstZxo0Aou2m83kDiws1ZM7TaoV-Ft6gj"
   },
-  "notes": "The app's answer (client \"app\", also when client is missing); a browser's is invite_accept_web.json. Uses the invite: it works once. The phone is signed in as a new person with the invite's name and role, or, with adds_phone, as the existing person. keys are what the inviting device locked with the secret after the dot in the invite's link (docs/e2ee-plan.md): versions of encrypted folders' keys for a new person, or the person's own key (folder null, version 0) for a new phone or browser, each with its public key; they come once, and are empty without them."
+  "notes": "The app's answer (client \"app\", also when client is missing); a browser's is invite_accept_web.json. Uses the invite: it works once. The phone is signed in as a new person with the invite's name and role, or, with adds_phone, as the existing person. keys are what the inviting device locked with the secret after the dot in the invite's link (docs/e2ee-plan.md): versions of encrypted folders' keys for a new person, each with its public key and the root's signature, or the person's own key (folder null, version 0, signature null) for a new phone or browser, with its public key; root, the root the inviting device trusted, locked the same way (aad root), which the new device trusts from then on. They come once, and are empty or null without them."
 }

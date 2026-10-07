@@ -5,6 +5,8 @@ import android.util.Log
 import androidx.core.net.toUri
 import com.eschgi.share.e2ee.E2eeException
 import com.eschgi.share.e2ee.FolderPublicKey
+import com.eschgi.share.e2ee.Keys
+import com.eschgi.share.e2ee.SendRefused
 import com.eschgi.share.net.RouteMonitor
 import com.eschgi.share.net.ServerConnection
 import com.eschgi.share.net.ServerInfo
@@ -23,6 +25,9 @@ object UploadEngine {
 
     /** The server's answers when a batch's folder is gone, or the person sees no folder any more. */
     private val FOLDER_GONE = setOf("folder_gone", "no_folder")
+
+    /** A file that didn't go: what the server says about its folder's keys can't be checked (docs/e2ee-plan.md). */
+    const val UNCHECKED = "unchecked"
 
     /** Over the local address nothing limits a request; over Cloudflare 100 MB does. */
     private const val LOCAL_CHUNK = 64L * 1024 * 1024
@@ -117,7 +122,10 @@ object UploadEngine {
                 var seal: UploadSeal? = null
                 val outcome = try {
                     val (sealed, uploadId) = sealOf(queue, item, lastModified, targets) { batchId ->
-                        UploadSeal.target(batch.auth, batch.folder) { path -> server.open(path, local, readTimeoutMs = 15_000) }.also { targets[batchId] = it }
+                        UploadSeal.target(
+                            batch.auth, batch.folder, { path -> server.open(path, local, readTimeoutMs = 15_000) },
+                            signedIn = { Keys.sendKey(app, it) }, guest = { Keys.guestKey(app, it) },
+                        ).also { targets[batchId] = it }
                     }
                     seal = sealed
                     // The encrypted stream goes up for a file into an encrypted folder.
@@ -147,6 +155,9 @@ object UploadEngine {
                             enc = seal?.enc(),
                         )
                     }
+                } catch (e: SendRefused) {
+                    // What the server says about the folder's keys can't be checked: nothing goes in.
+                    UploadOutcome.Failed(0, UNCHECKED)
                 } catch (e: UploadSeal.HttpFailure) {
                     when (e.status) {
                         401 -> if (batch.auth == UploadBatch.PIN) UploadOutcome.PinEnded else UploadOutcome.SignedOut
@@ -191,7 +202,7 @@ object UploadEngine {
                             // The file stays queued until the person chooses another folder.
                             queue.pauseBatch(batch.id, UploadBatch.FOLDER_GONE)
                         } else {
-                            queue.finish(item, UploadRow.FAILED, "HTTP ${outcome.status} ${outcome.code ?: ""}".trim())
+                            queue.finish(item, UploadRow.FAILED, if (outcome.code == UNCHECKED) UNCHECKED else "HTTP ${outcome.status} ${outcome.code ?: ""}".trim())
                             release(app, item)
                         }
                     }

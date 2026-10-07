@@ -38,6 +38,10 @@ func (d *DB) SetRole(ctx context.Context, id, role string) error {
 		if role != RoleMember {
 			return nil
 		}
+		// A member doesn't sign for folders: the root's private key sealed for them goes.
+		if _, err := tx.ExecContext(ctx, "DELETE FROM root_grants WHERE user_id = $1", id); err != nil {
+			return err
+		}
 		_, err = tx.ExecContext(ctx, `INSERT INTO folder_people (folder_id, user_id)
 			SELECT id, $1 FROM folders WHERE deleted_at IS NULL ON CONFLICT DO NOTHING`, id)
 		return err
@@ -74,7 +78,7 @@ func (d *DB) RevokeInvite(ctx context.Context, id string, at time.Time) error {
 		return err
 	}
 	return d.inTx(ctx, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, "UPDATE invites SET revoked_at = $1, person_key = NULL WHERE id = $2 AND used_at IS NULL AND revoked_at IS NULL",
+		if _, err := tx.ExecContext(ctx, "UPDATE invites SET revoked_at = $1, person_key = NULL, root_locked = NULL WHERE id = $2 AND used_at IS NULL AND revoked_at IS NULL",
 			at, id); err != nil {
 			return err
 		}

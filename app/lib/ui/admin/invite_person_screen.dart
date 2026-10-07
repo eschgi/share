@@ -71,18 +71,20 @@ class _InvitePersonScreenState extends State<InvitePersonScreen> {
       if (person == null) {
         final encrypted = [for (final f in services.folders.list ?? const <FolderInfo>[]) if (f.keyVersion != null) f.id];
         final gets = _role == Role.admin ? encrypted : [for (final id in _given) if (encrypted.contains(id)) id];
-        ({String secret, List<Json> keys})? keys;
-        if (gets.isNotEmpty && services.keys.state.ready) {
+        // The root goes along whenever this phone trusts one, so the new person's phone or browser
+        // checks the folders' keys with it.
+        ({String secret, List<Json> keys, String? root})? keys;
+        if (services.keys.state.ready) {
           try {
             keys = await services.platform.inviteKeys(gets);
           } on KeysException {
             keys = null; // the new person waits for the family's phones instead
           }
         }
-        invite = await admin.invite(_who, _role, folders: _given, keys: keys?.keys ?? const []);
-        if (keys != null && keys.keys.isNotEmpty) invite = invite.withLink('${invite.link}.${keys.secret}');
+        invite = await admin.invite(_who, _role, folders: _given, keys: keys?.keys ?? const [], root: keys?.root);
+        if (keys != null && (keys.keys.isNotEmpty || keys.root != null)) invite = invite.withLink('${invite.link}.${keys.secret}');
       } else {
-        ({String secret, String locked})? own;
+        ({String secret, String locked, String? root})? own;
         if (person.isMe) {
           try {
             own = await services.platform.personKeyForInvite();
@@ -90,7 +92,7 @@ class _InvitePersonScreenState extends State<InvitePersonScreen> {
             own = null;
           }
         }
-        invite = await admin.invitePhone(person.id, personKey: own?.locked);
+        invite = await admin.invitePhone(person.id, personKey: own?.locked, root: own?.root);
         if (own != null) invite = invite.withLink('${invite.link}.${own.secret}');
       }
       if (mounted) setState(() => _invite = invite);

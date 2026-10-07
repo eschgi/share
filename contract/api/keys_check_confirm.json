@@ -1,0 +1,10 @@
+{
+  "method": "PUT",
+  "path": "/api/keys/checks/{id}/confirm",
+  "auth": "device",
+  "status": 204,
+  "request": {
+    "confirmation": "Zymi70etU-VgK8rIQx3Ehwyi21z333OOhZSw4eUaQP6JodtkvMxfQ2D9XpMlXFTDFHE6LZ2-9QxL0YRAT6P3-96V7anlULsAvwg4JkqdoG5qg13lDCF9OpynCwUNAJFaTRuFW4g5aZVNliI0XZ_UeSgiA-_NPrUmcxgQoyXfqshFZs9D9wIOpdKP5FmYpZRxmu-Eu34_KucACw-IBmcvPCgO6ccaA5yNqPAyJGkzhJukgaWkatCcLIJPEEygDP7juch6t4kBYNhvvul3FL2ncyw5_xpCO6QJH1Xkv-yx8dhDtg1Eoo2tb6_J6oX4Q0uk7ffkNxXhgQMrQuc8174z8Si_6lMx4WNUmT1h6Nqh67H7qtf6iXh41oeyAdsGb_S5"
+  },
+  "notes": "After the person allowed it, what the asking device hands on, locked with a key from the two one-time keys (contract/crypto/check.json): UTF-8 JSON {\"root\": the root it trusts, or null; \"person\": {\"public_key\", \"private_key\"}, the person's key pair, for a device of its person}. Only the waiting side opens it; a device takes the person's key from there and seals it for itself (POST /api/keys/grants), and adopts the root. Only from the device that asks, after its reveal, once: 409 not_answered otherwise. 400 bad_request for an empty one, or one over 1 KiB."
+}

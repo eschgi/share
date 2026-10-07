@@ -63,7 +63,7 @@ func (e *env) newFolder(name string) db.Folder {
 	e.t.Helper()
 	e.clock.Add(time.Second)
 	f := db.Folder{ID: ids.New(), Name: name, Dir: name, CreatedBy: "test", CreatedAt: e.clock.Now()}
-	if err := e.app.DB.InsertFolder(context.Background(), f); err != nil {
+	if err := e.app.DB.InsertFolder(context.Background(), f, nil); err != nil {
 		e.t.Fatal(err)
 	}
 	return f

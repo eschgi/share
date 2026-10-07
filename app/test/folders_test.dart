@@ -260,7 +260,8 @@ void main() {
 
   testWidgets('a new folder opens at once; the last one can\'t be deleted', (tester) async {
     final server = adminServer();
-    await startApp(tester, signedInPhone(), server);
+    final platform = signedInPhone();
+    await startApp(tester, platform, server);
     await openSettings(tester);
     expect(find.text('1 folder'), findsOneWidget);
     await tapInList(tester, find.text('Folders'));
@@ -282,7 +283,13 @@ void main() {
     await tester.tap(find.widgetWithText(TextButton, 'Create'));
     await tester.pumpAndSettle();
     expect(find.text("A folder needs a name, and it can't be a date like 2026-09-27."), findsOneWidget);
+    // Once there is a recovery key, a phone that doesn't hold it can't sign a new folder.
+    platform.lacksRoot = true;
     await tester.enterText(find.byType(TextField), 'Kindergarten');
+    await tester.tap(find.widgetWithText(TextButton, 'Create'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('it needs the recovery key'), findsOneWidget);
+    platform.lacksRoot = false;
     await tester.tap(find.widgetWithText(TextButton, 'Create'));
     await tester.pumpAndSettle();
     expect(find.widgetWithText(AppBar, 'Kindergarten'), findsOneWidget);
@@ -351,7 +358,8 @@ void main() {
     await tester.tap(find.text('Show the QR code'));
     await tester.pumpAndSettle();
     final made = server.requests.lastWhere((r) => r.url.path == '/api/invites');
-    expect(jsonDecode(made.body), {'name': 'Oma Rosa', 'role': 'member', 'folders': [wedding, family]});
+    // The root this phone trusts goes along, locked with the link's secret.
+    expect(jsonDecode(made.body), {'name': 'Oma Rosa', 'role': 'member', 'folders': [wedding, family], 'root': 'locked-root'});
     expect(boxOf('Family').onChanged, isNull, reason: 'made already');
 
     // An admin sees every folder: nothing to tick.
@@ -363,7 +371,7 @@ void main() {
     expect(find.byType(Checkbox), findsNothing);
     await tester.tap(find.text('Show the QR code'));
     await tester.pumpAndSettle();
-    expect(jsonDecode(server.requests.lastWhere((r) => r.url.path == '/api/invites').body), {'name': 'Anna', 'role': 'admin'});
+    expect(jsonDecode(server.requests.lastWhere((r) => r.url.path == '/api/invites').body), {'name': 'Anna', 'role': 'admin', 'root': 'locked-root'});
   });
 
   testWidgets('with one folder an invite gives it without asking', (tester) async {

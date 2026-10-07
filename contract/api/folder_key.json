@@ -6,8 +6,9 @@
   "request": {
     "version": 2,
     "public_key": "BJfxSoI9XU4Wjc3HP-qZfuHdRPWhgun8FwJFhnN9pcHIDOUfJ0NIFuKUB9iIMdT6wq9oFz0WNNRDM1WizbHTNug",
+    "signature": "FyxXjhdRPV5Cz5Ez4wW_3mliab6GNWBFVsAPf0eT91wgr4CHocrc2TcXReU_Ymalcm70T9nQ3_cFIAhstcPlzQ",
     "sealed": "IrND8bSTM9bOKWE9Af5eb5nKnB8pLXz1A8GXxzuOL7JUb8FPkQ1BPnG05AOYeHrPLdd9qqBaY6jY-y1WeTq-aq3sI5_EM0LAt9AE6AboqGRUqlhbK7M-MZUzV36lg38zQy4C3C2lK06OaHKHpYcFc0Q",
     "recovery_sealed": "0cqAWYj3cb_R-LM1fFJneV8GprlKrwEep0mdk4hEfz44VObksi_zlm-rsGBz7Sg3_gVL7_I4kflVkvJ6-6Xw8WgdeMD03lr_EdRQp_8Ob2mwTSvczhnqofeRbYlJuP_mr0nYPvGjv3B7JoPJxmNX97k"
   },
-  "notes": "The next version of an encrypted folder's key, after someone lost the folder (todo.rekey in GET /api/keys): made on the device of someone who holds the newest version, sealed for them and for the recovery key. New uploads seal their file keys for it; older files keep theirs. Errors: 409 key_outdated unless version is the next one, 404 not_found for a folder the caller holds no newest key of."
+  "notes": "The next version of an encrypted folder's key, after someone lost the folder (todo.rekey in GET /api/keys): made on the device of an admin who holds the newest version and the root, signed by the root (share-e2ee-v1/sign/folder-key), sealed for them and for the recovery key. New uploads seal their file keys for it; older files keep theirs. Errors: 409 key_outdated unless version is the next one, 409 not_encrypted for a folder switched off (turning it on makes the next version), 400 bad_signature, 404 not_found for a folder the caller holds no newest key of."
 }

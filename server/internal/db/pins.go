@@ -29,12 +29,13 @@ type Pin struct {
 	Secret *PinSecret
 }
 
-// PinSecret is what the link of a PIN that shows an encrypted folder brings: its secret,
-// sealed for a version of the folder's key, and the folder's keys locked with it. Only
-// InsertPin reads it.
+// PinSecret is what the link of a PIN that shows an encrypted folder brings: its secret, locked
+// with a key from a version of the folder's private key, and the root and the folder's keys
+// locked with it. Only InsertPin reads Keys.
 type PinSecret struct {
-	Sealed  []byte
+	Locked  []byte
 	Version int
+	Root    []byte
 	Keys    []PinKey
 }
 
@@ -45,15 +46,15 @@ func (p Pin) LiveAt(now time.Time) bool {
 
 const pinColumns = "id, code, kind, created_by, created_at, expires_at, ended_at, folder_id, shows_folder"
 
-// pinSelect is what a PIN is read with: its columns and its link's sealed secret.
-const pinSelect = pinColumns + ", secret_sealed, secret_version"
+// pinSelect is what a PIN is read with: its columns and its link's locked secret and root.
+const pinSelect = pinColumns + ", secret_locked, secret_version, root_locked"
 
 func scanPin(row interface{ Scan(...any) error }) (Pin, error) {
 	var p Pin
 	var folderID sql.NullString
-	var secretSealed []byte
+	var secretLocked, rootLocked []byte
 	var secretVersion sql.NullInt64
-	err := row.Scan(&p.ID, &p.Code, &p.Kind, &p.CreatedBy, &p.CreatedAt, &p.ExpiresAt, &p.EndedAt, &folderID, &p.ShowsFolder, &secretSealed, &secretVersion)
+	err := row.Scan(&p.ID, &p.Code, &p.Kind, &p.CreatedBy, &p.CreatedAt, &p.ExpiresAt, &p.EndedAt, &folderID, &p.ShowsFolder, &secretLocked, &secretVersion, &rootLocked)
 	if noRow(err) {
 		return p, ErrNotFound
 	}
@@ -61,8 +62,8 @@ func scanPin(row interface{ Scan(...any) error }) (Pin, error) {
 		return p, err
 	}
 	p.FolderID = folderID.String
-	if secretSealed != nil {
-		p.Secret = &PinSecret{Sealed: secretSealed, Version: int(secretVersion.Int64)}
+	if secretLocked != nil {
+		p.Secret = &PinSecret{Locked: secretLocked, Version: int(secretVersion.Int64), Root: rootLocked}
 	}
 	return p, nil
 }
@@ -78,7 +79,8 @@ func (d *DB) InsertPin(ctx context.Context, p Pin) error {
 		if err != nil || p.Secret == nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, "UPDATE pins SET secret_sealed = $1, secret_version = $2 WHERE id = $3", p.Secret.Sealed, p.Secret.Version, p.ID); err != nil {
+		if _, err := tx.ExecContext(ctx, "UPDATE pins SET secret_locked = $1, secret_version = $2, root_locked = $3 WHERE id = $4",
+			p.Secret.Locked, p.Secret.Version, p.Secret.Root, p.ID); err != nil {
 			return err
 		}
 		for _, k := range p.Secret.Keys {

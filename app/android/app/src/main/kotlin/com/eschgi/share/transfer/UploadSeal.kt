@@ -5,6 +5,7 @@ import com.eschgi.share.e2ee.E2ee
 import com.eschgi.share.e2ee.E2eeException
 import com.eschgi.share.e2ee.EncryptingSource
 import com.eschgi.share.e2ee.FolderPublicKey
+import com.eschgi.share.e2ee.SendRefused
 import com.eschgi.share.net.readLimited
 import org.json.JSONException
 import org.json.JSONObject
@@ -88,28 +89,24 @@ class UploadSeal(
         val RESEAL = setOf("key_outdated", "encryption_required", "not_encrypted")
 
         /**
-         * The key new files into [folder] are encrypted for; null while that folder is plain. A
-         * PIN asks its session (contract/api/session.json), someone signed in the folder list and
-         * the keys (GET /api/keys). [open] makes a GET with the batch's key and route.
+         * The key new files into [folder] are encrypted for; null while they go plain. A PIN asks
+         * its session (contract/api/session.json), someone signed in the folder list; the keys
+         * decide, with the root this phone trusts: [signedIn] for the folder as the list describes
+         * it (Keys.sendKey), [guest] for the session (Keys.guestKey). They throw [SendRefused] when
+         * nothing may go into the folder. [open] makes a GET with the batch's key and route.
          */
-        fun target(auth: String, folder: String?, open: (path: String) -> HttpURLConnection): FolderPublicKey? {
-            if (auth == Credentials.PIN) {
-                val session = getJson(open, "/api/session")
-                val enc = session.optJSONObject("encrypt") ?: return null
-                return FolderPublicKey(enc.getString("folder"), enc.getInt("version"), E2ee.fromB64u(enc.getString("public_key")))
-            }
+        fun target(
+            auth: String,
+            folder: String?,
+            open: (path: String) -> HttpURLConnection,
+            signedIn: (folder: JSONObject) -> FolderPublicKey?,
+            guest: (session: JSONObject) -> FolderPublicKey?,
+        ): FolderPublicKey? {
+            if (auth == Credentials.PIN) return guest(getJson(open, "/api/session"))
             if (folder == null) return null
             val folders = getJson(open, "/api/folders").getJSONArray("folders")
             val info = (0 until folders.length()).map { folders.getJSONObject(it) }.firstOrNull { it.getString("id") == folder } ?: return null
-            if (!info.optBoolean("encrypted")) return null
-            val keys = getJson(open, "/api/keys").getJSONArray("folders")
-            var best: JSONObject? = null
-            for (i in 0 until keys.length()) {
-                val k = keys.getJSONObject(i)
-                if (k.getString("folder") == folder && (best == null || k.getInt("version") > best.getInt("version"))) best = k
-            }
-            val newest = best ?: throw IOException("no key for encrypted folder $folder")
-            return FolderPublicKey(folder, newest.getInt("version"), E2ee.fromB64u(newest.getString("public_key")))
+            return signedIn(info)
         }
 
         private fun getJson(open: (path: String) -> HttpURLConnection, path: String): JSONObject {

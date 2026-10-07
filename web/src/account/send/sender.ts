@@ -3,7 +3,7 @@
 // queue that a closed page interrupted. The screens' steps are the PIN pages' (state.ts).
 import { useEffect, useState } from 'preact/hooks';
 import { getInfo } from '../../api';
-import { keyring } from '../../e2ee/keyring';
+import { keyring, SendRefused } from '../../e2ee/keyring';
 import { claimShared, dropShared, sharedGone, type Shared } from '../../incoming';
 import { notify } from '../../notify';
 import { initialState, reduce, type Action, type State } from '../../state';
@@ -14,6 +14,8 @@ import { foldersNow, refreshFolders } from '../folders/store';
 let state: State = initialState;
 let uploader: Uploader | null = null;
 let rejected: string[] = [];
+/** Files weren't sent: what the server says about their folder's keys can't be checked. */
+let refused = false;
 /** Files waiting for the person to say which folder they go into. */
 let pending: { files: File[]; shared: Shared[] } | null = null;
 /** Grows each time a folder turned out to be gone, for the pages to say so. */
@@ -54,10 +56,16 @@ export function startSender(signedOut: () => void): void {
           void refreshFolders();
           changed();
         },
-        // An encrypted folder's new files are encrypted for its newest key.
-        encryptFor: (folder) => {
+        // An encrypted folder's new files are encrypted for its newest key, which the root
+        // signed; files go plain only where the root says so.
+        encryptFor: async (folder) => {
           const f = foldersNow().list?.find((x) => x.id === folder);
-          return f?.encrypted ? keyring.encryptFor(f.id) : null;
+          if (!f) throw new SendRefused('no such folder');
+          return keyring.sendKey(f);
+        },
+        onRefused: () => {
+          refused = true;
+          changed();
         },
         refreshKeys: async () => {
           await Promise.all([refreshFolders(), keyring.refresh()]);
@@ -89,6 +97,7 @@ export function sendFiles(files: File[], folder = foldersNow().sendTo): void {
   if (files.length === 0 || !uploader) return; // e.g. a dropped folder with nothing but hidden files
   if (folder === null) return hold(files, []);
   rejected = [];
+  refused = false;
   uploader.add(files, folder);
   dispatch({ type: 'filesAdded' });
 }
@@ -106,6 +115,7 @@ export function sendPending(folder: string): void {
   const { files, shared } = pending;
   pending = null;
   rejected = [];
+  refused = false;
   uploader.add(files, folder);
   uploader.addShared(shared, folder);
   dispatch({ type: 'filesAdded' });
@@ -139,6 +149,7 @@ export function retryFailed(): void {
 }
 
 export function sendMore(): void {
+  refused = false;
   uploader?.clear();
   dispatch({ type: 'sendMore' });
 }
@@ -147,6 +158,7 @@ export interface Sending {
   state: State;
   snapshot: Snapshot | null;
   rejected: string[];
+  refused: boolean;
   /** How many files wait for the person to say which folder they go into. */
   pending: number;
   /** Grows each time a folder turned out to be gone. */
@@ -161,7 +173,7 @@ export function useSender(): Sending {
     listeners.add(l);
     return () => void listeners.delete(l);
   }, []);
-  return { state, snapshot: uploader?.snapshot() ?? null, rejected, pending: (pending?.files.length ?? 0) + (pending?.shared.length ?? 0), foldersGone };
+  return { state, snapshot: uploader?.snapshot() ?? null, rejected, refused, pending: (pending?.files.length ?? 0) + (pending?.shared.length ?? 0), foldersGone };
 }
 
 /** Files are still on their way: closing the page would interrupt them. */

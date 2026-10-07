@@ -29,8 +29,14 @@ object Keys {
     /** The secret of the link of a PIN that shows an encrypted folder, while the PIN works here. */
     private const val PIN_SECRET = "e2ee_pin_secret"
 
+    /** The root's fingerprint the link of a PIN that only sends into a folder with keys carried, while the PIN works here. */
+    private const val PIN_ROOT = "e2ee_pin_root"
+
     /** The people's keys checked on this phone, as JSON: the device's id, and user id to public key. */
     private const val TRUSTED = "e2ee_trusted"
+
+    /** What this phone keeps of the keys (Pins), as JSON: the device's id, and the pins. */
+    private const val PINS = "e2ee_pins"
 
     /** Who is signed in, as lib/data/session.dart stores it. */
     private const val USER = "user"
@@ -159,16 +165,47 @@ object Keys {
         return null
     }
 
-    /** A PIN guest opens the folder the PIN shows with the secret of its link, which is kept while the PIN works here. How many versions of its key opened. */
-    fun openPin(context: Context, secret: String): Int {
-        SecretStore(context).write(PIN_SECRET, secret)
-        return ring(context).openPinKeys(ServerKeysApi(context.applicationContext, Credentials.PIN), secret)
+    /**
+     * What the link of the PIN just unlocked carries after its code, kept while the PIN works
+     * here: the [secret] of one that shows an encrypted folder, which opens it, or the [root]'s
+     * fingerprint of one that only sends into a folder with keys; both name the root its uploads
+     * check the folder's key with. A PIN typed without either forgets them. How many versions of
+     * the folder's key opened.
+     */
+    fun pinLink(context: Context, secret: String?, root: String?): Int {
+        val store = SecretStore(context)
+        store.write(PIN_SECRET, secret)
+        store.write(PIN_ROOT, root)
+        ring(context).forgetPin()
+        return if (secret == null) 0 else ring(context).openPinKeys(ServerKeysApi(context.applicationContext, Credentials.PIN), secret)
     }
 
-    /** The PIN's keys go, with the secret; e.g. when the PIN ended or another one came. */
+    /** The PIN's keys go, with what its link carried; e.g. when the PIN ended or another one came. */
     fun forgetPin(context: Context) {
-        SecretStore(context).write(PIN_SECRET, null)
-        ring(context).forgetPin()
+        pinLink(context, null, null)
+    }
+
+    /**
+     * What a new file into [folder] (as GET /api/folders describes it) is sealed for, someone
+     * signed in: after a check-in, the folder's newest key signed by the root this phone trusts,
+     * or null for plain where the root's plain statement allows it. Throws [SendRefused] when
+     * nothing may go in.
+     */
+    fun sendKey(context: Context, folder: JSONObject): FolderPublicKey? {
+        val r = ring(context)
+        val me = account(context) ?: throw IOException("signed out")
+        r.sync(me, quiet = true)
+        return r.sendKey(folder)
+    }
+
+    /** What a PIN guest's new file is sealed for, from the PIN's [session]: checked with the root its link named, if it named one (Keyring.guestKey). */
+    fun guestKey(context: Context, session: JSONObject): FolderPublicKey? {
+        val store = SecretStore(context)
+        val fingerprint = store.read(PIN_ROOT)
+        val secret = store.read(PIN_SECRET)
+        val r = ring(context)
+        if (secret != null && r.guestRoot == null) reopenPin(context)
+        return Keyring.guestKey(session, fingerprint != null || secret != null, fingerprint, r.guestRoot)
     }
 
     /** The PIN guest's keys again, after the app started anew; how many opened. */
@@ -215,6 +252,20 @@ object Keys {
 
         override fun trust(deviceId: String, trusted: Map<String, String>) {
             SecretStore(app).write(TRUSTED, JSONObject().put("device", deviceId).put("keys", JSONObject(trusted)).toString())
+        }
+
+        override fun pins(deviceId: String): Pins {
+            val raw = SecretStore(app).read(PINS) ?: return Pins()
+            return try {
+                val j = JSONObject(raw)
+                if (j.optString("device") != deviceId) Pins() else Pins.parse(j.optJSONObject("pins"))
+            } catch (e: JSONException) {
+                Pins()
+            }
+        }
+
+        override fun keepPins(deviceId: String, pins: Pins) {
+            SecretStore(app).write(PINS, JSONObject().put("device", deviceId).put("pins", pins.toJson()).toString())
         }
     }
 }

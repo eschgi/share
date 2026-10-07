@@ -97,7 +97,7 @@ export function JoinPage() {
       return setJoinProblem(t('join.cookieLost'));
     }
     // The keys the link's secret unlocks become this browser's; without them it waits for others.
-    await keysFromInvite(me, secret, joined.keys).catch(() => {});
+    await keysFromInvite(me, secret, joined.keys, joined.root).catch(() => {});
     setSignedInHint(true);
     location.replace('/library');
   }

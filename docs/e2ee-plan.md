@@ -36,20 +36,17 @@ It protects the contents and thumbnails of encrypted folders from the bucket's p
 database's host, leaked bucket keys or links, and anyone who copies the server's disk or database.
 Keys go to a new phone, browser or person only after a check whose code the person compares on
 both screens (below), so someone who can change the database can't slip in a device or a person of
-their own either.
+their own either; and the recovery key signs every folder's keys and every decision to send a folder
+plain, so they can't switch a folder's encryption off or name a key of their own for it.
 
 It doesn't protect:
 - names and the other readable data above;
 - against a server that has been taken over and sends the browsers changed website code, since the
   website comes from the server (the Android app's code doesn't);
 - a PIN link that shows its folder: whoever has the link can read the folder, by design;
-- someone who can change the database switching a folder's encryption off, or naming a key of their
-  own as a folder's newest version: phones and browsers take both from the server, so new files
-  are then sent plain, or encrypted for that key; the files encrypted before stay safe;
-- two things that still get folder keys without a check, decided to come later: the recovery key
-  (a database changed to name another recovery key gets every folder key sealed for it) and PIN
-  links that show a folder (a secret sealed for the folder key by someone else gets each new
-  version locked for it);
+- the few cases where a phone or browser can't check what the server says about a folder's keys
+  (under "What a changed database can't fake", below): a guest who types a PIN's code, a device that
+  never learned the root before the database was changed, hidden folders;
 - files a removed person already downloaded;
 - a password backup better than the password: the server sees passwords at sign-in.
 
@@ -73,8 +70,9 @@ scalar, everything binary in JSON as base64url without padding.
 - **File key**, 32 random bytes per file, sealed for the folder key's newest version when the upload
   starts. The contents' and the thumbnail's keys come from it with HKDF. So a PIN guest can send into
   an encrypted folder but can't read it.
-- **Recovery key**, one per server. Its private key is locked with the recovery code, which the
-  admin who turns on the first encrypted folder sees once.
+- **Recovery key**, one per server, also the root key that signs folder keys (below). Its private
+  key is locked with the recovery code, which the admin who turns on the first encrypted folder sees
+  once, and sealed for each admin's person key.
 
 ## Formats (contract/crypto)
 
@@ -87,7 +85,7 @@ scalar, everything binary in JSON as base64url without padding.
   | a file key, for a folder key | `share-e2ee-v1/file` | `folder:<folder id>:<version>` |
   | a folder key, for a person or the recovery key | `share-e2ee-v1/folder` | `folder:<folder id>:<version>` |
   | a person key, for a device | `share-e2ee-v1/person` | `person:<user id>` |
-  | a PIN link's secret, for a folder key | `share-e2ee-v1/pin` | `folder:<folder id>:<version>` |
+  | the recovery key's private key, for an admin's person key | `share-e2ee-v1/root` | `root` |
 
   The context keeps a server from passing one folder's key off as another's, which would make a
   member encrypt into a folder that others see.
@@ -95,7 +93,12 @@ scalar, everything binary in JSON as base64url without padding.
   PIN's, 32 random bytes) or the recovery code gives the key with HKDF-SHA256 (no salt, the purpose
   as info: `share-e2ee-v1/invite`, `share-e2ee-v1/pin`, `share-e2ee-v1/recovery`). A password lock
   starts with a 16-byte salt and the iteration count (4 bytes, big endian; 600 000 today); the key is
-  PBKDF2-HMAC-SHA256 of the password.
+  PBKDF2-HMAC-SHA256 of the password. A key's private key gives keys the same way: a folder key's
+  for its PIN links' secrets (`share-e2ee-v1/pin-secret`, aad `folder:<folder id>:<version>`), a
+  person key's for their note (`share-e2ee-v1/note`, aad `note:<user id>`). An invite's or a PIN's
+  link locks the root's public key with aad `root`.
+- **Signatures** (sign.json): ECDSA on P-256 with SHA-256 over the messages under "What a changed
+  database can't fake", as r‖s in 64 bytes.
 - **Contents:** a 16-byte header ("SHE1", the chunk size 65536, a random 7-byte nonce prefix, a zero
   byte), then chunks of 64 KiB, each AES-256-GCM with a key from the file key (HKDF, salted with the
   header) and the nonce prefix, the chunk's number and a last-chunk flag. Encrypted size = 16 +
@@ -105,9 +108,11 @@ scalar, everything binary in JSON as base64url without padding.
 - **Thumbnails:** the JPEG locked with a key from the file key (HKDF, `share-e2ee-v1/thumb`).
 - **Recovery code:** 20 random bytes as 32 characters of Crockford's base32, in groups of four.
 - **Checks** (check.json): the commitment is SHA-256 of `share-e2ee-v1/check` and the asking
-  device's 32-byte nonce; the code is the first 4 bytes of SHA-256 of `share-e2ee-v1/code`, both
-  nonces and the public key that gets the keys, as a big-endian number modulo a million, in 6
-  digits.
+  device's one-time public key; the code is the first 4 bytes of SHA-256 of `share-e2ee-v1/code`,
+  both one-time keys and the public key that gets the keys, as a big-endian number modulo a million,
+  in 6 digits. The confirmation is locked with HKDF-SHA256 of the two one-time keys' ECDH secret,
+  salted with SHA-256 of both one-time keys and the key that gets the keys
+  (`share-e2ee-v1/confirm`), aad `check:<check id>`.
 
 ## How it works
 
@@ -134,15 +139,20 @@ recovery key; the admin's device then finds everyone else on its to-do list at o
 **Checks** (decided on 2026-10-06, screens 50 to 55 of the mockup): before a device passes keys on,
 both screens show the same code of 6 digits, made from the key that would get them. The server only
 relays it, and can't show the code of a key of its own:
-- the asking device opens a check with a commitment to a random nonce (`POST /api/keys/checks`);
+- the asking device opens a check with a commitment to a one-time public key
+  (`POST /api/keys/checks`);
 - the device it is for, or a device of the person it is for that holds their key, answers with a
-  nonce of its own, and keeps the commitment it saw;
-- the asking device reveals its nonce for the answer it saw, which the server takes only while it
+  one-time public key of its own, and keeps the commitment it saw;
+- the asking device reveals its key for the answer it saw, which the server takes only while it
   is still the answer; from then on the answer can't change;
-- both make the code from both nonces and the key: the waiting device from its own key, or its
-  person's, after checking the nonce against the commitment it kept; the asking device from the
-  key on its to-do list and the answer it revealed for. Neither nonce can be chosen after seeing the
-  other, so whoever relays them has one chance in a million to make two keys show the same code.
+- both make the code from both one-time keys and the key that gets the keys: the waiting device
+  from its own key, or its person's, after checking the revealed key against the commitment it
+  kept; the asking device from the key on its to-do list and the answer it revealed for. Neither
+  one-time key can be chosen after seeing the other, so whoever relays them has one chance in a
+  million to make two keys show the same code;
+- after Allow, the asking device puts its confirmation on the check (`PUT
+  /api/keys/checks/{id}/confirm`), which only the waiting side opens, as only the two of them have
+  the secret of the two one-time keys.
 
 Nothing opens by itself (the user's choice): the asking device lists who waits over the library,
 under "Waiting for your OK": a new phone or browser of the person, with its name, or, on an admin's
@@ -151,8 +161,9 @@ phones and browsers, a person whose folders wait. Only admins pass folder keys o
 check for someone else and leaves out folder keys a member seals for someone else; folder keys a
 person seals for themselves, from an invite's link or the recovery code, still count. Show opens a dialog (a sheet in the app) with when the phone or browser signed in, or
 the person's folders, and only then starts the check, so the code comes on both screens a few
-seconds later. Allow seals the keys for the key that was checked; Not me signs that phone or browser
-out; Not now, or closing the dialog, ends the check, and the ask stays listed. Several are listed
+seconds later. Allow hands the person's key to a device of theirs in the confirmation, which the
+device seals for itself, or seals folder keys, and the root's private key for an admin, for the
+person's key that was checked; Not me signs that phone or browser out; Not now, or closing the dialog, ends the check, and the ask stays listed. Several are listed
 together, each opened on its own, with its own check and code. A person's key, once allowed, is
 remembered on that device (in the device's IndexedDB record, or the app's `SecretStore`), so new
 versions and new folders reach them at once, until their key changes. Only those seen in the last
@@ -161,6 +172,75 @@ the person sees no encrypted folder. While a check runs, opened with Show or ans
 check in every 2 seconds; a device that waits for keys every 5 seconds; otherwise every half
 minute. Signing in with the password and joining with an invite link ask nothing: they bring their
 keys with them.
+
+**What a changed database can't fake** (decided on 2026-10-07): someone who can change the
+database, its host or whoever has its password, must not be able to make a phone or browser send a
+file plain, or encrypted for a key of theirs, where the folder's admins didn't decide so; nor get
+folder keys sealed or locked for a key or secret of theirs.
+
+- **The root key** is the recovery key. It signs (ECDSA on P-256 with SHA-256, the signature as r‖s
+  in 64 bytes, contract/crypto/sign.json):
+
+  | What is signed | The message |
+  |----------------|-------------|
+  | a version of a folder's key | `share-e2ee-v1/sign/folder-key` ‖ `folder:<id>:<version>` ‖ its public key |
+  | a folder that sends plain: never encrypted, or switched off | `share-e2ee-v1/sign/plain` ‖ `folder:<id>:<its newest version, or 0>` ‖ `\n` ‖ its name |
+  | the key of a new recovery code | `share-e2ee-v1/sign/root` ‖ the new public key, signed with the old one |
+
+  Admins' phones and browsers hold its private key too, sealed for the admin's person key
+  (`root_grants`; HPKE, `share-e2ee-v1/root`, aad `root`): given like folder keys, with an OK, or at
+  once to an admin whose key was checked on that device before. With it they make folders, switch
+  encryption, rename a folder that sends plain, and make a folder's next key version; nothing is
+  signed by itself otherwise. Turning encryption on always makes a new version, so a plain statement
+  signed for an older one can't be shown again; renaming a plain folder signs it anew. A new
+  recovery code signs its key with the old one, and signs every version and every plain statement
+  anew, after checking each under the old one; phones and browsers follow the chain of roots and
+  take only signatures by the newest. The first recovery key signs every folder there is as plain.
+- **Each phone and browser trusts one root,** and keeps it with the person's public key and the
+  newest version of each folder's key it has seen (IndexedDB, or the app's `SecretStore`). It learns
+  the root where the database can't change it: the device made it, or opened it with the recovery
+  code; an invite's link carries it, locked with the link's secret (aad `root`); a check hands it on
+  (below); or **the person's note**, which holds the root and those versions, locked with a key from
+  the person's private key (HKDF, `share-e2ee-v1/note`; AES-GCM, aad `note:<user id>`), so their
+  next phone or browser, e.g. one signed in with the password, finds them. Each device writes what it
+  saw into the note. A device that has none of these (it was used before encryption was set up)
+  takes the root the server shows the first time, and keeps it.
+- **Sending into a folder**, once there is a root: the newest version of the folder's key must be
+  signed by the root, or nothing is sent; an encrypted folder gets the file encrypted for it. A
+  folder sends plain only with its plain statement, signed for its newest version and its name;
+  without one, a folder with keys gets the file encrypted, which the server takes, and one without
+  keys gets nothing. A folder showing fewer versions than seen before gets nothing either. Before
+  any root, files go plain, as no folder can have keys.
+- **Keys that are opened** must match: a folder's private key its signed public key; the person's
+  key the one the device keeps, or the one a check, the password, an invite or the recovery code
+  gave.
+- **The recovery key's seals** go only to the root the device trusts: a database naming another
+  recovery key gets nothing sealed for it.
+- **A PIN link's secret** is locked with a key from the folder's private key (HKDF,
+  `share-e2ee-v1/pin-secret`; aad `folder:<id>:<version>`), not sealed for its public key, so only
+  someone who holds the folder's key can make one, and phones and browsers lock new versions only
+  for a secret that opens that way.
+- **Checks use one-time keys** instead of nonces: the asking device commits to its one-time public key
+  (SHA-256 of `share-e2ee-v1/check` ‖ key); the other side answers with its own; the asking device
+  reveals its key; the code is made from `share-e2ee-v1/code` ‖ the asking key ‖ the answering key ‖
+  the key that gets the keys. Both sides make the same secret from the two one-time keys (ECDH).
+  After Allow, the asking device puts a confirmation on the check, locked with a key from that
+  secret (HKDF-SHA256, salted with SHA-256 of the asking key, the answering key and the key that
+  gets the keys, `share-e2ee-v1/confirm`; AES-GCM, aad `check:<id>`): the root, and for a device of
+  its person the person's key pair, which the device then seals for itself. Folder keys and the root's
+  private key for another person are sealed for their checked key, as before. The waiting side keeps
+  its one-time private key in memory until it reads the confirmation, then closes the check.
+- **PIN links** into an encrypted folder carry the root: a PIN that only sends has its fingerprint
+  after the code (`#<code>.<the first 16 bytes of SHA-256 of the root, base64url>`), a PIN that shows
+  its folder has the root locked with its link's secret (aad `root`). A guest with such a link
+  always sends encrypted, for the newest version, signed by the root the link names (following the
+  chain); never plain.
+- **What still can't be checked:** a guest who types a PIN's code, or has a link made while the
+  folder was plain; a phone or browser that never learned the root, while the database is changed
+  before it first sees one; a phone or browser that signs in for the first time with only the
+  password, while the database also brings back an older note of the person and leaves out the
+  versions since; folders hidden, so that the person sends into another one, plain if it is; and
+  changed website code from a server that was taken over, as the website comes from the server.
 
 **A device that has no person key yet** (a new browser after a sign-in, a phone whose key was lost)
 shows encrypted files as locked and says it waits for approval on another phone or browser of the
@@ -175,9 +255,13 @@ says: no phone or browser holds it any more, and no password lock opens it. An a
 instead, since the recovery code opens every folder again.
 
 **Turning encryption on** for a folder (admins): the device makes the recovery key first if there is
-none and shows its code, then the folder key, seals it for the admin's person key and the recovery
-key, and the server marks the folder encrypted. New uploads into it must be encrypted from then on;
-uploads that started before stay plain. Turning it off marks the folder plain again.
+none and shows its code, then the folder key's next version, signs it with the root, seals it for
+the admin's person key and the recovery key, and the server marks the folder encrypted. New uploads
+into it must be encrypted from then on; uploads that started before stay plain. Turning it off
+signs the folder's plain statement for its newest version and name, and marks the folder plain
+again. A new folder comes with either, under an id the device picks, so that its signature can name
+it. All three need the root's private key on the device: an admin whose device doesn't hold it yet
+waits for another admin's OK.
 
 **Sending** into an encrypted folder: the device makes a file key and a header, seals the file key
 for the folder key's newest version, and keeps the file key with the upload until it is done, so a
@@ -196,8 +280,9 @@ writing.
 
 **Invites:** the inviting device locks every version of the invite's encrypted folders' keys (all
 encrypted folders for an admin) with a secret that only the link carries, after a dot:
-`/join#shi_<token>.<secret>`, and in the app's link as `&key=<secret>`. Accepting the invite returns
-the locked keys; the new device opens them, makes its keys and seals the folder keys for the new
+`/join#shi_<token>.<secret>`, and in the app's link as `&key=<secret>`, and locks the root with it
+too, so a link has a secret whenever there is a root. Accepting the invite returns the locked keys;
+the new device opens them, takes the root, makes its keys and seals the folder keys for the new
 person. An invite for a new phone or browser of someone locks their person key the same way. A link
 without the secret still works; the device then waits for the others like any new device.
 
@@ -209,11 +294,12 @@ key makes. New files use the new version; older ones keep theirs.
 target folder's newest key, and the server takes the move only with them. Encrypted files can't move
 into a folder that has never been encrypted.
 
-**PINs:** a PIN that sends into an encrypted folder gets the folder's public key with its session,
-and the guest's browser encrypts. A PIN that also shows the folder needs a link with a secret
-(`/#<code>.<secret>`): the admin's device locks the folder's keys with it, and seals the secret for
-the folder key, so that later versions can be locked for it too. The code alone still sends, and
-shows encrypted files as locked.
+**PINs:** a PIN that sends into an encrypted folder gets the folder's newest public key, with its
+signature and the chain of roots, with its session, and the guest's browser encrypts; its link names
+the root (`/#<code>.<fingerprint>`). A PIN that also shows the folder needs a link with a secret
+(`/#<code>.<secret>`): the admin's device locks the folder's keys and the root with it, and locks the
+secret with a key from the folder's key, so that later versions can be locked for it too. The code
+alone still sends, unchecked, and shows encrypted files as locked.
 
 ## API (contract/api)
 
@@ -257,6 +343,30 @@ Changed:
   /api/session` and unlocking a PIN give `encrypt` (the folder's newest public key, or null).
 - `POST /api/downloads` lists each file's folder and `enc`, so one by one and saving into a folder
   can decrypt.
+- What a changed database can't fake (2026-10-07):
+  - `GET /api/keys` adds `person.note`, `folders[].signature`, `roots` (the chain, oldest first:
+    `{public_key, signature}`, the first without one), `root_sealed` (the newest root's private key
+    sealed for the person), `todo.roots` (admins whose person lacks it: `{user, name, public_key,
+    active}`, for a device whose person holds it) and `checks[].confirm`; `recovery_key` goes, as the
+    newest root is it. `PUT /api/keys/note` `{note}`. `POST /api/keys/grants` adds `roots` (`{user,
+    sealed}`).
+  - Checks: `PUT …/answer` `{key}`, `PUT …/reveal` `{key, answer}`, and `PUT …/confirm`
+    `{confirm}` by the asking device after its reveal. A device with a confirmation waiting isn't on
+    anyone's to-do list.
+  - Folders, once there is a root: `POST /api/folders` `{id, name, key | plain_signature}`; `PATCH
+    /api/folders/{id}` `{name, plain_signature}` for a folder that sends plain; `PUT
+    /api/folders/{id}/encryption` `{encrypted: true, key}` (always the next version) or `{encrypted:
+    false, plain_signature}`; a folder key's version always brings its `signature`. `FolderInfo` adds
+    `plain_signature`. The server checks every signature against the newest root.
+  - `GET /api/recovery` adds `roots` and `sign`: `{folder_keys: [{folder, version, public_key,
+    signature}], plain: [{folder, version, name, signature}]}`, all a new recovery code signs anew;
+    `PUT /api/recovery` `{public_key, locked, signature, sealed, folder_keys, plain}` takes it only
+    complete, and with the old root's signature once there is one.
+  - Invites add `root` (the root locked with the link's secret), and accepting one returns it. A
+    PIN's `secret` is `{locked, version, keys, root}`, `GET /api/pins` gives `{locked, version}`
+    back, and `GET /api/pin/keys` adds `root`. A PIN session's `encrypt` becomes `folder_key`:
+    `{folder, version, public_key, signature, encrypted}`, the folder's newest key whenever it has
+    one, with `roots`.
 - New error codes: `encryption_required` (409, an upload into an encrypted folder came plain),
   `key_outdated` (409, sealed for a key version that isn't the newest), `not_encrypted` (409, moving
   encrypted files into a folder without keys, or an encrypted upload into one), `key_exists` (409,
@@ -286,10 +396,14 @@ Changed:
 - Who loses a folder, from `SetFolderPerson`, `DeleteUser` and folder deletion, drops their grants
   and marks the folder for a new version.
 - An admin's password reset drops the person's password lock.
-- Migration 0002, `key_checks`: the asking device, the device or person it is for, the commitment,
-  the answer with the device that gave it, and the reveal. The server checks who may ask whom, that
+- `key_checks`: the asking device, the device or person it is for, the commitment, the answer with
+  the device that gave it, the reveal and the confirmation. The server checks who may ask whom, that
   the reveal matches the commitment and comes for the answer that is there, and forgets checks after
   15 minutes.
+- What a changed database can't fake, in the first schema (no release yet, so no migration):
+  `roots (seq, public_key, signature, locked)` instead of the recovery key in `meta`, `root_grants
+  (user_id, sealed)`, `folder_keys.signature`, `folders.plain_signature`, `users.note`,
+  `invites.root_locked`, `pins.root_locked`, and `pins.secret_locked` instead of `secret_sealed`.
 
 ## Website (`web/`, no new packages, hand-formatted)
 

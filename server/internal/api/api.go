@@ -136,33 +136,42 @@ type Session struct {
 	FolderName *string `json:"folder_name"`
 	// ShowsFolder: the PIN also shows what is in its folder (/api/folders, /api/library, ...).
 	ShowsFolder bool `json:"shows_folder"`
-	// Encrypt: the key new files into the folder are encrypted for; null while the folder is
-	// plain.
-	Encrypt *EncryptInfo `json:"encrypt"`
+	// FolderKey: the newest version of the folder's key, whenever it has one, which uploads seal
+	// their file keys for while it is encrypted, and always for a guest whose link names the root;
+	// null for a folder that was never encrypted.
+	FolderKey *SessionKey `json:"folder_key"`
+	// Roots: the chain of roots, the first first, which a guest whose link names one follows to
+	// the newest, which signs the folder's key.
+	Roots []RootInfo `json:"roots"`
 }
 
-// EncryptInfo is the newest version of an encrypted folder's key, which uploads seal their
-// file keys for.
-type EncryptInfo struct {
+// SessionKey is the newest version of a folder's key, signed by the root.
+type SessionKey struct {
 	Folder    string `json:"folder"`
 	Version   int    `json:"version"`
 	PublicKey B64    `json:"public_key"`
+	Signature B64    `json:"signature"`
+	Encrypted bool   `json:"encrypted"` // new files into the folder must be encrypted
 }
 
-// encryptFor is the key that uploads into a folder are encrypted for; nil while it is plain.
-func (a *API) encryptFor(ctx context.Context, folderID string) (*EncryptInfo, error) {
+// sessionKeys are the newest key of a PIN's folder, nil without one, and the chain of roots.
+func (a *API) sessionKeys(ctx context.Context, folderID string) (*SessionKey, []RootInfo, error) {
+	roots, err := a.roots(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
 	f, err := a.Auth.DB.FolderByID(ctx, folderID)
 	if errors.Is(err, db.ErrNotFound) {
-		return nil, nil
+		return nil, roots, nil
 	}
-	if err != nil || !f.Encrypted || f.KeyVersion == 0 {
-		return nil, err
+	if err != nil || f.KeyVersion == 0 {
+		return nil, roots, err
 	}
 	k, err := a.Auth.DB.FolderKeyOf(ctx, f.ID, f.KeyVersion)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return &EncryptInfo{Folder: f.ID, Version: k.Version, PublicKey: k.PublicKey}, nil
+	return &SessionKey{Folder: f.ID, Version: k.Version, PublicKey: k.PublicKey, Signature: k.Signature, Encrypted: f.Encrypted}, roots, nil
 }
 
 // folderName is the name of a PIN's folder for its session, nil on a server with one folder.
@@ -240,14 +249,14 @@ func (a *API) unlock(w http.ResponseWriter, r *http.Request) {
 		internal(w, "unlock", err)
 		return
 	}
-	encrypt, err := a.encryptFor(r.Context(), res.Session.Pin.FolderID)
+	key, roots, err := a.sessionKeys(r.Context(), res.Session.Pin.FolderID)
 	if err != nil {
 		internal(w, "unlock", err)
 		return
 	}
 	resp := UnlockResponse{
 		Session: Session{Kind: auth.KindPin, PinKind: res.Session.Pin.Kind, ExpiresAt: res.ExpiresAt, FolderName: folder,
-			ShowsFolder: res.Session.Pin.ShowsFolder, Encrypt: encrypt},
+			ShowsFolder: res.Session.Pin.ShowsFolder, FolderKey: key, Roots: roots},
 		MovedUploads: res.Moved,
 	}
 	if req.Client == "app" {
@@ -270,13 +279,13 @@ func (a *API) session(w http.ResponseWriter, r *http.Request) {
 		internal(w, "session", err)
 		return
 	}
-	encrypt, err := a.encryptFor(r.Context(), p.PinFolderID)
+	key, roots, err := a.sessionKeys(r.Context(), p.PinFolderID)
 	if err != nil {
 		internal(w, "session", err)
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, Session{Kind: p.Kind, PinKind: p.PinKind, ExpiresAt: p.PinExpiresAt, FolderName: folder,
-		ShowsFolder: p.PinShowsFolder, Encrypt: encrypt})
+		ShowsFolder: p.PinShowsFolder, FolderKey: key, Roots: roots})
 }
 
 func (a *API) endSession(w http.ResponseWriter, r *http.Request) {

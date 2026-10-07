@@ -3,6 +3,7 @@ package com.eschgi.share
 import com.eschgi.share.data.ServerConfig
 import com.eschgi.share.e2ee.DeviceKeyStore
 import com.eschgi.share.e2ee.KeyPair
+import com.eschgi.share.e2ee.Pins
 import com.eschgi.share.e2ee.Keyring
 import com.eschgi.share.e2ee.SealedFile
 import com.eschgi.share.net.Route
@@ -80,6 +81,10 @@ class PlatformContractTest {
             override fun load(deviceId: String): KeyPair? = null
 
             override fun save(deviceId: String, pair: KeyPair) {}
+
+            override fun pins(deviceId: String) = Pins()
+
+            override fun keepPins(deviceId: String, pins: Pins) {}
         })
         val off = ring.state()
         val expected = fixture.getJSONObject("keys_event")

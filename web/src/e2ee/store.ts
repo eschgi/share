@@ -1,5 +1,6 @@
 // This browser's device keys, in IndexedDB: the private key as a CryptoKey that can't be
-// exported, by the id of the device the server knows this browser as.
+// exported, by the id of the device the server knows this browser as, with what this browser
+// keeps of the keys it was given (docs/e2ee-plan.md).
 import type { Bytes } from './bytes';
 
 export interface DeviceKey {
@@ -8,6 +9,19 @@ export interface DeviceKey {
   publicKey: Bytes;
   /** The people's keys this browser checked before passing folder keys on: user id to key. */
   trusted?: Record<string, string>;
+  /** What this browser keeps of what the server says about keys, so that a changed database
+   * can't take it back. */
+  pins?: Pins;
+}
+
+/** The person's public key this browser holds the private key of; the root it trusts, and
+ * whether it only took it from the server, the first time (tofu), or from where a database can't
+ * change it; and the newest version of each folder's key it saw, signed by the root. */
+export interface Pins {
+  person?: string;
+  root?: string;
+  tofu?: boolean;
+  folders: Record<string, number>;
 }
 
 const dbName = 'share-keys';
@@ -49,6 +63,12 @@ export const loadTrusted = async (deviceId: string) => (await loadDeviceKey(devi
 export async function saveTrusted(deviceId: string, trusted: Record<string, string>): Promise<void> {
   const k = await loadDeviceKey(deviceId);
   if (k) await saveDeviceKey({ ...k, trusted });
+}
+
+/** What this browser keeps of the keys, kept with its device key. */
+export async function savePins(deviceId: string, pins: Pins): Promise<void> {
+  const k = await loadDeviceKey(deviceId);
+  if (k) await saveDeviceKey({ ...k, pins });
 }
 
 /** Forgets the keys of other devices this browser was before, e.g. after signing out. */

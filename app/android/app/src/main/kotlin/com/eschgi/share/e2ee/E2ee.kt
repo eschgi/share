@@ -42,20 +42,29 @@ object E2ee {
     /** Keys locked with an invite link's secret. */
     const val PURPOSE_INVITE = "share-e2ee-v1/invite"
 
-    /** Folder keys locked with a PIN link's secret, and that secret sealed for a folder key. */
+    /** Folder keys and the root locked with a PIN link's secret. */
     const val PURPOSE_PIN = "share-e2ee-v1/pin"
 
     /** The recovery key, locked with the recovery code. */
     const val PURPOSE_RECOVERY = "share-e2ee-v1/recovery"
 
-    /** A check's commitment to the asking device's nonce (contract/crypto/check.json). */
+    /** The root's private key, sealed for an admin's person key. */
+    const val PURPOSE_ROOT = "share-e2ee-v1/root"
+
+    /** The person's note, locked with a key from their private key. */
+    const val PURPOSE_NOTE = "share-e2ee-v1/note"
+
+    /** A PIN link's secret, locked with a key from a folder's private key. */
+    const val PURPOSE_PIN_SECRET = "share-e2ee-v1/pin-secret"
+
+    /** A check's commitment to the asking device's one-time key (contract/crypto/check.json). */
     const val PURPOSE_CHECK = "share-e2ee-v1/check"
 
-    /** A check's code, from both nonces and the public key that gets the keys. */
+    /** A check's code, from both one-time keys and the public key that gets the keys. */
     const val PURPOSE_CODE = "share-e2ee-v1/code"
 
-    /** The size of a check's nonces. */
-    const val CHECK_NONCE_SIZE = 32
+    /** What the asking device hands on after Allow. */
+    const val PURPOSE_CONFIRM = "share-e2ee-v1/confirm"
 
     const val FILE_KEY_SIZE = 32
 
@@ -83,26 +92,71 @@ object E2ee {
     /** What a person's private key is bound to. */
     fun personContext(userId: String): ByteArray = "person:$userId".toByteArray()
 
+    /** What the root's private key is bound to when sealed for an admin, and its public key when locked with an invite's or a PIN's link. */
+    val rootContext: ByteArray get() = "root".toByteArray()
+
+    /** What a person's note is bound to. */
+    fun noteContext(userId: String): ByteArray = "note:$userId".toByteArray()
+
+    /** What a check's confirmation is bound to. */
+    fun checkContext(id: String): ByteArray = "check:$id".toByteArray()
+
     /**
      * A check comes before a device passes keys on (docs/e2ee-plan.md): the asking device sends
-     * this commitment to a random nonce, the other side answers with a nonce of its own, and only
-     * then is the first nonce revealed. So neither can be chosen after seeing the other, and
-     * whoever relays them can't try out keys until the codes match.
+     * this commitment to a one-time key, the other side answers with a one-time key of its own,
+     * and only then is the first key revealed. So neither can be chosen after seeing the other,
+     * and whoever relays them can't try out keys until the codes match.
      */
-    fun commitment(nonce: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").run {
+    fun commitment(key: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").run {
         update(PURPOSE_CHECK.toByteArray())
-        digest(nonce)
+        digest(key)
     }
 
-    /** The code both screens show: the first 4 bytes of SHA-256 of the purpose, both nonces and the public key that gets the keys, as a big-endian number, modulo a million, in 6 digits. */
-    fun checkCode(askerNonce: ByteArray, answerNonce: ByteArray, publicKey: ByteArray): String {
+    /** The code both screens show: the first 4 bytes of SHA-256 of the purpose, both one-time keys and the public key that gets the keys, as a big-endian number, modulo a million, in 6 digits. */
+    fun checkCode(askerKey: ByteArray, answerKey: ByteArray, publicKey: ByteArray): String {
         val h = MessageDigest.getInstance("SHA-256")
         h.update(PURPOSE_CODE.toByteArray())
-        h.update(askerNonce)
-        h.update(answerNonce)
+        h.update(askerKey)
+        h.update(answerKey)
         h.update(publicKey)
         return (u32(h.digest(), 0) % 1_000_000).toString().padStart(6, '0')
     }
+
+    /** The key the asking device's confirmation is locked with: HKDF-SHA256 of one side's one-time private key's ECDH with the other side's public key, salted with SHA-256 of both one-time keys and the key that gets the keys. The same on both sides. */
+    fun confirmKey(privateKey: ByteArray, otherKey: ByteArray, askerKey: ByteArray, answerKey: ByteArray, publicKey: ByteArray): ByteArray {
+        val salt = MessageDigest.getInstance("SHA-256").run {
+            update(askerKey)
+            update(answerKey)
+            digest(publicKey)
+        }
+        return hkdf(Hpke.dh(privateKey, otherKey), salt, PURPOSE_CONFIRM)
+    }
+
+    // What the root, which is the recovery key, signs (contract/crypto/sign.json).
+
+    /** A version of a folder's key. */
+    fun folderKeyMessage(folderId: String, version: Int, publicKey: ByteArray): ByteArray =
+        "share-e2ee-v1/sign/folder-key".toByteArray() + folderContext(folderId, version) + publicKey
+
+    /** A folder that sends plain: never encrypted (version 0) or switched off, under its name. */
+    fun plainMessage(folderId: String, version: Int, name: String): ByteArray =
+        "share-e2ee-v1/sign/plain".toByteArray() + folderContext(folderId, version) + "\n$name".toByteArray()
+
+    /** The key of a new recovery code, signed with the old one. */
+    fun rootMessage(publicKey: ByteArray): ByteArray = "share-e2ee-v1/sign/root".toByteArray() + publicKey
+
+    fun sign(privateKey: ByteArray, message: ByteArray): ByteArray = Hpke.sign(privateKey, message)
+
+    fun verify(publicKey: ByteArray, message: ByteArray, signature: ByteArray): Boolean = Hpke.verify(publicKey, message, signature)
+
+    /** The root's fingerprint in a PIN's link: the first 16 bytes of SHA-256. */
+    fun fingerprint(publicKey: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").digest(publicKey).copyOfRange(0, 16)
+
+    /** The key a person's note is locked with, from their private key. */
+    fun noteKey(personPrivate: ByteArray): ByteArray = secretKey(personPrivate, PURPOSE_NOTE)
+
+    /** The key a PIN link's secret is locked with, from a version of the folder's private key. */
+    fun pinSecretKey(folderPrivate: ByteArray): ByteArray = secretKey(folderPrivate, PURPOSE_PIN_SECRET)
 
     /** What the recovery key is bound to. */
     val recoveryContext: ByteArray get() = "recovery".toByteArray()

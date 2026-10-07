@@ -95,14 +95,23 @@ Future<PinInfo?> makePin(BuildContext context, {String? folder}) async {
 
 /// A PIN's link to hand on: for one that shows an encrypted folder, with its secret after a dot,
 /// which this phone opens with the folder's key (docs/e2ee-plan.md). Without that key the link
-/// opens none of the encrypted files, which a note says.
+/// opens none of the encrypted files, which a note says. For one that only sends into a folder
+/// with keys, with the root's fingerprint, which guests check the folder's key with.
 Future<String> pinLink(BuildContext context, PinInfo p) async {
   final secret = p.secret;
-  if (secret == null) return p.link;
+  final platform = Services.read(context).platform;
+  if (secret == null) {
+    try {
+      final root = p.showsFolder ? null : await platform.pinLinkRoot(p.folder);
+      return root == null ? p.link : '${p.link}.$root';
+    } on KeysException {
+      return p.link;
+    }
+  }
   final t = AppLocalizations.of(context);
   final messenger = ScaffoldMessenger.of(context);
   try {
-    final s = await Services.read(context).platform.pinLinkSecret(p.folder, secret.sealed, secret.version);
+    final s = await platform.pinLinkSecret(p.folder, secret.locked, secret.version);
     if (s != null) return '${p.link}.$s';
   } on KeysException {
     // as without the key
@@ -381,7 +390,15 @@ class _NewPinSheetState extends State<NewPinSheet> {
         if (secret == null && services.folders.byId(folder)?.keyVersion != null) return setState(() => _error = t.keysCantOpen);
       }
       final pin = await services.admin.createPin(_kind, code: _code.text, folder: folder, showsFolder: _shows, secret: secret?.body);
-      navigator.pop(secret == null ? pin : pin.withLink('${pin.link}.${secret.secret}'));
+      if (secret != null) return navigator.pop(pin.withLink('${pin.link}.${secret.secret}'));
+      // One that only sends into a folder with keys names the root in its link.
+      String? root;
+      try {
+        root = await services.platform.pinLinkRoot(folder);
+      } on KeysException {
+        root = null;
+      }
+      navigator.pop(root == null ? pin : pin.withLink('${pin.link}.$root'));
     } on ApiException catch (e) {
       setState(() => _error = switch (e.code) { 'pin_taken' => t.pinTaken, 'pin_format' => t.pinBadCode, 'folder_gone' => t.folderGone, _ => t.commonFailed });
     } on NetworkException {

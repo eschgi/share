@@ -28,6 +28,7 @@ import com.eschgi.share.e2ee.E2ee
 import com.eschgi.share.e2ee.E2eeException
 import com.eschgi.share.e2ee.Keys
 import com.eschgi.share.e2ee.KeysApiError
+import com.eschgi.share.e2ee.NeedsRoot
 import com.eschgi.share.e2ee.SealedFile
 import com.eschgi.share.net.RouteMonitor
 import com.eschgi.share.net.RouteStatus
@@ -273,6 +274,9 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
                     "keys.thumb" -> Keys.thumb(app, auth(call), file(), call.argument<ByteArray>("data")!!)
                     "keys.decrypt" -> Keys.decrypt(app, auth(call), file(), call.argument<ByteArray>("data")!!)
                     "keys.encrypt_folder" -> ring.encryptFolder(call.argument<String>("folder")!!, call.argument<Int>("key_version")).toString()
+                    "keys.switch_off" -> ring.switchOff(call.argument<String>("folder")!!, call.argument<Int>("key_version"), call.argument<String>("name")!!).toString()
+                    "keys.new_folder" -> ring.newFolder(call.argument<String>("name")!!).toString()
+                    "keys.renamed" -> ring.renamed(JSONObject(call.argument<String>("folder")!!), call.argument<String>("name")!!).toString()
                     "keys.make_recovery" -> ring.makeRecovery()
                     "keys.use_recovery" -> ring.useRecoveryCode(call.argument<String>("code")!!)
                     "keys.start_over" -> {
@@ -280,17 +284,18 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
                         ring.state()
                     }
                     "keys.password_lock" -> if (ring.status == com.eschgi.share.e2ee.Keyring.Status.READY) E2ee.b64u(ring.passwordLock(call.argument<String>("password")!!)) else null
-                    "keys.invite_keys" -> ring.inviteKeys(call.argument<List<String>>("folders")).let { (secret, keys) -> mapOf("secret" to secret, "keys" to keys.toString()) }
-                    "keys.person_key" -> ring.personKeyForInvite()?.let { (secret, locked) -> mapOf("secret" to secret, "locked" to locked) }
+                    "keys.invite_keys" -> ring.inviteKeys(call.argument<List<String>>("folders")).let { (secret, keys, root) -> mapOf("secret" to secret, "keys" to keys.toString(), "root" to root) }
+                    "keys.person_key" -> ring.personKeyForInvite()?.let { (secret, locked, root) -> mapOf("secret" to secret, "locked" to locked, "root" to root) }
                     "keys.pin_secret" -> ring.pinSecret(call.argument<String>("folder")!!)?.let { (secret, body) -> mapOf("secret" to secret, "body" to body.toString()) }
-                    "keys.pin_link_secret" -> ring.pinLinkSecret(call.argument<String>("folder")!!, call.argument<String>("sealed")!!, call.argument<Int>("version")!!)
+                    "keys.pin_link_secret" -> ring.pinLinkSecret(call.argument<String>("folder")!!, call.argument<String>("locked")!!, call.argument<Int>("version")!!)
+                    "keys.pin_link_root" -> ring.pinLinkRoot(call.argument<String>("folder")!!)
                     "keys.move_keys" -> {
                         val files = JSONArray(call.argument<String>("files")!!)
                         ring.moveKeys(List(files.length()) { files.getJSONObject(it) }, call.argument<String>("target")!!).toString()
                     }
                     "keys.from_invite" -> {
                         val keys = JSONArray(call.argument<String>("keys") ?: "[]")
-                        Keys.account(app)?.let { ring.fromInvite(it, call.argument<String>("secret"), List(keys.length()) { i -> keys.getJSONObject(i) }) }
+                        Keys.account(app)?.let { ring.fromInvite(it, call.argument<String>("secret"), List(keys.length()) { i -> keys.getJSONObject(i) }, call.argument<String>("root")) }
                         Keys.sync(app)
                     }
                     "keys.allow" -> {
@@ -309,7 +314,7 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
                         ring.hide(call.argument<String>("kind")!!, call.argument<String>("id")!!)
                         ring.state()
                     }
-                    "keys.open_pin" -> Keys.openPin(app, call.argument<String>("secret")!!)
+                    "keys.pin_link" -> Keys.pinLink(app, call.argument<String>("secret"), call.argument<String>("root"))
                     "keys.forget_pin" -> {
                         Keys.forgetPin(app)
                         null
@@ -321,6 +326,9 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
                 }
             } catch (e: E2eeException) {
                 main.post { result.error("sealed", e.message, null) }
+                return@execute
+            } catch (e: NeedsRoot) {
+                main.post { result.error("needs_root", e.message, null) }
                 return@execute
             } catch (e: KeysApiError) {
                 main.post { result.error(e.code, e.message, e.status) }

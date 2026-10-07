@@ -46,7 +46,8 @@ const labeledExtract = (suite: Bytes, salt: Bytes, label: string, ikm: Bytes) =>
 const labeledExpand = (suite: Bytes, prk: Bytes, label: string, info: Bytes, length: number) =>
   expand(prk, concat(i2osp(length, 2), version, suite, utf8(label), info), length);
 
-async function dh(privateKey: CryptoKey, publicKey: Bytes): Promise<Bytes> {
+/** P-256's shared x-coordinate of a private key and another public key. */
+export async function dh(privateKey: CryptoKey, publicKey: Bytes): Promise<Bytes> {
   let pub: CryptoKey;
   try {
     pub = await crypto.subtle.importKey('raw', publicKey, ecdh, false, []);

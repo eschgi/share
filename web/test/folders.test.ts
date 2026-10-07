@@ -4,7 +4,7 @@ import { allTotals, dropTarget, hasChoices, inviteDefault, moveDefault, sendTarg
 import { uploadMeta } from '../src/uploader';
 
 function folder(id: string, files = 1, bytes = 100): FolderInfo {
-  return { id, name: id, files, bytes, senders: 1, people: 2, admins_only: false, cover: null, created_at: '2026-09-12T08:00:00Z', encrypted: false, key_version: null };
+  return { id, name: id, files, bytes, senders: 1, people: 2, admins_only: false, cover: null, created_at: '2026-09-12T08:00:00Z', encrypted: false, key_version: null, plain_signature: null };
 }
 
 describe('folders', () => {

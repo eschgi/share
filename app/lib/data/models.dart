@@ -59,7 +59,7 @@ class ServerInfo {
 
 /// A signed-in phone: the token is shown once, at sign-in.
 class SignedIn {
-  const SignedIn({required this.token, required this.user, required this.deviceId, required this.server, this.keys = const []});
+  const SignedIn({required this.token, required this.user, required this.deviceId, required this.server, this.keys = const [], this.root});
 
   factory SignedIn.fromJson(Json j) => SignedIn(
         token: _str(j['token']),
@@ -67,6 +67,7 @@ class SignedIn {
         deviceId: _str(_obj(j['device'])['id']),
         server: ServerInfo.fromJson(_obj(j['server'])),
         keys: [for (final k in _list(j['keys'])) if (k is Map) k.cast<String, dynamic>()],
+        root: j['root'] is String ? j['root'] as String : null,
       );
 
   final String token;
@@ -74,8 +75,10 @@ class SignedIn {
   final String deviceId;
   final ServerInfo server;
 
-  /// An accepted invite's keys, locked with the secret in its link (docs/e2ee-plan.md).
+  /// An accepted invite's keys, locked with the secret in its link (docs/e2ee-plan.md), and the
+  /// root the inviting device trusted, locked the same way.
   final List<Json> keys;
+  final String? root;
 }
 
 class InvitePeek {
@@ -352,7 +355,7 @@ class PinInfo {
         phones: _int(j['phones']),
         folder: _str(j['folder']),
         showsFolder: _bool(j['shows_folder']),
-        secret: j['secret'] is Map ? (sealed: _str(_obj(j['secret'])['sealed']), version: _int(_obj(j['secret'])['version'])) : null,
+        secret: j['secret'] is Map ? (locked: _str(_obj(j['secret'])['locked']), version: _int(_obj(j['secret'])['version'])) : null,
       );
 
   final String id;
@@ -366,9 +369,9 @@ class PinInfo {
   final String folder; // the id of the folder it sends into
   final bool showsFolder; // guests with it also see and download the folder
 
-  /// For a PIN that shows an encrypted folder: its link's secret, sealed for that version of the
-  /// folder's key, so an admin's phone can hand on the whole link again.
-  final ({String sealed, int version})? secret;
+  /// For a PIN that shows an encrypted folder: its link's secret, locked with a key from that
+  /// version of the folder's key, so an admin's phone can hand on the whole link again.
+  final ({String locked, int version})? secret;
 
   /// The PIN with its whole [link], secret and all, which needs no opening any more.
   PinInfo withLink(String link) => PinInfo(

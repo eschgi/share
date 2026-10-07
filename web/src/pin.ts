@@ -33,3 +33,9 @@ export function pinFromHash(hash: string): string | null {
 export function pinSecretFromHash(hash: string): string | null {
   return /^#?[^.#]+\.([A-Za-z0-9_-]{43})$/.exec(hash)?.[1] ?? null;
 }
+
+/** The root's fingerprint in the link of a PIN that only sends into a folder with keys: 16 bytes
+ * in base64url, 22 characters. */
+export function pinRootFromHash(hash: string): string | null {
+  return /^#?[^.#]+\.([A-Za-z0-9_-]{22})$/.exec(hash)?.[1] ?? null;
+}

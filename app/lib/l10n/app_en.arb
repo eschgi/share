@@ -1029,6 +1029,8 @@
       }
     }
   },
+  "sendUnchecked": "Some files weren't sent: Share couldn't check the keys of their folder, so it couldn't be sure they stay private. Tell an admin.",
+  "sendUncheckedGuest": "Some files weren't sent: Share couldn't check the keys of the folder this PIN sends into, so it couldn't be sure they stay private. Tell whoever gave you the PIN.",
   "sendFailedCount": "{count, plural, =1{1 file couldn't be sent.} other{{count} files couldn't be sent.}}",
   "@sendFailedCount": {
     "placeholders": {
@@ -1190,6 +1192,7 @@
   "encryptionSwitch": "Encrypt new files",
   "encryptionSwitchOn": "Only the family's phones and browsers can open them",
   "encryptionSwitchOff": "New files are stored as they are",
+  "encryptionNeedsRoot": "This phone can't do that yet: it needs the recovery key, which another admin passes on with an OK, or the recovery code.",
   "encryptionNoKeysHere": "This phone doesn't have the keys yet",
   "encryptionOn": "New files in {folder} are now encrypted",
   "@encryptionOn": {
@@ -1277,6 +1280,14 @@
   },
   "keysPersonFirst": "Once you allow it, these folders open for {name}:",
   "@keysPersonFirst": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "keysPersonRoot": "As an admin, {name} also gets the recovery key, which confirms folders and their keys.",
+  "@keysPersonRoot": {
     "placeholders": {
       "name": {
         "type": "String"

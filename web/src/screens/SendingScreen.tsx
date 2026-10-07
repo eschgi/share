@@ -15,13 +15,16 @@ interface Props {
   snapshot: Snapshot;
   online: boolean;
   rejected: string[];
+  /** Files weren't sent: what the server says about their folder's keys can't be checked; who
+   * to tell depends on who sends. */
+  refused?: 'account' | 'guest' | null;
   onFiles: (f: File[]) => void;
   onSkipGhosts: () => void;
   onRetry: () => void;
 }
 
 /** Screen 4: progress in files and bytes, and every file as a tile. */
-export function SendingScreen({ name, snapshot: s, online, rejected, onFiles, onSkipGhosts, onRetry }: Props) {
+export function SendingScreen({ name, snapshot: s, online, rejected, refused, onFiles, onSkipGhosts, onRetry }: Props) {
   const { t, tn, lang } = useI18n();
   const meter = useRef(new RateMeter());
   useEffect(() => meter.current.add(Date.now(), s.bytesDone), [s.bytesDone]);
@@ -74,6 +77,12 @@ export function SendingScreen({ name, snapshot: s, online, rejected, onFiles, on
             {t('sending.tooLarge', { name: n })}
           </p>
         ))}
+        {refused && s.failed > 0 && (
+          <p class="help err">
+            <Icon name="alert" />
+            {t(refused === 'guest' ? 'sending.uncheckedGuest' : 'sending.unchecked')}
+          </p>
+        )}
         <div class="grow" />
         <FilePicker label={t('sending.addMore')} look="outline more" onFiles={onFiles} />
       </div>

@@ -31,7 +31,13 @@
         "version": 2,
         "locked": "QJ_QD6chALxcBx6zjimTM7jprwH-_O6hs2_yydceTPcPh5S73XrbGOgAXAal07JDEq5Bnp3XsXOznq6O"
       }
+    ],
+    "roots": [
+      {
+        "user": "u8ev5x2k7mbqz4bwdbyj6qsqxa",
+        "sealed": "mfnTlTHuE1-D3S1ymkLGx6ryARujmLWeWTcJXlckCzT_QQmZu6bpNNAC0VNorV8vnk8TNAjLfox7EGgZy2WpjCejiBenKWWyRWj8SKpOavQNT76R4ltqagTdxP_NXaQyZLpnNPEBb-YobB3SF2eT4l0"
+      }
     ]
   },
-  "notes": "What this device sealed or locked from its to-do list (GET /api/keys): the person's key for one of their devices; a version of a folder's key for a person who sees the folder (the giver must see it too); for the recovery key; for a PIN link (the giver must hold that version). Any list may be empty or left out; at most 1000 keys at a time. Keys the server can't take any more, because the to-do list changed meanwhile, are left out; a key already there stays. 400 bad_request for wrong sizes."
+  "notes": "What this device sealed or locked from its to-do list (GET /api/keys): the person's key for one of their devices; a version of a folder's key for a person who sees the folder (the giver must see it too); for the recovery key; for a PIN link (the giver must hold that version); the newest root's private key for an admin who has a person key (roots: the giver must hold it, or be that admin). Any list may be empty or left out; at most 1000 keys at a time. Keys the server can't take any more, because the to-do list changed meanwhile, are left out; a key already there stays. 400 bad_request for wrong sizes."
 }

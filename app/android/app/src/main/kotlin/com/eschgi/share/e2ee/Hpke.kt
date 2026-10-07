@@ -96,6 +96,51 @@ object Hpke {
         pointOf(publicKey)
     }
 
+    /** P-256's DH output of a private key and another public key: the shared point's x. */
+    fun dh(privateKey: ByteArray, publicKey: ByteArray): ByteArray = dh(privateKeyOf(privateKey), publicKeyOf(pointOf(publicKey)))
+
+    /** Signs [message] with a private key: ECDSA with SHA-256, as r and s in 64 bytes (the JCE gives DER). */
+    fun sign(privateKey: ByteArray, message: ByteArray): ByteArray {
+        val der = guard("can't sign") { Signature.getInstance(SIGNATURE).run { initSign(privateKeyOf(privateKey)); update(message); sign() } }
+        return rawSignature(der)
+    }
+
+    /** Whether [signature], r and s in 64 bytes, is [publicKey]'s signature of [message]. */
+    fun verify(publicKey: ByteArray, message: ByteArray, signature: ByteArray): Boolean {
+        if (signature.size != 64) return false
+        return try {
+            Signature.getInstance(SIGNATURE).run { initVerify(publicKeyOf(pointOf(publicKey))); update(message); verify(derSignature(signature)) }
+        } catch (e: GeneralSecurityException) {
+            false
+        } catch (e: E2eeException) {
+            false
+        }
+    }
+
+    /** r and s of a DER signature: SEQUENCE { INTEGER r, INTEGER s }, short lengths for P-256. */
+    private fun rawSignature(der: ByteArray): ByteArray {
+        if (der.size < 8 || der[0] != 0x30.toByte()) throw E2eeException("not a DER signature")
+        var at = 2
+        fun int(): ByteArray {
+            if (der[at] != 2.toByte()) throw E2eeException("not a DER signature")
+            val len = der[at + 1].toInt()
+            val v = der.copyOfRange(at + 2, at + 2 + len)
+            at += 2 + len
+            return fixed(BigInteger(1, v).toByteArray())
+        }
+        return int() + int()
+    }
+
+    /** A DER signature of r and s. */
+    private fun derSignature(raw: ByteArray): ByteArray {
+        fun int(b: ByteArray): ByteArray {
+            val v = BigInteger(1, b).toByteArray() // with a leading zero where the top bit is set
+            return byteArrayOf(2, v.size.toByte()) + v
+        }
+        val body = int(raw.copyOfRange(0, 32)) + int(raw.copyOfRange(32, 64))
+        return byteArrayOf(0x30, body.size.toByte()) + body
+    }
+
     /** Seals [plaintext] for the holder of [publicKey]'s private key: the encapsulated key (65 bytes), then the ciphertext. */
     fun seal(publicKey: ByteArray, info: ByteArray, aad: ByteArray, plaintext: ByteArray): ByteArray =
         seal(publicKey, info, aad, plaintext, generateKeyPair())

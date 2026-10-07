@@ -35,6 +35,10 @@ void main() {
     final pin = parseLink('https://share.example.com/#k7m2q.$secret') as PinLink;
     expect([pin.code, pin.secret], ['K7M2Q', secret]);
     expect((parseLink('https://share.example.com/#K7M2Q.short') as PinLink).secret, isNull, reason: 'not a secret: the PIN works without');
+    // A PIN that only sends into a folder with keys: the root's fingerprint.
+    final sends = parseLink('https://share.example.com/#K7M2Q.${'R' * 22}') as PinLink;
+    expect([sends.secret, sends.root], [null, 'R' * 22]);
+    expect(pin.root, isNull);
     expect(parseLink('https://share.example.com/#K7M2.$secret'), isNull);
   });
 
@@ -52,13 +56,14 @@ void main() {
     expect(folder.encrypted, isTrue);
     expect(folder.keyVersion, 1);
 
-    final pin = PinInfo.fromJson({'id': 'p', 'code': 'R8D4W', 'link': 'https://s/#R8D4W', 'secret': {'sealed': 'x', 'version': 2}});
-    expect(pin.secret, (sealed: 'x', version: 2));
+    final pin = PinInfo.fromJson({'id': 'p', 'code': 'R8D4W', 'link': 'https://s/#R8D4W', 'secret': {'locked': 'x', 'version': 2}});
+    expect(pin.secret, (locked: 'x', version: 2));
     expect(pin.withLink('https://s/#R8D4W.$secret').secret, isNull, reason: 'the whole link needs no opening');
 
     final joined = SignedIn.fromJson(contractResponse('api/invite_accept.json'));
     expect(joined.keys, hasLength(1));
     expect(joined.keys.single['folder'], 'f4mily5x2k7mbqz4bwdbyj6qsq');
+    expect(joined.root, contractResponse('api/invite_accept.json')['root']);
   });
 
   testWidgets('signing in with the password opens the keys with it', (tester) async {
@@ -285,7 +290,9 @@ void main() {
     expect(find.textContaining('First comes the recovery code'), findsNothing, reason: 'there is one');
     await tester.tap(find.text('Encrypt'));
     await tester.pumpAndSettle();
-    expect(platform.keyCalls.single, startsWith('encrypt '));
+    // The recovery key signed the new folder as plain, then its first key.
+    expect(platform.keyCalls, ['new folder Holidays', startsWith('encrypt ')]);
+    expect(jsonDecode(server.requests.lastWhere((r) => r.method == 'POST' && r.url.path == '/api/folders').body), {'name': 'Holidays', 'plain_signature': 'signed-Holidays'});
   });
 
   testWidgets('a phone without its keys shows locks and waits; the recovery code opens them', (tester) async {
@@ -340,7 +347,7 @@ void main() {
     await tester.tap(find.text('Create & share'));
     await tester.pumpAndSettle();
     final made = jsonDecode(server.requests.lastWhere((r) => r.method == 'POST' && r.url.path == '/api/pins').body) as Map;
-    expect(made['secret'], {'sealed': 'sealed-secret', 'version': 1, 'keys': []});
+    expect(made['secret'], {'locked': 'locked-secret', 'version': 1, 'root': 'locked-root', 'keys': []});
     expect(platform.sharedTexts.single, endsWith('#R8D4W.${platform.linkSecret}'));
   });
 

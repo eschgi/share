@@ -139,12 +139,16 @@ class InviteLink extends ShareLink {
 
 /// A PIN link, `<server>/#K7M2Q`: the app sends with that PIN, as the website does.
 class PinLink extends ShareLink {
-  const PinLink(this.server, this.code, {this.secret});
+  const PinLink(this.server, this.code, {this.secret, this.root});
   final Uri server;
   final String code;
 
   /// For a PIN that shows an encrypted folder, after a dot: the secret that opens it.
   final String? secret;
+
+  /// For a PIN that only sends into a folder with keys, after a dot: the root's fingerprint, which
+  /// the folder's key is checked with (docs/e2ee-plan.md).
+  final String? root;
 }
 
 final _inviteToken = RegExp(r'^shi_[A-Za-z0-9_-]{20,}$');
@@ -152,6 +156,9 @@ final _pinCode = RegExp(r'^[2-9A-HJ-NP-Za-hj-np-z]{5}$');
 
 /// A link's secret: 32 bytes in base64url.
 final _secret = RegExp(r'^[A-Za-z0-9_-]{43}$');
+
+/// The root's fingerprint in a PIN's link: 16 bytes in base64url.
+final _root = RegExp(r'^[A-Za-z0-9_-]{22}$');
 
 String? _secretOf(String? s) => s != null && _secret.hasMatch(s) ? s : null;
 
@@ -170,7 +177,8 @@ ShareLink? parseLink(String text) {
   final dot = fragment.indexOf('.');
   final head = dot < 0 ? fragment : fragment.substring(0, dot);
   final secret = dot < 0 ? null : _secretOf(fragment.substring(dot + 1));
+  final root = dot >= 0 && _root.hasMatch(fragment.substring(dot + 1)) ? fragment.substring(dot + 1) : null;
   if (uri.path == '/join' && _inviteToken.hasMatch(head)) return InviteLink(server, head, secret: secret);
-  if ((uri.path == '/' || uri.path.isEmpty) && _pinCode.hasMatch(head)) return PinLink(server, head.toUpperCase(), secret: secret);
+  if ((uri.path == '/' || uri.path.isEmpty) && _pinCode.hasMatch(head)) return PinLink(server, head.toUpperCase(), secret: secret, root: root);
   return null;
 }
