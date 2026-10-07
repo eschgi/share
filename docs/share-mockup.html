@@ -831,6 +831,39 @@
   .ntf .nacts{display:flex;gap:22px;margin-top:12px;font-size:14px;font-weight:600;color:var(--accent-text)}
   .lockdate + .ntf{margin-top:44px}
   .lockhint{text-align:center;font-size:13px;color:var(--text-3);margin:18px 0 6px;flex:none}
+  /* ---------- a PIN's poster: printed, so in paper colours whatever the theme ---------- */
+  .paper{width:780px;height:1103px;zoom:.5;background:#FBF7F1;color:#2A1F18;position:relative;overflow:hidden;display:flex;flex-direction:column;
+    align-items:center;text-align:center;padding:76px 76px 60px;box-shadow:0 30px 70px rgba(0,0,0,.6),0 3px 10px rgba(0,0,0,.45)}
+  body.shot .paper{zoom:1;box-shadow:none}
+  .paper .pbrand{display:flex;align-items:center;gap:10px;font-family:var(--serif);font-weight:700;font-size:26px;color:#A4461F}
+  .paper .pbrand .ic{width:28px;height:28px}
+  .paper .pt{font-family:var(--serif);font-weight:700;font-size:78px;line-height:1.05;margin-top:34px}
+  .paper .pdate{font-size:24px;color:#5F5147;margin-top:14px}
+  .paper .pline{font-family:var(--serif);font-size:33px;line-height:1.3;color:#3A2C24;margin-top:34px}
+  .paper .pqr{width:300px;height:300px;padding:20px;background:#fff;border:2px solid #E6DACB;border-radius:28px;margin-top:38px;flex:none}
+  .paper .pqr svg{width:100%;height:100%;display:block}
+  .paper .pscan{font-size:23px;font-weight:600;margin-top:18px}
+  .paper .psteps{display:flex;gap:24px;justify-content:center;margin-top:36px}
+  .paper .psteps div{width:184px;font-size:19px;line-height:1.35;color:#4A3A30}
+  .paper .psteps b{display:grid;place-items:center;width:44px;height:44px;border-radius:50%;background:#C45A30;color:#fff;font-size:21px;margin:0 auto 10px}
+  .paper .pnote{font-size:19px;line-height:1.45;color:#5F5147;margin:30px 0 0}
+  .paper .por{font-size:18px;color:#85766A;margin-top:auto;padding-top:20px}
+  .paper .pcode{display:flex;gap:8px;justify-content:center;margin-top:12px}
+  .paper .pcode b{width:50px;height:60px;border-radius:12px;border:2px solid #D9CBBB;display:grid;place-items:center;font-family:var(--mono);font-size:30px;font-weight:700}
+  .paper.cards{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;padding:0}
+  .tcard{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px 28px;border:0 dashed #CDBDAB}
+  .tcard:nth-child(odd){border-right-width:2px} .tcard:nth-child(-n+2){border-bottom-width:2px}
+  .tcard .pt{font-size:40px;margin-top:0}
+  .tcard .pline{font-size:19px;margin-top:10px}
+  .tcard .pqr{width:196px;height:196px;padding:14px;border-radius:18px;margin-top:20px}
+  .tcard .pscan{font-size:16px;margin-top:12px}
+  .tcard .pcode{margin-top:12px} .tcard .pcode b{width:32px;height:40px;font-size:20px;border-radius:8px}
+  .ddlg.poster{width:1040px}
+  .pedit{display:flex;gap:30px;align-items:flex-start}
+  .pform{flex:1;min-width:0}
+  .pform .dopt:first-child{margin-top:0}
+  .pprev{width:340px;height:481px;flex:none;border-radius:6px;overflow:hidden;box-shadow:0 12px 34px rgba(0,0,0,.45)}
+  .pprev .paper{zoom:.436;box-shadow:none}
 </style>
 </head>
 <body>
@@ -891,6 +924,7 @@
   <symbol id="i-camera" viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></symbol>
   <symbol id="i-calendar" viewBox="0 0 24 24"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></symbol>
   <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/></symbol>
+  <symbol id="i-printer" viewBox="0 0 24 24"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/><rect x="6" y="14" width="12" height="8" rx="1"/></symbol>
 </svg>
 
 <div class="page">
@@ -1936,6 +1970,38 @@
     </div>
   </section>
 
+  <section class="sec" id="poster">
+    <div class="sec-head">
+      <div class="sec-tag">Proposal · poster</div>
+      <h2>A poster for the PIN</h2>
+      <p>For a wedding or a party, nobody has to send the guests a link: a poster at the entrance and a card on each table do it. It is made from a PIN, in the app or on the website, and printed or saved as a PDF. The QR code opens the PIN's page, which needs no app and no account; the code to type is for phones whose camera reads no QR codes. For an encrypted folder the QR code carries the link's secret, as the PIN's link does: whoever types the code sends encrypted too, but sees the folder only through the QR code.</p>
+    </div>
+    <div class="board">
+
+      <div class="slot">
+        <h3><span class="n">68</span>Poster, in the app <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Poster joins Share and QR code on a PIN's card. The app makes the page itself and hands it to Android's printing, which lists the printers nearby and Save as PDF.</p>
+        <div class="phone" data-shot="68-poster-app"><div class="sb" data-time="20:14"></div><div class="ab back"><span class="ib"><span data-i="back"></span></span><h2>Upload PINs</h2></div><div class="scroll pad"><div class="glabel">Permanent</div><div class="pincard"><div class="pc-top"><div class="code"><b>A</b><b>N</b><b>N</b><b>A</b><b>5</b></div><span class="pcico" data-i="infinity"></span></div><div class="pc-meta"><span class="ftag"><span data-i="folder"></span>Wedding Anna &amp; Marco</span>Since 5 Oct · not used yet</div><div class="pc-actions"><span><span data-i="share"></span>Share</span><span><span data-i="qr"></span>QR code</span><span><span data-i="printer"></span>Poster</span></div></div></div><div class="gest"></div><div class="scrim"></div><div class="sheet"><div class="grip"></div><h3>Poster</h3><div class="opts"><div class="opt on"><span data-i="file"></span><i class="radio"></i><b>Poster</b><span class="sub">One A4 page, for a wall</span></div><div class="opt"><span data-i="copy"></span><i class="radio"></i><b>Table cards</b><span class="sub">Four on a page, to cut out</span></div></div><div class="label">Title</div><div class="input">Anna &amp; Marco</div><div class="label">Under it</div><div class="input">Share your photos of today with us</div><div class="btn primary mt20"><span data-i="printer"></span>Print or save as PDF</div></div></div>
+      </div>
+      <div class="slot wide">
+        <h3><span class="n">69</span>Poster, on a computer <span class="badge proposal">proposal</span></h3>
+        <p class="cap">On a computer the poster opens in a dialog, with a preview that follows every change. Title and line are free; the date and the code to type can go. Print uses the browser's own dialog, which also saves a PDF.</p>
+        <div class="desktop" data-shot="69-poster-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>Settings · Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com/settings/pins</span></div></div><div class="dview"><div class="ahd"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div><nav class="dtabs"><a><span data-i="images"></span>Library</a><a><span data-i="upload"></span>Send</a><a class="on"><span data-i="settings"></span>Settings</a></nav><span class="av acc">S</span></div><div class="dset"><div class="pane"><div class="profile"><span class="av lg acc">S</span><div><b>Stefan <span class="role admin"><span data-i="crown"></span>Admin</span></b><span class="sub">Signed in in this browser</span></div><span class="chev" data-i="chev"></span></div><div class="group"><div class="row on"><span class="ri acc"><span data-i="key"></span></span><div class="rt"><b>Upload PINs</b><span>1 permanent · 1 for 24 hours</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="users"></span></span><div class="rt"><b>People</b><span>3 people · 1 invite open</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="trash"></span></span><div class="rt"><b>Recently deleted</b><span>3 files · 9.3 MB</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="hdd"></span></span><div class="rt"><b>Storage</b><span>789 GB free of 931 GB</span></div></div></div><div class="group"><div class="row"><span class="ri"><span data-i="globe"></span></span><div class="rt"><b>Language</b><span>Automatic · English</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="palette"></span></span><div class="rt"><b>Theme</b><span>Ember</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="lock"></span></span><div class="rt"><b>Password</b><span>Set · username stefan</span></div><span class="chev" data-i="chev"></span></div></div><div class="group"><div class="row"><span class="ri"><span data-i="log-out"></span></span><div class="rt"><b>Sign out</b></div></div><div class="row dang"><span class="ri dang"><span data-i="user-x"></span></span><div class="rt"><b>Delete my account</b></div></div></div></div><div class="pane pane2"><div class="phead"><h2>Upload PINs</h2><span class="btn primary xs"><span data-i="plus"></span>New PIN</span></div><p class="lead sm" data-tr>A PIN only lets people <b>send</b>. Nobody can see or download anything with it.</p><div class="pgrid"><div><div class="glabel">Permanent</div><div class="pincard"><div class="pc-top"><div class="code"><b>A</b><b>N</b><b>N</b><b>A</b><b>5</b></div><span class="pcico" data-i="infinity"></span></div><div class="pc-meta"><span class="ftag"><span data-i="folder"></span>Wedding Anna &amp; Marco</span>Since 5 Oct · not used yet</div><div class="pc-actions"><span><span data-i="copy"></span>Copy link</span><span><span data-i="qr"></span>QR code</span><span><span data-i="printer"></span>Poster</span><span class="danger">End now</span></div></div><div><div class="glabel">For 24 hours</div><div class="pincard"><div class="pc-top"><div class="code"><b>4</b><b>H</b><b>X</b><b>9</b><b>T</b></div></div><div class="pc-meta"><span class="timepill sm"><span data-i="clock"></span>Ends today 18:30</span>45 files from 7 devices</div><div class="pc-actions"><span><span data-i="copy"></span>Copy link</span><span><span data-i="qr"></span>QR code</span><span class="danger">End now</span></div></div></div></div></div></div><div class="scrim"></div><div class="ddlg poster"><div class="dlgh"><h3>Poster for ANNA5</h3><span class="ib"><span data-i="x"></span></span></div><div class="pedit"><div class="pform"><div class="dopt on"><div class="dt"><b>Poster</b><span>One A4 page, for a wall</span></div><i class="radio"></i></div><div class="dopt"><div class="dt"><b>Table cards</b><span>Four on a page, to cut out</span></div><i class="radio"></i></div><div class="label">Title</div><div class="input">Anna &amp; Marco</div><div class="label">Under it</div><div class="input">Share your photos of today with us</div><div class="swrow"><div class="rt"><b>Date</b><span>Saturday, 10 October 2026</span></div><span class="sw on"></span></div><div class="swrow"><div class="rt"><b>The code to type</b><span>For phones whose camera reads no QR codes</span></div><span class="sw on"></span></div></div><div class="pprev"><div class="paper"><div class="pbrand"><span data-i="images"></span><span translate="no">Share</span></div><div class="pt">Anna &amp; Marco</div><div class="pdate">Saturday, 10 October 2026</div><div class="pline">Share your photos of today with us</div><div class="pqr" data-qr="70"></div><div class="pscan">Scan with your phone's camera</div><div class="psteps"><div><b>1</b>Scan the code</div><div><b>2</b>Choose photos and videos</div><div><b>3</b>Done, in full quality</div></div><p class="pnote">No app, no account. Scan again later to see everyone's photos.</p><div class="por">No QR reader? Open share.example.com and type:</div><div class="pcode"><b>A</b><b>N</b><b>N</b><b>A</b><b>5</b></div></div></div></div><div class="dbtns"><span class="tbtn">Download PDF</span><div class="btn primary sm"><span data-i="printer"></span>Print</div></div></div></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">70</span>The poster <span class="badge proposal">proposal</span></h3>
+        <p class="cap">One A4 page: for whom, one line, a big QR code and three steps, in the server's language. The code to type sits at the bottom. A PIN that shows its folder adds that guests can scan again later to see everyone's photos.</p>
+        <div class="paper" data-shot="70-poster-a4"><div class="pbrand"><span data-i="images"></span><span translate="no">Share</span></div><div class="pt">Anna &amp; Marco</div><div class="pdate">Saturday, 10 October 2026</div><div class="pline">Share your photos of today with us</div><div class="pqr" data-qr="70"></div><div class="pscan">Scan with your phone's camera</div><div class="psteps"><div><b>1</b>Scan the code</div><div><b>2</b>Choose photos and videos</div><div><b>3</b>Done, in full quality</div></div><p class="pnote">No app, no account. Scan again later to see everyone's photos.</p><div class="por">No QR reader? Open share.example.com and type:</div><div class="pcode"><b>A</b><b>N</b><b>N</b><b>A</b><b>5</b></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">71</span>Cards for the tables <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Four cards on a page, cut along the dashed lines: one for each table, with the same QR code and the code to type.</p>
+        <div class="paper cards" data-shot="71-poster-cards"><div class="tcard"><div class="pt">Anna &amp; Marco</div><div class="pline">Share your photos of today with us</div><div class="pqr" data-qr="70"></div><div class="pscan">Scan with your phone's camera</div><div class="pcode"><b>A</b><b>N</b><b>N</b><b>A</b><b>5</b></div></div><div class="tcard"><div class="pt">Anna &amp; Marco</div><div class="pline">Share your photos of today with us</div><div class="pqr" data-qr="70"></div><div class="pscan">Scan with your phone's camera</div><div class="pcode"><b>A</b><b>N</b><b>N</b><b>A</b><b>5</b></div></div><div class="tcard"><div class="pt">Anna &amp; Marco</div><div class="pline">Share your photos of today with us</div><div class="pqr" data-qr="70"></div><div class="pscan">Scan with your phone's camera</div><div class="pcode"><b>A</b><b>N</b><b>N</b><b>A</b><b>5</b></div></div><div class="tcard"><div class="pt">Anna &amp; Marco</div><div class="pline">Share your photos of today with us</div><div class="pqr" data-qr="70"></div><div class="pscan">Scan with your phone's camera</div><div class="pcode"><b>A</b><b>N</b><b>N</b><b>A</b><b>5</b></div></div></div>
+      </div>
+
+    </div>
+  </section>
+
 </div>
 
 <script>
@@ -2045,6 +2111,94 @@
       "Change": [
           "Ändern",
           "Cambia"
+      ],
+      "Since 5 Oct · not used yet": [
+          "Seit 5. Okt. · noch nicht benutzt",
+          "Dal 5 ott · non ancora usato"
+      ],
+      "Poster": [
+          "Poster",
+          "Locandina"
+      ],
+      "One A4 page, for a wall": [
+          "Eine A4-Seite, für die Wand",
+          "Una pagina A4, da appendere"
+      ],
+      "Table cards": [
+          "Tischkarten",
+          "Cartoncini per i tavoli"
+      ],
+      "Four on a page, to cut out": [
+          "Vier pro Seite, zum Ausschneiden",
+          "Quattro per pagina, da ritagliare"
+      ],
+      "Title": [
+          "Titel",
+          "Titolo"
+      ],
+      "Under it": [
+          "Darunter",
+          "Sotto"
+      ],
+      "Share your photos of today with us": [
+          "Teilt eure Fotos von heute mit uns",
+          "Condividete con noi le vostre foto di oggi"
+      ],
+      "Print or save as PDF": [
+          "Drucken oder als PDF sichern",
+          "Stampa o salva come PDF"
+      ],
+      "Poster for ANNA5": [
+          "Poster für ANNA5",
+          "Locandina per ANNA5"
+      ],
+      "Date": [
+          "Datum",
+          "Data"
+      ],
+      "Saturday, 10 October 2026": [
+          "Samstag, 10. Oktober 2026",
+          "Sabato 10 ottobre 2026"
+      ],
+      "The code to type": [
+          "Der Code zum Eintippen",
+          "Il codice da digitare"
+      ],
+      "For phones whose camera reads no QR codes": [
+          "Für Handys, deren Kamera keine QR-Codes liest",
+          "Per i telefoni la cui fotocamera non legge i codici QR"
+      ],
+      "Download PDF": [
+          "PDF herunterladen",
+          "Scarica PDF"
+      ],
+      "Print": [
+          "Drucken",
+          "Stampa"
+      ],
+      "Scan with your phone's camera": [
+          "Mit der Handykamera scannen",
+          "Inquadralo con la fotocamera del telefono"
+      ],
+      "Scan the code": [
+          "Code scannen",
+          "Inquadra il codice"
+      ],
+      "Choose photos and videos": [
+          "Fotos und Videos auswählen",
+          "Scegli foto e video"
+      ],
+      "Done, in full quality": [
+          "Fertig, in voller Qualität",
+          "Fatto, in qualità originale"
+      ],
+      "No app, no account. Scan again later to see everyone's photos.": [
+          "Keine App, kein Konto. Später noch einmal scannen: Dann seht ihr die Fotos von allen.",
+          "Nessuna app, nessun account. Inquadralo di nuovo più tardi per vedere le foto di tutti."
+      ],
+      "No QR reader? Open share.example.com and type:": [
+          "Kein QR-Leser? Öffne share.example.com und tippe:",
+          "Niente lettore QR? Apri share.example.com e digita:"
       ],
       "Send automatically": [
           "Automatisch senden",
@@ -3752,14 +3906,14 @@
       ]
   };
   // Names, codes, numbers and file names that stay the same in every language.
-  const KEEP = /^(?:[A-Z0-9]|\d+(?::\d+)?|Stefan|Maria|Peter|maria|Admin|PIN|PDF|DOCX|ZIP|XLSX|•+|\d{8}_\d{6}\.(?:jpg|mp4)|\/srv\/share|(?:https:\/\/)?share\.example\.com(?:\/[a-z\/-]*)?|https:\/\/192\.168\.1\.20:8443|\d+ (?:KB|MB|GB)|@maria|Pixel 8|Chrome · Windows|IMG_\d+\.jpg|image\/jpeg|Quick Share|iPhone · Safari|Android · Chrome|\d+ MB\/s)$/;
+  const KEEP = /^(?:[A-Z0-9]|\d+(?::\d+)?|Stefan|Maria|Peter|maria|Admin|PIN|PDF|DOCX|ZIP|XLSX|•+|\d{8}_\d{6}\.(?:jpg|mp4)|\/srv\/share|(?:https:\/\/)?share\.example\.com(?:\/[a-z\/-]*)?|https:\/\/192\.168\.1\.20:8443|\d+ (?:KB|MB|GB)|@maria|Pixel 8|Chrome · Windows|IMG_\d+\.jpg|image\/jpeg|Quick Share|iPhone · Safari|Android · Chrome|\d+ MB\/s|Anna & Marco)$/;
   const LANGS = ['en', 'de', 'it'];
   const original = new WeakMap();
   function setLang(lang) {
     if (!LANGS.includes(lang)) lang = 'en';
     const k = LANGS.indexOf(lang) - 1;
     const missing = new Set();
-    document.querySelectorAll('.phone, .tablet, .desktop').forEach(ph => {
+    document.querySelectorAll('.phone, .tablet, .desktop, .paper').forEach(ph => {
       ph.querySelectorAll('[data-tr]').forEach(el => {
         if (el.dataset.en == null) el.dataset.en = el.innerHTML;
         const key = el.dataset.en.replace(/\s+/g, ' ').trim();
