@@ -795,6 +795,11 @@
   .fchips{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0}
   .tile.lockd{filter:saturate(.3) brightness(.62)}
   .tile.lockd > .tico{color:rgba(255,255,255,.8)}
+  /* ---------- nearby: Quick Share, or a QR code that connects a browser straight to this device ---------- */
+  .sheet .choice{background:var(--s2);margin-top:10px;padding:16px 14px}
+  .ddlg .qrcard{background:var(--s2);margin-top:4px}
+  .wb > .drow{flex:none;margin-top:4px}
+  .wb > .route + .grid,.wb > .bytes + .grid{margin-top:16px}
 </style>
 </head>
 <body>
@@ -851,6 +856,7 @@
   <symbol id="i-user-x" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m17 8 5 5"/><path d="m22 8-5 5"/></symbol>
   <symbol id="i-log-out" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></symbol>
   <symbol id="i-palette" viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></symbol>
+  <symbol id="i-radio" viewBox="0 0 24 24"><path d="M16.247 7.761a6 6 0 0 1 0 8.478"/><path d="M19.075 4.933a10 10 0 0 1 0 14.134"/><path d="M4.925 19.067a10 10 0 0 1 0-14.134"/><path d="M7.753 16.239a6 6 0 0 1 0-8.478"/><circle cx="12" cy="12" r="2"/></symbol>
 </svg>
 
 <div class="page">
@@ -1800,6 +1806,49 @@
     </div>
   </section>
 
+  <section class="sec" id="nearby">
+    <div class="sec-head">
+      <div class="sec-tag">Proposal · nearby</div>
+      <h2>Sending to someone nearby</h2>
+      <p>Photos for the person next to you, in seconds, straight from phone to phone. Android does that already with Quick Share: Bluetooth finds the other device and Wi-Fi Direct carries the files, without the internet, and from a Pixel 10 or a recent Galaxy it reaches iPhones by AirDrop too. So Share builds no radio of its own: Nearby hands the files to Quick Share. What Share adds is the way to everyone else, through the browser: a QR code that connects this phone, or the website on a computer, with any browser on the same Wi-Fi. The server introduces the two once; the files go straight across and never touch it.</p>
+    </div>
+    <p class="sub-h">In the app</p>
+    <div class="board">
+
+      <div class="slot">
+        <h3><span class="n">56</span>Send nearby <span class="badge proposal">proposal</span></h3>
+        <p class="cap">A new button next to Share in the selection. Quick Share finds phones, tablets and Windows computers nearby; Share hands it the files, decrypted, as its Share button does today. Its line names iPhones only on phones whose Quick Share reaches them. The QR code (57) is for everyone else.</p>
+        <div class="phone" data-shot="56-nearby-choose"><div class="sb" data-time="15:20"></div><div class="ab ctx"><span class="ib"><span data-i="x"></span></span><h2>12 selected</h2><span class="tbtn">Select all</span></div><div class="scroll"><div class="day"><div><h4>Today</h4><div class="meta">12 of 18 selected</div></div><span class="dsel part"><span data-i="minus"></span></span></div><div class="grid g4" data-tiles="p3/s p8/s p6/s p1/s p4/s p7/s p9/s p2/s p10/s p5/s p3/s p8/s p6/o p1/o v2@0:18/o p4/o p9/o p2/o"></div></div><div class="actionbar"><span class="abtn"><span data-i="share"></span></span><span class="abtn"><span data-i="radio"></span></span><div class="btn primary"><span data-i="download"></span>Download 12</div></div><div class="gest"></div><div class="scrim"></div><div class="sheet"><div class="grip"></div><h3>Send 12 photos nearby</h3><div class="choice"><div class="cico"><span data-i="radio"></span></div><div class="ct"><b>Quick Share</b><span>To phones and computers nearby, iPhones too. The fastest way, even without internet.</span></div><span class="chev" data-i="chev"></span></div><div class="choice"><div class="cico"><span data-i="qr"></span></div><div class="ct"><b>QR code for a browser</b><span>For any other phone or computer: its camera opens the photos, straight from this phone.</span></div><span class="chev" data-i="chev"></span></div><div class="note slim"><span data-i="shield"></span><p>Both send straight to the other device, not through your server.</p></div></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">57</span>A QR code for a browser <span class="badge proposal">proposal</span></h3>
+        <p class="cap">The code opens Share's website with a key made for this one sending. The server introduces the two devices, so both need the internet for that moment; then the photos go straight across the Wi-Fi, and the key lets both check each other: neither the server nor anyone else on the Wi-Fi sees them. With no Wi-Fi in common, the other device joins this phone's hotspot first.</p>
+        <div class="phone" data-shot="57-nearby-qr"><div class="sb" data-time="15:20"></div><div class="ab back"><span class="ib"><span data-i="back"></span></span><h2>Send nearby</h2></div><div class="wb"><div class="qrcard"><div class="qr" data-qr="57"></div><b>Scan this with the other device's camera</b><span class="exp"><span data-i="wifi"></span>On the same Wi-Fi: Wedding Anna &amp; Marco</span></div><div class="dest"><div class="drow"><span class="ri"><span data-i="images"></span></span><div><b>12 photos</b><span>84 MB · in full quality</span></div></div><div class="drow"><span class="ri"><span data-i="shield"></span></span><div><b>Only for whoever scans this</b><span>Works until you close this screen</span></div></div></div><div class="grow"></div><div class="btn outline"><span data-i="wifi"></span>Open a hotspot</div><p class="small">With no Wi-Fi in common, the other device joins this phone first.</p></div><div class="gest"></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">58</span>Sending directly <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Once a browser is there, the code gives way to the progress, at Wi-Fi speed. Show the code lets the next person scan; when this screen closes the code stops working, so nobody can come back for the photos later.</p>
+        <div class="phone" data-shot="58-nearby-sending"><div class="sb" data-time="15:21"></div><div class="ab back"><span class="ib"><span data-i="back"></span></span><h2>Send nearby</h2></div><div class="wb"><div class="drow"><span class="ri acc"><span data-i="smartphone"></span></span><div><b>iPhone · Safari</b><span>Connected directly</span></div></div><div class="count"><span class="big">7</span><span class="of">of 12</span><span class="eta">A few seconds left</span></div><div class="bar"><i style="width:58%"></i></div><div class="bytes"><span>49 of 84 MB</span><span>22 MB/s</span></div><div class="route"><span data-i="wifi"></span>Straight over Wi-Fi · not through your server</div><div class="grid g4" data-tiles="p3/k p8/k p6/k p1/k p4/k p7/k p9/u60 p2/q p10/q p5/q p3/q p8/q"></div><div class="grow"></div><div class="btnrow"><div class="btn outline">Stop</div><div class="btn tonal"><span data-i="qr"></span>Show the code</div></div></div><div class="gest"></div></div>
+      </div>
+
+    </div>
+    <p class="sub-h">On the website</p>
+    <div class="board">
+
+      <div class="slot">
+        <h3><span class="n">59</span>Receiving, on an iPhone <span class="badge proposal">proposal</span></h3>
+        <p class="cap">No app and no account: the camera opens the link, and the page takes the photos as they come. Save to Photos goes through the iPhone's share sheet; on a computer the same button downloads them. Nothing stays on the server.</p>
+        <div class="phone" data-shot="59-nearby-receive"><div class="sb" data-time="15:21"></div><div class="wb"><div class="brand"><span data-i="images"></span><span translate="no">Share</span><span class="langpill"><span data-i="globe"></span>EN</span></div><h1 class="hero md">Stefan sends you 12 photos</h1><p class="lead">Straight from his phone, over this Wi-Fi.</p><div class="count"><span class="big">7</span><span class="of">of 12</span><span class="eta">22 MB/s</span></div><div class="bar"><i style="width:58%"></i></div><div class="bytes"><span>49 of 84 MB</span><span>directly</span></div><div class="grid g3" data-tiles="p3/k p8/k p6/k p1/k p4/k p7/k p9/u60 p2/q p10/q"></div><div class="grow"></div><div class="btn primary"><span data-i="download"></span>Save to Photos</div><p class="small">Nothing is kept on a server. Close this page when you're done.</p></div></div>
+      </div>
+      <div class="slot wide">
+        <h3><span class="n">60</span>From a computer to a phone <span class="badge proposal">proposal</span></h3>
+        <p class="cap">The other way round, for a computer without Quick Share, such as a Mac next to an Android phone: Nearby in the selection shows the code in a dialog, and the phone's camera opens it. Two phones' browsers can do the same, an iPhone's and an Android's.</p>
+        <div class="desktop" data-shot="60-nearby-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>Library · Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com/library</span></div></div><div class="dview"><div class="ahd"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div><nav class="dtabs"><a class="on"><span data-i="images"></span>Library</a><a><span data-i="upload"></span>Send</a><a><span data-i="settings"></span>Settings</a></nav><span class="dsearch"><span data-i="search"></span>Search file names</span><span class="av tan">M</span></div><div class="dlib"><div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div><div class="day"><div><h4>Today</h4><div class="meta">3 of 6 selected</div></div><span class="dsel part"><span data-i="minus"></span></span></div><div class="grid g8" data-tiles="p3/s p8/s v2@0:18/s d#PDF=Car_insurance.pdf/o p6/o p1/o"></div><div class="day"><div><h4>Yesterday</h4><div class="meta">45 files · 620 MB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p4/o p7/o p9/o v5@1:15/o p2/o p10/o p6/o p3/o p5/o d#DOCX=Recipes_Oma.docx/o p8/o p1/o v3@0:42/o p2/o p9/o p7/o"></div></div><div class="selbar"><span class="ib"><span data-i="x"></span></span><b>3 selected</b><span class="sz">45 MB</span><span class="tbtn">Select all</span><span class="gap"></span><div class="btn tonal sm"><span data-i="radio"></span>Nearby</div><div class="btn primary sm"><span data-i="download"></span>Download 3</div></div><div class="scrim"></div><div class="ddlg"><h3>Send 3 files nearby</h3><div class="qrcard"><div class="qr" data-qr="60"></div><b>Scan this with the phone's camera</b><span class="exp"><span data-i="wifi"></span>On the same Wi-Fi as this computer</span></div><div class="group mt12"><div class="row"><span class="ri acc"><span data-i="smartphone"></span></span><div class="rt"><b>Android · Chrome</b><span>Receiving 2 of 3 · 31 of 45 MB</span></div></div></div><div class="dbtns"><span class="tbtn">Close</span></div></div></div></div>
+      </div>
+
+    </div>
+  </section>
+
 </div>
 
 <script>
@@ -1894,6 +1943,154 @@
   // English is written in the markup. T maps each English string to [German, Italian]; elements marked
   // data-tr are translated as a whole, because their inline markup sits at a different place in each language.
   const T = {
+      "12 selected": [
+          "12 ausgewählt",
+          "12 selezionati"
+      ],
+      "12 of 18 selected": [
+          "12 von 18 ausgewählt",
+          "12 di 18 selezionati"
+      ],
+      "Download 12": [
+          "12 herunterladen",
+          "Scarica 12"
+      ],
+      "Send 12 photos nearby": [
+          "12 Fotos an ein Gerät in der Nähe",
+          "12 foto a un dispositivo qui vicino"
+      ],
+      "To phones and computers nearby, iPhones too. The fastest way, even without internet.": [
+          "An Handys und Computer in der Nähe, auch an iPhones. Der schnellste Weg, auch ohne Internet.",
+          "A telefoni e computer qui vicino, anche agli iPhone. Il modo più veloce, anche senza internet."
+      ],
+      "QR code for a browser": [
+          "QR-Code für einen Browser",
+          "Codice QR per un browser"
+      ],
+      "For any other phone or computer: its camera opens the photos, straight from this phone.": [
+          "Für jedes andere Handy oder jeden Computer: Seine Kamera öffnet die Fotos, direkt von diesem Handy.",
+          "Per qualsiasi altro telefono o computer: la sua fotocamera apre le foto, direttamente da questo telefono."
+      ],
+      "Both send straight to the other device, not through your server.": [
+          "Beide senden direkt an das andere Gerät, nicht über deinen Server.",
+          "Entrambi inviano direttamente all'altro dispositivo, non tramite il tuo server."
+      ],
+      "Send nearby": [
+          "In der Nähe senden",
+          "Invia qui vicino"
+      ],
+      "Scan this with the other device's camera": [
+          "Scanne das mit der Kamera des anderen Geräts",
+          "Scansionalo con la fotocamera dell'altro dispositivo"
+      ],
+      "On the same Wi-Fi: Wedding Anna & Marco": [
+          "Im selben WLAN: Hochzeit Anna & Marco",
+          "Sulla stessa rete Wi-Fi: Matrimonio Anna & Marco"
+      ],
+      "12 photos": [
+          "12 Fotos",
+          "12 foto"
+      ],
+      "84 MB · in full quality": [
+          "84 MB · in voller Qualität",
+          "84 MB · in qualità originale"
+      ],
+      "Only for whoever scans this": [
+          "Nur für den, der das scannt",
+          "Solo per chi lo scansiona"
+      ],
+      "Works until you close this screen": [
+          "Gilt, bis du diese Ansicht schließt",
+          "Vale finché non chiudi questa schermata"
+      ],
+      "Open a hotspot": [
+          "Hotspot öffnen",
+          "Apri un hotspot"
+      ],
+      "With no Wi-Fi in common, the other device joins this phone first.": [
+          "Ohne gemeinsames WLAN verbindet sich das andere Gerät zuerst mit diesem Handy.",
+          "Senza una rete Wi-Fi in comune, l'altro dispositivo si collega prima a questo telefono."
+      ],
+      "Connected directly": [
+          "Direkt verbunden",
+          "Collegato direttamente"
+      ],
+      "of 12": [
+          "von 12",
+          "di 12"
+      ],
+      "A few seconds left": [
+          "Noch wenige Sekunden",
+          "Ancora pochi secondi"
+      ],
+      "49 of 84 MB": [
+          "49 von 84 MB",
+          "49 di 84 MB"
+      ],
+      "Straight over Wi-Fi · not through your server": [
+          "Direkt über WLAN · nicht über deinen Server",
+          "Direttamente via Wi-Fi · non tramite il tuo server"
+      ],
+      "Stop": [
+          "Stoppen",
+          "Interrompi"
+      ],
+      "Show the code": [
+          "Code zeigen",
+          "Mostra il codice"
+      ],
+      "Stefan sends you 12 photos": [
+          "Stefan sendet dir 12 Fotos",
+          "Stefan ti invia 12 foto"
+      ],
+      "Straight from his phone, over this Wi-Fi.": [
+          "Direkt von seinem Handy, über dieses WLAN.",
+          "Direttamente dal suo telefono, tramite questa rete Wi-Fi."
+      ],
+      "directly": [
+          "direkt",
+          "diretto"
+      ],
+      "Save to Photos": [
+          "In Fotos sichern",
+          "Salva in Foto"
+      ],
+      "Nothing is kept on a server. Close this page when you're done.": [
+          "Auf keinem Server bleibt etwas liegen. Schließ diese Seite, wenn du fertig bist.",
+          "Su nessun server resta niente. Chiudi questa pagina quando hai finito."
+      ],
+      "3 of 6 selected": [
+          "3 von 6 ausgewählt",
+          "3 di 6 selezionati"
+      ],
+      "3 selected": [
+          "3 ausgewählt",
+          "3 selezionati"
+      ],
+      "Nearby": [
+          "In der Nähe",
+          "Qui vicino"
+      ],
+      "Download 3": [
+          "3 herunterladen",
+          "Scarica 3"
+      ],
+      "Send 3 files nearby": [
+          "3 Dateien an ein Gerät in der Nähe",
+          "3 file a un dispositivo qui vicino"
+      ],
+      "Scan this with the phone's camera": [
+          "Scanne das mit der Kamera des Handys",
+          "Scansionalo con la fotocamera del telefono"
+      ],
+      "On the same Wi-Fi as this computer": [
+          "Im selben WLAN wie dieser Computer",
+          "Sulla stessa rete Wi-Fi di questo computer"
+      ],
+      "Receiving 2 of 3 · 31 of 45 MB": [
+          "Empfängt 2 von 3 · 31 von 45 MB",
+          "Riceve 2 di 3 · 31 di 45 MB"
+      ],
       "Waiting for approval": [
           "Warten auf Freigabe",
           "In attesa di approvazione"
@@ -3296,7 +3493,7 @@
       ]
   };
   // Names, codes, numbers and file names that stay the same in every language.
-  const KEEP = /^(?:[A-Z0-9]|\d+(?::\d+)?|Stefan|Maria|Peter|maria|Admin|PIN|PDF|DOCX|ZIP|XLSX|•+|\d{8}_\d{6}\.(?:jpg|mp4)|\/srv\/share|(?:https:\/\/)?share\.example\.com(?:\/[a-z\/-]*)?|https:\/\/192\.168\.1\.20:8443|\d+ (?:KB|MB|GB)|@maria|Pixel 8|Chrome · Windows|IMG_\d+\.jpg|image\/jpeg)$/;
+  const KEEP = /^(?:[A-Z0-9]|\d+(?::\d+)?|Stefan|Maria|Peter|maria|Admin|PIN|PDF|DOCX|ZIP|XLSX|•+|\d{8}_\d{6}\.(?:jpg|mp4)|\/srv\/share|(?:https:\/\/)?share\.example\.com(?:\/[a-z\/-]*)?|https:\/\/192\.168\.1\.20:8443|\d+ (?:KB|MB|GB)|@maria|Pixel 8|Chrome · Windows|IMG_\d+\.jpg|image\/jpeg|Quick Share|iPhone · Safari|Android · Chrome|\d+ MB\/s)$/;
   const LANGS = ['en', 'de', 'it'];
   const original = new WeakMap();
   function setLang(lang) {
