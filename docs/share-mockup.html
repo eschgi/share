@@ -832,6 +832,27 @@
   .lockdate + .ntf{margin-top:44px}
   .tile .fromb{position:absolute;left:5px;bottom:5px;width:19px;height:19px;border-radius:50%;background:rgba(18,13,10,.66);color:#fff;
     font-size:10.5px;font-weight:700;display:grid;place-items:center}
+  /* ---------- faces: the photos one is in, found on one's own phone ---------- */
+  .facesline{display:flex;gap:12px;align-items:center;background:var(--s1);border:1px solid var(--line-soft);border-radius:16px;padding:10px 14px;margin:6px 12px 4px;flex:none}
+  .facesline > .ic{width:20px;height:20px;color:var(--accent-text)}
+  .facesline .at{flex:1;min-width:0}
+  .facesline .at b{display:block;font-size:14.5px;font-weight:600}
+  .facesline .at span{display:block;font-size:12.5px;color:var(--text-3);margin-top:1px}
+  .phone.cam{background:#050403}
+  .camtop{display:flex;align-items:center;gap:12px;padding:6px 14px 0;color:#fff;flex:none;position:relative;z-index:3}
+  .camtop b{flex:1;font-size:16px;font-weight:600}
+  .camdots{display:flex;gap:6px;margin-right:10px} .camdots i{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.3)} .camdots i.on{background:var(--accent-text)}
+  .camoval{width:250px;height:330px;border:3px dashed var(--accent-text);border-radius:50%;margin:56px auto 0;display:grid;place-items:center;flex:none;
+    background:radial-gradient(closest-side,rgba(90,70,58,.55),rgba(30,24,20,.2))}
+  .camoval .ic{width:140px;height:140px;color:rgba(255,255,255,.28)}
+  .camoval .ic svg{stroke-width:1.2}
+  .camhint{text-align:center;font-size:17px;font-weight:500;color:#fff;margin:26px 24px 0}
+  .shutter{width:78px;height:78px;border-radius:50%;border:4px solid #fff;display:grid;place-items:center;margin:0 auto 26px;flex:none}
+  .shutter i{width:62px;height:62px;border-radius:50%;background:#fff}
+  .vfound{position:absolute;left:16px;right:16px;top:calc(50% + 126px);z-index:3;display:flex;align-items:center;gap:10px;background:rgba(28,22,18,.88);
+    border-radius:16px;padding:6px 6px 6px 14px;color:#fff}
+  .vfound > .ic{width:18px;height:18px;color:var(--accent-text)}
+  .vfound .t{flex:1;font-size:14.5px;font-weight:500}
   .lockhint{text-align:center;font-size:13px;color:var(--text-3);margin:18px 0 6px;flex:none}
   /* ---------- a PIN's poster: printed, so in paper colours whatever the theme ---------- */
   .paper{width:780px;height:1103px;zoom:.5;background:#FBF7F1;color:#2A1F18;position:relative;overflow:hidden;display:flex;flex-direction:column;
@@ -2008,6 +2029,43 @@
     </div>
   </section>
 
+  <section class="sec" id="faces">
+    <div class="sec-head">
+      <div class="sec-tag">Proposal · faces</div>
+      <h2>Only the photos with me</h2>
+      <p>After a wedding there are 1,200 photos, and Stefan is in 40 of them. Turned on by Stefan for himself, his phone learns his face from three selfies, looks at the photos of his folders itself, and keeps a list of the ones he is in: a filter in the library, and the only ones it saves into his gallery by itself. His face never leaves his phone, nobody else's face is kept anywhere, and the server learns nothing, so it works in encrypted folders too. Two small open models do the work on the phone: YuNet finds the faces (MIT licence), SFace tells whether one is Stefan's (Apache 2.0). It finds most, not all: a face in profile or behind sunglasses can slip through, and Not me corrects a wrong one.</p>
+    </div>
+    <div class="board">
+
+      <div class="slot">
+        <h3><span class="n">73</span>Find me in photos <span class="badge proposal">proposal</span></h3>
+        <p class="cap">In Settings, and only for oneself: nobody can look for someone else. It says what stays where before anything happens. In the EU a face used to recognise someone is biometric data, one more reason it is asked for and stays on the phone.</p>
+        <div class="phone" data-shot="73-faces-start"><div class="sb" data-time="22:05"></div><div class="ab back"><span class="ib"><span data-i="back"></span></span><h2>Photos with me</h2></div><div class="wb"><div class="roundico"><span data-i="user"></span></div><h1 class="hero md">Find the photos you're in</h1><div class="dest"><div class="drow"><span class="ri"><span data-i="camera"></span></span><div><b>Three selfies</b><span>Your phone learns your face from them.</span></div></div><div class="drow"><span class="ri"><span data-i="images"></span></span><div><b>It looks itself</b><span>At the photos of your folders, new ones as they come.</span></div></div><div class="drow"><span class="ri"><span data-i="lock"></span></span><div><b>Your face stays here</b><span>It never leaves this phone, and nobody else's face is kept.</span></div></div></div><div class="grow"></div><div class="btn primary"><span data-i="camera"></span>Take three selfies</div><p class="small">Only for you: nobody can look for someone else.</p></div><div class="gest"></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">74</span>Learning a face <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Three selfies, the head turned a little each time, make a face print: 128 numbers, kept encrypted on this phone. Update my face, later on, helps when a child grows.</p>
+        <div class="phone cam" data-shot="74-faces-selfie"><div class="sb" data-time="22:06"></div><div class="camtop"><span class="ib"><span data-i="x"></span></span><b>2 of 3</b><span class="camdots"><i class="on"></i><i class="on"></i><i></i></span></div><div class="camoval"><span data-i="user"></span></div><p class="camhint">Turn your head a little to the left</p><div class="grow"></div><div class="shutter"><i></i></div><div class="gest"></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">75</span>With me <span class="badge proposal">proposal</span></h3>
+        <p class="cap">A new chip next to Photos and Videos. New photos are looked at as they arrive; older ones on Wi-Fi while the phone charges, which the line says. Looking takes the phone a fraction of a second per photo; fetching the photo is the bigger part, hence Wi-Fi for older ones.</p>
+        <div class="phone" data-shot="75-faces-filter"><div class="sb" data-time="9:30"></div><div class="ab"><h2 class="fpick"><span class="t">Wedding Anna &amp; Marco</span><span data-i="chev" class="down"></span></h2><span class="ib"><span data-i="search"></span></span><span class="av sm acc">S</span></div><div class="chips"><span class="chip">All</span><span class="chip on">With me</span><span class="chip">Photos</span><span class="chip">Videos</span></div><div class="facesline"><span data-i="user"></span><div class="at"><b>38 photos with you</b><span>Still looking through 870 older ones, on Wi-Fi</span></div></div><div class="scroll"><div class="day"><div><h4>Saturday, 10 Oct</h4><div class="meta">31 of 1,214 with you</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p6/aM p2/aP p9 p4/aM p1/aM p7/aP p5 p8/aM p3/aM p10/aP p2/aM p6 p9/aM p1/aP p5/aM p8/aM"></div><div class="day"><div><h4>Friday, 9 Oct</h4><div class="meta">7 of 96 with you</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p3/aM p7/aP p10 p4/aM"></div></div><nav class="nav" data-on="library"></nav><div class="gest"></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">76</span>Not me <span class="badge proposal">proposal</span></h3>
+        <p class="cap">One photo says Stefan is in it. Not me takes it off his list; on a photo the phone missed, Also me puts it on. Both stay on his phones only, like the list itself.</p>
+        <div class="phone viewer" data-shot="76-faces-not-me"><div class="sb" data-time="9:31"></div><div class="vtop"><span class="ib"><span data-i="back"></span></span><div class="vt"><b>Saturday, 10 Oct</b><span>From Maria · 21:12</span></div><span class="ib"><span data-i="more"></span></span></div><div class="vphoto"></div><div class="vfound"><span data-i="user"></span><span class="t">You're in this photo</span><span class="tbtn">Not me</span></div><div class="vbottom"><div class="film" data-tiles="p8 p3 p6/c p1 p7"></div><div class="vmeta">PXL_20261010_211205.jpg · 3.9 MB · 4080 × 3072</div><div class="vactions"><div><span data-i="download"></span>Download</div><div><span data-i="share"></span>Share</div><div><span data-i="info"></span>Details</div></div></div><div class="gest"></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">77</span>Receive only those <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Receive automatically puts a folder's new photos into the gallery by themselves; with Only photos with me, just those Stefan is in. It pairs with sending automatically: Maria's phone sends everything, Stefan's keeps what he is in.</p>
+        <div class="phone" data-shot="77-faces-receive"><div class="sb" data-time="9:33"></div><div class="ab"><h2 class="fpick"><span class="t">Wedding Anna &amp; Marco</span><span data-i="chev" class="down"></span></h2><span class="ib"><span data-i="search"></span></span><span class="av sm acc">S</span></div><div class="chips"><span class="chip">All</span><span class="chip on">With me</span><span class="chip">Photos</span><span class="chip">Videos</span></div><div class="scroll"><div class="grid g4" data-tiles="p6/aM p2/aP p9 p4/aM p1/aM p7/aP p5 p8/aM"></div></div><nav class="nav" data-on="library"></nav><div class="gest"></div><div class="scrim"></div><div class="sheet"><div class="grip"></div><h3>Receive automatically</h3><div class="label t0">From</div><div class="fsel"><span class="fcov ph t6"><span data-i="image"></span></span><div class="rt"><b>Wedding Anna &amp; Marco</b><span>1,310 files · 9 people</span></div><span data-i="chev" class="down"></span></div><div class="swrow"><div class="rt"><b>Only photos with me</b><span>38 so far, and new ones as they arrive.</span></div><span class="sw on"></span></div><div class="swrow"><div class="rt"><b>Videos too</b><span>Faces are looked for in photos only.</span></div><span class="sw"></span></div><div class="note slim"><span data-i="images"></span><p>Into this phone's gallery, album Share.</p></div><div class="btn primary mt20"><span data-i="download"></span>Start</div></div></div>
+      </div>
+
+    </div>
+  </section>
+
 </div>
 
 <script>
@@ -2103,6 +2161,122 @@
   // English is written in the markup. T maps each English string to [German, Italian]; elements marked
   // data-tr are translated as a whole, because their inline markup sits at a different place in each language.
   const T = {
+      "Photos with me": [
+          "Fotos mit mir",
+          "Foto con me"
+      ],
+      "Find the photos you're in": [
+          "Finde die Fotos, auf denen du bist",
+          "Trova le foto in cui ci sei"
+      ],
+      "Three selfies": [
+          "Drei Selfies",
+          "Tre selfie"
+      ],
+      "Your phone learns your face from them.": [
+          "Daraus lernt dein Handy dein Gesicht.",
+          "Da questi il telefono impara il tuo viso."
+      ],
+      "It looks itself": [
+          "Es sucht selbst",
+          "Cerca da solo"
+      ],
+      "At the photos of your folders, new ones as they come.": [
+          "In den Fotos deiner Ordner, neue sobald sie kommen.",
+          "Nelle foto delle tue cartelle, quelle nuove appena arrivano."
+      ],
+      "Your face stays here": [
+          "Dein Gesicht bleibt hier",
+          "Il tuo viso resta qui"
+      ],
+      "It never leaves this phone, and nobody else's face is kept.": [
+          "Es verlässt dieses Handy nie, und kein anderes Gesicht wird gespeichert.",
+          "Non lascia mai questo telefono, e nessun altro viso viene conservato."
+      ],
+      "Take three selfies": [
+          "Drei Selfies machen",
+          "Scatta tre selfie"
+      ],
+      "Only for you: nobody can look for someone else.": [
+          "Nur für dich: Niemand kann nach jemand anderem suchen.",
+          "Solo per te: nessuno può cercare qualcun altro."
+      ],
+      "2 of 3": [
+          "2 von 3",
+          "2 di 3"
+      ],
+      "Turn your head a little to the left": [
+          "Dreh den Kopf ein wenig nach links",
+          "Gira un po' la testa a sinistra"
+      ],
+      "With me": [
+          "Mit mir",
+          "Con me"
+      ],
+      "38 photos with you": [
+          "38 Fotos mit dir",
+          "38 foto con te"
+      ],
+      "Still looking through 870 older ones, on Wi-Fi": [
+          "Sucht noch in 870 älteren, über WLAN",
+          "Sta ancora cercando in 870 più vecchie, via Wi-Fi"
+      ],
+      "Saturday, 10 Oct": [
+          "Samstag, 10. Okt.",
+          "Sabato 10 ott"
+      ],
+      "31 of 1,214 with you": [
+          "31 von 1.214 mit dir",
+          "31 di 1.214 con te"
+      ],
+      "Friday, 9 Oct": [
+          "Freitag, 9. Okt.",
+          "Venerdì 9 ott"
+      ],
+      "7 of 96 with you": [
+          "7 von 96 mit dir",
+          "7 di 96 con te"
+      ],
+      "From Maria · 21:12": [
+          "Von Maria · 21:12",
+          "Da Maria · 21:12"
+      ],
+      "You're in this photo": [
+          "Du bist auf diesem Foto",
+          "Ci sei in questa foto"
+      ],
+      "PXL_20261010_211205.jpg · 3.9 MB · 4080 × 3072": [
+          "PXL_20261010_211205.jpg · 3,9 MB · 4080 × 3072",
+          "PXL_20261010_211205.jpg · 3,9 MB · 4080 × 3072"
+      ],
+      "Receive automatically": [
+          "Automatisch empfangen",
+          "Ricezione automatica"
+      ],
+      "1,310 files · 9 people": [
+          "1.310 Dateien · 9 Personen",
+          "1.310 file · 9 persone"
+      ],
+      "Only photos with me": [
+          "Nur Fotos mit mir",
+          "Solo foto con me"
+      ],
+      "38 so far, and new ones as they arrive.": [
+          "Bisher 38, und neue, sobald sie ankommen.",
+          "Finora 38, e quelle nuove appena arrivano."
+      ],
+      "Faces are looked for in photos only.": [
+          "Gesichter werden nur in Fotos gesucht.",
+          "I volti vengono cercati solo nelle foto."
+      ],
+      "Into this phone's gallery, album Share.": [
+          "In die Galerie dieses Handys, Album Share.",
+          "Nella galleria di questo telefono, album Share."
+      ],
+      "Start": [
+          "Starten",
+          "Avvia"
+      ],
       "Until midnight, only what you take from now on. The 9 people in this folder see it as it arrives.": [
           "Bis Mitternacht, nur was du ab jetzt aufnimmst. Die 9 Personen in diesem Ordner sehen es, sobald es ankommt.",
           "Fino a mezzanotte, solo ciò che scatti da ora. Le 9 persone di questa cartella lo vedono appena arriva."
