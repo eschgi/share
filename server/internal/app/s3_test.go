@@ -207,7 +207,7 @@ func TestS3ModeKeepsItsBucket(t *testing.T) {
 		t.Fatal(err)
 	}
 	bucket, _ := s3.Open(cfg.S3, s3.Options{Transport: fake.Client().Transport, MaxRetries: 1})
-	if _, err := New(context.Background(), cfg, Options{S3: bucket}); err == nil || !strings.Contains(err.Error(), "new data_dir") {
+	if _, err := New(context.Background(), cfg, Options{S3: bucket}); err == nil || !strings.Contains(err.Error(), "a new database") {
 		t.Errorf("another prefix for the same database: %v", err)
 	}
 	disk, err := config.Parse([]byte(fmt.Sprintf(`{"public_url": "https://share.example.test", "storage_dir": %q, "data_dir": %q, "http": {"listen": "127.0.0.1:0"}%s}`, filepath.Join(dir, "files"), dir, database)))
@@ -217,7 +217,7 @@ func TestS3ModeKeepsItsBucket(t *testing.T) {
 	if err := storage.Init(storage.Layout{StorageDir: disk.StorageDir, DataDir: disk.DataDir}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := New(context.Background(), disk, Options{}); err == nil || !strings.Contains(err.Error(), "new data_dir") {
+	if _, err := New(context.Background(), disk, Options{}); err == nil || !strings.Contains(err.Error(), "a new database") {
 		t.Errorf("a drive for the same database: %v", err)
 	}
 }
