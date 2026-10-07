@@ -72,7 +72,8 @@ release without it.
 
 ```sh
 flutter analyze && flutter test
-(cd android && ./gradlew testDirectDebugUnitTest testPlayDebugUnitTest)
+flutter build apk --config-only              # once: makes android/gradlew, which isn't in the repository
+(cd android && ./gradlew testDirectDebugUnitTest testPlayDebugUnitTest lintDirectDebug)
 flutter test --run-skipped --tags golden     # screenshots, compared with docs/share-mockup
 ```
 

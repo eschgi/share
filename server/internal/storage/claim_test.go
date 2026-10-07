@@ -27,7 +27,7 @@ func TestClaimStorage(t *testing.T) {
 	t.Run("a library from before buckets stays on its drive", func(t *testing.T) {
 		d := open(t)
 		addFile(t, d)
-		if err := ClaimStorage(ctx, d, "s3:family/share/"); err == nil || !strings.Contains(err.Error(), "new data_dir") {
+		if err := ClaimStorage(ctx, d, "s3:family/share/"); err == nil || !strings.Contains(err.Error(), "a new database") {
 			t.Errorf("moving it to a bucket: %v", err)
 		}
 		if err := ClaimStorage(ctx, d, "disk"); err != nil || stored(d) != "disk" {

@@ -344,7 +344,13 @@ func pin(args []string) error {
 
 func printPin(cfg *config.Config, p db.Pin) {
 	fmt.Printf("PIN:   %s\n", p.Code)
-	fmt.Printf("Link:  %s/#%s\n", strings.TrimSuffix(cfg.PublicURL, "/"), p.Code)
+	if p.Secret != nil {
+		// Its folder is encrypted: the whole link carries a secret that only a key of the folder
+		// opens, which the command line hasn't got. The code alone sends, and shows locked files.
+		fmt.Println("Link:  in the app or on the website, with the secret that opens the encrypted folder; the code alone only sends")
+	} else {
+		fmt.Printf("Link:  %s/#%s\n", strings.TrimSuffix(cfg.PublicURL, "/"), p.Code)
+	}
 	fmt.Printf("Works: %s\n", status(cfg, p))
 	if p.ShowsFolder {
 		fmt.Println("Guests with it also see and download what is in its folder.")

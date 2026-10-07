@@ -43,6 +43,9 @@ It doesn't protect:
 - against a server that has been taken over and sends the browsers changed website code, since the
   website comes from the server (the Android app's code doesn't);
 - a PIN link that shows its folder: whoever has the link can read the folder, by design;
+- someone who can change the database switching a folder's encryption off, or naming a key of their
+  own as a folder's newest version: phones and browsers take both from the server, so new files
+  are then sent plain, or encrypted for that key; the files encrypted before stay safe;
 - two things that still get folder keys without a check, decided to come later: the recovery key
   (a database changed to name another recovery key gets every folder key sealed for it) and PIN
   links that show a folder (a secret sealed for the folder key by someone else gets each new

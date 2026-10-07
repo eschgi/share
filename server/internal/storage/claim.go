@@ -27,9 +27,9 @@ func ClaimStorage(ctx context.Context, d *db.DB, want string) error {
 	switch {
 	case have == "" && files && want != "disk":
 		// A database from before buckets: its files are on a drive.
-		return fmt.Errorf("the files of this database are in storage_dir on a drive, but config.json names %s; Share doesn't move them into a bucket: give \"s3\" a new data_dir or database", storageName(want))
+		return fmt.Errorf("the files of this database are in storage_dir on a drive, but config.json names %s; Share doesn't move them into a bucket: give \"s3\" a new database", storageName(want))
 	case have != "" && files:
-		return fmt.Errorf("the files of this database are in %s, but config.json names %s; Share doesn't move them: put config.json back, or give the new storage a new data_dir or database", storageName(have), storageName(want))
+		return fmt.Errorf("the files of this database are in %s, but config.json names %s; Share doesn't move them: put config.json back, or give the new storage a new database", storageName(have), storageName(want))
 	case have != "":
 		// Nothing was kept in the old storage, so nothing is left to remove there either.
 		if err := d.DropS3Garbage(ctx); err != nil {

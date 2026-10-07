@@ -131,7 +131,7 @@ func users(args []string) error {
 		return err
 	}
 	if len(list) == 0 {
-		fmt.Println("Nobody has an account yet. The server prints an invite for the first admin when it starts.")
+		fmt.Println("Nobody has an account yet: the first admin makes theirs on the server's setup page, whose link it logs when it starts.")
 		return nil
 	}
 	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)

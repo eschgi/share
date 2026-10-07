@@ -9,7 +9,7 @@
 #   sudo cp config.json /etc/share/                  (storage_dir: /srv/share, and "database")
 #   sudo -u share share init --config /etc/share/config.json
 #   sudo cp share.service /etc/systemd/system/ && sudo systemctl enable --now share
-#   journalctl -u share                                              (the first admin's invite)
+#   journalctl -u share                          (the link to the setup page, for the first admin)
 #
 # Commands then run as the same user: sudo -u share share pin create --day --config /etc/share/config.json
 # With data_dir outside storage_dir, add it to ReadWritePaths too.
