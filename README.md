@@ -11,6 +11,10 @@
 >   configuration, the API, the way files are stored and the apps, without a migration path.
 >
 > Use it to try Share out, and keep your own copies of anything you can't afford to lose.
+>
+> **Planning to use Share?** Please say so in a
+> [GitHub Discussion](https://github.com/eschgi/share/discussions). Knowing that Share is in use
+> helps me keep breaking changes to a minimum and plan updates with existing installations in mind.
 
 A self-hosted place where family and friends drop photos, videos and documents.
 
