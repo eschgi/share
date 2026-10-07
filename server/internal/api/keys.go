@@ -177,7 +177,7 @@ func (a *API) keys(w http.ResponseWriter, r *http.Request) {
 		internal(w, "keys", err)
 		return
 	}
-	todo, err := a.Auth.DB.TodoOf(ctx, p.UserID, recovery != nil, a.Now())
+	todo, err := a.Auth.DB.TodoOf(ctx, p.UserID, p.Role == db.RoleAdmin, recovery != nil, a.Now())
 	if err != nil {
 		internal(w, "keys", err)
 		return
@@ -237,8 +237,8 @@ type checkRequest struct {
 }
 
 // newCheck opens a check before this device passes keys on: its person's key to another of
-// their devices, or folder keys to another person. It replaces this device's earlier check for
-// the same one.
+// their devices, or, for an admin, folder keys to another person. It replaces this device's
+// earlier check for the same one.
 func (a *API) newCheck(w http.ResponseWriter, r *http.Request) {
 	p, ok := a.device(w, r)
 	if !ok {
@@ -250,6 +250,10 @@ func (a *API) newCheck(w http.ResponseWriter, r *http.Request) {
 	}
 	if (req.Device == "") == (req.User == "") {
 		httpx.WriteError(w, http.StatusBadRequest, "bad_request", "Name a device or a person.")
+		return
+	}
+	if req.User != "" && p.Role != db.RoleAdmin {
+		httpx.WriteError(w, http.StatusForbidden, "forbidden", "Only admins pass folder keys on to other people.")
 		return
 	}
 	if (req.Device != "" && !ids.Valid(req.Device)) || (req.User != "" && !ids.Valid(req.User)) {

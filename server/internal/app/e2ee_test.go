@@ -385,6 +385,38 @@ func TestEncryptedFolder(t *testing.T) {
 		t.Fatal("Maria's browser can't open her keys")
 	}
 
+	// Only admins pass folder keys on to other people. Peter joins: Maria's to-do list doesn't name
+	// him, a check for him from her phone is refused, and a key she seals for him is left out.
+	peter := e.accept(e.invite(admin, "Peter", db.RoleMember), "Peter's phone")
+	pk := e.keyring(peter)
+	pk.makePersonKey()
+	if a := mk.sync(); len(a.Todo.People) != 0 {
+		t.Errorf("Maria's to-do list names someone: %+v", a.Todo.People)
+	}
+	if r := e.postJSON(nil, "/api/keys/checks", maria.token, map[string]any{"user": peter.userID, "commitment": b64u.EncodeToString(make([]byte, 32))}, nil); r.status != http.StatusForbidden || r.errorCode() != "forbidden" {
+		t.Errorf("a check from a member for someone else: %d %s", r.status, r.body)
+	}
+	forPeter, err := e2ee.Seal(pk.personPub, e2ee.PurposeFolder, e2ee.FolderContext(family.ID, 1), mk.folders[family.ID+":1"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	grant := map[string]any{"devices": []any{}, "recovery": []any{}, "pins": []any{},
+		"people": []any{map[string]any{"folder": family.ID, "version": 1, "user": peter.userID, "sealed": b64u.EncodeToString(forPeter)}}}
+	if r := e.postJSON(nil, "/api/keys/grants", maria.token, grant, nil); r.status != http.StatusNoContent {
+		t.Errorf("grants: %d %s", r.status, r.body)
+	}
+	if pk.sync(); len(pk.folders) != 0 {
+		t.Error("Peter got the folder key from a member")
+	}
+	if a := ak.sync(); len(a.Todo.People) != 1 || a.Todo.People[0].User != peter.userID {
+		t.Fatalf("the admin's to-do list: %+v", a.Todo)
+	} else {
+		ak.work(a)
+	}
+	if pk.sync(); len(pk.folders) != 1 {
+		t.Error("Peter can't open the folder after the admin's grant")
+	}
+
 	// A file sent into the folder is stored encrypted, and listed with what opens it.
 	plain := randomBytes(t, 3*e2ee.ChunkSize+1000)
 	id, sent := mk.sendEncrypted(family.ID, "IMG_0001.jpg", plain)

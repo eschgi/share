@@ -88,8 +88,9 @@ vi.mock('../src/api', async (importOriginal) => {
                 .filter(([id, d]) => d.user === c.user && d.publicKey && !p.sealed.has(id))
                 .map(([id, d]) => ({ id, public_key: fake.swapped.get(id) ?? d.publicKey!, name: id, client: 'web' as const, created_at: '2026-10-06T10:00:00Z', active: !fake.away.has(id) }))
             : [],
+          // Only admins pass folder keys on to other people.
           people: mine
-            .filter((v) => held(v.folder, v.version))
+            .filter((v) => p.admin && held(v.folder, v.version))
             .flatMap((v) =>
               [...fake.people]
                 .filter(([u, q]) => u !== c.user && q.publicKey && sees(q, v.folder) && !held(v.folder, v.version, u))
@@ -134,6 +135,7 @@ vi.mock('../src/api', async (importOriginal) => {
       const { c, p } = member();
       const device = 'device' in target ? target.device : null;
       const user = 'user' in target ? target.user : null;
+      if (user && !p.admin) throw new real.ApiError(403, 'forbidden', 'only admins pass folder keys on to other people');
       const d = device ? fake.devices.get(device) : null;
       const ok = p.sealed.has(c.device) && (device ? !!d && d.user === c.user && !!d.publicKey && !p.sealed.has(device) : user !== c.user && !!fake.people.get(user!)?.publicKey);
       if (!ok) throw new real.ApiError(404, 'not_found', 'nobody waits there');
@@ -200,7 +202,8 @@ vi.mock('../src/api', async (importOriginal) => {
         if (fake.devices.get(d.device)?.user !== c.user) throw new real.ApiError(400, 'bad_request', 'not their device');
         p.sealed.set(d.device, d.sealed);
       }
-      for (const x of g.people) fake.sealed.set(`${x.folder}:${x.version}:${x.user}`, x.sealed);
+      // A member's keys for someone else are left out.
+      for (const x of g.people) if (x.user === c.user || p.admin) fake.sealed.set(`${x.folder}:${x.version}:${x.user}`, x.sealed);
       for (const x of g.recovery) fake.recoverySealed.set(`${x.folder}:${x.version}`, x.sealed);
       for (const x of g.pins) fake.pins.get(x.pin)!.locked.set(x.version, x.locked);
     },
@@ -637,6 +640,12 @@ describe('keyring', { timeout: 60_000 }, () => {
     await l1.ring.start(l1.me);
     expect(l1.ring.status).toBe('ready');
     expect(l1.ring.hasFolderKey('f1', 1)).toBe(false);
+
+    // A member who holds f1 doesn't list Leo: only admins pass folder keys on to other people.
+    as(e1);
+    await e1.ring.checkIn();
+    expect(e1.ring.hasFolderKey('f1', 1)).toBe(true);
+    expect(e1.ring.asks).toEqual([]);
 
     // Leo is listed; Show opens his check, and Not now ends it, while he stays listed.
     as(a1);

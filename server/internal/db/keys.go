@@ -76,7 +76,7 @@ func (d *DB) KeysOf(ctx context.Context, userID, deviceID string) (Keys, error) 
 // Todo is what a person's device can seal for others with the keys the person holds.
 type Todo struct {
 	Devices  []DeviceKey     // the person's devices that lack the person's key
-	People   []PersonNeed    // people who see a folder and lack a version of its key
+	People   []PersonNeed    // people who see a folder and lack a version of its key; for admins only
 	Recovery []FolderVersion // versions of folder keys not yet sealed for the recovery key
 	Rekey    []string        // folders whose key needs a new version
 	Pins     []PinNeed       // PIN links that show a folder and lack a version of its key
@@ -117,8 +117,10 @@ type PinNeed struct {
 }
 
 // TodoOf lists what a person can seal for others, given the versions of folder keys sealed
-// for them: only those can they seal on. recovery says whether there is a recovery key.
-func (d *DB) TodoOf(ctx context.Context, userID string, recovery bool, now time.Time) (Todo, error) {
+// for them: only those can they seal on. Only admins pass folder keys on to other people, after
+// a check, so only they get the people who lack them. recovery says whether there is a recovery
+// key.
+func (d *DB) TodoOf(ctx context.Context, userID string, admin, recovery bool, now time.Time) (Todo, error) {
 	var t Todo
 	// Seen lately: a device is touched every 10 minutes while it is used (auth's touchEvery).
 	seen := now.Add(-CheckLife)
@@ -135,21 +137,23 @@ func (d *DB) TodoOf(ctx context.Context, userID string, recovery bool, now time.
 	if err != nil {
 		return t, err
 	}
-	err = eachRow(ctx, d.pool, `SELECT g.folder_id, g.version, u.id, u.name, u.public_key, EXISTS (SELECT 1 FROM devices v
-			JOIN person_keys k ON k.device_id = v.id WHERE v.user_id = u.id AND v.revoked_at IS NULL AND v.last_seen_at > $2)
-		FROM folder_grants g JOIN users u ON u.public_key IS NOT NULL AND `+sees("g.folder_id")+`
-		WHERE g.user_id = $1 AND NOT EXISTS (SELECT 1 FROM folder_grants o
-			WHERE o.folder_id = g.folder_id AND o.version = g.version AND o.user_id = u.id)
-		ORDER BY g.folder_id, g.version, u.id`, []any{userID, seen}, func(row scanner) error {
-		var n PersonNeed
-		if err := row.Scan(&n.FolderID, &n.Version, &n.UserID, &n.Name, &n.PublicKey, &n.Active); err != nil {
-			return err
+	if admin {
+		err = eachRow(ctx, d.pool, `SELECT g.folder_id, g.version, u.id, u.name, u.public_key, EXISTS (SELECT 1 FROM devices v
+				JOIN person_keys k ON k.device_id = v.id WHERE v.user_id = u.id AND v.revoked_at IS NULL AND v.last_seen_at > $2)
+			FROM folder_grants g JOIN users u ON u.public_key IS NOT NULL AND `+sees("g.folder_id")+`
+			WHERE g.user_id = $1 AND NOT EXISTS (SELECT 1 FROM folder_grants o
+				WHERE o.folder_id = g.folder_id AND o.version = g.version AND o.user_id = u.id)
+			ORDER BY g.folder_id, g.version, u.id`, []any{userID, seen}, func(row scanner) error {
+			var n PersonNeed
+			if err := row.Scan(&n.FolderID, &n.Version, &n.UserID, &n.Name, &n.PublicKey, &n.Active); err != nil {
+				return err
+			}
+			t.People = append(t.People, n)
+			return nil
+		})
+		if err != nil {
+			return t, err
 		}
-		t.People = append(t.People, n)
-		return nil
-	})
-	if err != nil {
-		return t, err
 	}
 	if recovery {
 		err = eachRow(ctx, d.pool, `SELECT k.folder_id, k.version FROM folder_keys k
@@ -293,13 +297,13 @@ func (d *DB) GrantDevice(ctx context.Context, userID, deviceID string, sealed []
 		"INSERT INTO person_keys (device_id, sealed, created_at) VALUES ($1, $2, $3)", deviceID, sealed, now)
 }
 
-// GrantFolder keeps a version of a folder's key sealed for a person, given by someone. Both
-// must see the folder, and the person must have a key; else ErrNotFound. A key already sealed
-// for them stays.
+// GrantFolder keeps a version of a folder's key sealed for a person, given by themselves (from an
+// invite's link or the recovery code) or by an admin. Both must see the folder, and the person
+// must have a key; else ErrNotFound. A key already sealed for them stays.
 func (d *DB) GrantFolder(ctx context.Context, giverID, folderID string, version int, userID string, sealed []byte, now time.Time) error {
 	return d.grant(ctx, `SELECT COUNT(*) FROM folder_keys k WHERE k.folder_id = $1 AND k.version = $2
 		AND EXISTS (SELECT 1 FROM users u WHERE u.id = $3 AND u.public_key IS NOT NULL AND `+sees("k.folder_id")+`)
-		AND EXISTS (SELECT 1 FROM users u WHERE u.id = $4 AND `+sees("k.folder_id")+`)`,
+		AND EXISTS (SELECT 1 FROM users u WHERE u.id = $4 AND `+sees("k.folder_id")+` AND (u.id = $3 OR u.role = 'admin'))`,
 		[]any{folderID, version, userID, giverID},
 		"INSERT INTO folder_grants (folder_id, version, user_id, sealed, created_at) VALUES ($1, $2, $3, $4, $5)",
 		folderID, version, userID, sealed, now)

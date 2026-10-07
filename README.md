@@ -182,7 +182,8 @@ The design and the formats are in [docs/e2ee-plan.md](docs/e2ee-plan.md).
   "Waiting for your OK". Show opens it, and both screens show the same code of 6 digits; Allow
   passes the keys on, and Not me signs the new one out. Nothing opens by itself. Someone given a
   folder gets its keys the same way, once an admin compared the code on their screen: once per
-  person and phone or browser, and again only when their key changes. So
+  person and phone or browser, and again only when their key changes. Only admins are asked about
+  other people; members only about their own new phones and browsers. So
   someone who can change the server's database can't slip in a phone or a person of their own. A
   member whose key is lost, with no phone or browser left that holds it and no password that opens
   it, gets a new one by itself, which an admin then allows.

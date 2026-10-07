@@ -118,8 +118,8 @@ the status doesn't pass through loading, and stays as it is without an answer):
 - opens the person key sealed for this device, then the folder keys sealed for the person;
 - answers the checks other devices ask of it (below);
 - then works through the server's to-do list, with the keys it holds: asks before passing the
-  person key on to the person's other devices that lack it, and folder keys to people who see the
-  folder and lack them, unless their key was checked on this device before; seals folder keys for
+  person key on to the person's other devices that lack it, and, on an admin's device, folder keys
+  to people who see the folder and lack them, unless their key was checked on this device before; seals folder keys for
   the recovery key, makes a folder's next key version when one is due, and locks new versions for
   PIN links that show the folder.
 
@@ -142,8 +142,11 @@ relays it, and can't show the code of a key of its own:
   other, so whoever relays them has one chance in a million to make two keys show the same code.
 
 Nothing opens by itself (the user's choice): the asking device lists who waits over the library,
-under "Waiting for your OK": a new phone or browser of the person, with its name, or a person whose
-folders wait. Show opens a dialog (a sheet in the app) with when the phone or browser signed in, or
+under "Waiting for your OK": a new phone or browser of the person, with its name, or, on an admin's
+phones and browsers, a person whose folders wait. Only admins pass folder keys on to other people
+(also the user's choice): a member's to-do list names no one else, the server refuses a member's
+check for someone else and leaves out folder keys a member seals for someone else; folder keys a
+person seals for themselves, from an invite's link or the recovery code, still count. Show opens a dialog (a sheet in the app) with when the phone or browser signed in, or
 the person's folders, and only then starts the check, so the code comes on both screens a few
 seconds later. Allow seals the keys for the key that was checked; Not me signs that phone or browser
 out; Not now, or closing the dialog, ends the check, and the ask stays listed. Several are listed

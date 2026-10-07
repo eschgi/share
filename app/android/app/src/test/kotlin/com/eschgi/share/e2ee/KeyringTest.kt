@@ -92,8 +92,8 @@ class KeyringTest {
                         )
                     }
                 }
-                val todoPeople = JSONArray()
-                for ((f, v, _) in mine.filter { held(it.first, it.second) }) {
+                val todoPeople = JSONArray() // only admins pass folder keys on to other people
+                for ((f, v, _) in mine.filter { p.admin && held(it.first, it.second) }) {
                     Fake.people.filter { (u, q) -> u != user && q.publicKey != null && sees(q, f) && !held(f, v, u) }
                         .forEach { (u, q) ->
                             val active = q.sealed.keys.any { Fake.devices.containsKey(it) && it !in Fake.away }
@@ -157,13 +157,16 @@ class KeyringTest {
                     require(Fake.devices[it.getString("device")]?.first == user) { "not their device" }
                     p.sealed[it.getString("device")] = it.getString("sealed")
                 }
-                g.getJSONArray("people").objects().forEach { Fake.sealed["${it.getString("folder")}:${it.getInt("version")}:${it.getString("user")}"] = it.getString("sealed") }
+                // A member's keys for someone else are left out.
+                g.getJSONArray("people").objects().filter { it.getString("user") == user || p.admin }
+                    .forEach { Fake.sealed["${it.getString("folder")}:${it.getInt("version")}:${it.getString("user")}"] = it.getString("sealed") }
                 g.getJSONArray("recovery").objects().forEach { Fake.recoverySealed["${it.getString("folder")}:${it.getInt("version")}"] = it.getString("sealed") }
                 g.getJSONArray("pins").objects().forEach { Fake.pins[it.getString("pin")]!!.locked[it.getInt("version")] = it.getString("locked") }
             }
             "POST /api/keys/checks" -> {
                 val target = body!!.optString("device").ifEmpty { null }
                 val other = body.optString("user").ifEmpty { null }
+                if (other != null && !p.admin) throw KeysApiError(403, "forbidden", "only admins pass folder keys on to other people")
                 val d = target?.let { Fake.devices[it] }
                 val ok = device in p.sealed && if (target != null) d != null && d.first == user && d.second != null && target !in p.sealed else other != user && Fake.people[other]?.publicKey != null
                 if (!ok) throw KeysApiError(404, "not_found", "nobody waits there")
@@ -614,6 +617,11 @@ class KeyringTest {
         l1.sync()
         assertEquals(Keyring.Status.READY, l1.ring.status)
         assertFalse(l1.ring.hasFolderKey("f1", 1))
+
+        // A member who holds f1 doesn't list Leo: only admins pass folder keys on to other people.
+        e1.checkIn()
+        assertTrue(e1.ring.hasFolderKey("f1", 1))
+        assertEquals(emptyList<Ask>(), e1.ring.asks)
 
         // Leo is listed; Show opens his check, and Not now ends it, while he stays listed.
         val a = a1!!
