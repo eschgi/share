@@ -10,6 +10,7 @@ import { SealError } from '../../e2ee/formats';
 import { useKeyring } from '../../e2ee/hooks';
 import { keyring, NeedsRoot, type Ask, type ShownCode } from '../../e2ee/keyring';
 import { useI18n, type I18n } from '../../i18n';
+import { hostOf, usePublicUrl } from '../../publicurl';
 import { Row, Switch } from '../components/Bits';
 import { Confirm, Modal } from '../components/Modal';
 import { useAccount } from '../context';
@@ -255,6 +256,8 @@ export function KeysBanner() {
   const { t } = useI18n();
   const { me } = useAccount();
   const keys = useKeyring();
+  const folders = useFolders();
+  if (keys.status === 'insecure') return folders.list?.some((f) => f.key_version !== null) ? <InsecureBanner /> : null;
   const [dialog, setDialog] = useState<'recovery' | 'startOver' | null>(null);
   const [busy, setBusy] = useState(false);
   const encryptedFolders = (keys.answer?.folders ?? []).length > 0;
@@ -311,6 +314,29 @@ export function KeysBanner() {
 /** Who waits for this browser's OK (screens 51 and 52): a new phone or browser of the person, or
  * another person and their folders. Nothing opens by itself: Show opens the dialog, which starts
  * the check, and Not now closes it again; the ask stays listed while it is due. */
+/** Over plain http, browsers don't encrypt: encrypted folders don't open here, and nothing goes
+ * into them from here. The server's https address, where it has one, does it all. */
+function InsecureBanner() {
+  const { t } = useI18n();
+  const url = usePublicUrl();
+  return (
+    <div class="keysbanner" role="status">
+      <Icon name="lock" />
+      <span>
+        <b>{t('keys.insecureTitle')}</b>
+        <span>{url ? t('keys.insecure', { url: hostOf(url) }) : t('keys.insecureNoUrl')}</span>
+      </span>
+      {url && (
+        <span class="keysbanner-actions">
+          <a class="btn xs outline" href={url.replace(/\/$/, '') + location.pathname}>
+            {t('keys.insecureOpen')}
+          </a>
+        </span>
+      )}
+    </div>
+  );
+}
+
 function KeysWaitingList() {
   const { t } = useI18n();
   const keys = useKeyring();

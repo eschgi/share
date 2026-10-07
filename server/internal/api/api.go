@@ -105,6 +105,9 @@ type Info struct {
 	MaxFileSizeBytes int64    `json:"max_file_size_bytes"`
 	Storage          string   `json:"storage"` // "disk": tus and /content; "s3": the bucket
 	Setup            bool     `json:"setup"`   // nobody has an account yet: the website offers /setup
+	// PublicURL is the server's public address, which pages opened over plain http point to:
+	// browsers encrypt only over https or on localhost.
+	PublicURL string `json:"public_url"`
 }
 
 func (a *API) info(w http.ResponseWriter, r *http.Request) {
@@ -122,6 +125,7 @@ func (a *API) info(w http.ResponseWriter, r *http.Request) {
 		MaxFileSizeBytes: a.MaxFileSize,
 		Storage:          a.storageMode(),
 		Setup:            setup,
+		PublicURL:        a.Cfg.PublicURL,
 	})
 }
 

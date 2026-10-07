@@ -418,6 +418,16 @@ Changed:
   folder decrypts while writing; "Download N" goes one by one when any file is encrypted.
 - Admin pages: the folder's switch, the default for new folders, the recovery code (shown once,
   copy, print), using it; the waiting state with "start over"; invites and PINs with secrets.
+- Plain http (added on 2026-10-07): browsers give a page opened over plain http no WebCrypto, so
+  there the keys don't load at all (status `insecure`).
+  - A line over the library says why encrypted folders don't open, pointing to the server's
+    `public_url` when it is an https one.
+  - Folders that aren't encrypted take files as the server says. A page that came unprotected
+    itself gains nothing from checking signatures, and couldn't anyway. Encrypted folders take
+    none, and the sending screen says why.
+  - An invite that would go without the keys of the encrypted folders it gives (plain http, keys
+    not ready, or this browser waiting itself) says so first, and is made only on "Make it
+    anyway". The app asks the same when its keys aren't ready.
 - Strings in English, German and Italian.
 
 ## App (`app/`, no new packages, no dart format)

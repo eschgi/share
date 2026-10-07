@@ -75,6 +75,7 @@
   "sending.tooLarge": "{name} è troppo grande da inviare.",
   "sending.unchecked": "Alcuni file non sono stati inviati: Share non ha potuto controllare le chiavi della loro cartella, quindi non può garantire che restino privati. Avvisa un admin.",
   "sending.uncheckedGuest": "Alcuni file non sono stati inviati: Share non ha potuto controllare le chiavi della cartella di questo PIN, quindi non può garantire che restino privati. Avvisa chi ti ha dato il PIN.",
+  "sending.insecure": "Alcuni file non sono stati inviati: la loro cartella è cifrata, e su una pagina aperta in http semplice i browser non cifrano. Inviali tramite https o dall'app.",
 
   "welcome.title": "Riprendiamo da qui",
   "welcome.lead": "L'invio si è interrotto. Non si è perso niente.",

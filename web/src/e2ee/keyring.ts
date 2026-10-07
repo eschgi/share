@@ -43,15 +43,15 @@ import {
   type KeyPair,
 } from './formats';
 import { keepOnly, loadDeviceKey, saveDeviceKey, savePins, saveTrusted, type DeviceKey, type Pins } from './store';
-import { follow, SendRefused, type FolderPublicKey } from './trust';
+import { canEncrypt, follow, SendRefused, type FolderPublicKey } from './trust';
 
 /**
  * Where this browser stands: 'off' before it knows anyone; 'ready' with the person's key
  * open; 'waiting' while no device of the person sealed it for this one (or the person has no
  * key yet and this one couldn't make it); 'failed' when the server or the browser's storage
- * can't be reached.
+ * can't be reached; 'insecure' on a page opened over plain http, where browsers don't encrypt.
  */
-export type KeysStatus = 'off' | 'loading' | 'ready' | 'waiting' | 'failed';
+export type KeysStatus = 'off' | 'loading' | 'ready' | 'waiting' | 'failed' | 'insecure';
 
 export { SendRefused, type FolderPublicKey } from './trust';
 
@@ -273,6 +273,7 @@ export class Keyring {
   }
 
   private async sync(password?: string, quiet = false): Promise<void> {
+    if (!canEncrypt()) return this.changed('insecure');
     this.syncing++;
     try {
       // A check's confirmation brings this browser the person's key or the root: the rest
@@ -842,6 +843,12 @@ export class Keyring {
    * version and its name allows, once there is a root. A folder switched off without one still
    * gets encrypted files, which the server takes. Throws SendRefused when nothing may go in. */
   async sendKey(folder: FolderInfo): Promise<FolderPublicKey | null> {
+    // Over plain http nothing encrypts, and a page that came unprotected itself gains nothing
+    // from checking the server's word: a plain folder takes files, an encrypted one none.
+    if (!canEncrypt()) {
+      if (folder.encrypted) throw new SendRefused("this page can't encrypt");
+      return null;
+    }
     if (!this.answer) await this.refresh();
     const a = this.answer;
     if (!a) throw new SendRefused("the keys couldn't be loaded");

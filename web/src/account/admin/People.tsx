@@ -30,6 +30,8 @@ import { personLine } from './format';
 import { NewPasswordDialog } from './NewPassword';
 import { copyText, sharesLinks, shareText } from './share';
 import { keyring } from '../../e2ee/keyring';
+import { canEncrypt } from '../../e2ee/trust';
+import { hostOf, usePublicUrl } from '../../publicurl';
 
 /** When an invite ends: "21:00" today, else with the day. */
 function inviteEnd(lang: Lang, when: string): string {
@@ -355,14 +357,21 @@ export function InviteDialog({ forPerson, onClose }: { forPerson?: Person; onClo
   /** The folders a new member gets; until changed, the one the library shows. */
   const [picked, setPicked] = useState<string[] | null>(null);
   const given = picked ?? inviteDefault(list, folders.shown?.id ?? null);
-  const pick = (id: string) => setPicked(given.includes(id) ? given.filter((f) => f !== id) : [...given, id]);
   const [invite, setInvite] = useState<NewInvite | null>(null);
   const [busy, setBusy] = useState(false);
+  /** Why the invite would go without the keys of the encrypted folders it gives: said first, and
+   * made only when asked again, since the new person would then wait for an OK with a code. */
+  const [noKeys, setNoKeys] = useState<string | null>(null);
+  const url = usePublicUrl();
+  const pick = (id: string) => {
+    setNoKeys(null);
+    setPicked(given.includes(id) ? given.filter((f) => f !== id) : [...given, id]);
+  };
   const [problem, setProblem] = useState<string | null>(null);
   const who = forPerson?.name ?? name.trim();
   const shares = sharesLinks();
 
-  const create = async () => {
+  const create = async (anyway = false) => {
     if (busy || (!forPerson && !who)) return;
     setBusy(true);
     setProblem(null);
@@ -379,7 +388,20 @@ export function InviteDialog({ forPerson, onClose }: { forPerson?: Person; onClo
         // browser checks the folders' keys with it.
         const encrypted = list.filter((f) => f.key_version !== null).map((f) => f.id);
         const gets = role === 'admin' ? encrypted : given.filter((id) => encrypted.includes(id));
+        if (gets.length && keyring.status === 'loading') await keyring.refresh();
         const keys = keyring.status === 'ready' ? await keyring.inviteKeys(gets) : null;
+        // Without the root, the new person's phone or browser can't check the keys, and takes none.
+        if (gets.length && !anyway && !(keys?.root && keys.keys.length)) {
+          setNoKeys(
+            !canEncrypt()
+              ? url
+                ? t('invite.noKeysInsecure', { name: who, url: hostOf(url) })
+                : t('invite.noKeysInsecureNoUrl', { name: who })
+              : t(keyring.status === 'waiting' ? 'invite.noKeysWaiting' : 'invite.noKeysFailed', { name: who }),
+          );
+          return;
+        }
+        setNoKeys(null);
         made = await createInvite(who, role, given, keys?.keys, keys?.root);
         if (keys?.keys.length || keys?.root) made = { ...made, link: `${made.link}.${keys.secret}` };
       }
@@ -400,6 +422,7 @@ export function InviteDialog({ forPerson, onClose }: { forPerson?: Person; onClo
   };
   const again = () => {
     setInvite(null);
+    setNoKeys(null);
     setName('');
     setRoleChoice('member');
     setPicked(null);
@@ -432,7 +455,10 @@ export function InviteDialog({ forPerson, onClose }: { forPerson?: Person; onClo
                 aria-checked={role === r}
                 class={role === r ? 'on' : ''}
                 disabled={!!invite}
-                onClick={() => setRoleChoice(r)}
+                onClick={() => {
+                  setNoKeys(null);
+                  setRoleChoice(r);
+                }}
               >
                 {role === r && <Icon name="check" />}
                 {t(r === 'admin' ? 'role.admin' : 'role.member')}
@@ -488,6 +514,12 @@ export function InviteDialog({ forPerson, onClose }: { forPerson?: Person; onClo
           {problem}
         </p>
       )}
+      {noKeys && !invite && (
+        <p class="help err" role="alert">
+          <Icon name="alert" />
+          {noKeys}
+        </p>
+      )}
       <div class="dbtns">
         {invite ? (
           <>
@@ -501,7 +533,17 @@ export function InviteDialog({ forPerson, onClose }: { forPerson?: Person; onClo
             </button>
           </>
         ) : (
-          !forPerson && (
+          !forPerson &&
+          (noKeys ? (
+            <>
+              <button type="button" class="tbtn dleft" disabled={busy} onClick={() => void create(true)}>
+                {t('invite.createAnyway')}
+              </button>
+              <button type="button" class="btn sm outline" onClick={onClose}>
+                {t('common.close')}
+              </button>
+            </>
+          ) : (
             <button
               type="button"
               class="btn sm primary"
@@ -511,7 +553,7 @@ export function InviteDialog({ forPerson, onClose }: { forPerson?: Person; onClo
               <Icon name="qr" />
               {t('invite.showCode')}
             </button>
-          )
+          ))
         )}
       </div>
     </Modal>

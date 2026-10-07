@@ -5,6 +5,7 @@ import { Icon } from '../components/Icon';
 import { NotifyOffer } from '../components/NotifyOffer';
 import { Page } from '../components/Page';
 import { touchFirst, useMedia, useOnWifi, useWakeLock } from '../device';
+import { canEncrypt } from '../e2ee/trust';
 import { RateMeter, formatBytes, formatCount, formatETA } from '../format';
 import { useI18n } from '../i18n';
 import type { Snapshot } from '../uploader';
@@ -80,7 +81,7 @@ export function SendingScreen({ name, snapshot: s, online, rejected, refused, on
         {refused && s.failed > 0 && (
           <p class="help err">
             <Icon name="alert" />
-            {t(refused === 'guest' ? 'sending.uncheckedGuest' : 'sending.unchecked')}
+            {t(!canEncrypt() ? 'sending.insecure' : refused === 'guest' ? 'sending.uncheckedGuest' : 'sending.unchecked')}
           </p>
         )}
         <div class="grow" />

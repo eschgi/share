@@ -12,6 +12,8 @@ export interface Info {
   storage: 'disk' | 's3';
   /** Nobody has an account yet: visitors without a PIN go to /setup. */
   setup: boolean;
+  /** The server's public address, which a page opened over plain http points to. */
+  public_url: string;
 }
 
 /** A PIN session; GET /api/session is only about those (a signed-in browser is /api/me). */

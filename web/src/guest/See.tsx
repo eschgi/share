@@ -19,6 +19,7 @@ import { Viewer } from '../account/viewer/Viewer';
 import { ApiError, createDownload, getFileIds, getFiles, getFolders, getInfo, getLibrary, zipUrl, type FolderInfo } from '../api';
 import { Icon } from '../components/Icon';
 import { keyring } from '../e2ee/keyring';
+import { canEncrypt } from '../e2ee/trust';
 import { pinSecret } from '../e2ee/pinlink';
 import { Page } from '../components/Page';
 import { formatBytes, formatCount, formatDay } from '../format';
@@ -164,7 +165,7 @@ export function See({ name, onEnded }: { name: string; onEnded: () => void }) {
       {folder?.key_version != null && opened === 0 && (
         <p class="help" role="status">
           <Icon name="lock" />
-          {t('see.locked')}
+          {t(canEncrypt() ? 'see.locked' : 'see.lockedInsecure')}
         </p>
       )}
       {problem && (

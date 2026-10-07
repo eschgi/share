@@ -2,7 +2,7 @@ import type { ComponentType } from 'preact';
 import { useEffect, useMemo, useReducer, useRef, useState } from 'preact/hooks';
 import { ApiError, endSession, getInfo, getSession, unlock, type Info, type Session } from './api';
 import { forgetPinLink, keepPinLink, pinRoot, pinSecret } from './e2ee/pinlink';
-import { guestKey, pinLinkRoot, type Anchor } from './e2ee/trust';
+import { canEncrypt, guestKey, pinLinkRoot, type Anchor } from './e2ee/trust';
 import { DropZone } from './components/DropZone';
 import { Page, PagePlaces, type Places } from './components/Page';
 import { useLeaveWarning } from './device';
@@ -151,7 +151,7 @@ export function App() {
           onSharedGone: sharedGone,
           encryptFor: async () => {
             const s = sessionAgain.current ?? sessionNow.current;
-            return s?.kind === 'pin' ? guestKey(s, await anchorOf()) : null;
+            return s?.kind === 'pin' ? guestKey(s, canEncrypt() ? await anchorOf() : null) : null;
           },
           onRefused: () => setRefused(true),
           refreshKeys: async () => {

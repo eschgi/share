@@ -12,7 +12,8 @@
     "chunk_size_bytes": 20971520,
     "max_file_size_bytes": 0,
     "storage": "disk",
-    "setup": false
+    "setup": false,
+    "public_url": "https://share.example.com"
   },
-  "notes": "storage says where the files are. disk: they are sent over tus (/tus/) and fetched from /api/files/{id}/content. s3: they are in a bucket, sent with /api/s3/uploads and fetched with links from /api/s3/files/{id}/url (a browser's /content goes on to the link by itself); tus is 404 then, and chunk_size_bytes is the smallest part. max_file_size_bytes is 0 for no limit; a bucket takes files of up to 5 TiB. setup is true while nobody has an account: the website then sends visitors without a PIN to /setup, where the first admin is made."
+  "notes": "storage says where the files are. disk: they are sent over tus (/tus/) and fetched from /api/files/{id}/content. s3: they are in a bucket, sent with /api/s3/uploads and fetched with links from /api/s3/files/{id}/url (a browser's /content goes on to the link by itself); tus is 404 then, and chunk_size_bytes is the smallest part. max_file_size_bytes is 0 for no limit; a bucket takes files of up to 5 TiB. setup is true while nobody has an account: the website then sends visitors without a PIN to /setup, where the first admin is made. public_url is the server's public address: a page opened over plain http, where browsers don't encrypt, points there for encrypted folders."
 }

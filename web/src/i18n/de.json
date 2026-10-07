@@ -75,6 +75,7 @@
   "sending.tooLarge": "{name} ist zu groß zum Senden.",
   "sending.unchecked": "Einige Dateien wurden nicht gesendet: Share konnte die Schlüssel ihres Ordners nicht prüfen und daher nicht sicherstellen, dass sie privat bleiben. Sag es einem Admin.",
   "sending.uncheckedGuest": "Einige Dateien wurden nicht gesendet: Share konnte die Schlüssel des Ordners dieser PIN nicht prüfen und daher nicht sicherstellen, dass sie privat bleiben. Sag es der Person, die dir die PIN gegeben hat.",
+  "sending.insecure": "Einige Dateien wurden nicht gesendet: Ihr Ordner ist verschlüsselt, und auf einer Seite über einfaches http verschlüsseln Browser nicht. Sende sie über https oder aus der App.",
 
   "welcome.title": "Willkommen zurück",
   "welcome.lead": "Das Senden wurde unterbrochen. Es ist nichts verloren.",

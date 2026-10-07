@@ -15,6 +15,19 @@ vi.mock('../src/api', async (importOriginal) => ({
 const signed = async (by: KeyPair, m: Uint8Array) => b64u(await sign(by.raw!, by.publicKey, m as Uint8Array<ArrayBuffer>));
 
 describe('a guest', () => {
+  it('over plain http, sends into a plain folder, and into an encrypted one nothing', async () => {
+    Object.defineProperty(globalThis, 'isSecureContext', { value: false, configurable: true });
+    try {
+      const key = { folder: 'f1', version: 1, public_key: 'AAAA', signature: 'AAAA', encrypted: true };
+      const session = { kind: 'pin', pin_kind: 'day', expires_at: null, folder_name: null, shows_folder: false, folder_key: key, roots: [] } as unknown as Api.Session;
+      await expect(guestKey(session, null)).rejects.toBeInstanceOf(SendRefused);
+      expect(await guestKey({ ...session, folder_key: { ...key, encrypted: false } }, { fingerprint: 'AAAA' })).toBeNull();
+      expect(await guestKey({ ...session, folder_key: null }, null)).toBeNull();
+    } finally {
+      delete (globalThis as { isSecureContext?: boolean }).isSecureContext;
+    }
+  });
+
   it("encrypts only for a key the link's root signed, following the chain", async () => {
     const [r1, r2, folder, other] = await Promise.all([generateKeyPair(true), generateKeyPair(true), generateKeyPair(true), generateKeyPair(true)]);
     const roots: Api.RootInfo[] = [

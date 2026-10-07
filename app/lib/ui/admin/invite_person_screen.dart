@@ -4,7 +4,7 @@ import '../../app.dart';
 import '../../data/api.dart';
 import '../../data/folders.dart';
 import '../../data/models.dart';
-import '../../data/platform.dart' show KeysException;
+import '../../data/platform.dart' show KeysException, KeysStatus;
 import '../../l10n/app_localizations.dart';
 import '../folders.dart';
 import '../icons.dart';
@@ -28,6 +28,9 @@ class _InvitePersonScreenState extends State<InvitePersonScreen> {
   NewInvite? _invite;
   String? _error;
   bool _busy = false;
+  /// Why the invite would go without the keys of the encrypted folders it gives: said first, and
+  /// made only when asked again, since the new person would then wait for an OK with a code.
+  String? _noKeys;
 
   @override
   void initState() {
@@ -52,10 +55,13 @@ class _InvitePersonScreenState extends State<InvitePersonScreen> {
 
   void _pick(String id) {
     final given = _given;
-    setState(() => _picked = given.contains(id) ? [for (final f in given) if (f != id) f] : [...given, id]);
+    setState(() {
+      _noKeys = null;
+      _picked = given.contains(id) ? [for (final f in given) if (f != id) f] : [...given, id];
+    });
   }
 
-  Future<void> _create() async {
+  Future<void> _create({bool anyway = false}) async {
     final t = AppLocalizations.of(context);
     setState(() {
       _busy = true;
@@ -73,6 +79,7 @@ class _InvitePersonScreenState extends State<InvitePersonScreen> {
         final gets = _role == Role.admin ? encrypted : [for (final id in _given) if (encrypted.contains(id)) id];
         // The root goes along whenever this phone trusts one, so the new person's phone or browser
         // checks the folders' keys with it.
+        if (gets.isNotEmpty && services.keys.state.status == KeysStatus.loading) await services.keys.sync();
         ({String secret, List<Json> keys, String? root})? keys;
         if (services.keys.state.ready) {
           try {
@@ -81,6 +88,13 @@ class _InvitePersonScreenState extends State<InvitePersonScreen> {
             keys = null; // the new person waits for the family's phones instead
           }
         }
+        // Without the root, the new person's phone or browser can't check the keys, and takes none.
+        if (gets.isNotEmpty && !anyway && (keys == null || keys.root == null || keys.keys.isEmpty)) {
+          final waiting = services.keys.state.status == KeysStatus.waiting;
+          setState(() => _noKeys = waiting ? t.inviteNoKeysWaiting(_who) : t.inviteNoKeysFailed(_who));
+          return;
+        }
+        _noKeys = null;
         invite = await admin.invite(_who, _role, folders: _given, keys: keys?.keys ?? const [], root: keys?.root);
         if (keys != null && (keys.keys.isNotEmpty || keys.root != null)) invite = invite.withLink('${invite.link}.${keys.secret}');
       } else {
@@ -110,6 +124,7 @@ class _InvitePersonScreenState extends State<InvitePersonScreen> {
         _name.clear();
         _role = Role.member;
         _picked = null;
+        _noKeys = null;
       });
 
   @override
@@ -140,7 +155,13 @@ class _InvitePersonScreenState extends State<InvitePersonScreen> {
                   textInputAction: TextInputAction.done,
                 ),
                 FieldLabel(t.joinRole),
-                _RoleToggle(role: _role, enabled: invite == null, onChanged: (r) => setState(() => _role = r)),
+                _RoleToggle(
+                    role: _role,
+                    enabled: invite == null,
+                    onChanged: (r) => setState(() {
+                          _noKeys = null;
+                          _role = r;
+                        })),
                 Help(t.inviteRoleHelp),
                 // With one folder there is nothing to choose: a new member gets it.
                 if (folders.length > 1 && _role == Role.member) ...[
@@ -179,12 +200,19 @@ class _InvitePersonScreenState extends State<InvitePersonScreen> {
               else if (person != null && _busy)
                 const Padding(padding: EdgeInsets.only(top: 80), child: Center(child: CircularProgressIndicator())),
               if (_error != null) Help(_error!, error: true),
+              if (_noKeys != null && invite == null) Help(_noKeys!, error: true),
             ]),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
             child: invite == null
-                ? (person == null
+                ? (person == null && _noKeys != null
+                    ? OutlinedButton(
+                        style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(56)),
+                        onPressed: _busy ? null : () => _create(anyway: true),
+                        child: Text(t.inviteCreateAnyway),
+                      )
+                    : person == null
                     ? BusyButton(
                         label: t.inviteShowCode,
                         icon: AppIcons.qrCode,

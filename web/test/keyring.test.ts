@@ -424,6 +424,21 @@ describe('keyring', { timeout: 60_000 }, () => {
     expect(await a1.ring.fileKey({ id: file.id, folder: 'f1', enc: file.enc })).toEqual(fileKey);
   });
 
+  it('over plain http, sends into plain folders as the server says and into encrypted ones nothing, and says why', async () => {
+    // Browsers offer no cryptography to a page opened over plain http.
+    Object.defineProperty(globalThis, 'isSecureContext', { value: false, configurable: true });
+    try {
+      const http = reopen('ada', 'a1');
+      as(http);
+      await http.ring.start(http.me);
+      expect(http.ring.status).toBe('insecure');
+      expect(await http.ring.sendKey(folderInfo('plain'))).toBeNull();
+      await expect(http.ring.sendKey(folderInfo('f1'))).rejects.toBeInstanceOf(SendRefused);
+    } finally {
+      delete (globalThis as { isSecureContext?: boolean }).isSecureContext;
+    }
+  });
+
   it("lets another browser wait until one with the key passes it on, after a check", async () => {
     as(a2);
     await a2.ring.start(a2.me);

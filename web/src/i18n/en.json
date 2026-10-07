@@ -75,6 +75,7 @@
   "sending.tooLarge": "{name} is too large to send.",
   "sending.unchecked": "Some files weren't sent: Share couldn't check the keys of their folder, so it couldn't be sure they stay private. Tell an admin.",
   "sending.uncheckedGuest": "Some files weren't sent: Share couldn't check the keys of the folder this PIN sends into, so it couldn't be sure they stay private. Tell whoever gave you the PIN.",
+  "sending.insecure": "Some files weren't sent: their folder is encrypted, and browsers don't encrypt on a page opened over plain http. Send them over https, or from the app.",
 
   "welcome.title": "Welcome back",
   "welcome.lead": "Your last upload was interrupted. Nothing is lost.",

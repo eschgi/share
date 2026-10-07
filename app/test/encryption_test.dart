@@ -372,6 +372,29 @@ void main() {
     expect(find.byWidgetPredicate((w) => w is QrCodeView && w.data.endsWith('.${platform.linkSecret}')), findsOneWidget);
   });
 
+  testWidgets("an invite that can't bring an encrypted folder's keys says so first, and is made only when asked again", (tester) async {
+    final server = adminFolders();
+    server.folders = [for (final f in server.folders) f['id'] == family ? {...f, 'encrypted': true, 'key_version': 1} : f];
+    final platform = signedInPhone()
+      ..encryptedFolders = {family}
+      ..keysState = const KeysState(status: KeysStatus.waiting, encryptedFolders: 1);
+    await startApp(tester, platform, server);
+    await openSettings(tester);
+    await tester.tap(find.text('Invite'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).first, 'Oma Rosa');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Show the QR code'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining("Oma Rosa wouldn't get the keys of the encrypted folders"), findsOneWidget);
+    expect(server.requests.where((r) => r.method == 'POST' && r.url.path == '/api/invites'), isEmpty);
+    await tester.tap(find.text('Make it anyway'));
+    await tester.pumpAndSettle();
+    final made = jsonDecode(server.requests.lastWhere((r) => r.method == 'POST' && r.url.path == '/api/invites').body) as Map;
+    expect(made['keys'] ?? const [], isEmpty, reason: 'made without keys, as asked');
+    expect(find.byType(QrCodeView), findsOneWidget);
+  });
+
   testWidgets('encrypted files move with their keys, sealed for where they go', (tester) async {
     final server = adminFolders();
     final first = server.files.firstWhere((f) => f['folder'] == family);

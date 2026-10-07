@@ -336,7 +336,8 @@ For work on the website, `cd web && npm run dev` serves it with hot reload and f
 the server on `127.0.0.1:8080`; `npm run dev -- --host` makes it reachable from phones at home
 (`http://192.168.1.20:5173`). Encrypted folders need the browser's Web Crypto, which only https and
 `localhost` have: with a phone on USB, `adb reverse tcp:5173 tcp:5173` lets it open
-`http://localhost:5173`.
+`http://localhost:5173`. Opened over plain http, the website says so over the library, sends only
+into folders that aren't encrypted, and asks before making an invite that couldn't carry the keys.
 
 ## Hosting
 

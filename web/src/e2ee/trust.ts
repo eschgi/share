@@ -15,6 +15,12 @@ export interface FolderPublicKey {
 /** Nothing goes into a folder: what the server says about its keys can't be checked. */
 export class SendRefused extends Error {}
 
+/** Whether this page can encrypt: browsers offer their cryptography only to pages opened over
+ * https or on localhost, not over plain http. */
+export function canEncrypt(): boolean {
+  return !!globalThis.crypto?.subtle && globalThis.isSecureContext !== false;
+}
+
 /** The newest root the chain leads to from root, each signed by the one before; root itself
  * where the chain doesn't name it. */
 export async function follow(roots: RootInfo[], root: Bytes): Promise<Bytes> {
@@ -53,6 +59,12 @@ export async function pinLinkRoot(secret: string): Promise<Bytes | null> {
  * otherwise. */
 export async function guestKey(s: Session, anchor: Anchor | null): Promise<FolderPublicKey | null> {
   const k = s.folder_key;
+  // Over plain http nothing encrypts, and a page that came unprotected itself gains nothing from
+  // checking a signature: a plain folder takes files, an encrypted one none.
+  if (!canEncrypt()) {
+    if (k?.encrypted) throw new SendRefused("this page can't encrypt");
+    return null;
+  }
   if (!anchor) return k?.encrypted ? { folder: k.folder, version: k.version, publicKey: fromB64u(k.public_key) } : null;
   let root = anchor.root ?? null;
   for (const r of s.roots) {

@@ -741,6 +741,23 @@
       }
     }
   },
+  "inviteNoKeysWaiting": "{name} wouldn't get the keys of the encrypted folders from this invite: this phone still waits for your OK itself, so {name} would wait for your OK with a code too.",
+  "@inviteNoKeysWaiting": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "inviteNoKeysFailed": "{name} wouldn't get the keys of the encrypted folders from this invite: they couldn't be loaded on this phone, so {name} would wait for your OK with a code. Try again in a moment.",
+  "@inviteNoKeysFailed": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "inviteCreateAnyway": "Make it anyway",
   "inviteWorksOnce": "Works once · expires in 24 h",
   "inviteSendLink": "Send as a link instead",
   "inviteShareText": "{name}, this invite signs you in to Share. It works once, for 24 hours: {link}",
