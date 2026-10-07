@@ -22,15 +22,21 @@ export async function copyText(text: string): Promise<boolean> {
   field.setAttribute('readonly', '');
   field.style.position = 'fixed';
   field.style.opacity = '0';
-  document.body.append(field);
+  // Behind a dialog the page can't be selected, so the field goes into the topmost open one:
+  // otherwise the copy would take nothing, and execCommand would still say it did.
+  const dialogs = document.querySelectorAll('dialog[open]');
+  const before = document.activeElement as HTMLElement | null;
+  (dialogs[dialogs.length - 1] ?? document.body).append(field);
+  field.focus();
   field.select();
   let ok = false;
   try {
-    ok = document.execCommand('copy');
+    ok = document.activeElement === field && field.selectionEnd - field.selectionStart === text.length && document.execCommand('copy');
   } catch {
     ok = false;
   }
   field.remove();
+  before?.focus();
   return ok;
 }
 
