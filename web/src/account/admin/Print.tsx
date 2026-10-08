@@ -10,7 +10,7 @@ import { Switch } from '../components/Bits';
 import { Modal } from '../components/Modal';
 import { useAccount } from '../context';
 import { useFolders } from '../folders/store';
-import { longTitle, pageTexts, type Printed, type PrintKind } from './print';
+import { longTitle, pageTexts, type Printed, type PrintKind } from './printText';
 
 /** Screens 71 and 72: the A4 page, a poster or four cards to cut out, in the server's language.
  * Its sizes follow its width, so the preview and the printed page are the same page. */

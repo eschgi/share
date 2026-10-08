@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import accountDe from '../src/account/i18n/de.json';
 import accountEn from '../src/account/i18n/en.json';
 import accountIt from '../src/account/i18n/it.json';
-import { longTitle, pageTexts, type Printed } from '../src/account/admin/print';
+import { longTitle, pageTexts, type Printed } from '../src/account/admin/printText';
 import { addDictionaries } from '../src/i18n';
 
 addDictionaries({ en: accountEn, de: accountDe, it: accountIt });
