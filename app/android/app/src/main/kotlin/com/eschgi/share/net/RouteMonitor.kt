@@ -17,7 +17,9 @@ import java.util.concurrent.Executors
  * and the route events) and for the downloads alike.
  *
  * The local address is probed when something asks and the last answer is older than five
- * minutes, a second after the phone's network changes, and whenever a caller saw it fail.
+ * minutes (half a minute when it didn't answer), a second after the phone's network changes, and
+ * whenever a caller saw a request fail, over either address: the public one may not answer at
+ * all, e.g. one not set up yet, while the local one answers again.
  * With only a public address nothing is probed, unless that address is plain http (a server
  * only at home): then the probe asks it too, and the phone's key goes there only after it
  * passed on this network ([httpAllowed]).
@@ -25,6 +27,9 @@ import java.util.concurrent.Executors
 @SuppressLint("StaticFieldLeak") // holds only the application context
 object RouteMonitor {
     private const val FRESH_MS = 5 * 60_000L
+
+    /** A local address that didn't answer is asked again sooner: the server may have been restarting, or the Wi-Fi waking up. */
+    private const val RETRY_MS = 30_000L
     private const val DEBOUNCE_MS = 1_000L
 
     private lateinit var app: Context
@@ -78,9 +83,11 @@ object RouteMonitor {
 
     /**
      * Probes the local address and waits for the answer. Callers that arrive during a probe
-     * wait for that one instead of starting their own.
+     * wait for that one instead of starting their own. Unless [quietly], it says checking
+     * meanwhile, so that callers wait for the answer; a look again in the background leaves the
+     * last answer in use until there is a new one.
      */
-    fun check(context: Context): RouteStatus {
+    fun check(context: Context, quietly: Boolean = false): RouteStatus {
         init(context)
         val asked = System.nanoTime()
         synchronized(probing) {
@@ -88,7 +95,7 @@ object RouteMonitor {
             if (config == null || !config.needsProbe) return set(RouteStatus.NO_LOCAL)
             val key = config.toString()
             if (probedAt > asked && probedFor == key) return status
-            set(status.copy(checking = true))
+            if (!quietly) set(status.copy(checking = true))
             val result = LocalProbe.probe(config, SecretStore(app).read(SecretStore.DEVICE_TOKEN))
             probedFor = key
             probedAt = System.nanoTime()
@@ -96,10 +103,13 @@ object RouteMonitor {
         }
     }
 
-    /** Probes in the background, unless another probe got there first. */
+    /**
+     * Probes in the background, unless another probe got there first. Quietly: e.g. away from
+     * home, where the local address is looked at again every half minute, nothing waits for it.
+     */
     fun checkLater() = background.execute {
         val config = ServerStore(app).config()
-        if (config != null && config.needsProbe && due(config.toString())) check(app)
+        if (config != null && config.needsProbe && due(config.toString())) check(app, quietly = true)
     }
 
     /**
@@ -121,8 +131,10 @@ object RouteMonitor {
         return if (local) status.isLocal else status.publicVerified
     }
 
-    private fun due(key: String) =
-        probedFor != key || probedAt == 0L || System.nanoTime() - probedAt > FRESH_MS * 1_000_000
+    private fun due(key: String): Boolean {
+        val fresh = if (status.reason == RouteReason.UNREACHABLE) RETRY_MS else FRESH_MS
+        return probedFor != key || probedAt == 0L || System.nanoTime() - probedAt > fresh * 1_000_000
+    }
 
     private val recheck = Runnable { checkLater() }
 

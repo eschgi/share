@@ -59,6 +59,16 @@ class HomeProofTest {
     }
 
     @Test
+    fun aProofThatDoesNotComeIsNoAnswer() {
+        // Too busy to answer in time says nothing about whose server it is: it is asked again
+        // soon (RouteMonitor), not taken for another one.
+        val port = serve(SERVER_ID, knows = TOKEN, proofDelayMs = 1_000)
+        assertEquals(RouteReason.UNREACHABLE, LocalProbe.probe(home(port), TOKEN, answerMs = 200).reason)
+        val failing = serve(SERVER_ID, knows = TOKEN, proofStatus = 503)
+        assertEquals(RouteReason.UNREACHABLE, LocalProbe.probe(home(failing), TOKEN).reason)
+    }
+
+    @Test
     fun aPublicAddressOverPlainHttpIsCheckedToo() {
         val port = serve(SERVER_ID, knows = TOKEN)
         val onlyHome = ServerConfig("http://127.0.0.1:$port", null, emptyList(), SERVER_ID, DEVICE)
@@ -73,14 +83,20 @@ class HomeProofTest {
 
     private fun home(port: Int) = ServerConfig("https://share.example.com", "http://127.0.0.1:$port", emptyList(), SERVER_ID, DEVICE)
 
-    /** A plain-http server with this id, which gives proofs for the key it [knows]. */
-    private fun serve(serverId: String, knows: String): Int {
+    /**
+     * A plain-http server with this id, which gives proofs for the key it [knows]: after
+     * [proofDelayMs], or none but [proofStatus].
+     */
+    private fun serve(serverId: String, knows: String, proofDelayMs: Long = 0, proofStatus: Int = 200): Int {
         val server = TestServer { req, res ->
             when (req.path) {
                 "/api/info" -> res.send(200, """{"server_id":"$serverId","name":"Share","api_version":1}""".toByteArray())
                 "/api/home/proof" -> {
                     val body = JSONObject(String(req.body.readNBytes(req.contentLength.toInt())))
-                    if (body.getString("device") != DEVICE) {
+                    Thread.sleep(proofDelayMs)
+                    if (proofStatus != 200) {
+                        res.send(proofStatus)
+                    } else if (body.getString("device") != DEVICE) {
                         res.send(404)
                     } else {
                         res.send(200, JSONObject().put("proof", proof(knows, body.getString("nonce"))).toString().toByteArray())

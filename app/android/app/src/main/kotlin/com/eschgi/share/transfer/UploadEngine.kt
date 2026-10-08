@@ -216,7 +216,8 @@ object UploadEngine {
                         if (attempts >= MAX_ATTEMPTS) {
                             queue.finish(item, UploadRow.FAILED, outcome.cause?.toString() ?: "HTTP ${outcome.status}")
                         } else {
-                            if (local) RouteMonitor.check(app) // maybe the local address went away
+                            // The local address may have gone away, or answer again while the public one doesn't.
+                            if (batch.auth == UploadBatch.DEVICE) RouteMonitor.check(app)
                             if (!rest(outcome.retryAfterMs ?: DownloadEngine.backoff(attempts), host)) return RunResult.RESCHEDULE
                         }
                     }

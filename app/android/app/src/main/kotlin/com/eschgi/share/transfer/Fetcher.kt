@@ -117,7 +117,7 @@ object Fetcher {
                 }
                 is Downloader.Outcome.Retry -> {
                     if (++attempt >= ATTEMPTS) throw IOException("couldn't fetch ${file.name}", outcome.cause)
-                    if (home) RouteMonitor.check(app)
+                    if (auth == Credentials.DEVICE) RouteMonitor.check(app) // over either address
                     Thread.sleep(DownloadEngine.backoff(attempt))
                 }
                 else -> {

@@ -99,8 +99,11 @@ app will go on Google Play later.
   like the home network.
 - **Two addresses per phone** (16). The public address is required. The local address is optional,
   for a server at home, and is preferred whenever it answers. The app checks when the network changes
-  and before each batch, with a short timeout. Without a local address everything uses the public one,
-  e.g. on a VPS. Both addresses come with an invite; nothing needs to be opened in the firewall at home.
+  and before each batch, with a short timeout. A local address that didn't answer is checked again after
+  half a minute, and right away when the public one doesn't answer either (e.g. not set up yet), so a
+  moment without it, such as the server restarting, heals by itself. Without a local address everything
+  uses the public one, e.g. on a VPS. Both addresses come with an invite; nothing needs to be opened in
+  the firewall at home.
 - **Is the local address really this server?** Many homes use the same 192.168.x addresses, so over https the server uses
   its own self-signed certificate there, and the app pins that certificate's fingerprint, which it learns
   over the public address. Over plain http there is no certificate: before the app sends its key there,

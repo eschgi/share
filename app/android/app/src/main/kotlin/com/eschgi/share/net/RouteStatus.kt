@@ -56,14 +56,18 @@ data class RouteStatus(
  * has to give the proof (HomeProof), for which the probe needs the phone's [token].
  */
 object LocalProbe {
-    const val TIMEOUT_MS = 1_500
+    /** How long an address gets to take the connection: quick at home, and away it fails fast. */
+    const val CONNECT_MS = 1_500
 
-    fun probe(config: ServerConfig, token: String? = null, timeoutMs: Int = TIMEOUT_MS): RouteStatus {
-        val publicVerified = config.publicIsHttp && ask(config.publicUrl, config, token, timeoutMs) == RouteReason.NONE
+    /** How long a server that took the connection gets to answer: a busy one is still there. */
+    const val ANSWER_MS = 5_000
+
+    fun probe(config: ServerConfig, token: String? = null, connectMs: Int = CONNECT_MS, answerMs: Int = ANSWER_MS): RouteStatus {
+        val publicVerified = config.publicIsHttp && ask(config.publicUrl, config, token, connectMs, answerMs) == RouteReason.NONE
         val local = config.localUrl
         if (local == null || !config.hasLocal) return RouteStatus.NO_LOCAL.copy(publicVerified = publicVerified)
         val started = System.nanoTime()
-        val reason = ask(local, config, token, timeoutMs)
+        val reason = ask(local, config, token, connectMs, answerMs)
         return if (reason == RouteReason.NONE) {
             RouteStatus(Route.LOCAL, millis = (System.nanoTime() - started) / 1_000_000, publicVerified = publicVerified)
         } else {
@@ -71,8 +75,11 @@ object LocalProbe {
         }
     }
 
-    /** Whether [base] is this phone's server: [RouteReason.NONE] if so, otherwise why not. */
-    private fun ask(base: String, config: ServerConfig, token: String?, timeoutMs: Int): RouteReason {
+    /**
+     * Whether [base] is this phone's server: [RouteReason.NONE] if so, otherwise why not. No answer,
+     * or a server error, is [RouteReason.UNREACHABLE], which is asked again soon (RouteMonitor).
+     */
+    private fun ask(base: String, config: ServerConfig, token: String?, connectMs: Int, answerMs: Int): RouteReason {
         val http = ServerConfig.isHttp(base)
         val conn = try {
             URL("$base/api/info").openConnection() as? HttpURLConnection
@@ -81,11 +88,13 @@ object LocalProbe {
         } ?: return RouteReason.UNREACHABLE
         try {
             if (!http) PinnedTls.pin(conn as? HttpsURLConnection ?: return RouteReason.UNREACHABLE, config.pins)
-            conn.connectTimeout = timeoutMs
-            conn.readTimeout = timeoutMs
+            conn.connectTimeout = connectMs
+            conn.readTimeout = answerMs
             conn.useCaches = false
             conn.instanceFollowRedirects = false
-            if (conn.responseCode != 200) return RouteReason.OTHER_SERVER
+            val status = conn.responseCode
+            if (status >= 500) return RouteReason.UNREACHABLE // there, but it can't answer now, e.g. while it starts
+            if (status != 200) return RouteReason.OTHER_SERVER
             val body = conn.inputStream.use { readLimited(it, 64 * 1024) }
             val id = JSONObject(String(body)).optString("server_id")
             if (config.serverId != null && id != config.serverId) return RouteReason.OTHER_SERVER
@@ -98,7 +107,12 @@ object LocalProbe {
         }
         if (http) {
             val device = config.deviceId
-            if (device == null || token == null || !HomeProof.check(base, device, token, timeoutMs)) return RouteReason.OTHER_SERVER
+            if (device == null || token == null) return RouteReason.OTHER_SERVER
+            return try {
+                if (HomeProof.check(base, device, token, connectMs, answerMs)) RouteReason.NONE else RouteReason.OTHER_SERVER
+            } catch (e: IOException) {
+                RouteReason.UNREACHABLE // no proof came, which says nothing about whose server it is
+            }
         }
         return RouteReason.NONE
     }

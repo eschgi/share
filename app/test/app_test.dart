@@ -1,6 +1,10 @@
+import 'dart:convert';
+
 import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:share_app/app.dart';
 import 'package:share_app/data/api.dart';
 import 'package:share_app/data/platform.dart';
@@ -20,13 +24,14 @@ String daysAgo(int n) => clock.now().subtract(Duration(days: n)).toIso8601String
 
 const inviteToken = 'shi_0123456789abcdefghijklmnopqrstuvwxyzABCDEFG';
 
-Future<AppServices> startApp(WidgetTester tester, FakePlatform platform, FakeServer server, {MediaPlayerFactory? player}) async {
+/// The app over [server]; with [public], the public address goes there instead.
+Future<AppServices> startApp(WidgetTester tester, FakePlatform platform, FakeServer server, {MediaPlayerFactory? player, http.Client? public}) async {
   tester.view.physicalSize = const Size(780, 1688);
   tester.view.devicePixelRatio = 2;
   addTearDown(tester.view.reset);
   final services = AppServices(
     platform: platform,
-    api: Api(platform: platform, publicClient: server.client, localClient: (_) => server.client),
+    api: Api(platform: platform, publicClient: public ?? server.client, localClient: (_) => server.client),
     player: player ?? FakeMediaPlayer.new,
   );
   await tester.pumpWidget(ShareApp(services: services));
@@ -120,6 +125,30 @@ void main() {
     expect(find.text('Saving 6 files'), findsOneWidget);
     expect(find.text('5 photos & videos'), findsOneWidget);
     expect(find.text('1 document'), findsOneWidget);
+  });
+
+  testWidgets('at home, with the public address not set up yet, the library comes back by itself', (tester) async {
+    // A check found nothing at home, e.g. while the server restarted; the public address
+    // doesn't lead anywhere.
+    final server = FakeServer()..addDay(today(), 3);
+    final platform = signedInPhone()
+      ..secrets['user'] = jsonEncode(contractResponse('api/me.json')['user'])
+      ..server = ServerConfig(
+        publicUrl: Uri.parse('https://share.example.com'),
+        localUrl: Uri.parse('http://192.168.8.248:8080'),
+        serverId: 'srv',
+        deviceId: 'dv1',
+      )
+      ..current = const RouteStatus(ServerRoute.public, reason: RouteReason.unreachable);
+    final nowhere = MockClient((_) async => throw http.ClientException('Failed host lookup: share.example.com'));
+    await startApp(tester, platform, server, public: nowhere);
+    expect(find.text('No connection to the server. Check your internet and try again.'), findsOneWidget);
+
+    // The server is back: at the next look the library is there, without "Try again".
+    platform.afterCheck = const RouteStatus(ServerRoute.local);
+    await tester.pump(const Duration(seconds: 30));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('3 files · '), findsOneWidget);
   });
 
   testWidgets('sharing the selection, and a file no app opens', (tester) async {

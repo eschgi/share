@@ -273,7 +273,8 @@ object Keys {
 /**
  * The keys API over [ServerConnection], with [auth]'s key: the phone's over the route it
  * picked, a PIN's over the public address. A read that fails at home is tried once more over the
- * public address, as the Dart side does.
+ * public address, and one that fails over the public address once more at home when the local
+ * address answers again, as the Dart side does.
  */
 class ServerKeysApi(private val app: Context, private val auth: String) : KeysApi {
     override fun call(method: String, path: String, body: JSONObject?): JSONObject {
@@ -285,9 +286,10 @@ class ServerKeysApi(private val app: Context, private val auth: String) : KeysAp
         } catch (e: KeysApiError) {
             throw e
         } catch (e: IOException) {
-            if (!home || method != "GET") throw e
-            RouteMonitor.check(app)
-            send(server, false, method, path, body)
+            if (auth != Credentials.DEVICE || method != "GET") throw e
+            val local = RouteMonitor.check(app).isLocal
+            if (!home && !local) throw e
+            send(server, !home, method, path, body)
         }
     }
 

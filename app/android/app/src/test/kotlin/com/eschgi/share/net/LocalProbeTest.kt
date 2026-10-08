@@ -75,6 +75,24 @@ class LocalProbeTest {
     }
 
     @Test
+    fun aBusyServerGetsLongerToAnswerThanToTakeTheConnection() {
+        // It took the connection at once; the answer comes after the time a connection gets.
+        val port = serve(certA, "server-1", delayMs = 400)
+        val status = LocalProbe.probe(config(port, pins = listOf(fingerprintA), serverId = "server-1"), connectMs = 200, answerMs = 3_000)
+        assertEquals(Route.LOCAL, status.route)
+    }
+
+    @Test
+    fun aServerErrorIsNoAnswerYet() {
+        // E.g. while the server starts: it is asked again soon (RouteMonitor), not taken for another one.
+        val port = serve(certA, "server-1", status = 503)
+        assertEquals(
+            RouteStatus(Route.PUBLIC, RouteReason.UNREACHABLE),
+            LocalProbe.probe(config(port, pins = listOf(fingerprintA), serverId = "server-1")),
+        )
+    }
+
+    @Test
     fun noLocalAddress() {
         assertEquals(RouteStatus.NO_LOCAL, LocalProbe.probe(ServerConfig("https://share.example.com", null, emptyList(), null)))
         // An address without pins can't be trusted, so it isn't tried.
@@ -91,12 +109,18 @@ class LocalProbeTest {
     private fun config(port: Int, pins: List<String>, serverId: String?) =
         ServerConfig("https://share.example.com", "https://127.0.0.1:$port", pins, serverId)
 
-    private fun serve(cert: Pair<KeyStore, X509Certificate>, serverId: String): Int {
+    /** A server with this id, which answers /api/info after [delayMs], with [status]. */
+    private fun serve(cert: Pair<KeyStore, X509Certificate>, serverId: String, delayMs: Long = 0, status: Int = 200): Int {
         val server = TestServer(serving(cert)) { req, res ->
-            if (req.path == "/api/info") {
-                res.send(200, """{"server_id":"$serverId","name":"Share","api_version":1}""".toByteArray(), mapOf("Content-Type" to "application/json"))
-            } else {
+            if (req.path != "/api/info") {
                 res.send(404)
+            } else {
+                Thread.sleep(delayMs)
+                if (status != 200) {
+                    res.send(status)
+                } else {
+                    res.send(200, """{"server_id":"$serverId","name":"Share","api_version":1}""".toByteArray(), mapOf("Content-Type" to "application/json"))
+                }
             }
         }
         servers += server

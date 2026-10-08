@@ -232,7 +232,8 @@ object DownloadEngine {
                             db.finish(item.batch, file.id, TransferItem.FAILED, error)
                             return
                         }
-                        if (home) RouteMonitor.check(app) // maybe the local address went away
+                        // The local address may have gone away, or answer again while the public one doesn't.
+                        if (item.auth == Credentials.DEVICE) RouteMonitor.check(app)
                         pause(outcome.retryAfterMs ?: backoff(attempts), abort, host)
                     }
                 }

@@ -1,6 +1,7 @@
 /// The server's JSON API, over the local address when the route says so and over the
 /// public one otherwise. A read that fails over the local address is tried once more over
-/// the public one; writes are never repeated.
+/// the public one, and one the public address doesn't answer over the local one, when it
+/// answers again; writes are never repeated.
 library;
 
 import 'dart:async';
@@ -18,13 +19,17 @@ import 'server.dart';
 
 /// An error answer from the server, with its code from contract/errors.json.
 class ApiException implements Exception {
-  const ApiException(this.status, this.code, this.message, {this.retryAfter, this.attemptsLeft});
+  const ApiException(this.status, this.code, this.message, {this.retryAfter, this.attemptsLeft, this.fromShare = true});
 
   final int status;
   final String code;
   final String message;
   final Duration? retryAfter;
   final int? attemptsLeft;
+
+  /// Whether Share answered, not something in front of it: e.g. Cloudflare's page when the
+  /// server or its tunnel is down.
+  final bool fromShare;
 
   /// The phone's key doesn't work any more: it was signed out, or its account deleted.
   bool get signedOut => code == 'signed_out' || (status == 401 && code == 'unauthorized');
@@ -140,7 +145,15 @@ class Api {
     }
     // Over plain http the phone's key goes only to a server that proved here to be its own.
     if (c.publicIsHttp && token != null && !route.publicVerified) throw const NetworkException('not this phone\'s server here');
-    return _request(_public, c.publicUrl, method, path, query: query, body: body);
+    try {
+      return await _request(_public, c.publicUrl, method, path, query: query, body: body);
+    } on Exception catch (e) {
+      // Share didn't answer over the public address, e.g. one not set up yet: the local address
+      // may answer again, although a check found nothing there a moment ago.
+      if (route.isLocal || !c.hasLocal || (e is ApiException && e.fromShare)) rethrow;
+      if (!(await platform.route(check: true)).isLocal || method != 'GET') rethrow; // a write may have arrived
+    }
+    return _request(_local ??= _makeLocal(c), c.localUrl!, method, path, query: query, body: body);
   }
 
   /// The bytes behind a link to the bucket, such as a photo at full size: asked exactly as the
@@ -196,7 +209,7 @@ class Api {
     } catch (_) {
       // Not ours: e.g. Cloudflare's HTML page when the server is down.
     }
-    if (e == null) return ApiException(res.statusCode, res.statusCode >= 500 ? 'unavailable' : 'unknown', res.reasonPhrase ?? '');
+    if (e == null) return ApiException(res.statusCode, res.statusCode >= 500 ? 'unavailable' : 'unknown', res.reasonPhrase ?? '', fromShare: false);
     final retry = e['retry_after_seconds'];
     return ApiException(
       res.statusCode,

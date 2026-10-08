@@ -27,28 +27,27 @@ object HomeProof {
         return mac.doFinal("share-home-proof:$nonce".toByteArray()).joinToString("") { "%02x".format(it) }
     }
 
-    /** Asks the server at [base] for the proof; false for a wrong one or no answer. */
-    fun check(base: String, deviceId: String, token: String, timeoutMs: Int): Boolean {
+    /**
+     * Asks the server at [base] for the proof; false for a wrong one. Throws IOException when no
+     * answer comes, or a server error: then it can't tell.
+     */
+    fun check(base: String, deviceId: String, token: String, connectMs: Int, answerMs: Int): Boolean {
         val nonce = Base64.getUrlEncoder().withoutPadding().encodeToString(ByteArray(24).also { random.nextBytes(it) })
-        val conn = try {
-            URL("$base/api/home/proof").openConnection() as HttpURLConnection
-        } catch (e: IOException) {
-            return false
-        }
+        val conn = URL("$base/api/home/proof").openConnection() as HttpURLConnection
         return try {
             conn.requestMethod = "POST"
-            conn.connectTimeout = timeoutMs
-            conn.readTimeout = timeoutMs
+            conn.connectTimeout = connectMs
+            conn.readTimeout = answerMs
             conn.useCaches = false
             conn.instanceFollowRedirects = false
             conn.doOutput = true
             conn.setRequestProperty("Content-Type", "application/json")
             conn.outputStream.use { it.write(JSONObject().put("device", deviceId).put("nonce", nonce).toString().toByteArray()) }
-            if (conn.responseCode != 200) return false
+            val status = conn.responseCode
+            if (status >= 500) throw IOException("$base can't give a proof now: HTTP $status")
+            if (status != 200) return false
             val proof = JSONObject(String(conn.inputStream.use { readLimited(it, 4 * 1024) })).optString("proof")
             MessageDigest.isEqual(proof.toByteArray(), expected(token, nonce).toByteArray())
-        } catch (e: IOException) {
-            false
         } catch (e: JSONException) {
             false
         } finally {

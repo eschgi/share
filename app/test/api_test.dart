@@ -72,6 +72,82 @@ void main() {
     expect(calls, hasLength(1));
   });
 
+  group('the public address doesn\'t answer, e.g. not set up yet', () {
+    // A check found nothing at home a moment ago, e.g. while the server restarted.
+    const unreachable = RouteStatus(ServerRoute.public, reason: RouteReason.unreachable);
+
+    test('a read goes to the local address when it answers again', () async {
+      platform
+        ..current = unreachable
+        ..afterCheck = const RouteStatus(ServerRoute.local);
+      final api = Api(platform: platform, publicClient: client('public', fail: true), localClient: (_) => client('local'))..config = config;
+      expect(await api.get('/api/library'), {'ok': true});
+      expect(calls, ['public GET https://share.example.com/api/library', 'local GET https://192.168.8.1:8443/api/library']);
+      expect(platform.routeChecks, 1);
+    });
+
+    test('so does one that something in front of Share answers, such as Cloudflare for a tunnel that is down', () async {
+      platform
+        ..current = unreachable
+        ..afterCheck = const RouteStatus(ServerRoute.local);
+      final cloudflare = MockClient((req) async {
+        calls.add('public ${req.method} ${req.url}');
+        return http.Response('<html>Error 1033</html>', 530);
+      });
+      final api = Api(platform: platform, publicClient: cloudflare, localClient: (_) => client('local'))..config = config;
+      expect(await api.get('/api/library'), {'ok': true});
+      expect(calls.last, 'local GET https://192.168.8.1:8443/api/library');
+    });
+
+    test('a write is not repeated, but the next one goes to the local address', () async {
+      platform
+        ..current = unreachable
+        ..afterCheck = const RouteStatus(ServerRoute.local);
+      final api = Api(platform: platform, publicClient: client('public', fail: true), localClient: (_) => client('local'))..config = config;
+      await expectLater(api.post('/api/folders', {'name': 'Trip'}), throwsA(isA<NetworkException>()));
+      expect(calls, ['public POST https://share.example.com/api/folders']);
+      await api.post('/api/folders', {'name': 'Trip'});
+      expect(calls.last, 'local POST https://192.168.8.1:8443/api/folders');
+    });
+
+    test('while the local address doesn\'t answer either, the error stays', () async {
+      platform.current = unreachable;
+      final api = Api(platform: platform, publicClient: client('public', fail: true), localClient: (_) => client('local'))..config = config;
+      await expectLater(api.get('/api/library'), throwsA(isA<NetworkException>()));
+      expect(calls, ['public GET https://share.example.com/api/library']);
+      expect(platform.routeChecks, 1, reason: 'it looked');
+    });
+
+    test('each address is tried once: a read that failed at home isn\'t sent there again', () async {
+      platform.current = const RouteStatus(ServerRoute.local);
+      final api = Api(platform: platform, publicClient: client('public', fail: true), localClient: (_) => client('local', fail: true))
+        ..config = config;
+      await expectLater(api.get('/api/library'), throwsA(isA<NetworkException>()));
+      expect(calls, ['local GET https://192.168.8.1:8443/api/library', 'public GET https://share.example.com/api/library']);
+    });
+
+    test('Share\'s own answer over the public address stays as it is', () async {
+      platform
+        ..current = unreachable
+        ..afterCheck = const RouteStatus(ServerRoute.local);
+      final api = Api(
+        platform: platform,
+        publicClient: client('public', status: 404, body: {'error': {'code': 'not_found', 'message': ''}}),
+        localClient: (_) => client('local'),
+      )..config = config;
+      await expectLater(api.get('/api/files/x'), throwsA(isA<ApiException>().having((e) => e.code, 'code', 'not_found')));
+      expect(calls, hasLength(1));
+      expect(platform.routeChecks, 0);
+    });
+
+    test('without a local address there is nothing to look at', () async {
+      final api = Api(platform: platform, publicClient: client('public', fail: true))
+        ..config = ServerConfig(publicUrl: Uri.parse('https://share.example.com'), serverId: 'srv');
+      await expectLater(api.get('/api/library'), throwsA(isA<NetworkException>()));
+      expect(platform.routeChecks, 0);
+    });
+  });
+
   group('a server only at home, over plain http', () {
     final home = ServerConfig(publicUrl: Uri.parse('http://192.168.8.52:8080'), serverId: 'srv', deviceId: 'dv1');
 
@@ -130,9 +206,14 @@ void main() {
       return http.Response('<html>Bad gateway</html>', 502);
     }))
       ..config = config;
-    await expectLater(api.post('/api/auth/login', {}),
-        throwsA(isA<ApiException>().having((e) => e.retryAfter, 'retryAfter', const Duration(seconds: 90))));
-    await expectLater(api.get('/api/library'), throwsA(isA<ApiException>().having((e) => e.code, 'code', 'unavailable')));
+    await expectLater(
+        api.post('/api/auth/login', {}),
+        throwsA(isA<ApiException>()
+            .having((e) => e.retryAfter, 'retryAfter', const Duration(seconds: 90))
+            .having((e) => e.fromShare, 'fromShare', true)));
+    await expectLater(
+        api.get('/api/library'),
+        throwsA(isA<ApiException>().having((e) => e.code, 'code', 'unavailable').having((e) => e.fromShare, 'fromShare', false)));
   });
 
   test('asks each server once where it keeps its files', () async {

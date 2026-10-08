@@ -112,10 +112,13 @@ class LibraryController extends ChangeNotifier {
 
   /// Something changed on the server (the version grew): puts new files on top without
   /// losing the place in the list; if files went away, such as into another folder, the list
-  /// starts over. Says whether the library changed.
+  /// starts over. A list that didn't load comes back once the server answers again. Says
+  /// whether the library changed.
   Future<bool> refreshIfChanged() async {
     final current = overview;
-    if (current == null || loading) return false;
+    if (loading) return false;
+    if (error != null && files.isEmpty) return _retry();
+    if (current == null) return false;
     final gen = _generation;
     try {
       final o = await repo.overview(_filter);
@@ -142,6 +145,19 @@ class LibraryController extends ChangeNotifier {
     } catch (_) {
       return false; // try again at the next check
     }
+  }
+
+  /// Asks quietly whether the server answers again, so "No connection" stays until it does.
+  Future<bool> _retry() async {
+    final gen = _generation;
+    try {
+      await repo.overview(_filter);
+    } catch (_) {
+      return false;
+    }
+    if (gen != _generation) return false;
+    await reload();
+    return true;
   }
 
   /// Files gone from the library, such as one deleted in the viewer: off the list and the
