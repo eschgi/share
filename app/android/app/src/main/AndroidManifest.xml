@@ -11,6 +11,11 @@
     <!-- Android 10 to 13: a WorkManager worker in the foreground instead. FOREGROUND_SERVICE
          itself is merged in by androidx.work. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- The QR code scanner (ScanActivity.kt) asks for the camera the first time. Phones without
+         one still install the app and paste invite links instead. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 
     <!-- usesCleartextTraffic: plain http to a server or a bucket at home. Android can't tell
          addresses at home from others, so the app checks that itself and refuses http:// for
@@ -111,11 +116,12 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
-        <!-- Google's code scanner (Scanner.kt) comes with Google Play services: installed from the
-             Play Store, its module is fetched with the app, not at the first scan. -->
-        <meta-data
-            android:name="com.google.mlkit.vision.DEPENDENCIES"
-            android:value="barcode_ui" />
+        <!-- Share's QR code scanner. Not exported: only PlatformChannel starts it. -->
+        <activity
+            android:name=".platform.ScanActivity"
+            android:exported="false"
+            android:theme="@style/ScanTheme" />
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

@@ -151,6 +151,9 @@ app, JSON on the website), so others can add languages.
   - **No broad media permissions.** Picking uses the system photo picker; Play restricts the
     `READ_MEDIA_*` permissions to apps that need them for their core function. Saving into the gallery
     and Downloads needs no permission.
+  - **The camera only for scanning.** The QR code scanner is part of the app (CameraX and ZXing), so
+    it works without Google Play services. It asks for the camera the first time someone scans, and
+    its pictures never leave the phone.
   - **Background transfers** with WorkManager, and user-initiated data transfer jobs on Android 14 and
     later.
   - **Store requirements**: in-app account deletion (everyone can delete their own account in

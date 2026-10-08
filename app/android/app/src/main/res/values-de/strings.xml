@@ -42,4 +42,9 @@
     <string name="uploads_signed_out">Dieses Handy wurde abgemeldet</string>
     <string name="uploads_signed_out_text">Melde dich wieder an, um weiter zu senden.</string>
     <string name="uploads_waiting">Wartet auf eine Verbindung, um weiter zu senden</string>
+
+    <string name="scan_hint">Richte die Kamera auf den QR-Code</string>
+    <string name="scan_close">Schließen</string>
+    <string name="scan_light_on">Licht einschalten</string>
+    <string name="scan_light_off">Licht ausschalten</string>
 </resources>

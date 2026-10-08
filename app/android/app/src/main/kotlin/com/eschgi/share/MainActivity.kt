@@ -21,7 +21,7 @@ class MainActivity : FlutterActivity() {
         platform?.onIntent(intent, initial = false)
     }
 
-    // The pickers of the send screen answer here.
+    // The pickers of the send screen, and the QR code scanner, answer here.
     @Deprecated("Flutter's embedding still uses it")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (platform?.onActivityResult(requestCode, resultCode, data) != true) super.onActivityResult(requestCode, resultCode, data)

@@ -106,9 +106,12 @@ dependencies {
     implementation("androidx.activity:activity:1.13.0")
     // Which way up a photo is, for the thumbnail sent along (HEIF and WebP too).
     implementation("androidx.exifinterface:exifinterface:1.4.2")
-    // Scanning invite QR codes without the camera permission; phones without Google Play
-    // services paste the link instead.
-    implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
+    // Scanning invite QR codes (ScanActivity): the camera, and ZXing to read the codes, both in
+    // the app, so that scanning works alike on every phone, with or without Google Play services.
+    implementation("androidx.camera:camera-camera2:1.6.2")
+    implementation("androidx.camera:camera-lifecycle:1.6.2")
+    implementation("androidx.camera:camera-view:1.6.2")
+    implementation("com.google.zxing:core:3.5.4")
 
     testImplementation("junit:junit:4.13.2")
     // The stock Android JVM test runtime stubs org.json to throw, so the real implementation

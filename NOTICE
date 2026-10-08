@@ -8,8 +8,9 @@ Share includes fonts and icons made by others, under their own licenses:
 - Lucide icons (https://lucide.dev): ISC License, Copyright (c) 2026 Lucide Icons and
   Contributors. The icons Lucide took over from Feather are under the MIT License,
   Copyright (c) 2013-present Cole Bemis. The app has a subset as a font
-  (app/assets/fonts/Lucide.ttf), the website copies the paths of the ones it uses
-  (web/src/components/Icon.tsx). License: app/assets/fonts/LICENSE-Lucide.txt.
+  (app/assets/fonts/Lucide.ttf) and copies the paths of a few into Android drawables
+  (app/android/app/src/main/res/drawable), the website copies the paths of the ones it
+  uses (web/src/components/Icon.tsx). License: app/assets/fonts/LICENSE-Lucide.txt.
 
 - Noto Serif: SIL Open Font License 1.1, Copyright 2022 The Noto Project Authors.
   License: app/assets/fonts/OFL-NotoSerif.txt.

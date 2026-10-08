@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../app.dart';
@@ -100,23 +98,17 @@ class _SharedWaiting extends StatelessWidget {
   }
 }
 
-/// A scan under way: a second tap would find the scanner busy.
+/// A scan under way: a second tap would open a second scanner.
 bool _scanning = false;
 
-/// Scans an invite's QR code, or, when the scanner doesn't open, asks for the link, saying why;
-/// then opens what it was: an invite (screen 10), or a PIN link (sending with that PIN, screen 1).
-/// The first scan may wait for Google Play services to install the scanner, which a note says.
+/// Scans an invite's QR code, or, when the scanner can't, asks for the link, saying why; then
+/// opens what it was: an invite (screen 10), or a PIN link (sending with that PIN, screen 1).
 Future<void> scanInvite(BuildContext context) async {
   if (_scanning) return;
   _scanning = true;
   final services = Services.read(context);
   final t = AppLocalizations.of(context);
   final messenger = ScaffoldMessenger.of(context);
-  var noted = false;
-  final note = Timer(const Duration(milliseconds: 800), () {
-    noted = true;
-    messenger.showSnackBar(SnackBar(content: Text(t.scanPreparing), duration: const Duration(seconds: 40)));
-  });
   String? text;
   ScanProblem? problem;
   try {
@@ -124,8 +116,6 @@ Future<void> scanInvite(BuildContext context) async {
   } on ScanUnavailable catch (e) {
     problem = e.problem;
   } finally {
-    note.cancel();
-    if (noted) messenger.hideCurrentSnackBar();
     _scanning = false;
   }
   if (problem != null) {
@@ -143,14 +133,15 @@ Future<void> scanInvite(BuildContext context) async {
   }
 }
 
-/// Asks for an invite's link when the scanner didn't open, saying why.
+/// Asks for an invite's link when the scanner couldn't scan, saying why; without the permission
+/// for the camera, it also offers Share's page in the phone's settings, where it is given.
 Future<String?> askForInviteLink(BuildContext context, ScanProblem problem) {
   final t = AppLocalizations.of(context);
+  final platform = Services.read(context).platform;
   final field = TextEditingController();
   final why = switch (problem) {
-    ScanProblem.noPlayServices => t.scanUnavailable,
-    ScanProblem.installing => t.scanInstalling,
-    ScanProblem.outdated => t.scanOutdated,
+    ScanProblem.noPermission => t.scanNoPermission,
+    ScanProblem.noCamera => t.scanNoCamera,
     ScanProblem.failed => t.scanFailed,
   };
   return showDialog<String>(
@@ -159,6 +150,14 @@ Future<String?> askForInviteLink(BuildContext context, ScanProblem problem) {
       title: Text(t.pasteInvite),
       content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(why, style: TextStyle(color: context.colors.text2)),
+        if (problem == ScanProblem.noPermission)
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              platform.openAppSettings();
+            },
+            child: Text(t.scanOpenSettings),
+          ),
         const SizedBox(height: 16),
         TextField(controller: field, autofocus: true, decoration: InputDecoration(hintText: t.pasteInviteHint)),
       ]),

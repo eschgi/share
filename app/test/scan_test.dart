@@ -9,8 +9,8 @@ import 'support/fake_platform.dart';
 import 'support/fake_server.dart';
 import 'support/fonts.dart';
 
-/// Scanning an invite's QR code (issue #5): what the scanner gives opens, and when the scanner
-/// doesn't open, the link is asked for, saying why, instead of nothing happening.
+/// Scanning an invite's QR code (issue #5): what the scanner reads opens, and when it can't scan,
+/// the link is asked for, saying why, instead of nothing happening.
 void main() {
   setUpAll(loadFonts);
 
@@ -24,7 +24,7 @@ void main() {
     expect(find.text('Join as Maria'), findsOneWidget);
   });
 
-  testWidgets('backing out of the scanner leaves things as they were', (tester) async {
+  testWidgets('closing the scanner leaves things as they were', (tester) async {
     final platform = FakePlatform();
     await startApp(tester, platform, FakeServer());
     await tester.tap(find.text('Got an invite? Scan it'));
@@ -35,18 +35,18 @@ void main() {
   });
 
   for (final (problem, why) in [
-    (ScanProblem.noPlayServices, 'Scanning needs Google Play services. Paste the invite link instead.'),
-    (ScanProblem.installing, 'The scanner is still being installed on this phone. Try again in a minute, or paste the invite link.'),
-    (ScanProblem.outdated, 'Scanning needs a newer version of Google Play services. Paste the invite link instead.'),
-    (ScanProblem.failed, "The scanner didn't open. Paste the invite link instead."),
+    (ScanProblem.noPermission, 'Scanning needs the camera. Allow Share to use it, or paste the invite link.'),
+    (ScanProblem.noCamera, 'This phone has no camera to scan with. Paste the invite link instead.'),
+    (ScanProblem.failed, "The camera didn't open. Paste the invite link instead."),
   ]) {
-    testWidgets('a scanner that does not open asks for the link: ${problem.name}', (tester) async {
+    testWidgets('a scanner that cannot scan asks for the link: ${problem.name}', (tester) async {
       final platform = FakePlatform()..scanProblem = problem;
       await startApp(tester, platform, FakeServer());
       await tester.tap(find.text('Got an invite? Scan it'));
       await tester.pumpAndSettle();
       expect(find.text('Paste invite link'), findsOneWidget);
       expect(find.text(why), findsOneWidget);
+      expect(find.text('Open settings'), problem == ScanProblem.noPermission ? findsOneWidget : findsNothing);
       await tester.enterText(find.byType(TextField), invite);
       await tester.tap(find.widgetWithText(TextButton, 'Save'));
       await tester.pumpAndSettle();
@@ -54,24 +54,31 @@ void main() {
     });
   }
 
-  testWidgets('a slow first scan says the scanner is getting ready, and a second tap waits for it', (tester) async {
-    final ready = Completer<void>();
-    final platform = FakePlatform()
-      ..scanned = invite
-      ..scanWait = ready.future;
+  testWidgets('without the camera, its permission is a tap away in the settings', (tester) async {
+    final platform = FakePlatform()..scanProblem = ScanProblem.noPermission;
     await startApp(tester, platform, FakeServer());
     await tester.tap(find.text('Got an invite? Scan it'));
-    await tester.pump(const Duration(milliseconds: 500));
-    expect(find.text('Getting the scanner ready…'), findsNothing, reason: 'not for a scanner that opens at once');
-    await tester.pump(const Duration(seconds: 1));
-    expect(find.text('Getting the scanner ready…'), findsOneWidget);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Open settings'));
+    await tester.pumpAndSettle();
+    expect(platform.settingsOpened, 1);
+    expect(find.byType(AlertDialog), findsNothing);
+  });
+
+  testWidgets('a second tap while the scanner opens opens no second one', (tester) async {
+    final closed = Completer<void>();
+    final platform = FakePlatform()
+      ..scanned = invite
+      ..scanWait = closed.future;
+    await startApp(tester, platform, FakeServer());
+    await tester.tap(find.text('Got an invite? Scan it'));
+    await tester.pump();
     await tester.tap(find.text('Got an invite? Scan it'));
     await tester.pump();
     expect(platform.scans, 1);
 
-    ready.complete();
+    closed.complete();
     await tester.pumpAndSettle();
-    expect(find.text('Getting the scanner ready…'), findsNothing);
     expect(find.text('Join as Maria'), findsOneWidget);
   });
 }

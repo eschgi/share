@@ -47,4 +47,9 @@
     <string name="uploads_signed_out">Questo telefono è stato disconnesso</string>
     <string name="uploads_signed_out_text">Accedi di nuovo per continuare l\'invio.</string>
     <string name="uploads_waiting">In attesa di una connessione per continuare l\'invio</string>
+
+    <string name="scan_hint">Inquadra il codice QR</string>
+    <string name="scan_close">Chiudi</string>
+    <string name="scan_light_on">Accendi la luce</string>
+    <string name="scan_light_off">Spegni la luce</string>
 </resources>

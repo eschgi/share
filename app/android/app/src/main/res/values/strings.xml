@@ -46,4 +46,10 @@
     <string name="uploads_signed_out">This phone was signed out</string>
     <string name="uploads_signed_out_text">Sign in again to go on sending.</string>
     <string name="uploads_waiting">Waiting for a connection to go on sending</string>
+
+    <!-- The QR code scanner (ScanActivity.kt) -->
+    <string name="scan_hint">Point the camera at the QR code</string>
+    <string name="scan_close">Close</string>
+    <string name="scan_light_on">Turn on the light</string>
+    <string name="scan_light_off">Turn off the light</string>
 </resources>

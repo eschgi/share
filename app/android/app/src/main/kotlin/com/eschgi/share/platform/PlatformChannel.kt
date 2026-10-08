@@ -66,12 +66,13 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
     private val io = Executors.newFixedThreadPool(4)
     private val secrets = SecretStore(app)
     private val server = ServerStore(app)
-    private val scanner = Scanner(activity)
 
     private var sink: EventChannel.EventSink? = null
     private var initialLink: String? = null
     /** The pick under way: who hears of it, how its files are sent and, signed in, into which folder. */
     private var picking: Triple<MethodChannel.Result, String, String?>? = null
+    /** Who hears of the scan under way. */
+    private var scanning: MethodChannel.Result? = null
 
     private val routeListener: (RouteStatus) -> Unit = { send(it.toMap() + ("type" to "route")) }
     private val transferListener: (Map<String, Any?>) -> Unit = { send(it) }
@@ -150,7 +151,19 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
                 result.success(initialLink)
                 initialLink = null
             }
-            "scan" -> scanner.scan(result)
+            "scan" -> io.execute {
+                val language = runCatching { secrets.read(SecretStore.LANGUAGE) }.getOrNull()
+                main.post { scan(language, result) }
+            }
+            "app.settings" -> {
+                // Share's page there, with its permissions.
+                try {
+                    activity.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", app.packageName, null)))
+                    result.success(null)
+                } catch (e: ActivityNotFoundException) {
+                    result.error("no_app", e.message, null)
+                }
+            }
             "url.open" -> {
                 val url = call.argument<String>("url")
                 try {
@@ -390,8 +403,30 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
         }
     }
 
-    /** The picker's answer; true if it was ours. */
+    /** Share's QR code scanner, in the language picked in the app. */
+    private fun scan(language: String?, result: MethodChannel.Result) {
+        scanning?.success(null) // an earlier scan that never came back
+        scanning = result
+        activity.startActivityForResult(Intent(activity, ScanActivity::class.java).putExtra(ScanActivity.EXTRA_LANGUAGE, language), REQUEST_SCAN)
+    }
+
+    /** The scanner's answer: the code's text, null when closed, or why it couldn't scan. */
+    private fun onScanned(resultCode: Int, data: Intent?) {
+        val result = scanning ?: return
+        scanning = null
+        when (resultCode) {
+            Activity.RESULT_OK -> result.success(data?.getStringExtra(ScanActivity.EXTRA_TEXT))
+            ScanActivity.RESULT_PROBLEM -> result.error(data?.getStringExtra(ScanActivity.EXTRA_PROBLEM) ?: ScanActivity.PROBLEM_CAMERA, null, null)
+            else -> result.success(null)
+        }
+    }
+
+    /** The picker's or the scanner's answer; true if it was ours. */
     fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
+        if (requestCode == REQUEST_SCAN) {
+            onScanned(resultCode, data)
+            return true
+        }
         if (requestCode != REQUEST_PICK) return false
         val (result, auth, folder) = picking ?: return true
         picking = null
@@ -491,5 +526,6 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
         private const val TAG = "PlatformChannel"
         private const val REQUEST_NOTIFICATIONS = 7001
         private const val REQUEST_PICK = 7002
+        private const val REQUEST_SCAN = 7003
     }
 }

@@ -19,12 +19,13 @@ class FakePlatform implements Platform {
   final downloads = <List<FileInfo>>[];
   final shared = <List<FileInfo>>[];
   Set<String> saved = {};
-  /// What a scan gives: [scanned], or [scanProblem] when the scanner doesn't open; with
+  /// What a scan gives: [scanned], or [scanProblem] when the scanner can't scan; with
   /// [scanWait], only once that completes.
   String? scanned;
   ScanProblem? scanProblem;
   Future<void>? scanWait;
   int scans = 0;
+  int settingsOpened = 0;
   String? launchLink;
 
   /// What shareFiles and openFile throw, if anything.
@@ -83,6 +84,9 @@ class FakePlatform implements Platform {
     if (scanProblem != null) throw ScanUnavailable(scanProblem!);
     return scanned;
   }
+
+  @override
+  Future<void> openAppSettings() async => settingsOpened++;
 
   @override
   Future<void> openUrl(String url) async => opened.add(url);

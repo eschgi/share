@@ -7,4 +7,9 @@
     <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
         <item name="android:windowBackground">@color/background</item>
     </style>
+    <!-- The QR code scanner (ScanActivity.kt): black until the camera's picture comes, which
+         reaches under the bars. -->
+    <style name="ScanTheme" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
 </resources>

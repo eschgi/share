@@ -177,13 +177,13 @@ class UploadState {
   int get current => (done + failed + lost + 1).clamp(1, total == 0 ? 1 : total);
 }
 
-/// Why the code scanner didn't open: no Google Play services, its module still on the way, Play
-/// services too old, or something else.
-enum ScanProblem { noPlayServices, installing, outdated, failed }
+/// Why the scanner couldn't scan: Share may not use the camera, the phone has none, or the camera
+/// didn't open.
+enum ScanProblem { noPermission, noCamera, failed }
 
-/// The code scanner didn't open, and says why; the person pastes the link instead.
+/// The scanner couldn't scan, and says why; the person pastes the link instead.
 class ScanUnavailable implements Exception {
-  const ScanUnavailable([this.problem = ScanProblem.noPlayServices]);
+  const ScanUnavailable([this.problem = ScanProblem.failed]);
   final ScanProblem problem;
 }
 
@@ -379,9 +379,12 @@ abstract class Platform {
   Future<String?> initialLink();
   Stream<String> get links;
 
-  /// Scans a QR code; null when the person backed out. Throws [ScanUnavailable] when the scanner
-  /// doesn't open, e.g. without Google Play services, or while its module is being installed.
+  /// Scans a QR code with the camera; null when the person closed the scanner. Throws
+  /// [ScanUnavailable] when it couldn't scan, e.g. while Share may not use the camera.
   Future<String?> scanCode();
+
+  /// Opens Share's page in the phone's settings, where its permissions are.
+  Future<void> openAppSettings();
 
   Future<void> openUrl(String url);
 
@@ -630,15 +633,17 @@ class ChannelPlatform implements Platform {
       return await _channel.invokeMethod<String>('scan');
     } on PlatformException catch (e) {
       throw ScanUnavailable(switch (e.code) {
-        'unavailable' => ScanProblem.noPlayServices,
-        'installing' => ScanProblem.installing,
-        'outdated' => ScanProblem.outdated,
+        'permission' => ScanProblem.noPermission,
+        'no_camera' => ScanProblem.noCamera,
         _ => ScanProblem.failed,
       });
     } on MissingPluginException {
       throw const ScanUnavailable();
     }
   }
+
+  @override
+  Future<void> openAppSettings() => _soft('app.settings');
 
   @override
   Future<void> openUrl(String url) => _soft('url.open', {'url': url});
