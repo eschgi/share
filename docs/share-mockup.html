@@ -867,6 +867,14 @@
   .av.rose{background:#D8B1B4;color:#3A1E22}
   .autoban .avs{margin-right:8px}
   .autoban .avs .av{box-shadow:0 0 0 2px var(--bg)}
+  /* ---------- a photo kept back: a minute before it goes ---------- */
+  .shadehead{display:flex;align-items:baseline;gap:12px;padding:20px 26px 24px;flex:none}
+  .shadehead b{font-family:var(--serif);font-size:40px;font-weight:700;line-height:1}
+  .shadehead span{font-size:15px;color:var(--text-2)}
+  .ntf .nrow{display:flex;gap:14px;align-items:flex-start}
+  .ntf .nt{flex:1;min-width:0}
+  .ntf .nimg{width:60px;height:60px;border-radius:12px;flex:none;margin-top:8px}
+  .sheet .grid.g3{margin-top:16px}
   /* ---------- a PIN's poster: printed, so in paper colours whatever the theme ---------- */
   .paper{width:780px;height:1103px;zoom:.5;background:#FBF7F1;color:#2A1F18;position:relative;overflow:hidden;display:flex;flex-direction:column;
     align-items:center;text-align:center;padding:76px 76px 60px;box-shadow:0 30px 70px rgba(0,0,0,.6),0 3px 10px rgba(0,0,0,.45)}
@@ -2200,6 +2208,33 @@
     </div>
   </section>
 
+  <section class="sec" id="keep">
+    <div class="sec-head">
+      <div class="sec-tag">Proposal · automatic</div>
+      <h2>Not this one: a photo kept back</h2>
+      <p>Sending automatically, alone or in a group, shouldn't mean sending everything. So each new photo waits a minute before it goes, and in that minute one tap keeps it on the phone: in the notification, without opening Share, or in Share for several at once. The minute is the same for everyone, so there is nothing to set, and Send now skips it. For a while nobody needs to see, Pause leaves out what is taken meanwhile (63, 64); and a photo that went anyway can be taken back until midnight (65), in a group also from the phones it came to by itself.</p>
+    </div>
+    <div class="board">
+
+      <div class="slot">
+        <h3><span class="n">94</span>A minute to say no <span class="badge proposal">proposal</span></h3>
+        <p class="cap">The notification that is there all day shows the newest photo and the time left. Don't send keeps it on this phone for good, without opening Share; Send now skips the wait. It changes quietly, nothing pops up, and on a locked phone the picture stays hidden.</p>
+        <div class="phone lock" data-shot="94-keep-notification"><div class="lockbg"></div><div class="sb" data-time="15:42"></div><div class="shadehead"><b>15:42</b><span>Saturday, 10 October</span></div><div class="ntf"><div class="nh"><span data-i="images"></span><span translate="no">Share</span><span>· now</span></div><div class="nrow"><div class="nt"><b>New photo, goes in 0:48</b><p>To Wedding Anna &amp; Marco · 39 photos, 2 videos today</p></div><span class="nimg ph t7"></span></div><div class="nacts"><span>Don't send</span><span>Send now</span><span>Pause</span></div></div><div class="grow"></div><div class="gest"></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">95</span>Several at once <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Photos taken in a row wait together, and the line over the library counts them down. Choose shows them: tap one to keep it here; the others go when the minute is up, or at once with Send now.</p>
+        <div class="phone" data-shot="95-keep-choose"><div class="sb" data-time="15:43"></div><div class="ab"><h2 class="fpick"><span class="t">Wedding Anna &amp; Marco</span><span data-i="chev" class="down"></span></h2><span class="ib"><span data-i="search"></span></span><span class="av sm acc">S</span></div><div class="autoban"><span class="live"></span><div class="at"><b>Sending automatically</b><span>3 new ones go in 0:40</span></div><span class="tbtn">Choose</span></div><div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div><div class="scroll"><div class="day"><div><h4>Today</h4><div class="meta">43 files · 640 MB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p7/q p3/q p9/q p6/u70 p2 p4/aM p1 p8 p5/aP p10 p6 p2/aM"></div></div><nav class="nav" data-on="library"></nav><div class="gest"></div><div class="scrim"></div><div class="sheet"><div class="grip"></div><h3>3 new photos</h3><p class="lead sm">Tap one to keep it on this phone. The others go in 0:40.</p><div class="grid g3" data-tiles="p7 p3/q/h p9"></div><div class="btnrow"><div class="btn outline">Keep all 3</div><div class="btn primary"><span data-i="upload"></span>Send 2 now</div></div></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">96</span>Already gone <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Until midnight its sender can still take it back (65). In a group it then also leaves the phones it came to by itself, as long as they keep the copy Share saved; a copy someone shared on from there can't be called back.</p>
+        <div class="phone viewer" data-shot="96-keep-take-back"><div class="sb" data-time="13:14"></div><div class="vtop"><span class="ib"><span data-i="back"></span></span><div class="vt"><b>Today</b><span>13:12 · sent automatically</span></div><span class="ib"><span data-i="more"></span></span></div><div class="vphoto"></div><div class="vbottom"><div class="film" data-tiles="p4 p9 p2/c p6 p1"></div><div class="vmeta">PXL_20261017_131205.jpg · 4.2 MB · 4080 × 3072</div><div class="vactions"><div><span data-i="download"></span>Download</div><div><span data-i="share"></span>Share</div><div><span data-i="undo"></span>Take back</div></div></div><div class="gest"></div><div class="scrim"></div><div class="sheet"><div class="grip"></div><h3>Take this photo back?</h3><p class="lead sm">It leaves Dolomites for everyone, also the phones it came to by itself. You can do this until midnight, for photos you sent automatically.</p><div class="btnrow"><div class="btn outline">Keep it</div><div class="btn primary"><span data-i="undo"></span>Take back</div></div></div></div>
+      </div>
+
+    </div>
+  </section>
+
 </div>
 
 <script>
@@ -2297,6 +2332,62 @@
   // English is written in the markup. T maps each English string to [German, Italian]; elements marked
   // data-tr are translated as a whole, because their inline markup sits at a different place in each language.
   const T = {
+      "New photo, goes in 0:48": [
+          "Neues Foto, wird in 0:48 gesendet",
+          "Nuova foto, parte tra 0:48"
+      ],
+      "To Wedding Anna & Marco · 39 photos, 2 videos today": [
+          "An Hochzeit Anna & Marco · heute 39 Fotos, 2 Videos",
+          "A Matrimonio Anna & Marco · oggi 39 foto, 2 video"
+      ],
+      "Don't send": [
+          "Nicht senden",
+          "Non inviare"
+      ],
+      "Send now": [
+          "Jetzt senden",
+          "Invia ora"
+      ],
+      "3 new ones go in 0:40": [
+          "3 neue werden in 0:40 gesendet",
+          "3 nuove partono tra 0:40"
+      ],
+      "Choose": [
+          "Auswählen",
+          "Scegli"
+      ],
+      "43 files · 640 MB": [
+          "43 Dateien · 640 MB",
+          "43 file · 640 MB"
+      ],
+      "3 new photos": [
+          "3 neue Fotos",
+          "3 nuove foto"
+      ],
+      "Tap one to keep it on this phone. The others go in 0:40.": [
+          "Tippe auf eins, um es auf diesem Handy zu behalten. Die anderen werden in 0:40 gesendet.",
+          "Toccane una per tenerla su questo telefono. Le altre partono tra 0:40."
+      ],
+      "Keep all 3": [
+          "Alle 3 behalten",
+          "Tienile tutte e 3"
+      ],
+      "Send 2 now": [
+          "2 jetzt senden",
+          "Invia 2 ora"
+      ],
+      "13:12 · sent automatically": [
+          "13:12 · automatisch gesendet",
+          "13:12 · inviata in automatico"
+      ],
+      "PXL_20261017_131205.jpg · 4.2 MB · 4080 × 3072": [
+          "PXL_20261017_131205.jpg · 4,2 MB · 4080 × 3072",
+          "PXL_20261017_131205.jpg · 4,2 MB · 4080 × 3072"
+      ],
+      "It leaves Dolomites for everyone, also the phones it came to by itself. You can do this until midnight, for photos you sent automatically.": [
+          "Es verschwindet für alle aus Dolomiten, auch von den Handys, auf die es von selbst kam. Das geht bis Mitternacht, für Fotos, die du automatisch gesendet hast.",
+          "Sparisce per tutti da Dolomiti, anche dai telefoni su cui è arrivata da sola. Puoi farlo fino a mezzanotte, per le foto che hai inviato in automatico."
+      ],
       "Share with each other": [
           "Miteinander teilen",
           "Condivisione reciproca"
