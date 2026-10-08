@@ -117,9 +117,19 @@ export function formatDay(day: string, now: Date, lang: Lang, today: string, yes
   const ago = daysAgo(d, now);
   if (ago === 0 && d <= now) return today;
   if (ago === 1) return yesterday;
-  const month = lang === 'en' ? 'short' : 'long';
-  const year = d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined;
+  return writtenDay(d, lang, lang === 'en' ? 'short' : 'long', d.getFullYear() !== now.getFullYear());
+}
+
+/** The day a printed page names, in full: "Saturday, 10 October 2026", "Samstag, 10. Oktober
+ * 2026", "Sabato 10 ottobre 2026". */
+export function formatLongDay(day: string, lang: Lang): string {
+  const d = dayDate(day);
+  return Number.isNaN(d.getTime()) ? day : writtenDay(d, lang, 'long', true);
+}
+
+function writtenDay(d: Date, lang: Lang, month: 'short' | 'long', withYear: boolean): string {
   const parts: Partial<Record<Intl.DateTimeFormatPartTypes, string>> = {};
+  const year = withYear ? 'numeric' : undefined;
   for (const p of new Intl.DateTimeFormat(lang, { weekday: 'long', day: 'numeric', month, year }).formatToParts(d)) parts[p.type] = p.value;
   const y = parts.year ? ` ${parts.year}` : '';
   const text =
@@ -129,6 +139,12 @@ export function formatDay(day: string, now: Date, lang: Lang, today: string, yes
         ? `${parts.weekday} ${parts.day} ${parts.month}${y}`
         : `${parts.weekday}, ${parts.day} ${parts.month}${y}`;
   return text.charAt(0).toLocaleUpperCase(lang) + text.slice(1);
+}
+
+/** A day as the API and date fields write it, 2026-10-10, here. */
+export function dayOf(when: Date): string {
+  const two = (n: number) => String(n).padStart(2, '0');
+  return `${when.getFullYear()}-${two(when.getMonth() + 1)}-${two(when.getDate())}`;
 }
 
 /** "12:32", for when a file came. */

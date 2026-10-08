@@ -15,6 +15,8 @@ interface Props {
   head?: ComponentChildren;
   onClose: () => void;
   wide?: boolean;
+  /** A dialog's own look, such as print's, with a preview beside the form. */
+  className?: string;
   children: ComponentChildren;
 }
 
@@ -23,7 +25,7 @@ interface Props {
  * bigger screens. Render it only while open. It is a real <dialog>, so the page behind is out
  * of reach and Escape closes it; Back closes it too, and the focus goes back where it was.
  */
-export function Modal({ title, icon, head, onClose, wide, children }: Props) {
+export function Modal({ title, icon, head, onClose, wide, className, children }: Props) {
   const { t } = useI18n();
   const ref = useRef<HTMLDialogElement>(null);
   const id = useId();
@@ -42,7 +44,7 @@ export function Modal({ title, icon, head, onClose, wide, children }: Props) {
   return (
     <dialog
       ref={ref}
-      class={`modal${wide ? ' wide' : ''}`}
+      class={`modal${wide ? ' wide' : ''}${className ? ` ${className}` : ''}`}
       aria-labelledby={id}
       onCancel={(e) => {
         e.preventDefault();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RateMeter, daysAgo, formatBytes, formatDay, formatDuration, formatETA, formatPercent, formatWait, formatWhen } from '../src/format';
+import { RateMeter, dayOf, daysAgo, formatBytes, formatDay, formatDuration, formatETA, formatLongDay, formatPercent, formatWait, formatWhen } from '../src/format';
 
 describe('formatPercent', () => {
   it('writes the share the way each language does', () => {
@@ -96,6 +96,18 @@ describe('formatDay', () => {
   });
   it('does not call a day ahead of this clock today', () => {
     expect(formatDay('2026-10-03', now, 'en', 'Today', 'Yesterday')).toBe('Saturday, 3 Oct');
+  });
+});
+
+describe('formatLongDay', () => {
+  it('writes the day in full, as a poster names it', () => {
+    expect(formatLongDay('2026-10-10', 'en')).toBe('Saturday, 10 October 2026');
+    expect(formatLongDay('2026-10-10', 'de')).toBe('Samstag, 10. Oktober 2026');
+    expect(formatLongDay('2026-10-10', 'it')).toBe('Sabato 10 ottobre 2026');
+  });
+  it('and reads it back from a date', () => {
+    expect(dayOf(new Date(2026, 9, 10, 23, 59))).toBe('2026-10-10');
+    expect(dayOf(new Date(2027, 0, 5))).toBe('2027-01-05');
   });
 });
 

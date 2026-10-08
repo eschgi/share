@@ -1,0 +1,243 @@
+/* A PIN's printed page (screens 71 and 72): in paper colours whatever the theme, and sized by its
+   own width (a cqw is a hundredth of it), so the preview and the printed page are the same page. */
+.paper {
+  container-type: inline-size;
+  aspect-ratio: 210 / 297;
+  overflow: hidden;
+  background: #fbf7f1;
+  color: #2a1f18;
+  font-family: var(--sans);
+}
+.paper .psheet {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  padding: 9.7cqw 9.7cqw 7.7cqw;
+  text-align: center;
+}
+.paper .pbrand {
+  display: flex;
+  align-items: center;
+  gap: 1.3cqw;
+  color: #a4461f;
+  font-family: var(--serif);
+  font-size: 3.3cqw;
+  font-weight: 700;
+}
+.paper .pbrand .ic {
+  width: 3.6cqw;
+  height: 3.6cqw;
+}
+.paper .pt {
+  margin-top: 4.4cqw;
+  font-family: var(--serif);
+  font-size: 10cqw;
+  font-weight: 700;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+.paper .pt.long {
+  font-size: 7cqw;
+}
+.paper .pdate {
+  margin-top: 1.8cqw;
+  color: #5f5147;
+  font-size: 3.1cqw;
+}
+.paper .pline {
+  margin-top: 4.4cqw;
+  color: #3a2c24;
+  font-size: 4.2cqw;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.paper .pqr {
+  flex: none;
+  width: 38.5cqw;
+  height: 38.5cqw;
+  margin-top: 4.9cqw;
+  padding: 1cqw;
+  border: 0.26cqw solid #e6dacb;
+  border-radius: 3.6cqw;
+  background: #fff;
+}
+.paper .pqr .qr {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+}
+.paper .pscan {
+  margin-top: 2.3cqw;
+  font-size: 2.95cqw;
+  font-weight: 500;
+}
+.paper .psteps {
+  display: flex;
+  justify-content: center;
+  gap: 3.1cqw;
+  margin-top: 4.6cqw;
+}
+.paper .psteps div {
+  width: 23.6cqw;
+  color: #4a3a30;
+  font-size: 2.45cqw;
+  line-height: 1.35;
+}
+.paper .psteps b {
+  display: grid;
+  place-items: center;
+  width: 5.6cqw;
+  height: 5.6cqw;
+  margin: 0 auto 1.3cqw;
+  border-radius: 50%;
+  background: #c45a30;
+  color: #fff;
+  font-size: 2.7cqw;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.paper .pnote {
+  margin: 3.9cqw 0 0;
+  color: #5f5147;
+  font-size: 2.45cqw;
+  line-height: 1.45;
+}
+.paper .por {
+  margin-top: auto;
+  padding-top: 2.6cqw;
+  color: #85766a;
+  font-size: 2.3cqw;
+}
+.paper .pcode {
+  display: flex;
+  justify-content: center;
+  gap: 1cqw;
+  margin-top: 1.5cqw;
+}
+.paper .pcode b {
+  display: grid;
+  place-items: center;
+  width: 6.4cqw;
+  height: 7.7cqw;
+  border: 0.26cqw solid #d9cbbb;
+  border-radius: 1.5cqw;
+  font-family: var(--mono);
+  font-size: 3.85cqw;
+  font-weight: 600;
+}
+
+/* Four cards for the tables, cut along the dashed lines. */
+.paper.cards .psheet {
+  display: grid;
+  grid: 1fr 1fr / 1fr 1fr;
+  align-items: stretch;
+  padding: 0;
+}
+.paper .tcard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 3.9cqw 3.6cqw;
+  border: 0 dashed #cdbdab;
+}
+.paper .tcard:nth-child(odd) {
+  border-right-width: 0.26cqw;
+}
+.paper .tcard:nth-child(-n + 2) {
+  border-bottom-width: 0.26cqw;
+}
+.paper .tcard .pt {
+  margin-top: 0;
+  font-size: 5.1cqw;
+}
+.paper .tcard .pt.long {
+  font-size: 3.8cqw;
+}
+.paper .tcard .pline {
+  margin-top: 1.3cqw;
+  font-size: 2.45cqw;
+}
+.paper .tcard .pqr {
+  width: 25.1cqw;
+  height: 25.1cqw;
+  margin-top: 2.6cqw;
+  border-radius: 2.3cqw;
+}
+.paper .tcard .pscan {
+  margin-top: 1.5cqw;
+  font-size: 2.05cqw;
+}
+.paper .tcard .pcode {
+  gap: 0.7cqw;
+}
+.paper .tcard .pcode b {
+  width: 4.1cqw;
+  height: 5.1cqw;
+  border-radius: 1cqw;
+  font-size: 2.56cqw;
+}
+
+/* The dialog: the form, and the preview beside it, or under it on a phone. */
+.pedit {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.pform {
+  flex: 1;
+  min-width: 0;
+}
+.pform .pday {
+  margin-top: 8px;
+}
+.pprev {
+  flex: none;
+  align-self: center;
+  width: min(100%, 300px);
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 12px 34px var(--shadow);
+}
+@media (min-width: 900px) and (min-height: 540px) {
+  .modal.print .modal-panel {
+    max-width: 960px;
+  }
+  .pedit {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 30px;
+  }
+  .pprev {
+    width: 340px;
+  }
+}
+
+/* Printing: the sheet alone, on an A4 page of its own, white to spare the ink. */
+.print-sheet {
+  display: none;
+}
+@page poster {
+  size: A4 portrait;
+  margin: 0;
+}
+@media print {
+  html.printing body > :not(.print-sheet) {
+    display: none !important;
+  }
+  html.printing .print-sheet {
+    display: block;
+    page: poster;
+  }
+  html.printing .print-sheet,
+  html.printing .print-sheet * {
+    visibility: visible;
+  }
+  html.printing .print-sheet .paper {
+    height: 100vh;
+    aspect-ratio: auto;
+    background: #fff;
+  }
+}

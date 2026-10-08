@@ -14,6 +14,7 @@ import { useAccount } from '../context';
 import { hasChoices } from '../folders/model';
 import { FolderField, FolderPicker } from '../folders/Folders';
 import { useFolders } from '../folders/store';
+import { PrintDialog } from './Print';
 import { copyText, sharesLinks, shareText } from './share';
 
 /** "12 Sep", "12. Sept.", "12 set": when a permanent PIN was made, the day first as in the app. */
@@ -54,6 +55,7 @@ export function PinsList({ pins, onChanged, bare }: { pins: PinInfo[]; onChanged
   // The folder of each card, where there are several, but not on a folder's own page.
   const folderOf = (p: PinInfo) => (!bare && hasChoices(folders.list) ? folders.byId(p.folder)?.name : undefined);
   const [qr, setQr] = useState<PinInfo | null>(null);
+  const [printing, setPrinting] = useState<{ pin: PinInfo; link: string } | null>(null);
   const [asking, setAsking] = useState<Asking>(null);
   const [busy, setBusy] = useState(false);
   const shares = sharesLinks();
@@ -90,6 +92,7 @@ export function PinsList({ pins, onChanged, bare }: { pins: PinInfo[]; onChanged
       shares={shares}
       onHandOn={() => void handOn(p)}
       onQr={() => setQr(p)}
+      onPrint={() => void linkOf(p).then((link) => setPrinting({ pin: p, link }))}
       onAsk={(kind) => setAsking({ kind, pin: p })}
     />
   );
@@ -116,6 +119,7 @@ export function PinsList({ pins, onChanged, bare }: { pins: PinInfo[]; onChanged
         )}
       </div>
       {qr && <PinQr pin={qr} onClose={() => setQr(null)} />}
+      {printing && <PrintDialog pin={printing.pin} link={printing.link} onClose={() => setPrinting(null)} />}
       {asking && (
         <Confirm
           title={t(asking.kind === 'newCode' ? 'pins.newCodeTitle' : 'pins.endTitle', { code: asking.pin.code })}
@@ -138,10 +142,12 @@ interface CardProps {
   shares: boolean;
   onHandOn: () => void;
   onQr: () => void;
+  /** A poster or cards for the tables (screens 69 and 70), for a permanent PIN. */
+  onPrint: () => void;
   onAsk: (kind: 'newCode' | 'end') => void;
 }
 
-function PinCard({ pin, folder, shares, onHandOn, onQr, onAsk }: CardProps) {
+function PinCard({ pin, folder, shares, onHandOn, onQr, onPrint, onAsk }: CardProps) {
   const { t, tn, lang } = useI18n();
   const permanent = pin.kind === 'permanent';
   return (
@@ -190,6 +196,12 @@ function PinCard({ pin, folder, shares, onHandOn, onQr, onAsk }: CardProps) {
           <Icon name="qr" />
           {t('pins.qr')}
         </button>
+        {permanent && (
+          <button type="button" onClick={onPrint}>
+            <Icon name="printer" />
+            {t('pins.print')}
+          </button>
+        )}
         {permanent && (
           <button type="button" onClick={() => onAsk('newCode')}>
             <Icon name="refresh" />
