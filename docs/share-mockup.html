@@ -862,6 +862,11 @@
   .dlline.warn{border-color:transparent;background:var(--warn-soft)}
   .dlline.warn > .ic,.dlline.warn .at b{color:var(--warn)}
   .dlib .dlline{margin:6px 0 10px}
+  /* ---------- sharing with each other: a group's photos on everyone's phone ---------- */
+  .av.sky{background:#AFC3D6;color:#1C2A38}
+  .av.rose{background:#D8B1B4;color:#3A1E22}
+  .autoban .avs{margin-right:8px}
+  .autoban .avs .av{box-shadow:0 0 0 2px var(--bg)}
   /* ---------- a PIN's poster: printed, so in paper colours whatever the theme ---------- */
   .paper{width:780px;height:1103px;zoom:.5;background:#FBF7F1;color:#2A1F18;position:relative;overflow:hidden;display:flex;flex-direction:column;
     align-items:center;text-align:center;padding:76px 76px 60px;box-shadow:0 30px 70px rgba(0,0,0,.6),0 3px 10px rgba(0,0,0,.45)}
@@ -2132,6 +2137,69 @@
     </div>
   </section>
 
+  <section class="sec" id="together">
+    <div class="sec-head">
+      <div class="sec-tag">Proposal · together</div>
+      <h2>Everyone's photos, on everyone's phone</h2>
+      <p>For a trip or a day out together, everyone's photos end up on everyone's phone. One person shows a code, the others scan it with their camera, and that's all. Behind it there is one folder for the group, and every phone sends its new photos into it and receives the others' by itself: sending and receiving automatically (61–68, 78–85), switched on by one scan. It runs until a last day the starter picks, at most two weeks ahead, and then ends by itself; the folder stays. In this proposal admins see the group's folder like every folder; an admin's code also invites friends who aren't on Share yet, for this folder only; friends with an iPhone join in the browser, see everything and send by hand; and a phone that was sending automatically into another folder sends into the group's while it runs. Two people at a wedding use the same thing.</p>
+    </div>
+    <p class="sub-h">Stefan starts it</p>
+    <div class="board">
+
+      <div class="slot">
+        <h3><span class="n">86</span>Share with each other <span class="badge proposal">proposal</span></h3>
+        <p class="cap">A second card on the Send tab, under sending by oneself. Two people at a wedding or five on a trip: one of them starts it, the others only scan.</p>
+        <div class="phone" data-shot="86-together-offer"><div class="sb" data-time="8:40"></div><div class="ab"><h2>Send</h2><span class="av sm acc">S</span></div><div class="scroll pad"><p class="lead sm">No PIN needed while you're signed in.</p><div class="picks"><div class="pick"><span data-i="images"></span><b>Photos &amp; videos</b></div><div class="pick"><span data-i="file"></span><b>Other files</b></div></div><div class="card auto"><div class="ah"><span class="ri acc"><span data-i="camera"></span></span><div class="at"><b>Send automatically</b><span>For a day others should see as it happens: a wedding, a trip, a birthday.</span></div></div><div class="btn tonal sm"><span data-i="camera"></span>Turn on for today</div></div><div class="card auto"><div class="ah"><span class="ri acc"><span data-i="users"></span></span><div class="at"><b>Share with each other</b><span>On a trip or a day out: everyone's photos, on everyone's phone.</span></div></div><p>One of you shows a code, the others scan it with their camera. Then the photos go back and forth by themselves.</p><div class="btn tonal sm"><span data-i="qr"></span>Start a group</div></div></div><nav class="nav" data-on="send"></nav><div class="gest"></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">87</span>Name and last day <span class="badge proposal">proposal</span></h3>
+        <p class="cap">A name, for the folder and the album, and the last day, at most two weeks ahead; today alone ends at midnight. Stefan is an admin, so his code also brings in friends who aren't on Share yet; a member's code, only people already on it.</p>
+        <div class="phone" data-shot="87-together-setup"><div class="sb" data-time="8:41"></div><div class="ab"><h2>Send</h2><span class="av sm acc">S</span></div><div class="scroll pad"><p class="lead sm">No PIN needed while you're signed in.</p><div class="picks"><div class="pick"><span data-i="images"></span><b>Photos &amp; videos</b></div><div class="pick"><span data-i="file"></span><b>Other files</b></div></div></div><nav class="nav" data-on="send"></nav><div class="gest"></div><div class="scrim"></div><div class="sheet"><div class="grip"></div><h3>Share with each other</h3><div class="label t0">Name</div><div class="input">Dolomites</div><div class="label">Until</div><div class="fsel"><span class="fcov all"><span data-i="clock"></span></span><div class="rt"><b>Sunday, 18 October</b><span>3 days, then it ends by itself</span></div><span class="tbtn">Change</span></div><div class="swrow"><div class="rt"><b>Videos too</b></div><span class="sw on"></span></div><div class="swrow sub"><div class="rt"><b>Also over mobile data</b><span>Otherwise big ones wait for Wi-Fi.</span></div><span class="sw"></span></div><div class="note slim"><span data-i="user-plus"></span><p>Whoever scans the code joins, also friends who aren't on Share yet: for them the code is an invite to this folder only.</p></div><div class="btn primary mt20"><span data-i="qr"></span>Show the code</div></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">88</span>The code <span class="badge proposal">proposal</span></h3>
+        <p class="cap">The others scan it with their phone's camera, one after the other, and show up in the list as they join, so a stranger would be noticed and removed. It works until Done; anyone in the group can show it again later (92).</p>
+        <div class="phone" data-shot="88-together-code"><div class="sb" data-time="8:44"></div><div class="ab back"><span class="ib"><span data-i="x"></span></span><h2>Dolomites</h2></div><div class="wb"><div class="qrcard"><div class="qr" data-qr="88"></div><b>The others scan this with their camera</b><span class="exp"><span data-i="clock"></span>Until Sunday, 18 October</span></div><div class="glabel">In the group</div><div class="group"><div class="row"><span class="av acc">S</span><div class="rt"><b>Stefan</b><span>You</span></div></div><div class="row"><span class="av sage">P</span><div class="rt"><b>Peter</b><span>Joined</span></div><span class="tbtn">Remove</span></div><div class="row"><span class="av tan">M</span><div class="rt"><b>Maria</b><span>Joined</span></div><span class="tbtn">Remove</span></div><div class="row"><span class="av sky">A</span><div class="rt"><b>Anna</b><span>New on Share · joined just now</span></div><span class="tbtn">Remove</span></div></div><div class="grow"></div><div class="btn primary"><span data-i="check"></span>Done</div></div><div class="gest"></div></div>
+      </div>
+
+    </div>
+    <p class="sub-h">The others join</p>
+    <div class="board">
+
+      <div class="slot">
+        <h3><span class="n">89</span>With one tap <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Maria's camera opens the code's link, and the page hands it to the app, as an invite does: what happens, with whom, until when, and Join. Anna, new to Share, gets the app from the page first and joins as someone who sees only this folder.</p>
+        <div class="phone" data-shot="89-together-join"><div class="sb" data-time="8:42"></div><div class="ab back"><span class="ib"><span data-i="x"></span></span></div><div class="wb"><div class="roundico"><span data-i="users"></span></div><h1 class="hero md">Stefan invites you to Dolomites</h1><p class="lead">Everyone's photos come to you, into the album Dolomites, and your new ones go to the others.</p><div class="facts"><div><span data-i="users"></span><em>With</em><b>Stefan, Peter</b></div><div><span data-i="clock"></span><em>Until</em><b>Sunday, 18 October</b></div></div><div class="swrow"><div class="rt"><b>Videos too</b></div><span class="sw on"></span></div><div class="swrow sub"><div class="rt"><b>Also over mobile data</b><span>Otherwise big ones wait for Wi-Fi.</span></div><span class="sw"></span></div><div class="grow"></div><div class="btn primary"><span data-i="users"></span>Join</div><p class="small">You can leave any time. Photos from before don't go.</p></div><div class="gest"></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">90</span>On an iPhone <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Luca, new to Share too, joins in the browser with just his name. Everyone's photos come to him there; his own he sends by hand, since a browser never sees the phone's photos by itself.</p>
+        <div class="phone" data-shot="90-together-iphone"><div class="sb" data-time="8:46"></div><div class="wb"><div class="brand"><span data-i="images"></span><span translate="no">Share</span><span class="langpill"><span data-i="globe"></span>EN</span></div><h1 class="hero md">Stefan invites you to Dolomites</h1><p class="lead">Everyone's photos come to you here, in this browser. On an iPhone you send yours by hand: tap Send and pick them.</p><div class="label">Your name</div><div class="input">Luca</div><div class="facts"><div><span data-i="users"></span><em>With</em><b>Stefan, Peter, Maria, Anna</b></div><div><span data-i="clock"></span><em>Until</em><b>Sunday, 18 October</b></div></div><div class="grow"></div><div class="btn primary">Join in this browser</div><p class="small">For this group only. No password needed.</p></div></div>
+      </div>
+
+    </div>
+    <p class="sub-h">On the way</p>
+    <div class="board">
+
+      <div class="slot">
+        <h3><span class="n">91</span>Everyone gets everything <span class="badge proposal">proposal</span></h3>
+        <p class="cap">A line over the library says who is sharing and until when; every photo carries its sender's initial. The others' photos also land in the gallery's album Dolomites, by when they were taken. With the app closed, one quiet notification (64).</p>
+        <div class="phone" data-shot="91-together-on"><div class="sb" data-time="13:05"></div><div class="ab"><h2 class="fpick"><span class="t">Dolomites</span><span data-i="chev" class="down"></span></h2><span class="ib"><span data-i="search"></span></span><span class="av sm tan">M</span></div><div class="autoban"><span class="live"></span><div class="at"><b>Sharing with each other</b><span>129 today from 5 people · until Sunday</span></div><span class="avs"><span class="av acc">S</span><span class="av sage">P</span><span class="av sky">A</span><span class="av rose">L</span></span></div><div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div><div class="scroll"><div class="day"><div><h4>Today</h4><div class="meta">129 files · 540 MB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p6/aS p2/aP p9 p4/aA p1/aS p7/aL p5 p8/aP p3/aA p10/aS p2 p6/aS v3@0:21/aS p9/aA p1 p5/aP p7/aS p4 p10/aA p3/aL"></div><div class="day"><div><h4>Yesterday</h4><div class="meta">212 files · 860 MB</div></div><span class="dsel"></span></div><div class="grid g4" data-tiles="p8/aS p1/aA p6 p2/aP"></div></div><nav class="nav" data-on="library"></nav><div class="gest"></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">92</span>The group <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Who is in it and what each one sent today; Add someone shows the code again. Pause leaves out what is taken meanwhile; Leave stops it on this phone only, and what was sent stays in the folder.</p>
+        <div class="phone" data-shot="92-together-group"><div class="sb" data-time="13:06"></div><div class="ab back"><span class="ib"><span data-i="back"></span></span><h2>Dolomites</h2></div><div class="scroll pad"><div class="fhead"><span class="fcov ph t5 lg"><span data-i="image"></span></span><div><b>Sharing with each other</b><span>Until Sunday, 18 October</span></div></div><div class="glabel">5 people<span class="gact"><span data-i="user-plus"></span>Add someone</span></div><div class="group"><div class="row"><span class="av tan">M</span><div class="rt"><b>Maria</b><span>You · 31 photos today</span></div></div><div class="row"><span class="av acc">S</span><div class="rt"><b>Stefan</b><span>42 photos, 2 videos today</span></div></div><div class="row"><span class="av sage">P</span><div class="rt"><b>Peter</b><span>18 photos today</span></div></div><div class="row"><span class="av sky">A</span><div class="rt"><b>Anna</b><span>27 photos today</span></div></div><div class="row"><span class="av rose">L</span><div class="rt"><b>Luca</b><span>iPhone, sends by hand · 9 photos today</span></div></div></div><div class="swrow"><div class="rt"><b>Videos too</b></div><span class="sw on"></span></div><div class="swrow sub"><div class="rt"><b>Also over mobile data</b><span>Otherwise big ones wait for Wi-Fi.</span></div><span class="sw"></span></div><div class="btnrow"><div class="btn outline">Pause</div><div class="btn dout">Leave</div></div></div><div class="gest"></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">93</span>Afterwards <span class="badge proposal">proposal</span></h3>
+        <p class="cap">On the last day at midnight it ends by itself on every phone and says what came together. The folder stays like any folder, for everyone in it.</p>
+        <div class="phone" data-shot="93-together-ended"><div class="sb" data-time="8:30"></div><div class="ab"><h2>Send</h2><span class="av sm tan">M</span></div><div class="scroll pad"><div class="card auto"><div class="ah"><span class="ri ok"><span data-i="check"></span></span><div class="at"><b>Dolomites is over</b><span>1,240 photos and 36 videos from 5 people, all in the album Dolomites. The folder stays.</span></div></div><div class="btnrow"><div class="btn outline sm">OK</div><div class="btn tonal sm"><span data-i="images"></span>Open</div></div></div><p class="lead sm">No PIN needed while you're signed in.</p><div class="picks"><div class="pick"><span data-i="images"></span><b>Photos &amp; videos</b></div><div class="pick"><span data-i="file"></span><b>Other files</b></div></div></div><nav class="nav" data-on="send"></nav><div class="gest"></div></div>
+      </div>
+
+    </div>
+  </section>
+
 </div>
 
 <script>
@@ -2229,6 +2297,178 @@
   // English is written in the markup. T maps each English string to [German, Italian]; elements marked
   // data-tr are translated as a whole, because their inline markup sits at a different place in each language.
   const T = {
+      "Share with each other": [
+          "Miteinander teilen",
+          "Condivisione reciproca"
+      ],
+      "On a trip or a day out: everyone's photos, on everyone's phone.": [
+          "Auf einer Reise oder einem Ausflug: alle Fotos von allen, auf jedem Handy.",
+          "In viaggio o in gita: le foto di tutti, sul telefono di ognuno."
+      ],
+      "One of you shows a code, the others scan it with their camera. Then the photos go back and forth by themselves.": [
+          "Einer von euch zeigt einen Code, die anderen scannen ihn mit der Kamera. Dann gehen die Fotos von selbst hin und her.",
+          "Uno di voi mostra un codice, gli altri lo inquadrano con la fotocamera. Poi le foto vanno e vengono da sole."
+      ],
+      "Start a group": [
+          "Gruppe starten",
+          "Avvia un gruppo"
+      ],
+      "Dolomites": [
+          "Dolomiten",
+          "Dolomiti"
+      ],
+      "Until": [
+          "Bis",
+          "Fino a"
+      ],
+      "Sunday, 18 October": [
+          "Sonntag, 18. Oktober",
+          "Domenica 18 ottobre"
+      ],
+      "3 days, then it ends by itself": [
+          "3 Tage, dann endet es von selbst",
+          "3 giorni, poi finisce da sé"
+      ],
+      "Whoever scans the code joins, also friends who aren't on Share yet: for them the code is an invite to this folder only.": [
+          "Wer den Code scannt, ist dabei, auch Freunde, die noch nicht bei Share sind: Für sie ist der Code eine Einladung nur zu diesem Ordner.",
+          "Chi inquadra il codice entra, anche gli amici che non usano ancora Share: per loro il codice è un invito solo a questa cartella."
+      ],
+      "The others scan this with their camera": [
+          "Die anderen scannen das mit ihrer Kamera",
+          "Gli altri lo inquadrano con la fotocamera"
+      ],
+      "Until Sunday, 18 October": [
+          "Bis Sonntag, 18. Oktober",
+          "Fino a domenica 18 ottobre"
+      ],
+      "In the group": [
+          "In der Gruppe",
+          "Nel gruppo"
+      ],
+      "You": [
+          "Du",
+          "Tu"
+      ],
+      "Joined": [
+          "Dabei",
+          "Ha aderito"
+      ],
+      "Remove": [
+          "Entfernen",
+          "Rimuovi"
+      ],
+      "New on Share · joined just now": [
+          "Neu bei Share · gerade dazugekommen",
+          "Nuova su Share · ha aderito ora"
+      ],
+      "Done": [
+          "Fertig",
+          "Fatto"
+      ],
+      "Stefan invites you to Dolomites": [
+          "Stefan lädt dich zu „Dolomiten“ ein",
+          "Stefan ti invita in “Dolomiti”"
+      ],
+      "Everyone's photos come to you, into the album Dolomites, and your new ones go to the others.": [
+          "Die Fotos aller kommen zu dir, ins Album Dolomiten, und deine neuen gehen an die anderen.",
+          "Le foto di tutti arrivano a te, nell'album Dolomiti, e le tue nuove vanno agli altri."
+      ],
+      "With": [
+          "Mit",
+          "Con"
+      ],
+      "Stefan, Peter": [
+          "Stefan, Peter",
+          "Stefan, Peter"
+      ],
+      "Join": [
+          "Beitreten",
+          "Unisciti"
+      ],
+      "You can leave any time. Photos from before don't go.": [
+          "Du kannst jederzeit gehen. Fotos von vorher gehen nicht mit.",
+          "Puoi uscire quando vuoi. Le foto di prima non vengono inviate."
+      ],
+      "Everyone's photos come to you here, in this browser. On an iPhone you send yours by hand: tap Send and pick them.": [
+          "Die Fotos aller kommen hier zu dir, in diesem Browser. Auf einem iPhone sendest du deine von Hand: Tippe auf Senden und wähle sie aus.",
+          "Le foto di tutti arrivano qui, in questo browser. Su un iPhone le tue le invii a mano: tocca Invia e sceglile."
+      ],
+      "Your name": [
+          "Dein Name",
+          "Il tuo nome"
+      ],
+      "Stefan, Peter, Maria, Anna": [
+          "Stefan, Peter, Maria, Anna",
+          "Stefan, Peter, Maria, Anna"
+      ],
+      "Join in this browser": [
+          "In diesem Browser beitreten",
+          "Unisciti in questo browser"
+      ],
+      "For this group only. No password needed.": [
+          "Nur für diese Gruppe. Kein Passwort nötig.",
+          "Solo per questo gruppo. Senza password."
+      ],
+      "Sharing with each other": [
+          "Teilt miteinander",
+          "Condivisione reciproca in corso"
+      ],
+      "129 today from 5 people · until Sunday": [
+          "129 heute von 5 Personen · bis Sonntag",
+          "129 oggi da 5 persone · fino a domenica"
+      ],
+      "129 files · 540 MB": [
+          "129 Dateien · 540 MB",
+          "129 file · 540 MB"
+      ],
+      "212 files · 860 MB": [
+          "212 Dateien · 860 MB",
+          "212 file · 860 MB"
+      ],
+      "5 people": [
+          "5 Personen",
+          "5 persone"
+      ],
+      "Add someone": [
+          "Jemanden hinzufügen",
+          "Aggiungi qualcuno"
+      ],
+      "You · 31 photos today": [
+          "Du · 31 Fotos heute",
+          "Tu · 31 foto oggi"
+      ],
+      "42 photos, 2 videos today": [
+          "42 Fotos, 2 Videos heute",
+          "42 foto, 2 video oggi"
+      ],
+      "18 photos today": [
+          "18 Fotos heute",
+          "18 foto oggi"
+      ],
+      "27 photos today": [
+          "27 Fotos heute",
+          "27 foto oggi"
+      ],
+      "iPhone, sends by hand · 9 photos today": [
+          "iPhone, sendet von Hand · 9 Fotos heute",
+          "iPhone, invia a mano · 9 foto oggi"
+      ],
+      "Leave": [
+          "Verlassen",
+          "Esci"
+      ],
+      "Dolomites is over": [
+          "„Dolomiten“ ist vorbei",
+          "“Dolomiti” è finito"
+      ],
+      "1,240 photos and 36 videos from 5 people, all in the album Dolomites. The folder stays.": [
+          "1.240 Fotos und 36 Videos von 5 Personen, alle im Album Dolomiten. Der Ordner bleibt.",
+          "1.240 foto e 36 video da 5 persone, tutti nell'album Dolomiti. La cartella resta."
+      ],
+      "Open": [
+          "Öffnen",
+          "Apri"
+      ],
       "Turn on": [
           "Einschalten",
           "Attiva"
@@ -4315,7 +4555,7 @@
       ]
   };
   // Names, codes, numbers and file names that stay the same in every language.
-  const KEEP = /^(?:[A-Z0-9]|\d+(?::\d+)?|Stefan|Maria|Peter|maria|Admin|PIN|PDF|DOCX|ZIP|XLSX|•+|\d{8}_\d{6}\.(?:jpg|mp4)|\/srv\/share|(?:https:\/\/)?share\.example\.com(?:\/[a-z\/-]*)?|https:\/\/192\.168\.1\.20:8443|\d+ (?:KB|MB|GB)|@maria|Pixel 8|Chrome · Windows|IMG_\d+\.jpg|image\/jpeg|Quick Share|iPhone · Safari|Android · Chrome|\d+ MB\/s|Anna & Marco)$/;
+  const KEEP = /^(?:[A-Z0-9]|\d+(?::\d+)?|Stefan|Maria|Peter|Anna|Luca|maria|Admin|PIN|PDF|DOCX|ZIP|XLSX|•+|\d{8}_\d{6}\.(?:jpg|mp4)|\/srv\/share|(?:https:\/\/)?share\.example\.com(?:\/[a-z\/-]*)?|https:\/\/192\.168\.1\.20:8443|\d+ (?:KB|MB|GB)|@maria|Pixel 8|Chrome · Windows|IMG_\d+\.jpg|image\/jpeg|Quick Share|iPhone · Safari|Android · Chrome|\d+ MB\/s|Anna & Marco)$/;
   const LANGS = ['en', 'de', 'it'];
   const original = new WeakMap();
   function setLang(lang) {
