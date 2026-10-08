@@ -18,6 +18,8 @@ Decided with the user:
   Google Play reviews (`READ_MEDIA_IMAGES`, `READ_MEDIA_VIDEO`).
 - **Only the Android app** can send automatically: a browser never sees a phone's gallery.
   Everyone sees the results, in the app and on the website.
+- **Big videos over mobile data only when allowed** (2026-10-08). Under Videos too, Also over
+  mobile data is off until the person switches it on; until then big videos wait for Wi-Fi.
 
 In an encrypted folder the photos go up encrypted, as always.
 
@@ -33,11 +35,13 @@ In an encrypted folder the photos go up encrypted, as always.
     `DCIM/Camera` (`ACTION_OPEN_DOCUMENT_TREE` with `EXTRA_INITIAL_URI`), and the app keeps that
     access (`takePersistableUriPermission`). Change picks another one, for phones that save on an
     SD card or into another folder.
-  - **Videos too**, on by default; big ones wait for Wi-Fi.
+  - **Videos too**, on by default, and under it **Also over mobile data**, off by default: big
+    videos wait for Wi-Fi unless it is on.
   - Start for today.
 - Starting keeps on the phone the folder, the tree's address, when it started, until when (the
-  next midnight on the phone) and whether videos count. It tells the server (`PUT /api/auto-send`),
-  shows the notification (64), and arms what notices new photos.
+  next midnight on the phone), whether videos count and whether big ones may go over mobile
+  data. It tells the server (`PUT /api/auto-send`), shows the notification (64), and arms what
+  notices new photos.
 - If Android took the folder's access away meanwhile, the card says so and asks for it again.
 
 ### Noticing new photos
@@ -73,8 +77,8 @@ second even for thousands of photos.
   job in the background. Uploads go in pieces, so what isn't done goes on at the next run. Photos
   fit easily; a long video may take several runs. User-initiated jobs (Android 14 on) and the
   foreground service before can't start from the background, so they aren't used here.
-- **Videos** over 50 MB wait for Wi-Fi (an unmetered network); with Videos too off, videos are
-  left out.
+- **Videos** over 50 MB wait for Wi-Fi (an unmetered network), unless Also over mobile data is on;
+  with Videos too off, videos are left out.
 - **Thumbnails** are made on the phone, as when sending by hand, and sealed for an encrypted
   folder.
 - The phone's own keys work while it is locked (the Keystore key needs no unlocked screen), so
@@ -153,8 +157,8 @@ API (with `contract/api` fixtures for each):
 - **Dart**: the card and the sheet on the Send tab, the line in the library, the summary card,
   Take back in the viewer, initials on tiles and the sender in the viewer's top line.
 - **Platform channel** (`contract/app/platform.json`): `auto.pick_folder`, `auto.start {folder,
-  videos}`, `auto.pause`, `auto.resume`, `auto.stop`, `auto.status`, and events with the day's
-  counts.
+  videos, mobile_data}`, `auto.pause`, `auto.resume`, `auto.stop`, `auto.status`, and events with
+  the day's counts.
 - **Kotlin**:
   - `AutoSend`: the day's settings, in the app's preferences;
   - `AutoScanner`: the folder's listing and what counts;
@@ -177,6 +181,7 @@ API (with `contract/api` fixtures for each):
 - **Kotlin** unit tests:
   - the scanner's choice: types, hidden files, still being written, before the start or after
     midnight, already queued;
+  - big videos: held for Wi-Fi, or sent over mobile data when that is allowed;
   - the day's end across a change to or from summer time.
 - **On the Pixel**:
   - the trigger with Share closed and no photo permission;
