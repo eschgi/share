@@ -1,6 +1,6 @@
 // PIN input rules, identical to the server's (contract/pin_codes.json).
 
-export const pinAlphabet = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+export const pinAlphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 export const pinLength = 5;
 
 /** The characters of a typed PIN that count: capitals, no spaces or dashes, only the alphabet. */
@@ -10,6 +10,17 @@ export function cleanPinInput(input: string): string {
     if (pinAlphabet.includes(ch)) out += ch;
   }
   return out.slice(0, pinLength);
+}
+
+/** What was typed into [before] to make [after]: only the new characters when some were added,
+ * wherever the cursor was, otherwise [after] itself (a deletion or a replacement). */
+export function typedInto(before: string, after: string): string {
+  if (after.length <= before.length) return after;
+  let start = 0;
+  while (start < before.length && before[start] === after[start]) start++;
+  let end = 0;
+  while (end < before.length - start && before[before.length - 1 - end] === after[after.length - 1 - end]) end++;
+  return after.slice(start, after.length - end);
 }
 
 /** The normalized code, or null if the input can't be a PIN (that is never sent as a try). */

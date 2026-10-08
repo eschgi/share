@@ -1,6 +1,6 @@
 {
-  "description": "How typed PINs are normalized. Server, website and app must agree. code null means the input can't be a PIN at all, which doesn't count as a wrong try.",
-  "alphabet": "23456789ABCDEFGHJKLMNPQRSTUVWXYZ",
+  "description": "How typed PINs are normalized. Server, website and app must agree. A PIN may hold every letter and digit, so an admin can choose one such as ANNA1; the random ones the server suggests leave out look-alikes (0, O, 1, I). code null means the input can't be a PIN at all, which doesn't count as a wrong try.",
+  "alphabet": "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ",
   "length": 5,
   "cases": [
     {"input": "K7M2Q", "code": "K7M2Q"},
@@ -9,10 +9,11 @@
     {"input": "4hx9t", "code": "4HX9T"},
     {"input": "K7M2", "code": null},
     {"input": "K7M2QX", "code": null},
-    {"input": "K7M2O", "code": null},
-    {"input": "K7M20", "code": null},
-    {"input": "K7M21", "code": null},
-    {"input": "K7M2I", "code": null},
+    {"input": "K7M2O", "code": "K7M2O"},
+    {"input": "K7M20", "code": "K7M20"},
+    {"input": "K7M21", "code": "K7M21"},
+    {"input": "K7M2I", "code": "K7M2I"},
+    {"input": "anna1", "code": "ANNA1"},
     {"input": "K7M2Ä", "code": null},
     {"input": "", "code": null}
   ]

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import contract from '../../contract/pin_codes.json';
-import { cleanPinInput, normalizePin, pinAlphabet, pinFromHash, pinLength, pinRootFromHash, pinSecretFromHash } from '../src/pin';
+import { cleanPinInput, normalizePin, pinAlphabet, pinFromHash, pinLength, pinRootFromHash, pinSecretFromHash, typedInto } from '../src/pin';
 
 describe('PIN rules', () => {
   it('uses the same alphabet and length as the server', () => {
@@ -14,7 +14,19 @@ describe('PIN rules', () => {
 
   it('keeps only usable characters while typing', () => {
     expect(cleanPinInput('k7-m 2q9')).toBe('K7M2Q');
-    expect(cleanPinInput('o0i1')).toBe('');
+    expect(cleanPinInput('anna-1')).toBe('ANNA1');
+    expect(cleanPinInput('ä é!')).toBe('');
+  });
+
+  it('takes what is typed into a made-up code, wherever the cursor was', () => {
+    expect(typedInto('R8D4W', 'R8D4WA')).toBe('A');
+    expect(typedInto('R8D4W', 'AR8D4W')).toBe('A');
+    expect(typedInto('R8D4W', 'R8AD4W')).toBe('A');
+    expect(typedInto('R8D4W', 'R8D4WANNA1')).toBe('ANNA1');
+    expect(typedInto('AAAAA', 'AAAAAA')).toBe('A');
+    // A deletion or a replacement stays as it is.
+    expect(typedInto('R8D4W', 'R8D4')).toBe('R8D4');
+    expect(typedInto('R8D4W', 'K')).toBe('K');
   });
 
   it('reads a PIN from the link', () => {

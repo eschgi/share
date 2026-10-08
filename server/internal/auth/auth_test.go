@@ -116,6 +116,10 @@ func TestGenerateCode(t *testing.T) {
 		if n, ok := NormalizeCode(c); !ok || n != c {
 			t.Fatalf("GenerateCode() = %q is not a normalized code", c)
 		}
+		// A typed code may be ANNA1, but a random one has no look-alikes.
+		if strings.ContainsAny(c, "01IO") {
+			t.Fatalf("GenerateCode() = %q has a look-alike", c)
+		}
 	}
 }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:share_app/ui/admin/invite_person_screen.dart';
+import 'package:share_app/ui/admin/pins_screen.dart' show typedInto;
 import 'package:share_app/ui/icons.dart';
 import 'package:share_app/ui/library/tiles.dart';
 import 'package:share_app/ui/settings_screen.dart';
@@ -102,6 +103,41 @@ void main() {
     await tester.pumpAndSettle();
     expect(platform.sharedTexts.single, 'Send me photos and files with Share: https://share.example.com/#M9CQ3');
     expect(find.bySemanticsLabel('M 9 C Q 3'), findsOneWidget, reason: 'in the list now');
+  });
+
+  testWidgets('typing over the made-up code makes one\'s own, with any letter or digit', (tester) async {
+    final server = adminServer();
+    final platform = signedInPhone();
+    await startApp(tester, platform, server);
+    await openSettings(tester);
+    await tester.tap(find.text('Upload PINs'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('New PIN'));
+    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('R 8 D 4 W'), findsOneWidget, reason: 'the suggestion');
+
+    // Key by key after it, as a keyboard types: the first key starts the code afresh.
+    await tester.showKeyboard(find.byType(TextField));
+    for (final key in 'anna1'.split('')) {
+      final now = tester.widget<TextField>(find.byType(TextField)).controller!.text;
+      tester.testTextInput.updateEditingValue(TextEditingValue(text: now + key, selection: TextSelection.collapsed(offset: now.length + 1)));
+      await tester.pump();
+    }
+    expect(find.bySemanticsLabel('A N N A 1'), findsOneWidget);
+    await tester.tap(find.text('Create & share'));
+    await tester.pumpAndSettle();
+    expect(platform.sharedTexts.single, 'Send me photos and files with Share: https://share.example.com/#ANNA1');
+  });
+
+  test('what is typed into a made-up code, wherever the cursor was', () {
+    expect(typedInto('R8D4W', 'R8D4WA'), 'A');
+    expect(typedInto('R8D4W', 'AR8D4W'), 'A');
+    expect(typedInto('R8D4W', 'R8AD4W'), 'A');
+    expect(typedInto('R8D4W', 'R8D4WANNA1'), 'ANNA1');
+    expect(typedInto('AAAAA', 'AAAAAA'), 'A');
+    // A deletion or a replacement stays as it is.
+    expect(typedInto('R8D4W', 'R8D4'), 'R8D4');
+    expect(typedInto('R8D4W', 'K'), 'K');
   });
 
   testWidgets('ending a PIN asks first', (tester) async {

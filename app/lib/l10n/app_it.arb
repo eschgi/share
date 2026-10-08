@@ -275,7 +275,7 @@
   "pinAnother": "Proponine un altro",
   "pinCreateShare": "Crea e condividi",
   "pinTaken": "Questo PIN è già stato usato. Scegline un altro.",
-  "pinBadCode": "Un PIN ha 5 lettere o numeri, senza 0, O, 1 e I.",
+  "pinBadCode": "Un PIN ha 5 lettere o numeri.",
   "inviteTitle": "Invita qualcuno",
   "inviteRoleHelp": "I membri vedono, scaricano e inviano. Gli admin possono anche eliminare file, gestire i PIN e invitare persone.",
   "inviteShowCode": "Mostra il codice QR",

@@ -6,5 +6,5 @@
   "response": {
     "code": "R8D4W"
   },
-  "notes": "A random code that no PIN has had yet, for the new-PIN screen. It isn't reserved."
+  "notes": "A random code that no PIN has had yet, for the new-PIN screen. It isn't reserved. It leaves out look-alikes (0, O, 1, I), which a typed code may have."
 }

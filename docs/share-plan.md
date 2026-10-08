@@ -29,7 +29,8 @@ app will go on Google Play later.
 
 ## Access
 
-- **Upload PINs**: 5 letters or digits, not case-sensitive, without look-alikes such as 0/O and 1/I.
+- **Upload PINs**: 5 letters or digits, not case-sensitive. An admin may choose any, such as ANNA1;
+  the ones suggested leave out look-alikes such as 0/O and 1/I.
   Either permanent or valid for 24 hours; no names, the code is the label (18, 19). A PIN sends into
   one folder (43, 45); only a PIN made to show its folder lets guests see it too (46). The link you share can carry the PIN (`…/#K7M2Q`). After 5 wrong tries, a device waits
   10 minutes.

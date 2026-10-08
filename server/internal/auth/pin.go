@@ -5,9 +5,13 @@ import (
 	"strings"
 )
 
-// PinAlphabet has no look-alikes (no 0/O, no 1/I), so a PIN survives being read out loud.
-// Its 32 symbols make every character exactly 5 random bits.
-const PinAlphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
+// PinAlphabet is what a PIN may hold: every letter and digit, so an admin can choose one such
+// as ANNA1.
+const PinAlphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+// suggestAlphabet is what a random PIN is made of: no look-alikes (no 0/O, no 1/I), so it
+// survives being read out loud. Its 32 symbols make every character exactly 5 random bits.
+const suggestAlphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
 
 // PinLength is the number of characters in a PIN.
 const PinLength = 5
@@ -17,7 +21,7 @@ func GenerateCode() string {
 	var b [PinLength]byte
 	rand.Read(b[:])
 	for i := range b {
-		b[i] = PinAlphabet[b[i]&31] // 256 is a multiple of 32, so no bias
+		b[i] = suggestAlphabet[b[i]&31] // 256 is a multiple of 32, so no bias
 	}
 	return string(b[:])
 }

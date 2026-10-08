@@ -152,7 +152,7 @@ class PinLink extends ShareLink {
 }
 
 final _inviteToken = RegExp(r'^shi_[A-Za-z0-9_-]{20,}$');
-final _pinCode = RegExp(r'^[2-9A-HJ-NP-Za-hj-np-z]{5}$');
+final _pinCode = RegExp(r'^[0-9A-Za-z]{5}$');
 
 /// A link's secret: 32 bytes in base64url.
 final _secret = RegExp(r'^[A-Za-z0-9_-]{43}$');

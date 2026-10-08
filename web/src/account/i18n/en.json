@@ -294,7 +294,7 @@
   "pins.codeLabel": "PIN",
   "pins.another": "Make up another one",
   "pins.madeUp": "Made up for you. You can also type your own.",
-  "pins.badCode": "A PIN has 5 letters or numbers, without 0, O, 1 and I.",
+  "pins.badCode": "A PIN has 5 letters or numbers.",
   "pins.taken": "That PIN was used before. Pick another one.",
   "pins.createShare": "Create & share",
   "pins.createCopy": "Create & copy link",

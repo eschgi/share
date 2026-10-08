@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { ApiError, createPin, endPin, newPinCode, suggestPin, type PinInfo } from '../../api';
 import { Bold } from '../../components/Bits';
 import { Icon } from '../../components/Icon';
@@ -7,7 +7,7 @@ import { SealError } from '../../e2ee/formats';
 import { keyring } from '../../e2ee/keyring';
 import { formatWhen } from '../../format';
 import { useI18n, type Lang } from '../../i18n';
-import { cleanPinInput, pinLength } from '../../pin';
+import { cleanPinInput, pinLength, typedInto } from '../../pin';
 import { Switch } from '../components/Bits';
 import { Confirm, Modal } from '../components/Modal';
 import { useAccount } from '../context';
@@ -231,20 +231,25 @@ export function NewPinDialog({ folder, onCreated, onClose }: { folder?: string; 
   const [shows, setShows] = useState(false);
   const [kind, setKind] = useState<PinInfo['kind']>('day');
   const [code, setCode] = useState('');
+  const own = useRef(false); // typed by the person, not made up for them
   const [focused, setFocused] = useState(false);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const shares = sharesLinks();
 
-  const suggest = async () => {
+  /** A code made up by the server; [over] one the person typed, too. */
+  const suggest = async (over: boolean) => {
     try {
-      setCode((await suggestPin()).code);
+      const made = (await suggestPin()).code;
+      if (own.current && !over) return; // typed one meanwhile
+      own.current = false;
+      setCode(made);
       setProblem(null);
     } catch {
       // typing one works too
     }
   };
-  useEffect(() => void suggest(), []);
+  useEffect(() => void suggest(false), []);
 
   const create = async () => {
     if (code.length !== pinLength) return setProblem(t('pins.badCode'));
@@ -319,7 +324,10 @@ export function NewPinDialog({ folder, onCreated, onClose }: { folder?: string; 
             spellcheck={false}
             enterKeyHint="done"
             onInput={(e) => {
-              const v = cleanPinInput(e.currentTarget.value);
+              // A made-up code gives way to what is typed into it.
+              const raw = e.currentTarget.value;
+              const v = cleanPinInput(own.current ? raw : typedInto(code, raw));
+              own.current = true;
               e.currentTarget.value = v;
               setCode(v);
               setProblem(null);
@@ -329,12 +337,12 @@ export function NewPinDialog({ folder, onCreated, onClose }: { folder?: string; 
             onKeyDown={(e) => e.key === 'Enter' && void create()}
           />
           {Array.from({ length: pinLength }, (_, i) => (
-            <b key={i} class={focused && i === Math.min(code.length, pinLength - 1) ? 'focus' : ''}>
+            <b key={i} class={focused && i === (own.current ? Math.min(code.length, pinLength - 1) : 0) ? 'focus' : ''}>
               {code[i] ?? ''}
             </b>
           ))}
         </span>
-        <button type="button" class="ib tonal" aria-label={t('pins.another')} title={t('pins.another')} onClick={() => void suggest()}>
+        <button type="button" class="ib tonal" aria-label={t('pins.another')} title={t('pins.another')} onClick={() => void suggest(true)}>
           <Icon name="refresh" />
         </button>
       </div>

@@ -728,7 +728,7 @@
   "pinAnother": "Make up another one",
   "pinCreateShare": "Create & share",
   "pinTaken": "That PIN was used before. Pick another one.",
-  "pinBadCode": "A PIN has 5 letters or numbers, without 0, O, 1 and I.",
+  "pinBadCode": "A PIN has 5 letters or numbers.",
   "inviteTitle": "Invite someone",
   "inviteRoleHelp": "Members see, download and send. Admins can also delete files, manage PINs and invite people.",
   "inviteShowCode": "Show the QR code",

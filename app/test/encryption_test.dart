@@ -351,6 +351,21 @@ void main() {
     expect(platform.sharedTexts.single, endsWith('#R8D4W.${platform.linkSecret}'));
   });
 
+  testWidgets('a PIN that only sends into an encrypted folder names the root once in its link', (tester) async {
+    final server = adminFolders();
+    final platform = signedInPhone()..encryptedFolders = {wedding};
+    await startApp(tester, platform, server);
+    await openSettings(tester);
+    await tapInList(tester, find.text('Folders'));
+    await tester.tap(find.text('Wedding Anna & Marco'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('New PIN for this folder'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Create & share'));
+    await tester.pumpAndSettle();
+    expect(platform.sharedTexts.single, endsWith('#R8D4W.${platform.rootFingerprint}'));
+  });
+
   testWidgets('an invite into an encrypted folder brings its keys, locked with its link\'s secret', (tester) async {
     final server = adminFolders();
     server.folders = [for (final f in server.folders) f['id'] == family ? {...f, 'encrypted': true, 'key_version': 1} : f];

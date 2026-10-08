@@ -89,7 +89,10 @@ class _PinsScreenState extends State<PinsScreen> {
 /// Screen 19, then sharing the new PIN; the PIN, or null. [folder] is where it sends into.
 Future<PinInfo?> makePin(BuildContext context, {String? folder}) async {
   final created = await showModalBottomSheet<PinInfo>(context: context, isScrollControlled: true, builder: (_) => NewPinSheet(folder: folder));
-  if (created != null && context.mounted) await sharePin(context, created);
+  if (created != null && context.mounted) {
+    // Its link is whole already: the sheet added the secret or the root's fingerprint.
+    await Services.read(context).platform.shareText(AppLocalizations.of(context).pinShareText(created.link));
+  }
   return created;
 }
 
@@ -336,13 +339,14 @@ class _NewPinSheetState extends State<NewPinSheet> {
   late String? _folder = widget.folder; // chosen here
   bool _shows = false;
   final _code = TextEditingController();
+  bool _own = false; // typed by the person, not made up for them
   String? _error;
   bool _busy = false;
 
   @override
   void initState() {
     super.initState();
-    _suggest();
+    _suggest(over: false);
   }
 
   @override
@@ -351,15 +355,16 @@ class _NewPinSheetState extends State<NewPinSheet> {
     super.dispose();
   }
 
-  Future<void> _suggest() async {
+  /// A code made up by the server; [over] one the person typed, too.
+  Future<void> _suggest({bool over = true}) async {
     try {
       final code = await Services.read(context).admin.suggestPin();
-      if (mounted) {
-        setState(() {
-          _code.text = code;
-          _error = null;
-        });
-      }
+      if (!mounted || (_own && !over)) return; // typed one meanwhile
+      setState(() {
+        _code.text = code;
+        _own = false;
+        _error = null;
+      });
     } on Exception {
       // Typing one works too.
     }
@@ -458,7 +463,16 @@ class _NewPinSheetState extends State<NewPinSheet> {
             ]),
             FieldLabel(t.pinCodeLabel),
             Row(children: [
-              Expanded(child: PinCodeField(controller: _code, onChanged: (_) => setState(() => _error = null))),
+              Expanded(
+                child: PinCodeField(
+                  controller: _code,
+                  replaces: !_own,
+                  onChanged: (_) => setState(() {
+                    _own = true;
+                    _error = null;
+                  }),
+                ),
+              ),
               const SizedBox(width: 10),
               IconButton.filled(
                 tooltip: t.pinAnother,
@@ -544,12 +558,16 @@ class _KindCard extends StatelessWidget {
   }
 }
 
-/// Five boxes to type a PIN into: letters and digits without look-alikes, in capitals.
+/// Five boxes to type a PIN into: letters and digits, in capitals.
 class PinCodeField extends StatefulWidget {
-  const PinCodeField({super.key, required this.controller, this.onChanged, this.autofocus = false});
+  const PinCodeField({super.key, required this.controller, this.onChanged, this.autofocus = false, this.replaces = false});
   final TextEditingController controller;
   final ValueChanged<String>? onChanged;
   final bool autofocus;
+
+  /// What is typed replaces the code in the field instead of adding to it: a code made up for
+  /// the person, which they haven't touched.
+  final bool replaces;
 
   @override
   State<PinCodeField> createState() => _PinCodeFieldState();
@@ -580,7 +598,12 @@ class _PinCodeFieldState extends State<PinCodeField> {
               textCapitalization: TextCapitalization.characters,
               maxLength: 5,
               inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp('[2-9A-HJ-NP-Za-hj-np-z]')),
+                FilteringTextInputFormatter.allow(RegExp('[0-9A-Za-z]')),
+                if (widget.replaces)
+                  TextInputFormatter.withFunction((old, v) {
+                    final typed = typedInto(old.text, v.text);
+                    return typed == v.text ? v : TextEditingValue(text: typed, selection: TextSelection.collapsed(offset: typed.length));
+                  }),
                 TextInputFormatter.withFunction((_, v) => v.copyWith(text: v.text.toUpperCase())),
               ],
               onChanged: widget.onChanged,
@@ -596,11 +619,27 @@ class _PinCodeFieldState extends State<PinCodeField> {
                 child: CodeBoxes(
                   widget.controller.text,
                   size: 52,
-                  active: _focus.hasFocus ? widget.controller.text.length.clamp(0, 4) : null,
+                  // Typing over a made-up code starts at the first box.
+                  active: _focus.hasFocus ? (widget.replaces ? 0 : widget.controller.text.length.clamp(0, 4)) : null,
                 ),
               ),
             ),
           ),
         ]),
       );
+}
+
+/// What was typed into [before] to make [after]: only the new characters when some were added,
+/// wherever the cursor was, otherwise [after] itself (a deletion or a replacement).
+String typedInto(String before, String after) {
+  if (after.length <= before.length) return after;
+  var start = 0;
+  while (start < before.length && before[start] == after[start]) {
+    start++;
+  }
+  var end = 0;
+  while (end < before.length - start && before[before.length - 1 - end] == after[after.length - 1 - end]) {
+    end++;
+  }
+  return after.substring(start, after.length - end);
 }
