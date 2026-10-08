@@ -34,6 +34,10 @@ app will go on Google Play later.
   Either permanent or valid for 24 hours; no names, the code is the label (18, 19). A PIN sends into
   one folder (43, 45); only a PIN made to show its folder lets guests see it too (46). The link you share can carry the PIN (`…/#K7M2Q`). After 5 wrong tries, a device waits
   10 minutes.
+- **Printing a PIN** (69–72): a permanent PIN prints as a poster (one A4 page) or as four table cards
+  to cut out, with a title, a line, the date and the code to type, in the server's language
+  (`default_language`). The app draws the page and hands it to Android's printing; the website shows
+  a preview beside the form and uses the browser's print dialog. Both save a PDF too.
 - **Accounts**: the roles are admin and member. People join with username and password, or with a
   one-time invite (QR code or link, valid 24 hours) that needs no password (10, 20). Each phone gets its
   own key, which an admin can revoke.

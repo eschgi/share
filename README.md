@@ -138,7 +138,10 @@ Both speak English, German and Italian.
   first admin's account ([Hosting](#hosting), step 6).
 - An admin makes a PIN, in the app, on the website or with `share pin create`: a permanent one, for
   the family, or one for 24 hours, for a party. A PIN link (`https://share.example.com/#K7M2Q`)
-  fills it in.
+  fills it in. Its code is made up, or chosen, such as ANNA1.
+- **A PIN prints for guests.** A permanent PIN prints as a poster for the entrance or as four cards
+  for the tables, in the app or on the website, or saves as a PDF: its QR code, three steps and the
+  code to type, in the server's language, so nobody has to send the guests a link.
 - The website sends with [tus](https://tus.io), in pieces of 20 MiB that the server confirms one by
   one, so a dropped connection costs at most one piece. If the page is closed in the middle, it
   offers to continue when it's opened again. It can be installed as an app.
