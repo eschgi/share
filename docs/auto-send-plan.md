@@ -2,8 +2,8 @@
 
 For a day others should see as it happens, a wedding, a trip, a birthday: turned on in the
 morning, every photo and video taken with the phone's camera goes into a chosen folder by itself,
-and at midnight it stops by itself. Planned on 2026-10-07; the screens are 61 to 68 of
-[share-mockup.html](share-mockup.html).
+and at midnight it stops by itself. Planned on 2026-10-07; the screens are 61 to 68 and 94 to 96
+of [share-mockup.html](share-mockup.html).
 
 Decided with the user:
 - **Today only.** It always ends at midnight on the phone; the next day it is one tap again. No
@@ -20,6 +20,9 @@ Decided with the user:
   Everyone sees the results, in the app and on the website.
 - **Big videos over mobile data only when allowed** (2026-10-08). Under Videos too, Also over
   mobile data is off until the person switches it on; until then big videos wait for Wi-Fi.
+- **A wait before each photo goes** (2026-10-08): 5 minutes, unless 1 or 15 are chosen when
+  starting. In that time Don't send, in the notification, keeps a photo on the phone, and Send now
+  lets it go at once. Photos arriving a little later is fine.
 
 In an encrypted folder the photos go up encrypted, as always.
 
@@ -37,11 +40,13 @@ In an encrypted folder the photos go up encrypted, as always.
     SD card or into another folder.
   - **Videos too**, on by default, and under it **Also over mobile data**, off by default: big
     videos wait for Wi-Fi unless it is on.
+  - **Wait before sending**: 1, 5 or 15 minutes, 5 unless changed. The phone remembers the
+    choice for the next time.
   - Start for today.
 - Starting keeps on the phone the folder, the tree's address, when it started, until when (the
-  next midnight on the phone), whether videos count and whether big ones may go over mobile
-  data. It tells the server (`PUT /api/auto-send`), shows the notification (64), and arms what
-  notices new photos.
+  next midnight on the phone), whether videos count, whether big ones may go over mobile data,
+  and the wait. It tells the server (`PUT /api/auto-send`), shows the notification (64), and arms
+  what notices new photos.
 - If Android took the folder's access away meanwhile, the card says so and asks for it again.
 
 ### Noticing new photos
@@ -53,7 +58,7 @@ What counts, checked in one place (`AutoScanner`):
 - changed at or after the start, and before midnight;
 - not hidden (names starting with `.`, as files the camera is still writing), and unchanged for
   5 seconds;
-- not queued before: the phone keeps the day's document ids.
+- not queued or kept back before: the phone keeps the day's document ids of both.
 
 When it looks:
 - **While Share runs**: a `ContentObserver` on MediaStore's images and videos, then a scan of the
@@ -70,8 +75,10 @@ second even for thousands of photos.
 
 ### Sending
 
-- New files go into the existing upload queue: one batch for the day, into the folder, marked
-  as automatic. Each upload carries `auto` (tus metadata `auto=1`; with a bucket `"auto": true`).
+- New files go into the existing upload queue, each with the time it may go: when it was noticed,
+  plus the wait. Nothing of it leaves the phone before then. One batch for the day, into the
+  folder, marked as automatic. Each upload carries `auto` (tus metadata `auto=1`; with a bucket
+  `"auto": true`).
 - **Share in front**: the transfer job takes them, as when sending by hand.
 - **Share closed**: the trigger job sends them itself, within the ten minutes Android gives a
   job in the background. Uploads go in pieces, so what isn't done goes on at the next run. Photos
@@ -96,6 +103,22 @@ second even for thousands of photos.
   others' line goes too.
 - **Stop for today**: ends the day early, as midnight does.
 
+### Keeping a photo back (94, 95)
+
+- The notification shows the newest waiting photo with the time left, as a countdown
+  (`setUsesChronometer` with `setChronometerCountDown`), and Don't send, Send now and Pause. It
+  changes quietly, without a sound or a heads-up. On a locked phone the picture stays hidden
+  (`VISIBILITY_PRIVATE`, with a public version without it).
+- **Don't send** keeps the photo on the phone for good: its document id joins the day's list of
+  photos kept back, which the scanner skips. By hand it can still be sent, as always.
+- **Send now** lets every waiting photo go at once.
+- **Several in a row** wait together, each until its own time. The line over the library counts
+  down the next one ("3 new ones go in 3:40"), and Choose opens a sheet with them: tap one to
+  keep it back, or Send them now.
+- **With Share closed**, the trigger job queues each photo with its time and arms a one-off
+  WorkManager job for that moment; a few minutes late does no harm.
+- Pause and Stop for today leave out what is taken meanwhile, as before.
+
 ### At midnight (66)
 
 - A job at the phone's midnight (WorkManager; a few minutes late does no harm, since files are
@@ -111,6 +134,8 @@ second even for thousands of photos.
   calls `POST /api/files/{id}/take-back`: the photo goes to Recently deleted for everyone, with the
   person as who deleted it.
 - The website's viewer has the same, for the same files.
+- Once Receive automatically (78–85) is built, the phones that saved the photo by themselves
+  delete their copy too (96).
 
 ## Everyone else (67, 68)
 
@@ -154,16 +179,18 @@ API (with `contract/api` fixtures for each):
 
 ## App
 
-- **Dart**: the card and the sheet on the Send tab, the line in the library, the summary card,
-  Take back in the viewer, initials on tiles and the sender in the viewer's top line.
+- **Dart**: the card and the sheet on the Send tab, with the wait, the line in the library with
+  its countdown, Choose, the summary card, Take back in the viewer, initials on tiles and the
+  sender in the viewer's top line.
 - **Platform channel** (`contract/app/platform.json`): `auto.pick_folder`, `auto.start {folder,
-  videos, mobile_data}`, `auto.pause`, `auto.resume`, `auto.stop`, `auto.status`, and events with
-  the day's counts.
+  videos, mobile_data, wait_minutes}`, `auto.keep {ids}`, `auto.send_now {ids}`, `auto.pause`,
+  `auto.resume`, `auto.stop`, `auto.status`, and events with the day's counts and the waiting
+  photos with their times.
 - **Kotlin**:
   - `AutoSend`: the day's settings, in the app's preferences;
   - `AutoScanner`: the folder's listing and what counts;
   - `AutoTriggerJob`: the content URI trigger, armed again after each run, which scans, queues and
-    sends;
+    sends, and arms a one-off job for the next waiting photo;
   - `AutoDayEnd`: the job at midnight;
   - a notification channel, Sending automatically.
 
@@ -176,17 +203,20 @@ API (with `contract/api` fixtures for each):
     Recently deleted with the right `deleted_by`;
   - the new `FileInfo` fields.
 - **Website** (vitest): the line, the initials, the viewer's line, and Take back only where allowed.
-- **Dart**: the card, the sheet (today only, folder choice), the line, the summary, Take back;
-  goldens of 61 to 68.
+- **Dart**: the card, the sheet (today only, folder choice, the wait), the line and its countdown,
+  Choose, the summary, Take back; goldens of 61 to 68, 94 and 95.
 - **Kotlin** unit tests:
   - the scanner's choice: types, hidden files, still being written, before the start or after
     midnight, already queued;
   - big videos: held for Wi-Fi, or sent over mobile data when that is allowed;
+  - the wait: a photo is held until its time; Don't send keeps it out for good, also after a
+    restart; Send now lets it go;
   - the day's end across a change to or from summer time.
 - **On the Pixel**:
   - the trigger with Share closed and no photo permission;
   - a whole day's battery and data;
-  - an encrypted folder with the phone locked.
+  - an encrypted folder with the phone locked;
+  - Don't send and Send now from the notification, with Share closed and the phone locked.
 
 ## Risks
 
