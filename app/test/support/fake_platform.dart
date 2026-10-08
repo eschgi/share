@@ -96,6 +96,12 @@ class FakePlatform implements Platform {
   @override
   Future<void> shareText(String text) async => sharedTexts.add(text);
 
+  /// The pages handed to printing.
+  final printed = <({Uint8List png, String name})>[];
+
+  @override
+  Future<void> printPage(Uint8List png, String name) async => printed.add((png: png, name: name));
+
   final copiedSecrets = <String>[];
 
   @override

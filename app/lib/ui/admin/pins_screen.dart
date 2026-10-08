@@ -12,6 +12,7 @@ import '../format.dart';
 import '../icons.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'print_sheet.dart';
 
 /// Screen 18: the PINs that work now, and a new one (19).
 class PinsScreen extends StatefulWidget {
@@ -163,7 +164,8 @@ Future<bool> _changePin(BuildContext context, String title, String body, String 
   return true;
 }
 
-/// A PIN with what can be done with it: share it, a new code or its QR code, end it.
+/// A PIN with what can be done with it: share it, a new code, its QR code, print it (a permanent
+/// one), end it.
 /// [onChanged] hears of a new code or the end.
 class PinCard extends StatelessWidget {
   const PinCard({super.key, required this.pin, required this.onChanged});
@@ -187,6 +189,7 @@ class PinCard extends StatelessWidget {
     void onShare() => sharePin(context, pin);
     void onNewCode() => _newCode(context);
     void onQr() => showPinQr(context, pin);
+    void onPrint() => showPrintSheet(context, pin);
     void onEnd() => _end(context);
     final t = AppLocalizations.of(context);
     final c = context.colors;
@@ -257,6 +260,7 @@ class PinCard extends StatelessWidget {
                 onSelected: (f) => f(),
                 itemBuilder: (_) => [
                   PopupMenuItem(value: onQr, child: Text(t.pinQr)),
+                  PopupMenuItem(value: onPrint, child: Text(t.pinPrint)),
                   PopupMenuItem(value: onEnd, child: Text(t.pinEndNow, style: TextStyle(color: c.danger))),
                 ],
               )
@@ -442,7 +446,7 @@ class _NewPinSheetState extends State<NewPinSheet> {
             FieldLabel(t.pinHowLong),
             Row(children: [
               Expanded(
-                child: _KindCard(
+                child: KindCard(
                   icon: AppIcons.infinity,
                   title: t.pinsPermanent,
                   detail: t.pinPermanentDetail,
@@ -452,7 +456,7 @@ class _NewPinSheetState extends State<NewPinSheet> {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _KindCard(
+                child: KindCard(
                   icon: AppIcons.clock,
                   title: t.pin24h,
                   detail: t.pinUntil(formatWhen(now.add(const Duration(days: 1)), now, locale)),
@@ -510,8 +514,9 @@ class _NewPinSheetState extends State<NewPinSheet> {
   }
 }
 
-class _KindCard extends StatelessWidget {
-  const _KindCard({required this.icon, required this.title, required this.detail, required this.selected, required this.onTap});
+/// One of two choices side by side, with a radio: how long a PIN works, or what to print.
+class KindCard extends StatelessWidget {
+  const KindCard({super.key, required this.icon, required this.title, required this.detail, required this.selected, required this.onTap});
   final IconData icon;
   final String title, detail;
   final bool selected;

@@ -7,6 +7,8 @@ abstract final class AppIcons {
   static const IconData alert = IconData(0xe077, fontFamily: 'Lucide');
   /// arrow-left
   static const IconData back = IconData(0xe048, fontFamily: 'Lucide');
+  /// calendar
+  static const IconData calendar = IconData(0xe063, fontFamily: 'Lucide');
   /// camera
   static const IconData camera = IconData(0xe064, fontFamily: 'Lucide');
   /// check
@@ -87,6 +89,8 @@ abstract final class AppIcons {
   static const IconData playCircle = IconData(0xe080, fontFamily: 'Lucide');
   /// plus
   static const IconData plus = IconData(0xe13d, fontFamily: 'Lucide');
+  /// printer
+  static const IconData printer = IconData(0xe141, fontFamily: 'Lucide');
   /// qr-code
   static const IconData qrCode = IconData(0xe1df, fontFamily: 'Lucide');
   /// refresh-cw

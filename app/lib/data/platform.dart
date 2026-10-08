@@ -391,6 +391,10 @@ abstract class Platform {
   /// Hands text to another app (a messenger, mail), e.g. an invite link.
   Future<void> shareText(String text);
 
+  /// Hands one A4 page to Android's printing, which lists the printers nearby and Save as PDF:
+  /// [png] is the page at 300 dpi, [name] the print job's and the PDF's.
+  Future<void> printPage(Uint8List png, String name);
+
   /// Copies a password: Android 13 and later hide it in the clipboard's preview.
   Future<void> copySecret(String text);
 
@@ -650,6 +654,9 @@ class ChannelPlatform implements Platform {
 
   @override
   Future<void> shareText(String text) => _soft('text.share', {'text': text});
+
+  @override
+  Future<void> printPage(Uint8List png, String name) => _invoke('print.page', {'png': png, 'name': name});
 
   @override
   Future<void> copySecret(String text) => _soft('clipboard.secret', {'text': text});

@@ -41,6 +41,18 @@ String formatDay(String day, DateTime now, String locale, {required String today
   return text.substring(0, 1).toUpperCase() + text.substring(1);
 }
 
+/// The day a printed page names, in full: Saturday, 10 October 2026; Samstag, 10. Oktober 2026;
+/// Sabato 10 ottobre 2026.
+String formatLongDay(DateTime day, String locale) {
+  final pattern = switch (locale) {
+    'de' => 'EEEE, d. MMMM y',
+    'it' => 'EEEE d MMMM y',
+    _ => 'EEEE, d MMMM y',
+  };
+  final text = DateFormat(pattern, locale).format(day);
+  return text.substring(0, 1).toUpperCase() + text.substring(1);
+}
+
 /// When something ends: "today, 21:00", "tomorrow, 21:00" or a date with the time, in the
 /// same style as the website's.
 String formatWhen(DateTime when, DateTime now, String locale) {

@@ -9,6 +9,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:share_app/data/models.dart';
 import 'package:share_app/data/platform.dart';
+import 'package:share_app/l10n/app_localizations.dart';
+import 'package:share_app/ui/admin/print_sheet.dart';
 import 'package:share_app/ui/library/tiles.dart';
 import 'package:share_app/ui/settings_screen.dart';
 
@@ -288,6 +290,48 @@ void main() {
     await shot(tester, 'en/18-pins');
     await tester.tap(find.text('New PIN'));
     await shot(tester, 'en/19-new-pin');
+  }));
+
+  testWidgets('print a PIN', (tester) => atTen(() async {
+    await startApp(tester, signedInPhone(), admin());
+    await tester.tap(find.text('Settings').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Upload PINs'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(PopupMenuButton<VoidCallback>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Print'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextField, 'Family'), 'Anna & Marco');
+    FocusManager.instance.primaryFocus?.unfocus();
+    await shot(tester, 'en/69-print');
+  }));
+
+  // The page itself, as it is printed (71, 72).
+  testWidgets('a printed page', (tester) => atTen(() async {
+    tester.view.physicalSize = PrintPage.size;
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final texts = lookupAppLocalizations(const Locale('en'));
+    Widget page(PrintKind kind) => MaterialApp(
+          debugShowCheckedModeBanner: false,
+          home: PrintPage(Printed(
+            kind: kind,
+            title: 'Anna & Marco',
+            line: texts.printLine,
+            link: 'https://share.example.com/#ANNA5',
+            brand: 'Share',
+            texts: texts,
+            locale: 'en',
+            day: DateTime(2026, 10, 10),
+            code: 'ANNA5',
+            showsFolder: true,
+          )),
+        );
+    await tester.pumpWidget(page(PrintKind.poster));
+    await shot(tester, 'en/71-print-poster');
+    await tester.pumpWidget(page(PrintKind.cards));
+    await shot(tester, 'en/72-print-cards');
   }));
 
   testWidgets('invite someone', (tester) => atTen(() async {

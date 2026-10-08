@@ -187,6 +187,15 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
                 activity.startActivity(Intent.createChooser(send, null))
                 result.success(null)
             }
+            "print.page" -> {
+                try {
+                    PagePrinter.print(activity, call.argument<ByteArray>("png")!!, call.argument<String>("name") ?: "Share")
+                    result.success(null)
+                } catch (e: RuntimeException) {
+                    Log.w(TAG, "printing", e)
+                    result.error("failed", e.message, null)
+                }
+            }
             "transfer.download" -> {
                 askForNotifications()
                 background(result) { Downloads.enqueue(app, FileRef.parseList(call.argument<String>("files")), auth(call)) }

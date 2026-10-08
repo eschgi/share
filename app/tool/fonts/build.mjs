@@ -17,6 +17,7 @@ const dartOut = new URL('../../lib/ui/icons.dart', import.meta.url);
 const icons = {
   alert: 'circle-alert',
   back: 'arrow-left',
+  calendar: 'calendar',
   camera: 'camera',
   check: 'check',
   checkCircle: 'circle-check',
@@ -57,6 +58,7 @@ const icons = {
   play: 'play',
   playCircle: 'circle-play',
   plus: 'plus',
+  printer: 'printer',
   qrCode: 'qr-code',
   refresh: 'refresh-cw',
   rotate: 'rotate-ccw',
