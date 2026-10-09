@@ -42,5 +42,9 @@ class MainActivity : FlutterActivity() {
         /** From the downloads' notification: the app opens and starts them again. */
         const val ACTION_RETRY_DOWNLOADS = "com.eschgi.share.RETRY_DOWNLOADS"
         const val ACTION_RETRY_UPLOADS = "com.eschgi.share.RETRY_UPLOADS"
+
+        /** The aliases of this activity in share sheets (AndroidManifest.xml): Send as ZIP, and Open in Share for ZIPs. */
+        const val SEND_AS_ZIP = "com.eschgi.share.SendAsZip"
+        const val OPEN_IN_SHARE = "com.eschgi.share.OpenInShare"
     }
 }

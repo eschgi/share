@@ -74,6 +74,11 @@ object Fetcher {
         }
     }
 
+    /** The copy of [file] fetched into the cache goes, e.g. once it is packed into a ZIP. */
+    fun forget(context: Context, file: FileRef) {
+        File(File(context.applicationContext.cacheDir, "fetch"), file.id).deleteRecursively()
+    }
+
     /** The copy fetched into the cache earlier, if it is there whole. */
     fun cached(context: Context, file: FileRef): Uri? {
         val app = context.applicationContext

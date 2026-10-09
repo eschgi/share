@@ -17,9 +17,15 @@ import com.eschgi.share.transfer.TransferItem
 import com.eschgi.share.transfer.UploadBatch
 import com.eschgi.share.transfer.UploadRow
 import com.eschgi.share.transfer.UploadSnapshot
+import com.eschgi.share.zip.PackFile
+import com.eschgi.share.zip.PackSet
+import com.eschgi.share.zip.ShareJson
+import com.eschgi.share.zip.ZipEvents
+import com.eschgi.share.zip.ZipPlan
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import java.time.ZoneId
 
 /** The Kotlin half of contract/app/platform.json; test/platform_test.dart is the Dart half. */
 class PlatformContractTest {
@@ -162,6 +168,71 @@ class PlatformContractTest {
         val sent = answer["headers"] as Map<String, String>
         assertEquals(expected.getJSONObject("headers").keys().asSequence().toSet(), sent.keys) // the app's name only, no key
         assertEquals(fixture.getJSONObject("play_copy").keys().asSequence().toSet(), answer.keys)
+    }
+
+    private fun fixtureMap(name: String) = fixture.getJSONObject(name).toMap().numbersAsLong()
+
+    @Test
+    fun filesToPackAreWhatDartReads() {
+        val take = fixture.getJSONObject("zip_take")
+        val files = take.getJSONArray("files")
+        assertEquals(files.getJSONObject(0).toMap().numbersAsLong(), ZipEvents.file(PackFile("IMG_20261004_161502.jpg", 20_000_000, "image/jpeg", 1_791_123_302_000), "photo", true).numbersAsLong())
+        assertEquals(files.getJSONObject(1).toMap().numbersAsLong(), ZipEvents.file(PackFile("VID_20261004_161944.mp4", 36_000_000, "video/mp4", 1_791_123_584_000), "video", false).numbersAsLong())
+    }
+
+    @Test
+    fun aPlanIsWhatDartReads() {
+        // Three files in ZIPs of at most 300,000 bytes: two photos, and a video cut into three pieces.
+        val t0 = 1_791_123_302_000L
+        val set = PackSet("1c6f3a62-5d0e-4c9b-9f7e-2b8f0f4d6a11", "Photos 4 Oct 2026", "Made with Share.", t0, "0.2.0", ZoneId.of("Europe/Rome"))
+        val files = listOf(PackFile("IMG_20261004_161502.jpg", 100_000, "image/jpeg", t0), PackFile("IMG_20261004_161503.jpg", 120_000, "image/jpeg", t0 + 1000), PackFile("VID_20261004_161944.mp4", 500_000, "video/mp4", t0 + 2000))
+        val made = ZipEvents.plan(ZipPlan.make(files, 300_000, set)).numbersAsLong()
+        // The bytes depend on every header; the rest is as Dart reads it.
+        fun withoutBytes(m: Map<String, Any?>): Map<String, Any?> =
+            @Suppress("UNCHECKED_CAST")
+            (m + ("parts" to (m["parts"] as List<Map<String, Any?>>).map { it - "bytes" }))
+        assertEquals(withoutBytes(fixtureMap("zip_plan")), withoutBytes(made))
+        @Suppress("UNCHECKED_CAST")
+        assertEquals(true, (made["parts"] as List<Map<String, Any?>>).all { (it["bytes"] as Long) <= 300_000 })
+        val ready = ZipEvents.ready(ZipPlan.make(files.take(1), null, set), listOf("Photos 4 Oct 2026.zip")).numbersAsLong()
+        assertEquals(fixtureMap("zip_ready").keys, ready.keys)
+    }
+
+    @Test
+    fun packingEventsAreWhatDartReads() {
+        assertEquals(fixtureMap("zip_packing"), ZipEvents.packing(8, 14, 200_000_000, 312_000_000, 1, 1, null).numbersAsLong())
+        assertEquals(fixtureMap("zip_no_room"), ZipEvents.noRoom(7_012_000_000, 3_100_000_000).numbersAsLong())
+        assertEquals(fixtureMap("zip_failed"), ZipEvents.failed("changed", "IMG_20261004_161502.jpg").numbersAsLong())
+        assertEquals(fixtureMap("zip_sent"), ZipEvents.sent(0, "WhatsApp").numbersAsLong())
+    }
+
+    @Test
+    fun whatAZipHoldsIsWhatDartReads() {
+        val piece = ShareJson.Piece("VID_20261017_141502.mp4", 1, 2, 0, 2_412_345_678, listOf(3, 4))
+        val contents = ZipEvents.contents(
+            name = "Dolomites 15–18 Oct 2026",
+            zips = 1,
+            broken = 0,
+            newer = false,
+            set = ZipEvents.set(4, listOf(3), listOf(1, 2), "phone", null),
+            fromWhatsapp = true,
+            bytes = 1_875_000_000,
+            files = listOf(
+                ZipEvents.entry(0, "IMG_20261017_101502.jpg", "photo", 70_000_000, readable = true, saved = false, piece = null),
+                ZipEvents.entry(1, "VID_20261017_141502.mp4.001", "video", 1_105_000_000, readable = true, saved = false, piece = piece),
+            ),
+            joins = listOf(ZipEvents.join("VID_20261017_141502.mp4", "video", 2_412_345_678, 2, listOf(1), listOf(3, 4))),
+        )
+        assertEquals(fixtureMap("zip_contents"), contents.numbersAsLong())
+        assertEquals(fixtureMap("zip_saving"), ZipEvents.saving(7, 14, 150_000_000, 312_000_000).numbersAsLong())
+        val saved = ZipEvents.saved(
+            11,
+            listOf(mapOf("file" to "VID_20261017_141502.mp4", "kind" to "video", "total" to 2_412_345_678L, "parts" to listOf(3, 4))),
+            listOf(mapOf("file" to "IMG_20261017_103001.jpg", "part" to 3)),
+            "phone",
+            null,
+        )
+        assertEquals(fixtureMap("zip_saved"), saved.numbersAsLong())
     }
 
     @Test

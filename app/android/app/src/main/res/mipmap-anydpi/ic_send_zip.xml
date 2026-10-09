@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Send as ZIP in share sheets: Share's colours, with an archive instead of the photos. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/accent" />
+    <foreground android:drawable="@drawable/ic_zip_foreground" />
+    <monochrome android:drawable="@drawable/ic_zip_foreground" />
+</adaptive-icon>

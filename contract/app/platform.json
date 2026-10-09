@@ -1,5 +1,5 @@
 {
-  "notes": "What the app's Dart side and its Kotlin side hand each other over the platform channel (app/lib/data/platform.dart, app/android/app/src/main/kotlin/com/eschgi/share/platform/PlatformChannel.kt). Both sides' tests read this file. server_config is what server.save stores and the downloads read; files is the argument of transfer.download (and of file.share, file.open, file.play and the keys calls): each file with its folder and, for an encrypted one (docs/e2ee-plan.md), its enc as the API gives it plus plain_size, the file's size, which Kotlin decrypts it with; the events arrive on com.eschgi.share/events. device_id is the phone's id on the server, for the proof it asks of a server over plain http (api/home_proof.json); public_verified says whether a public address over plain http passed that on this network. The upload event is the batch in upload_rows, with a few of its files: the last one sent, the one on its way and the next ones. Signed in, files go into a folder: upload.pick {what, auth, folder} and shared.send {auth, folder} name it, and the upload event says it (null with a PIN, which sends into its own). A batch whose folder is gone, or no longer the person's, is paused with folder_gone; upload.resume {auth, folder} sends it into the folder chosen instead. transfer.download, file.share, file.open and file.play take auth too: device (the default) with the phone's key over the route it picked, or pin for a PIN that shows its folder, with the PIN's key over the public address only; a PIN that ended fails only its own downloads. The transfer event is the batch in batch_items: skipped files don't count towards the totals. file.play {file} answers where the player plays a video or sound from: play_copy, a copy on the phone (saved, or fetched into the cache first over the https port at home, whose own certificate the player can't pin), or play_stream, the server with the phone's key, or with the files in a bucket play_s3, the file's link there exactly as the server signed it (a query with escapes that must stay as they are) and no key; null if the fetch was cancelled. screen.awake {on} keeps the screen on while something plays. print.page {png, name} hands one page to Android's printing, which lists the printers nearby and Save as PDF: png is a PIN's poster or four table cards as the Dart side draws them, an A4 page at 300 dpi (2480 × 3507), which fills the paper's printable area as far as its shape allows; name is the print job's and the PDF's. The keys for encrypted folders live in Kotlin (keys.sync, keys.thumb, keys.decrypt and the rest of keys.*); keys.sync {password, quiet} opens them, with the password just typed, or quietly for a check-in, which neither passes through loading nor changes the status when it fails; a keys event (keys_event) says where the phone stands: status off, loading, ready, waiting or failed; has_recovery; lacks_root, there is a recovery key but this phone doesn't hold its private key, which making folders, switching their encryption and renaming plain ones need (another admin passes it on with an OK); encrypted_folders, how many the person sees; open, the folder key versions open here as folder:version; asks, whom the phone would pass keys on to after a check (docs/e2ee-plan.md): a device of the person (kind device, its name, client app or web, since when it is signed in) or a person (kind person, name, the folders they wait for, root when they are an admin who gets the recovery key's private key too, key_changed when their key was checked here before and is new now), with code once the other side answered, null before; codes, the codes this phone shows for checks others ask (kind, from: the asking device's name, code); waits_for_folders, the person waits for keys of folders they see; pace, milliseconds until the next check-in. The library lists the asks; nothing opens by itself: keys.show {kind, id} opens one (Show), which starts its check, keys.hide {kind, id} closes it (Not now) and ends the check, keys.allow {kind, id} passes the keys on after the person compared the code, keys.deny {kind, id} signs a device out (Not me); each answers the state. Admins: keys.encrypt_folder {folder, key_version} turns a folder's encryption on with its key's next version, keys.switch_off {folder, key_version, name} off with the recovery key's plain statement, both answering the folder as JSON; keys.new_folder {name} and keys.renamed {folder: the folder as JSON, name} answer the body to POST /api/folders or PATCH /api/folders/{id} with, signed where it needs to be (api/folder_create.json). keys.invite_keys {folders} answers {secret, keys, root}, keys.person_key {secret, locked, root}, keys.from_invite {secret, keys, root} takes what an invite brought; keys.pin_secret {folder} answers {secret, body}, keys.pin_link_secret {folder, locked, version} the secret of a PIN that shows its folder, keys.pin_link_root {folder} the root's fingerprint for the link of a PIN that only sends into a folder with keys, or null. keys.pin_link {secret, root}, after a PIN is unlocked, keeps what its link carried after the code (or forgets it, for a typed code), which the PIN's uploads check the folder's key with, and opens the folder with the secret. A keys call fails with sealed while a key isn't open here, needs_root while this phone doesn't hold the recovery key's private key, offline without an answer, or the server's error code. An upload that fails because the server's word about its folder's keys can't be checked has the error unchecked, and the upload event counts those among the failed as unchecked.",
+  "notes": "What the app's Dart side and its Kotlin side hand each other over the platform channel (app/lib/data/platform.dart, app/android/app/src/main/kotlin/com/eschgi/share/platform/PlatformChannel.kt). Both sides' tests read this file. server_config is what server.save stores and the downloads read; files is the argument of transfer.download (and of file.share, file.open, file.play and the keys calls): each file with its folder and, for an encrypted one (docs/e2ee-plan.md), its enc as the API gives it plus plain_size, the file's size, which Kotlin decrypts it with; the events arrive on com.eschgi.share/events. device_id is the phone's id on the server, for the proof it asks of a server over plain http (api/home_proof.json); public_verified says whether a public address over plain http passed that on this network. The upload event is the batch in upload_rows, with a few of its files: the last one sent, the one on its way and the next ones. Signed in, files go into a folder: upload.pick {what, auth, folder} and shared.send {auth, folder} name it, and the upload event says it (null with a PIN, which sends into its own). A batch whose folder is gone, or no longer the person's, is paused with folder_gone; upload.resume {auth, folder} sends it into the folder chosen instead. transfer.download, file.share, file.open and file.play take auth too: device (the default) with the phone's key over the route it picked, or pin for a PIN that shows its folder, with the PIN's key over the public address only; a PIN that ended fails only its own downloads. The transfer event is the batch in batch_items: skipped files don't count towards the totals. file.play {file} answers where the player plays a video or sound from: play_copy, a copy on the phone (saved, or fetched into the cache first over the https port at home, whose own certificate the player can't pin), or play_stream, the server with the phone's key, or with the files in a bucket play_s3, the file's link there exactly as the server signed it (a query with escapes that must stay as they are) and no key; null if the fetch was cancelled. screen.awake {on} keeps the screen on while something plays. print.page {png, name} hands one page to Android's printing, which lists the printers nearby and Save as PDF: png is a PIN's poster or four table cards as the Dart side draws them, an A4 page at 300 dpi (2480 × 3507), which fills the paper's printable area as far as its shape allows; name is the print job's and the PDF's. The keys for encrypted folders live in Kotlin (keys.sync, keys.thumb, keys.decrypt and the rest of keys.*); keys.sync {password, quiet} opens them, with the password just typed, or quietly for a check-in, which neither passes through loading nor changes the status when it fails; a keys event (keys_event) says where the phone stands: status off, loading, ready, waiting or failed; has_recovery; lacks_root, there is a recovery key but this phone doesn't hold its private key, which making folders, switching their encryption and renaming plain ones need (another admin passes it on with an OK); encrypted_folders, how many the person sees; open, the folder key versions open here as folder:version; asks, whom the phone would pass keys on to after a check (docs/e2ee-plan.md): a device of the person (kind device, its name, client app or web, since when it is signed in) or a person (kind person, name, the folders they wait for, root when they are an admin who gets the recovery key's private key too, key_changed when their key was checked here before and is new now), with code once the other side answered, null before; codes, the codes this phone shows for checks others ask (kind, from: the asking device's name, code); waits_for_folders, the person waits for keys of folders they see; pace, milliseconds until the next check-in. The library lists the asks; nothing opens by itself: keys.show {kind, id} opens one (Show), which starts its check, keys.hide {kind, id} closes it (Not now) and ends the check, keys.allow {kind, id} passes the keys on after the person compared the code, keys.deny {kind, id} signs a device out (Not me); each answers the state. Admins: keys.encrypt_folder {folder, key_version} turns a folder's encryption on with its key's next version, keys.switch_off {folder, key_version, name} off with the recovery key's plain statement, both answering the folder as JSON; keys.new_folder {name} and keys.renamed {folder: the folder as JSON, name} answer the body to POST /api/folders or PATCH /api/folders/{id} with, signed where it needs to be (api/folder_create.json). keys.invite_keys {folders} answers {secret, keys, root}, keys.person_key {secret, locked, root}, keys.from_invite {secret, keys, root} takes what an invite brought; keys.pin_secret {folder} answers {secret, body}, keys.pin_link_secret {folder, locked, version} the secret of a PIN that shows its folder, keys.pin_link_root {folder} the root's fingerprint for the link of a PIN that only sends into a folder with keys, or null. keys.pin_link {secret, root}, after a PIN is unlocked, keeps what its link carried after the code (or forgets it, for a typed code), which the PIN's uploads check the folder's key with, and opens the folder with the secret. A keys call fails with sealed while a key isn't open here, needs_root while this phone doesn't hold the recovery key's private key, offline without an answer, or the server's error code. An upload that fails because the server's word about its folder's keys can't be checked has the error unchecked, and the upload event counts those among the failed as unchecked. ZIPs (docs/zip-plan.md) move in Kotlin too. A share sheet's Send as ZIP, or ZIPs opened with Share, arrive as an event zip_in; zip.take answers once what arrived: zip_take, files to pack, or {kind: open}. zip.pick (the photo picker) and zip.library {files, taken, auth} (library files with when each arrived, in ms) answer the files to pack as zip_take's files have them. zip.thumb {index} is a small JPEG of one of them, if it's on the phone. zip.plan {name, about, limit} answers zip_plan: the parts a limit in bytes makes (null: one ZIP), with the pieces of cut files, or too_many over 100. zip.pack {name, about, part_name, limit} packs, part_name with {name}, {part} and {parts} in it; events of type zip say how it goes: zip_packing, then zip_ready (zip_plan with each part's file name), zip_no_room, zip_failed (reason changed, no_room or failed) or stopped after zip.stop. zip.send {part} hands one part, or all without a part, to Android's share sheet; zip_sent says which app took it. zip.save_downloads answers how many ZIPs it copied into Download/Share, and zip.close forgets the files waiting. zip.contents answers zip_contents: the ZIPs opened, their set as this phone knows it, every file, and the cut files with the pieces this phone has (from before, or in the ZIPs open). zip.open_thumb {index} answers {jpeg, duration_ms}. zip.save {to: phone or folder, folder} saves what's open; events of type zip_save say how it goes: zip_saving, then zip_saved (with the cut files put back together and the broken ones), no_room or failed. zip.close_opened gives the ZIPs back. gallery.open opens the phone's gallery app, storage.free Android's way to free up space.",
   "server_config": {
     "public_url": "https://share.example.com",
     "local_url": "https://192.168.8.1:8443",
@@ -268,5 +268,216 @@
     ],
     "waits_for_folders": false,
     "pace": 5000
+  },
+  "zip_take": {
+    "kind": "pack",
+    "files": [
+      {
+        "name": "IMG_20261004_161502.jpg",
+        "size": 20000000,
+        "type": "image/jpeg",
+        "kind": "photo",
+        "taken": 1791123302000,
+        "on_phone": true
+      },
+      {
+        "name": "VID_20261004_161944.mp4",
+        "size": 36000000,
+        "type": "video/mp4",
+        "kind": "video",
+        "taken": 1791123584000,
+        "on_phone": false
+      }
+    ],
+    "skipped": 1
+  },
+  "zip_plan": {
+    "too_many": false,
+    "parts": [
+      {
+        "number": 1,
+        "name": null,
+        "bytes": 299701,
+        "files": 2,
+        "pieces": [
+          {
+            "file": "VID_20261004_161944.mp4",
+            "number": 1,
+            "pieces": 3
+          }
+        ]
+      },
+      {
+        "number": 2,
+        "name": null,
+        "bytes": 299850,
+        "files": 0,
+        "pieces": [
+          {
+            "file": "VID_20261004_161944.mp4",
+            "number": 2,
+            "pieces": 3
+          }
+        ]
+      },
+      {
+        "number": 3,
+        "name": null,
+        "bytes": 123118,
+        "files": 0,
+        "pieces": [
+          {
+            "file": "VID_20261004_161944.mp4",
+            "number": 3,
+            "pieces": 3
+          }
+        ]
+      }
+    ],
+    "cut": [
+      {
+        "name": "VID_20261004_161944.mp4",
+        "size": 500000,
+        "parts": [
+          1,
+          2,
+          3
+        ]
+      }
+    ]
+  },
+  "zip_packing": {
+    "type": "zip",
+    "state": "packing",
+    "files_done": 8,
+    "files": 14,
+    "bytes_done": 200000000,
+    "bytes_total": 312000000,
+    "part": 1,
+    "parts": 1,
+    "fetching": null
+  },
+  "zip_ready": {
+    "type": "zip",
+    "state": "ready",
+    "too_many": false,
+    "parts": [
+      {
+        "number": 1,
+        "name": "Photos 4 Oct 2026.zip",
+        "bytes": 312004000,
+        "files": 14,
+        "pieces": []
+      }
+    ],
+    "cut": []
+  },
+  "zip_no_room": {
+    "type": "zip",
+    "state": "no_room",
+    "needed": 7012000000,
+    "free": 3100000000
+  },
+  "zip_failed": {
+    "type": "zip",
+    "state": "failed",
+    "reason": "changed",
+    "file": "IMG_20261004_161502.jpg"
+  },
+  "zip_sent": {
+    "type": "zip_sent",
+    "part": 0,
+    "app": "WhatsApp"
+  },
+  "zip_contents": {
+    "name": "Dolomites 15–18 Oct 2026",
+    "zips": 1,
+    "broken": 0,
+    "newer": false,
+    "set": {
+      "parts": 4,
+      "here": [
+        3
+      ],
+      "saved": [
+        1,
+        2
+      ],
+      "to": "phone",
+      "folder": null
+    },
+    "from_whatsapp": true,
+    "bytes": 1875000000,
+    "files": [
+      {
+        "index": 0,
+        "name": "IMG_20261017_101502.jpg",
+        "kind": "photo",
+        "size": 70000000,
+        "readable": true,
+        "saved": false,
+        "piece": null
+      },
+      {
+        "index": 1,
+        "name": "VID_20261017_141502.mp4.001",
+        "kind": "video",
+        "size": 1105000000,
+        "readable": true,
+        "saved": false,
+        "piece": {
+          "file": "VID_20261017_141502.mp4",
+          "number": 1,
+          "pieces": 2
+        }
+      }
+    ],
+    "joins": [
+      {
+        "file": "VID_20261017_141502.mp4",
+        "kind": "video",
+        "total": 2412345678,
+        "pieces": 2,
+        "have": [
+          1
+        ],
+        "parts": [
+          3,
+          4
+        ]
+      }
+    ]
+  },
+  "zip_saving": {
+    "type": "zip_save",
+    "state": "saving",
+    "done": 7,
+    "total": 14,
+    "bytes_done": 150000000,
+    "bytes_total": 312000000
+  },
+  "zip_saved": {
+    "type": "zip_save",
+    "state": "done",
+    "saved": 11,
+    "joined": [
+      {
+        "file": "VID_20261017_141502.mp4",
+        "kind": "video",
+        "total": 2412345678,
+        "parts": [
+          3,
+          4
+        ]
+      }
+    ],
+    "broken": [
+      {
+        "file": "IMG_20261017_103001.jpg",
+        "part": 3
+      }
+    ],
+    "to": "phone",
+    "folder": null
   }
 }

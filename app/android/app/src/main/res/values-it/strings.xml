@@ -2,6 +2,8 @@
 <resources>
     <!-- The app in other apps' share sheets. -->
     <string name="send_with_share">Invia con Share</string>
+    <string name="send_as_zip">Invia come ZIP</string>
+    <string name="open_in_share">Apri in Share</string>
 
     <string name="downloads_channel">Download</string>
     <string name="downloads_saving">Salvataggio su questo telefono</string>

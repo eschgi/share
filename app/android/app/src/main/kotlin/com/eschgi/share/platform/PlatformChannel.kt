@@ -13,6 +13,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.PersistableBundle
+import android.os.storage.StorageManager
 import android.provider.Settings
 import android.util.Log
 import android.view.WindowManager
@@ -42,6 +43,8 @@ import com.eschgi.share.transfer.Picked
 import com.eschgi.share.transfer.Playback
 import com.eschgi.share.transfer.UploadBatch
 import com.eschgi.share.transfer.Uploads
+import com.eschgi.share.zip.ZipOpening
+import com.eschgi.share.zip.ZipSending
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
@@ -73,10 +76,20 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
     private var picking: Triple<MethodChannel.Result, String, String?>? = null
     /** Who hears of the scan under way. */
     private var scanning: MethodChannel.Result? = null
+    /** Who hears of the photo picker opened for a ZIP. */
+    private var zipPicking: MethodChannel.Result? = null
+
+    /**
+     * ZIPs (docs/zip-plan.md): what arrived for the Dart side to take, "pack" or "open", and one thread
+     * for them, so that taking it waits until the files are described or the ZIPs open.
+     */
+    @Volatile private var zipWaiting: String? = null
+    private val zipIo = Executors.newSingleThreadExecutor()
 
     private val routeListener: (RouteStatus) -> Unit = { send(it.toMap() + ("type" to "route")) }
     private val transferListener: (Map<String, Any?>) -> Unit = { send(it) }
     private val keysListener: (Map<String, Any?>) -> Unit = { send(it) }
+    private val zipListener: (Map<String, Any?>) -> Unit = { send(it) }
 
     init {
         methods.setMethodCallHandler(this)
@@ -85,6 +98,9 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
         io.execute {
             Downloads.resumeIfNeeded(app)
             Uploads.resumeIfNeeded(app)
+            // ZIPs sent a day ago, and pieces two weeks old, go by themselves.
+            ZipSending.trim(app)
+            ZipOpening.inbox(app).trim()
         }
     }
 
@@ -93,6 +109,7 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
         events.setStreamHandler(null)
         onCancel(null)
         io.shutdown()
+        zipIo.shutdown()
     }
 
     /** An intent that opened the app, or reached it while open. */
@@ -100,6 +117,8 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
         if (intent == null) return
         if (intent.action == MainActivity.ACTION_RETRY_DOWNLOADS) io.execute { Downloads.retry(app) }
         if (intent.action == MainActivity.ACTION_RETRY_UPLOADS) io.execute { Uploads.retry(app) }
+        if (isSendAsZip(intent)) return receiveZip(intent, ZIP_PACK, initial)
+        if (isZipToOpen(intent)) return receiveZip(intent, ZIP_OPEN, initial)
         if (Outbox.isShare(intent)) return receiveShare(intent, initial)
         val link = linkOf(intent) ?: return
         if (initial) initialLink = link else send(mapOf("type" to "link", "url" to link))
@@ -122,6 +141,34 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
                 Outbox.Received(0, uris.size)
             }
             send(sharedEvent(received.skipped))
+        }
+    }
+
+    /** The share sheet's Send as ZIP. */
+    private fun isSendAsZip(intent: Intent) = Outbox.isShare(intent) && intent.component?.className == MainActivity.SEND_AS_ZIP
+
+    /** A ZIP opened with Share (Open with), or ZIPs shared to Open in Share. */
+    private fun isZipToOpen(intent: Intent): Boolean {
+        if (Outbox.isShare(intent)) return intent.component?.className == MainActivity.OPEN_IN_SHARE
+        if (intent.action != Intent.ACTION_VIEW || intent.data?.scheme != "content" && intent.data?.scheme != "file") return false
+        return intent.type in ZIP_TYPES || intent.data?.lastPathSegment.orEmpty().endsWith(".zip", ignoreCase = true)
+    }
+
+    /**
+     * Files for a ZIP, or ZIPs to open: the app that lends them allows it only while this screen is
+     * there, so they are described or opened at once; the Dart side takes them with zip.take.
+     */
+    private fun receiveZip(intent: Intent, kind: String, initial: Boolean) {
+        val uris = if (Outbox.isShare(intent)) Outbox.uris(intent) else listOfNotNull(intent.data)
+        if (uris.isEmpty()) return
+        zipIo.execute {
+            try {
+                if (kind == ZIP_PACK) ZipSending.fromUris(app, uris) else ZipOpening.open(app, uris)
+                zipWaiting = kind
+                if (!initial) send(mapOf("type" to "zip_in", "kind" to kind))
+            } catch (e: Exception) {
+                Log.w(TAG, "receiving a ZIP", e)
+            }
         }
     }
 
@@ -275,6 +322,86 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
                 result.success(null)
             }
             "cache.dir" -> result.success(app.cacheDir.absolutePath)
+            "zip.take" -> zipIo.execute {
+                val kind = zipWaiting
+                zipWaiting = null
+                val value = when (kind) {
+                    ZIP_PACK -> mapOf("kind" to kind, "files" to ZipSending.waiting(), "skipped" to ZipSending.lastSkipped)
+                    ZIP_OPEN -> mapOf("kind" to kind)
+                    else -> null
+                }
+                main.post { result.success(value) }
+            }
+            "zip.pick" -> {
+                zipPicking?.success(null) // an earlier pick that never came back
+                zipPicking = result
+                try {
+                    activity.startActivityForResult(
+                        ActivityResultContracts.PickMultipleVisualMedia().createIntent(activity, PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)),
+                        REQUEST_ZIP_PICK,
+                    )
+                } catch (e: ActivityNotFoundException) {
+                    zipPicking = null
+                    result.error("no_app", e.message, null)
+                }
+            }
+            "zip.library" -> background(result) {
+                ZipSending.fromLibrary(app, FileRef.parseList(call.argument<String>("files")), call.argument<List<Number>>("taken").orEmpty().map { it.toLong() }, auth(call))
+            }
+            "zip.thumb" -> background(result) { ZipSending.thumb(app, call.argument<Int>("index") ?: -1) }
+            "zip.plan" -> background(result) {
+                ZipSending.plan(call.argument<String>("name") ?: "", call.argument<String>("about") ?: "", call.argument<Number>("limit")?.toLong())
+            }
+            "zip.pack" -> {
+                ZipSending.pack(app, call.argument<String>("name") ?: "", call.argument<String>("about") ?: "", call.argument<String>("part_name") ?: "{name} ({part}/{parts})", call.argument<Number>("limit")?.toLong())
+                result.success(null)
+            }
+            "zip.stop" -> background(result) {
+                ZipSending.stop()
+                null
+            }
+            "zip.send" -> {
+                try {
+                    ZipSending.send(activity, call.argument<Int>("part"))
+                    result.success(null)
+                } catch (e: ActivityNotFoundException) {
+                    result.error("no_app", e.message, null)
+                }
+            }
+            "zip.save_downloads" -> background(result) { ZipSending.saveToDownloads(app) }
+            "zip.close" -> background(result) {
+                ZipSending.close()
+                null
+            }
+            "zip.contents" -> background(result) { ZipOpening.contents(app) }
+            "zip.open_thumb" -> background(result) { ZipOpening.thumb(call.argument<Int>("index") ?: -1) }
+            "zip.save" -> background(result) {
+                val to = call.argument<String>("to") ?: ZipOpening.PHONE
+                ZipOpening.save(app, to, call.argument<String>("folder"))
+                if (to == ZipOpening.FOLDER) send(sharedEvent())
+                null
+            }
+            "zip.close_opened" -> background(result) {
+                ZipOpening.close()
+                null
+            }
+            "gallery.open" -> {
+                try {
+                    activity.startActivity(Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_GALLERY))
+                    result.success(null)
+                } catch (e: ActivityNotFoundException) {
+                    result.error("no_app", e.message, null)
+                }
+            }
+            "storage.free" -> {
+                // Android's own way to free up space.
+                try {
+                    activity.startActivity(Intent(StorageManager.ACTION_MANAGE_STORAGE))
+                    result.success(null)
+                } catch (e: ActivityNotFoundException) {
+                    result.error("no_app", e.message, null)
+                }
+            }
             else -> if (call.method.startsWith("keys.")) keys(call, result) else result.notImplemented()
         }
     }
@@ -373,6 +500,8 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
         Downloads.listen(transferListener)
         Uploads.listen(transferListener)
         Keys.listen(keysListener)
+        ZipSending.listen(zipListener)
+        ZipOpening.listen(zipListener)
         io.execute {
             // A new listener starts from where things are, not from the next change.
             send(RouteMonitor.current(app).toMap() + ("type" to "route"))
@@ -389,6 +518,8 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
         Downloads.unlisten(transferListener)
         Uploads.unlisten(transferListener)
         Keys.unlisten(keysListener)
+        ZipSending.unlisten(zipListener)
+        ZipOpening.unlisten(zipListener)
     }
 
     /** What to send: from the photo picker, or any files from the document picker. */
@@ -436,6 +567,10 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
             onScanned(resultCode, data)
             return true
         }
+        if (requestCode == REQUEST_ZIP_PICK) {
+            onZipPicked(resultCode, data)
+            return true
+        }
         if (requestCode != REQUEST_PICK) return false
         val (result, auth, folder) = picking ?: return true
         picking = null
@@ -459,6 +594,30 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
             }
         }
         return true
+    }
+
+    /** Photos and videos picked for a ZIP: described for the screen, which packs them while it's open. */
+    private fun onZipPicked(resultCode: Int, data: Intent?) {
+        val result = zipPicking ?: return
+        zipPicking = null
+        val uris = LinkedHashSet<Uri>()
+        if (resultCode == Activity.RESULT_OK && data != null) {
+            data.data?.let { uris += it }
+            data.clipData?.let { clip -> for (i in 0 until clip.itemCount) clip.getItemAt(i).uri?.let { uris += it } }
+        }
+        if (uris.isEmpty()) {
+            result.success(null)
+            return
+        }
+        zipIo.execute {
+            val files = try {
+                ZipSending.fromUris(app, uris.toList())
+            } catch (e: Exception) {
+                Log.w(TAG, "describing picked files", e)
+                null
+            }
+            main.post { result.success(files) }
+        }
     }
 
     /** Name, size and type of a picked file, keeping the permission to read it after a restart. */
@@ -536,5 +695,9 @@ class PlatformChannel(private val activity: Activity, messenger: BinaryMessenger
         private const val REQUEST_NOTIFICATIONS = 7001
         private const val REQUEST_PICK = 7002
         private const val REQUEST_SCAN = 7003
+        private const val REQUEST_ZIP_PICK = 7004
+        private const val ZIP_PACK = "pack"
+        private const val ZIP_OPEN = "open"
+        private val ZIP_TYPES = setOf("application/zip", "application/x-zip-compressed", "application/x-zip")
     }
 }

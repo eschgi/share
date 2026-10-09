@@ -130,6 +130,31 @@ object Outbox {
         return file.copy(uri = FileProvider.getUriForFile(app, "${app.packageName}.files", copy).toString())
     }
 
+    /**
+     * A file made on this phone for sending, such as one out of a ZIP sent into a folder: it waits in
+     * the outbox as a shared copy does, and goes the same way. [write] fills the file.
+     */
+    fun keepMade(context: Context, name: String, mime: String, write: (File) -> Unit): Picked {
+        val app = context.applicationContext
+        val dir = File(File(app.filesDir, "outbox"), UUID.randomUUID().toString()).apply { mkdirs() }
+        val copy = File(dir, safeName(name))
+        try {
+            write(copy)
+        } catch (e: Exception) {
+            dir.deleteRecursively()
+            throw e
+        }
+        val file = Picked(FileProvider.getUriForFile(app, "${app.packageName}.files", copy).toString(), name, copy.length(), mime)
+        TransferDb.get(app).writableDatabase.insertOrThrow("shared", null, ContentValues().apply {
+            put("uri", file.uri)
+            put("name", file.name)
+            put("size", file.size)
+            put("mime", file.mime)
+            put("shared_at", System.currentTimeMillis())
+        })
+        return file
+    }
+
     /** The files waiting, in the order they were shared, with their place in the outbox. */
     private fun rows(context: Context): List<Pair<Long, Picked>> =
         TransferDb.get(context).readableDatabase.rawQuery("SELECT seq, uri, name, size, mime FROM shared ORDER BY seq", null).use { c ->

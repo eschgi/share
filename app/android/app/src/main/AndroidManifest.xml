@@ -70,7 +70,64 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="*/*" />
             </intent-filter>
+            <!-- Open with: a ZIP from a chat or Files opens in Share, which saves what's inside
+                 (docs/zip-plan.md). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/zip" />
+                <data android:mimeType="application/x-zip-compressed" />
+                <data android:mimeType="application/x-zip" />
+            </intent-filter>
         </activity>
+
+        <!-- "Send as ZIP" in other apps' share sheets: photos and videos packed in full quality, for
+             WhatsApp and the like (docs/zip-plan.md). It names the types it packs, so a share of only
+             ZIPs doesn't offer it; a mix arrives as */*, which matches any of them. -->
+        <activity-alias
+            android:name=".SendAsZip"
+            android:targetActivity=".MainActivity"
+            android:label="@string/send_as_zip"
+            android:icon="@mipmap/ic_send_zip"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+                <data android:mimeType="video/*" />
+                <data android:mimeType="audio/*" />
+                <data android:mimeType="text/*" />
+                <data android:mimeType="application/pdf" />
+                <data android:mimeType="application/rtf" />
+                <data android:mimeType="application/msword" />
+                <data android:mimeType="application/vnd.ms-excel" />
+                <data android:mimeType="application/vnd.ms-powerpoint" />
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.presentationml.presentation" />
+                <data android:mimeType="application/vnd.oasis.opendocument.text" />
+                <data android:mimeType="application/vnd.oasis.opendocument.spreadsheet" />
+                <data android:mimeType="application/vnd.oasis.opendocument.presentation" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- "Open in Share" for ZIPs: several parts shared at once, from Files or a chat, open as one
+             set. -->
+        <activity-alias
+            android:name=".OpenInShare"
+            android:targetActivity=".MainActivity"
+            android:label="@string/open_in_share"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/zip" />
+                <data android:mimeType="application/x-zip-compressed" />
+                <data android:mimeType="application/x-zip" />
+            </intent-filter>
+        </activity-alias>
 
         <!-- Android 14+: the host of downloads and uploads. Only the system binds it, and it is only ever
              scheduled from Android 14 on. -->
@@ -103,6 +160,11 @@
         <!-- The notification's Cancel. Not exported: only our own PendingIntent fires it. -->
         <receiver
             android:name=".transfer.TransferReceiver"
+            android:exported="false" />
+
+        <!-- Which app took a ZIP, from the share sheet. Not exported: only our own PendingIntent fires it. -->
+        <receiver
+            android:name=".zip.ZipChosenReceiver"
             android:exported="false" />
 
         <!-- Files fetched into the cache, handed to other apps for sharing or opening. -->

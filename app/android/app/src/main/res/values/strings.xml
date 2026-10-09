@@ -3,6 +3,9 @@
     <string name="app_name" translatable="false">Share</string>
     <!-- The app in other apps' share sheets. -->
     <string name="send_with_share">Send with Share</string>
+    <!-- The app in other apps' share sheets for ZIPs: photos packed in full quality, and ZIPs opened (docs/zip-plan.md). -->
+    <string name="send_as_zip">Send as ZIP</string>
+    <string name="open_in_share">Open in Share</string>
 
     <!-- Downloads (TransferNotification.kt) -->
     <string name="downloads_channel">Downloads</string>
