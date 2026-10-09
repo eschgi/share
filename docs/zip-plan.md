@@ -19,14 +19,20 @@ Asked by the user:
 - **Each ZIP holds a `share.json`** with what's in it.
 - **As easy as possible.**
 
-Proposed here, to be confirmed:
+Decided with the user on 2026-10-09, after the drawings:
+- **Into the Share folders, as downloads go now.** What a ZIP brings, whole or put back together,
+  goes into the album "Share" (`Pictures/Share`) and documents into `Download/Share`. No album
+  for each ZIP.
+- **The five choices** of where a ZIP goes, below, are right.
+- **Packed ZIPs delete themselves** a day after packing.
+- **The screens as drawn**, so a set's later parts are saved by themselves once one is.
+
+Also part of the drawings:
 - **Each ZIP opens on its own.** Files stay whole; only a file bigger than a whole ZIP is cut
   into pieces, and only its pieces need Share, or 7-Zip on a computer, to be joined. No split
   archive (`.z01`, `.z02`, `.zip`), which nothing opens part by part.
 - **Where it goes, not a size.** The sheet names apps, says how many ZIPs each one makes of these
   files, and remembers the choice.
-- **The name is the album's too.** The receiving phone saves photos and videos into an album
-  named after the ZIP, documents into `Download/Share/<name>`.
 - **Later parts follow the first.** Once a part of a set is saved, the set's other parts are saved
   the same way as soon as they're opened.
 - **Nothing piles up.** Packed ZIPs go a day after packing, and pieces waiting for their other
@@ -76,8 +82,7 @@ The proposal is a word for what the files are, and when they were taken:
 - The name becomes:
   - the ZIP's file name, `<name>.zip`, or for several `<name> (1 of 4).zip` in the phone's
     language;
-  - the name in `share.json`;
-  - on the other phone, the album's name.
+  - the name in `share.json`, which Share on the other phone shows over the files.
 
 ### Where it goes (98, 103)
 
@@ -255,15 +260,10 @@ Here it is for part 3 of Stefan's Dolomites (104):
 
 ### Saving (106, 107)
 
-- **Save to this phone**:
-  - photos and videos go into `Pictures/Share/<name>`, which the gallery shows as the album
-    <name>;
-  - documents go into `Download/Share/<name>`;
-  - both go through `MediaStoreSink` as downloads do, pending until complete, and each file's
-    CRC-32 is checked while it's copied.
-
-  `MediaStoreSink` gets the album as a parameter, which the albums for each folder (77 to 80) need
-  too.
+- **Save to this phone** puts photos and videos into the album "Share" (`Pictures/Share`) and
+  documents into `Download/Share`, as downloads do: through `MediaStoreSink`, pending until
+  complete, with each file's CRC-32 checked while it's copied. A name that's there already gets
+  MediaStore's own " (1)".
 - **Room** is checked first. Without it, the screen says how much is missing, with Free up space.
 - **Nothing twice**: what was saved is remembered by set and entry (for an ordinary ZIP, by its
   name, size and CRCs), so a part opened again says it's saved.
@@ -296,8 +296,8 @@ Here it is for part 3 of Stefan's Dolomites (104):
 ### Any ZIP
 
 A ZIP without `share.json`, from a computer or another app, opens the same way. Its files show,
-and Save puts photos and videos into an album named after the ZIP, and everything else into
-`Download/Share/<name>`, keeping the ZIP's folders. Pieces made by other tools aren't joined.
+and Save puts photos and videos into the album "Share" and everything else into `Download/Share`,
+without the ZIP's folders. Pieces made by other tools aren't joined.
 
 Safety, for any ZIP:
 - A name from a ZIP never leads outside Share's places: names are cleaned as above, and `..` and
@@ -403,6 +403,8 @@ In `contract/app/platform.json`:
   it sent and received. Saved (107) points that out on the other phone.
 - **Without Share**: an iPhone's Files app unpacks the ZIPs, but nothing there joins a cut video.
   Videos over 1.95 GB are rare: a few minutes of 4K.
+- **No phone here**: this machine has no emulator, so everything Android does (share sheets,
+  WhatsApp, MediaStore) is first seen on the Pixel.
 
 ## Order of work
 
@@ -422,11 +424,3 @@ In `contract/app/platform.json`:
 - ZIPs with a password: a ZIP is as readable as the photos in it, also those from an encrypted
   folder. For such files, the sheet in the library (101) adds a line saying that the ZIP isn't
   encrypted.
-
-## To decide
-
-1. An album for each ZIP, named after it (proposed), or everything into the album "Share"?
-2. The choices and their sizes, and whether Somewhere else is needed at all.
-3. Packed ZIPs deleted after a day (proposed), or kept until deleted by hand?
-4. Later parts saved by themselves once one is saved (proposed), or a Save for every part, as in
-   the drawings?
