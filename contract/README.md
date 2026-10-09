@@ -11,6 +11,9 @@ What the server, the website and the app must agree on, as JSON that each side's
 - `app/platform.json`: what the app's Dart and Kotlin halves hand each other over the platform
   channel: the stored server addresses, the files of a download, and the route and transfer
   events. Read by the Flutter tests and the Android unit tests.
+- `app/share_zip.json`: the `share.json` in every ZIP the app makes (docs/zip-plan.md): an example,
+  and broken or mismatched variants of it that must open as ordinary ZIPs. Read by the Android unit
+  tests.
 - `api/*.json`: one example request and response per endpoint: `method`, `path`, `auth`
   (`none`, `pin`, `device`, `admin`; `device` and `admin` mean the app's bearer token or a
   signed-in browser's cookie), `request`, `status` and `response`. The server's end-to-end

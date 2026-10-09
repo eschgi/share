@@ -1,0 +1,54 @@
+{
+  "notes": "share.json, the first entry of every ZIP the app makes (docs/zip-plan.md). example is part 3 of 4 of a set, as screen 104 makes it, and entries are its ZIP's other entries with their sizes: it must read as Share's and match them. Each of broken changes the example (change: fields set at the top, remove: fields taken away, file with change_file, remove_file or change_piece: fields set in or taken from one of its files, or set in that file's piece) and must read as not Share's, so the ZIP opens as an ordinary one. Each of mismatched reads as Share's but doesn't match entries, changed the same way or with other entries. newer is from a later version of the format. The app's Kotlin tests (ShareJsonTest) read this file.",
+  "example": {
+    "share_zip": 1,
+    "about": "Made with Share. Open every part with Share on an Android phone to save everything and put cut files back together. On a computer, 7-Zip joins the .001 and .002 files.",
+    "set": "1c6f3a62-5d0e-4c9b-9f7e-2b8f0f4d6a11",
+    "name": "Dolomites 15–18 Oct 2026",
+    "made": "2026-10-19T20:07:12+02:00",
+    "app": "0.2.0",
+    "part": 3,
+    "parts": 4,
+    "set_files": 52,
+    "set_bytes": 7012345678,
+    "files": [
+      {"entry": "IMG_20261017_101502.jpg", "type": "image/jpeg", "size": 4123456, "taken": "2026-10-17T10:15:02+02:00"},
+      {"entry": "VID_20261017_141502.mp4.001", "type": "video/mp4", "size": 1105000000, "taken": "2026-10-17T14:15:02+02:00", "piece": {"file": "VID_20261017_141502.mp4", "number": 1, "pieces": 2, "offset": 0, "total": 2412345678, "parts": [3, 4]}}
+    ]
+  },
+  "entries": {
+    "IMG_20261017_101502.jpg": 4123456,
+    "VID_20261017_141502.mp4.001": 1105000000
+  },
+  "broken": [
+    {"why": "no version", "remove": ["share_zip"]},
+    {"why": "an older version", "change": {"share_zip": 0}},
+    {"why": "no set", "remove": ["set"]},
+    {"why": "an empty set", "change": {"set": ""}},
+    {"why": "no name", "remove": ["name"]},
+    {"why": "a blank name", "change": {"name": "  "}},
+    {"why": "a part after the last one", "change": {"part": 5}},
+    {"why": "part 0", "change": {"part": 0}},
+    {"why": "no parts", "change": {"parts": 0}},
+    {"why": "more parts than any set has", "change": {"parts": 20000, "part": 1}},
+    {"why": "no files", "remove": ["files"]},
+    {"why": "a negative size", "file": 0, "change_file": {"size": -1}},
+    {"why": "a file without its entry", "file": 0, "remove_file": ["entry"]},
+    {"why": "a piece of a piece", "file": 1, "change_piece": {"pieces": 1}},
+    {"why": "piece 3 of 2", "file": 1, "change_piece": {"number": 3}},
+    {"why": "a negative offset", "file": 1, "change_piece": {"offset": -5}},
+    {"why": "an offset past the end", "file": 1, "change_piece": {"offset": 2412345678}},
+    {"why": "parts that don't hold every piece", "file": 1, "change_piece": {"parts": [3]}},
+    {"why": "a piece of a file in a folder", "file": 1, "change_piece": {"file": "../VID.mp4"}},
+    {"why": "not JSON", "text": "share_zip: 1"}
+  ],
+  "mismatched": [
+    {"why": "a size that isn't the entry's", "file": 0, "change_file": {"size": 4123457}},
+    {"why": "an entry the ZIP doesn't have", "file": 0, "change_file": {"entry": "IMG_1.jpg"}},
+    {"why": "an entry it doesn't list", "entries": {"IMG_20261017_101502.jpg": 4123456, "VID_20261017_141502.mp4.001": 1105000000, "extra.txt": 3}},
+    {"why": "a piece that runs past its file", "file": 1, "change_piece": {"offset": 2000000000}},
+    {"why": "a piece in a part that isn't this one", "file": 1, "change_piece": {"parts": [1, 2]}},
+    {"why": "a part list naming a part the set doesn't have", "file": 1, "change_piece": {"parts": [3, 5]}}
+  ],
+  "newer": {"share_zip": 2, "set": "x", "name": "From the future"}
+}
