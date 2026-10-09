@@ -35,6 +35,10 @@ A self-hosted place where family and friends drop photos, videos and documents.
   them, and only the phones and browsers of the people who see the folder open them: not the
   server, its drive or bucket, or its database. [End-to-end encryption](#end-to-end-encryption)
   says how, and what it doesn't protect.
+- **Photos in full quality over WhatsApp.** The Android app packs photos and videos into ZIPs,
+  which WhatsApp and other messengers pass on as they are, and on the other phone opens them into
+  the gallery, without a server or an account. A set too big for one ZIP goes in several, and a
+  video bigger than one is cut into pieces, which Share puts back together.
 - Files are stored as they were sent, in a directory per folder with one folder per upload day
   inside: `<storage_dir>/Family/2026-09-30/IMG_0001.jpg`, an encrypted folder's as their sender
   encrypted them. Or in an S3 bucket, such as Cloudflare R2, Backblaze B2, Amazon S3 or MinIO,
@@ -182,6 +186,19 @@ Both speak English, German and Italian.
   Signed in, it goes at once, or for someone who sees several folders once they chose one on the
   Send tab; with a PIN, with the PIN; with neither, it waits for one, or can be dropped. The files
   wait on the phone until the server has them.
+- **ZIPs for WhatsApp and the like** ([plan](docs/zip-plan.md)). Send as ZIP in another app's share
+  sheet, Share in the library or the viewer, or a card on the Send tab packs photos and videos as
+  they are into ZIPs as big as the app that carries them takes:
+  - 2 GB for WhatsApp and Telegram;
+  - 100 MB for Signal;
+  - 14 MB for email;
+  - any size for Quick Share or a computer, or a size of one's own.
+
+  Each ZIP opens on its own and holds a `share.json` saying what's in it. Only a file bigger than
+  a whole ZIP is cut, into pieces named as 7-Zip expects (`.001`, `.002`). On the other phone,
+  Open with Share shows what's inside and saves it into the album "Share" and `Download/Share`, as
+  downloads go. A set's later parts follow the first, and a cut file comes back together once its
+  pieces are in. Packed ZIPs go after a day, and pieces still waiting after two weeks.
 - The app plays videos and sound itself: a copy on the phone if there is one, else straight from the
   server, at home over its local address, or from the bucket. The website's viewer zooms into
   photos, with two fingers, a double tap, the mouse wheel or the keyboard.

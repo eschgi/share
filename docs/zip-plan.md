@@ -4,8 +4,9 @@ WhatsApp makes photos smaller and videos much smaller, unless they are sent as a
 is a document, so photos and videos packed into one arrive exactly as they were taken. Share makes
 such ZIPs on the phone, from the gallery's share sheet, the library or the Send tab, and Share on
 the other phone saves what's inside into its gallery. Packing and opening need no server, no
-account and no internet. Planned on 2026-10-09 from the user's drawings; the screens are 97 to 110
-of [share-mockup.html](share-mockup.html).
+account and no internet. Planned on 2026-10-09 from the user's drawings, and built the same day
+(commits 2f12638, 77a792b and 0b1ad9d); the screens are 97 to 110 of
+[share-mockup.html](share-mockup.html). What only a phone can show is under On the Pixel, below.
 
 Asked by the user:
 - **Only in the Android app, for now.** The server and the website don't change.
@@ -76,8 +77,8 @@ The proposal is a word for what the files are, and when they were taken:
 
   Dates are written in the phone's language: Fotos 4. Okt. 2026, Foto 4 ott 2026.
 - **Editing**: the field can be changed; `.zip` stays outside it.
-  - Characters that file systems refuse (`/ \ : * ? " < > |` and control characters) become a
-    dash, and leading and trailing dots and spaces go.
+  - Characters that file systems refuse (`/ \ : * ? " < > |` and control characters) become
+    `_`, and leading and trailing dots and spaces go.
   - The name is cut at 80 characters, and an empty one goes back to the proposal.
 - The name becomes:
   - the ZIP's file name, `<name>.zip`, or for several `<name> (1 of 4).zip` in the phone's
@@ -114,20 +115,20 @@ in the sheet, the parts' sizes and their names are exact.
 
 ### Packing (99)
 
-- `ZipPacker` writes the parts one after the other into Share's own storage, `files/zips/<id>/`.
-  It runs on a background thread while the screen is open. Packing is copying: seconds for a few
-  hundred MB, about a minute for 7 GB.
+- `ZipSending` writes the parts one after the other into Share's own storage, `files/zips/<id>/`,
+  on a thread of its own while the screen is open. Packing is copying: seconds for a few hundred
+  MB, about a minute for 7 GB.
 - `ZipWriter` reads each file once. It writes the local header with zeros for the CRC and sizes,
   copies the data while computing the CRC-32, then writes both into the header. This needs no
   data descriptors, which Android's `ZipInputStream` can't read for stored files.
 - **Room** is checked first: the set's size plus the 200 MB the outbox keeps free
   (`Outbox.SPARE`). Without it, the screen says how much is missing, with Free up space (Android's
   `ACTION_MANAGE_STORAGE`).
-- **A file that can't be read**, because the sharing app took it back or it was deleted meanwhile,
-  is left out and named afterwards.
+- **A file that can't be read**: a lent file that can't be read when it arrives is left out, and
+  the screen says how many. One that changes while packing stops it, and the screen names it.
 - **Progress** goes out as events: file i of n, bytes, part j of k.
 - **Stopping**: Stop packing deletes `files/zips/<id>`. If Android ends Share during packing, the
-  half-made folder goes at the next start.
+  half-made folder goes a day later, as packed ones do.
 - **Library files** that aren't on the phone are fetched into the cache one at a time, packed and
   deleted at once, so they need room for one file at a time.
 
@@ -140,8 +141,8 @@ in the sheet, the parts' sizes and their names are exact.
   - Share itself left out (`EXTRA_EXCLUDE_COMPONENTS`), so a ZIP isn't sent to the server or
     packed again by mistake.
 - **A part's arrow** sends just that part, for apps that take one at a time, as email does. The
-  chooser's callback (`EXTRA_CHOSEN_COMPONENT_INTENT_SENDER`) tells which app took it, so the row
-  can say "Sent to WhatsApp".
+  chooser's callback (`EXTRA_CHOSEN_COMPONENT_INTENT_SENDER`, `ZipChosenReceiver`) tells which app
+  took it, so the row can say "Sent with WhatsApp".
 - **Save to Downloads** copies the ZIPs into `Download/Share/` through MediaStore.
 - **Cleanup**: other apps read a ZIP when they like (WhatsApp while it uploads), so it can't go
   at once. Folders in `files/zips/` older than a day are deleted when Share starts and before the
@@ -188,26 +189,8 @@ Here it is for part 3 of Stefan's Dolomites (104):
   "set_files": 52,
   "set_bytes": 7012345678,
   "files": [
-    {
-      "entry": "IMG_20261017_101502.jpg",
-      "type": "image/jpeg",
-      "size": 4123456,
-      "taken": "2026-10-17T10:15:02+02:00"
-    },
-    {
-      "entry": "VID_20261017_141502.mp4.001",
-      "type": "video/mp4",
-      "size": 1105000000,
-      "taken": "2026-10-17T14:15:02+02:00",
-      "piece": {
-        "file": "VID_20261017_141502.mp4",
-        "number": 1,
-        "pieces": 2,
-        "offset": 0,
-        "total": 2412345678,
-        "parts": [3, 4]
-      }
-    }
+    {"entry": "IMG_20261017_101502.jpg", "type": "image/jpeg", "size": 4123456, "taken": "2026-10-17T10:15:02+02:00"},
+    {"entry": "VID_20261017_141502.mp4.001", "type": "video/mp4", "size": 1105000000, "taken": "2026-10-17T14:15:02+02:00", "piece": {"file": "VID_20261017_141502.mp4", "number": 1, "pieces": 2, "offset": 0, "total": 2412345678, "parts": [3, 4]}}
   ]
 }
 ```
@@ -223,7 +206,8 @@ Here it is for part 3 of Stefan's Dolomites (104):
   continues. Each piece's CRC-32 is in the ZIP itself.
 - `about` is in the sender's language, for someone who unpacks the ZIP without Share.
 - It says nothing about people, the server or the phone, only what the files are. It is written
-  with two-space indents, so it reads well in an editor, and its exact size is part of the plan.
+  the same way every time, with two-space indents and one line for each file, so it reads well in
+  an editor, and its exact size is part of the plan.
 - **Reading is strict.** Each of these makes the ZIP an ordinary one:
   - JSON that doesn't parse, or a missing field;
   - a negative or overlapping offset;
@@ -237,13 +221,15 @@ Here it is for part 3 of Stefan's Dolomites (104):
 
 ### Opening (105, 108)
 
-- **Open with**: an intent filter for `ACTION_VIEW` with `application/zip` and
-  `application/x-zip-compressed`. WhatsApp opens documents that way, and so does Files.
+- **Open with**: an intent filter for `ACTION_VIEW` with `application/zip`,
+  `application/x-zip-compressed` and `application/x-zip`. WhatsApp opens documents that way, and
+  so does Files.
 - **Several at once**: a third entry in the share sheet, Open in Share. It is an `<activity-alias>`
   with `ACTION_SEND` and `ACTION_SEND_MULTIPLE` for the same two types. From the Files app, or from
   WhatsApp if it lets several documents be shared, all parts arrive together and open as one
   set (108).
-- **Signed in or out**, the ZIP screen opens over whatever is there, as an invite does.
+- **Signed in or out**, the ZIP screen opens over whatever is there, as an invite does. Closing
+  it goes back to the app the ZIP came from, so the next part is a tap away.
 - **Reading**: `ZipReader` opens the URI with `openFileDescriptor("r")`, reads the end record (and
   Zip64's), then the central directory: names, sizes, CRCs and offsets.
   - Names are UTF-8, or the old IBM PC code page when the UTF-8 flag isn't set.
@@ -277,17 +263,19 @@ Here it is for part 3 of Stefan's Dolomites (104):
 
 ### Parts and pieces (108 to 110)
 
-- **Tables**: `TransferDb` version 7 adds
-  - `zip_sets`: set, name, parts, where its files went, when it was seen;
-  - `zip_parts`: set, part, when it was saved;
-  - `zip_pieces`: set, file, piece, offset, size, done.
-- **Chips** show which parts this phone has saved, from `zip_parts`.
+- **What's kept**: `ZipInbox`, in Share's own storage, `files/zip-in/<set>/`:
+  - `set.json`: the set's name and parts, the parts and entries saved, and where its files went;
+  - for each cut file, its bytes so far (`<key>.part`) and which pieces are in (`<key>.json`).
+
+  Plain files rather than tables, so the plain-Kotlin tests cover them.
+- **Chips** show which parts this phone has saved.
 - **Later parts follow**: once a part was saved or sent into a folder, the set's other parts do the
-  same as soon as they're opened (109). The screen shows the progress, then what was saved.
-- **Pieces** are written at their offset into one file for each cut file,
-  `files/zip-pieces/<set>/<n>`, and each is checked against its CRC-32 as it's written. When the
-  last one is in and the file has its `total` length, the file goes where the set's files went, and
-  the pieces' file is deleted (110).
+  same as soon as they're opened (109); into a folder only while sending still goes there. The
+  screen shows the progress, then what was saved.
+- **Pieces** are written at their offset into their file's `<key>.part`, and each is checked
+  against its CRC-32 as it's written. When the last one is in and the file has its `total` length,
+  the file goes where the set's files went, and its pieces go (110). Saving also delivers a whole
+  file left from an earlier try.
 - **A broken piece** is thrown away and named, so only its part has to be opened again ("Part 3 is
   damaged: open it again from the chat"). The other pieces stay.
 - **Pieces waiting more than two weeks** go by themselves when Share starts. The set's screen then
@@ -321,64 +309,78 @@ Safety, for any ZIP:
 
 ### Kotlin
 
-A new package, `zip`:
-- `ZipPlan`: the parts, their files and pieces, and exact sizes and names. Plain Kotlin.
-- `ZipWriter`: writes one part of the plan, filling in each header after its data.
+A new package, `zip`. Plain Kotlin, covered by JVM tests:
+- `ZipLayout` and `ZipWriter`: a ZIP of stored files, its exact size, and writing it, each header's
+  CRC-32 filled in after its data.
+- `ZipPlan`: the parts, their files and pieces, and exact sizes and names (`Names`).
 - `ShareJson`: writes and reads `share.json`.
-- `ZipPacker`: runs a plan: its sources (lent URIs, saved copies, fetched files), progress, Stop,
-  the room check and cleanup.
 - `ZipReader`: the central directory, the entries, Zip64, deflate, and a stream for each entry.
-- `ZipOpener`: an opened ZIP: thumbnails, saving, the outbox, pieces.
-- `ZipStore`: the tables, the pieces' files and their cleanup.
+- `ZipInbox`: the sets and the pieces this phone keeps, and their cleanup.
+- `ZipEvents`: the maps the Dart side reads.
+
+On Android:
+- `ZipSending`: the files waiting (lent URIs, saved copies, fetched files), the plans, packing, the
+  room check, sending and cleanup; `ZipChosenReceiver` hears which app took a part.
+- `ZipOpening`: the ZIPs open, their contents and thumbnails, saving, the outbox and pieces.
+- `Outbox.keepMade` takes a file made on the phone into the outbox; `Fetcher.forget` drops a
+  fetched copy once it's packed.
 
 In `PlatformChannel`, `onIntent` tells the aliases and `VIEW` apart from today's sharing.
 
 ### Platform channel
 
-In `contract/app/platform.json`:
-- `zip.files`: the files waiting to be packed (from the share sheet, the picker, or the library's
-  `{files, auth}`), each with name, size, type, when it was taken, and whether it's on the phone.
-- `zip.pick`: the photo picker, for a ZIP.
-- `zip.thumb {source, index}`: a small JPEG, for the screens before packing and after opening.
-- `zip.plan {limit}`: what a choice makes (the parts with their files, sizes and pieces), and the
-  count for every choice.
-- `zip.pack {name, limit}` and `zip.stop`; events `zip` with the state (packing, ready, failed),
-  file i of n, bytes and the parts.
-- `zip.send {part}` (all parts without one), and `zip.save_downloads`.
-- An event `zip_opened` when a ZIP arrives, and `zip.contents`: name, part, parts, chips, entries,
-  pieces waiting.
-- `zip.save {to: "phone" | "folder", folder}`, with progress events, and `gallery.open`.
+In `contract/app/platform.json`, with a fixture for each answer and event (zip_*):
+- An event `zip_in` when something arrives from another app; `zip.take` answers it once: files to
+  pack, or ZIPs to open.
+- `zip.pick` (the photo picker) and `zip.library {files, taken, auth}` answer the files to pack,
+  each with name, size, type, when it was taken, and whether it's on the phone.
+- `zip.thumb {index}`: a small JPEG of a file to pack.
+- `zip.plan {name, about, limit}`: what a choice makes, the parts with their files, sizes and
+  pieces, or too many.
+- `zip.pack {name, about, part_name, limit}` and `zip.stop`; events `zip` with packing, ready,
+  no_room, failed or stopped.
+- `zip.send {part}` (all parts without one), with an event `zip_sent`; `zip.save_downloads`; and
+  `zip.close`.
+- `zip.contents`: the ZIPs open, their set, the files and the cut files with their pieces;
+  `zip.open_thumb {index}`: a JPEG and a video's length.
+- `zip.save {to: "phone" | "folder", folder}`, with events `zip_save`; `zip.close_opened`.
+- `gallery.open`, and `storage.free` for Free up space.
 
 ### Dart
 
-- `ZipScreen`: name, where it goes, packing, ready and the parts (98 to 100, 104).
-- `ZipWhereSheet` (103), and `ShareHowSheet` in the library and the viewer (101).
-- The card on the Send tab (102), and the third way on the first screen.
-- `ZipOpenScreen` (106, 108, 109) and `ZipDoneScreen` (107, 110).
-- `zipName()`: the proposal, a plain function with its own tests.
-- Strings in `app_en.arb`, `app_de.arb` and `app_it.arb`.
+- `lib/data/zip.dart`: what the screens see, the choices (`ZipWhere`), and `zipName()`, the
+  proposal, a plain function with its own tests.
+- `lib/ui/zip/zip_screen.dart`: `ZipScreen`, with name, where it goes, packing, ready and the
+  parts (98 to 100, 104), and `ZipWhereSheet` (103).
+- `lib/ui/zip/zip_entry.dart`: Share's sheet in the library and the viewer (101), the card on the
+  Send tab (102), and the third way on the first screen.
+- `lib/ui/zip/zip_open_screen.dart`: `ZipOpenScreen` (106 to 110).
+- `app.dart` opens the screens for what arrives from another app.
+- Strings in `app_en.arb`, `app_de.arb` and `app_it.arb`; five more Lucide icons (archive, send,
+  scissors, mail, message-circle) in the icon font.
 
 ## Tests
 
-- **Kotlin** unit tests:
-  - `ZipPlan`:
+- **Kotlin** unit tests, in `app/android/app/src/test/kotlin/com/eschgi/share/zip`:
+  - `ZipPlanTest`:
     - each limit;
     - files in order, with gaps filled;
     - only what can't fit in a part on its own is cut;
-    - every part's planned size equals what `ZipWriter` writes;
+    - every part written and measured: exactly its planned size;
     - more than 100 parts refused;
-    - names: " (2)", cleaning, "(1 of 4)".
-  - `ZipWriter`: `java.util.zip.ZipFile` and `ZipInputStream` read its ZIPs with the same bytes
-    and CRCs; times; UTF-8 names; Zip64 with a sparse 5 GB file.
-  - `ShareJson`: written and read back, and every case in `contract/app/share_zip.json`.
-  - `ZipReader`, on Share's ZIPs and on small ZIPs from other tools, kept as test resources:
-    deflated, with data descriptors, Zip64, names in the old code page, an encrypted entry, cut
-    off, with a comment.
-  - Pieces: in order and backwards, a part opened twice, a part of another set, a broken piece,
-    two weeks.
+    - names: " (2)", cleaning, a file named like a piece.
+  - `ZipWriterTest`: `java.util.zip.ZipFile` and `ZipInputStream` read its ZIPs with the same
+    bytes and CRCs; times; UTF-8 names; a file that changed; Zip64 with a sparse 4.3 GB file.
+  - `ShareJsonTest`: written and read back, and every case in `contract/app/share_zip.json`.
+  - `ZipReaderTest`, on ZIPs made in the test by Java's `ZipOutputStream`: deflated with data
+    descriptors, stored, names in the old code page, a comment, an encrypted entry, cut off, and
+    one that would inflate into more than it says.
+  - `ZipInboxTest`: pieces in order, backwards and twice, a broken one, the sets, two weeks.
+  - `PlatformContractTest`: the zip_* fixtures.
 - **Dart**:
-  - `zipName()` in three languages: one day, a month, across months and years, a folder, cleaning;
-  - widget tests of the screens;
+  - `test/zip_test.dart`: `zipName()` in three languages, cleaning, the remembered choice, and the
+    screens with the fake platform, from the share sheet, the library and a chat;
+  - `test/platform_test.dart`: the zip_* fixtures;
   - goldens of 98 to 110, without the other apps' screens (97, 105).
 - **On the Pixel**, with a second phone:
   - Send as ZIP in the gallery's share sheet, and not in a share of ZIPs;
@@ -406,21 +408,14 @@ In `contract/app/platform.json`:
 - **No phone here**: this machine has no emulator, so everything Android does (share sheets,
   WhatsApp, MediaStore) is first seen on the Pixel.
 
-## Order of work
+## Status
 
-1. **A spike on the Pixel**: WhatsApp's limit and several documents, Open with for
-   `application/zip`, and the two aliases in the share sheet. Kotlin only, not kept.
-2. **The ZIP core** in Kotlin: `ZipPlan`, `ZipWriter`, `ShareJson` and `ZipReader`, with their tests
-   and `contract/app/share_zip.json`.
-3. **Sending**: `ZipPacker`, the alias, the channel calls, and the Dart screens 97 to 104 with
-   their goldens.
-4. **Receiving**: `ZipOpener`, `ZipStore`, saving, pieces, Send into a folder, and the screens 105
-   to 110.
-5. **The README**, and this plan updated to what was built.
+Built on 2026-10-09: the ZIP core with its tests, the Android side, the screens, the README and
+this plan. All of it runs in tests here; what Android, WhatsApp and the gallery do is first seen on
+the Pixel (the list under Tests), WhatsApp's limit and several documents at once first.
 
 ## Not in this step
 
 - The website and the server: nothing changes there.
 - ZIPs with a password: a ZIP is as readable as the photos in it, also those from an encrypted
-  folder. For such files, the sheet in the library (101) adds a line saying that the ZIP isn't
-  encrypted.
+  folder. For such files, the ZIP screen (98) adds a line saying that the ZIP isn't encrypted.
