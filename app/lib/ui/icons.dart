@@ -5,6 +5,8 @@ import 'package:flutter/widgets.dart';
 abstract final class AppIcons {
   /// circle-alert
   static const IconData alert = IconData(0xe077, fontFamily: 'Lucide');
+  /// archive
+  static const IconData archive = IconData(0xe041, fontFamily: 'Lucide');
   /// arrow-left
   static const IconData back = IconData(0xe048, fontFamily: 'Lucide');
   /// calendar
@@ -69,6 +71,10 @@ abstract final class AppIcons {
   static const IconData lockOpen = IconData(0xe10c, fontFamily: 'Lucide');
   /// log-out
   static const IconData logOut = IconData(0xe10e, fontFamily: 'Lucide');
+  /// mail
+  static const IconData mail = IconData(0xe10f, fontFamily: 'Lucide');
+  /// message-circle
+  static const IconData message = IconData(0xe116, fontFamily: 'Lucide');
   /// minus
   static const IconData minus = IconData(0xe11c, fontFamily: 'Lucide');
   /// circle-minus
@@ -99,8 +105,12 @@ abstract final class AppIcons {
   static const IconData rotate = IconData(0xe148, fontFamily: 'Lucide');
   /// scan-qr-code
   static const IconData scan = IconData(0xe5f6, fontFamily: 'Lucide');
+  /// scissors
+  static const IconData scissors = IconData(0xe14e, fontFamily: 'Lucide');
   /// search
   static const IconData search = IconData(0xe151, fontFamily: 'Lucide');
+  /// send
+  static const IconData send = IconData(0xe152, fontFamily: 'Lucide');
   /// server
   static const IconData server = IconData(0xe153, fontFamily: 'Lucide');
   /// settings

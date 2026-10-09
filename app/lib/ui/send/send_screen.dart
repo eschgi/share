@@ -14,6 +14,7 @@ import '../icons.dart';
 import '../sign_in.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import '../zip/zip_entry.dart';
 import 'pin_entry_screen.dart';
 import 'see_screen.dart';
 import 'send_panel.dart';
@@ -62,6 +63,8 @@ class SendScreen extends StatelessWidget {
             const SizedBox(height: 20),
           ],
           const SendPanel(auth: SendAuth.device),
+          const SizedBox(height: 16),
+          const ZipCard(),
         ]),
       ),
     );

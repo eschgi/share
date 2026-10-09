@@ -18,6 +18,7 @@ import 'library/tiles.dart';
 import 'media_page.dart';
 import 'theme.dart';
 import 'widgets.dart';
+import 'zip/zip_entry.dart';
 
 /// Screen 14: one file at a time, at original size; swipe to the next. Admins can delete the file
 /// shown. Under a PIN's LibraryScope (screen 46) it fetches with the PIN, and says nothing of who
@@ -216,7 +217,7 @@ class _ViewerState extends State<_Viewer> {
             _Action(
               icon: AppIcons.share,
               label: t.viewerShare,
-              onTap: () => withFetch(context, 1, () => Services.read(context).platform.shareFiles([f], auth: LibraryScope.read(context).auth)),
+              onTap: () => shareHow(context, [f], auth: LibraryScope.read(context).auth),
             ),
             _Action(icon: AppIcons.info, label: t.viewerDetails, onTap: _details),
             if (widget.screen.onDeleted != null) _Action(icon: AppIcons.trash, label: t.deleteSelected, onTap: _delete),

@@ -11,6 +11,7 @@ import 'data/pin.dart';
 import 'data/platform.dart';
 import 'data/server.dart';
 import 'data/session.dart';
+import 'data/zip.dart';
 import 'l10n/app_localizations.dart';
 import 'ui/first_start.dart';
 import 'ui/home.dart';
@@ -19,6 +20,8 @@ import 'ui/player.dart';
 import 'ui/send/pin_entry_screen.dart';
 import 'ui/send/send_screen.dart';
 import 'ui/theme.dart';
+import 'ui/zip/zip_open_screen.dart';
+import 'ui/zip/zip_screen.dart';
 
 /// Everything the screens use, made once. Tests build it with a fake platform and a mock
 /// HTTP client.
@@ -111,6 +114,7 @@ class _ShareAppState extends State<ShareApp> {
   final _messenger = GlobalKey<ScaffoldMessengerState>();
   StreamSubscription<String>? _links;
   StreamSubscription<SharedFiles>? _shared;
+  StreamSubscription<void>? _zips;
 
   /// The keys may have news: someone to seal for or to ask about, a key sealed for this phone, a
   /// check to answer, a new version. So the app checks in when it comes back, and while it is in
@@ -150,12 +154,15 @@ class _ShareAppState extends State<ShareApp> {
     _links = s.platform.links.listen(_open);
     _shared = s.platform.sharedChanges.listen(_sharedChanged);
     unawaited(s.platform.initialLink().then((l) => l == null ? null : _open(l)));
+    _zips = s.platform.zipArrivals.listen((_) => unawaited(s.platform.takeZip().then(_zip)));
+    unawaited(s.platform.takeZip().then(_zip));
   }
 
   @override
   void dispose() {
     _links?.cancel();
     _shared?.cancel();
+    _zips?.cancel();
     _lifecycle.dispose();
     _keysTimer?.cancel();
     widget.services.keys.removeListener(_keysChanged);
@@ -167,6 +174,19 @@ class _ShareAppState extends State<ShareApp> {
     final messenger = _messenger.currentState;
     if (shared.skipped == 0 || messenger == null) return;
     messenger.showSnackBar(SnackBar(content: Text(AppLocalizations.of(messenger.context).sharedSkipped(shared.skipped))));
+  }
+
+  /// Another app's share sheet sent files to pack (Send as ZIP), or a ZIP was opened with Share: its
+  /// screen opens over whatever is there, signed in or not (docs/zip-plan.md).
+  void _zip(ZipArrival? arrival) {
+    switch (arrival) {
+      case final ZipToPack pack:
+        _navigator.currentState?.push(MaterialPageRoute<void>(builder: (_) => ZipScreen(files: pack.files, skipped: pack.skipped, fromOutside: true)));
+      case ZipToOpen():
+        _navigator.currentState?.push(MaterialPageRoute<void>(builder: (_) => const ZipOpenScreen()));
+      case null:
+        break;
+    }
   }
 
   /// A link that opened the app: an invite (from the invite page or a scan), or a PIN link.

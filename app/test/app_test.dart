@@ -158,7 +158,11 @@ void main() {
 
     await tester.tap(find.bySemanticsLabel('Select the day').first);
     await tester.pumpAndSettle();
+    // Share asks how: as a ZIP in full quality, or one by one as before (screen 101).
     await tester.tap(find.byIcon(AppIcons.share));
+    await tester.pumpAndSettle();
+    expect(find.text('Share 6 files'), findsOneWidget);
+    await tester.tap(find.text('One by one'));
     await tester.pumpAndSettle();
     expect(platform.shared.single, hasLength(6));
     await tester.tap(find.byIcon(AppIcons.x));

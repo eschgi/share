@@ -9,8 +9,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:share_app/data/models.dart';
 import 'package:share_app/data/platform.dart';
+import 'package:share_app/data/zip.dart';
 import 'package:share_app/l10n/app_localizations.dart';
 import 'package:share_app/ui/admin/print_sheet.dart';
+import 'package:share_app/ui/icons.dart';
 import 'package:share_app/ui/library/tiles.dart';
 import 'package:share_app/ui/settings_screen.dart';
 
@@ -20,6 +22,7 @@ import 'support/contract.dart';
 import 'support/fake_platform.dart';
 import 'support/fake_server.dart';
 import 'support/fonts.dart';
+import 'zip_test.dart' show dolomitesPart3, sundayFiles, sundayZip;
 
 /// Screenshots of the app's screens, for comparing with `docs/share-mockup/<lang>/*.png`.
 ///   flutter test --run-skipped --tags golden --update-goldens
@@ -453,5 +456,131 @@ void main() {
     await tester.enterText(find.byType(TextField), 'K7M2Q');
     await tester.tap(find.text('Unlock'));
     await shot(tester, 'en/24-pin-send');
+  }));
+
+  // Sending photos as ZIPs, and opening them (docs/zip-plan.md, screens 98 to 110).
+  FakePlatform sunday() => FakePlatform()
+    ..zipArrival = ZipToPack(sundayFiles())
+    ..zipSizes = [for (final f in sundayFiles()) f.size];
+
+  testWidgets('a ZIP: name, and where it goes', (tester) => atTen(() async {
+    await startApp(tester, sunday(), FakeServer());
+    await shot(tester, 'en/98-zip-setup');
+  }));
+
+  testWidgets('a ZIP: packing, and ready to send', (tester) => atTen(() async {
+    final platform = sunday();
+    await startApp(tester, platform, FakeServer());
+    await tester.tap(find.text('Pack ZIP'));
+    await tester.pump();
+    platform.zipPackingEvents.add(const ZipPackState(stage: ZipPackStage.packing, filesDone: 8, files: 14, bytesDone: 200000000, bytesTotal: 312000000, part: 1, parts: 1));
+    await shot(tester, 'en/99-zip-packing');
+    platform.zipPackingEvents.add(const ZipPackState(stage: ZipPackStage.ready, plan: ZipPlanInfo(parts: [ZipPartInfo(number: 1, name: 'Photos 4 Oct 2026.zip', bytes: 312004000, files: 14)])));
+    await shot(tester, 'en/100-zip-ready');
+  }));
+
+  testWidgets('a ZIP from the library', (tester) => atTen(() async {
+    await startApp(tester, signedInPhone()..secrets['folder'] = family, folders());
+    await tester.tap(find.bySemanticsLabel('Select the day').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(AppIcons.share));
+    await shot(tester, 'en/101-zip-library');
+  }));
+
+  testWidgets('a ZIP on the Send tab', (tester) => atTen(() async {
+    await startApp(tester, signedInPhone(), FakeServer());
+    await tester.tap(find.text('Send').last);
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView).last, const Offset(0, -400));
+    await shot(tester, 'en/102-zip-send-tab');
+  }));
+
+  testWidgets('a ZIP: where it goes, and four of them', (tester) => atTen(() async {
+    final files = [
+      for (var i = 0; i < 49; i++) ZipFileInfo(name: 'IMG_$i.jpg', size: 90000000, type: 'image/jpeg', kind: FileKind.photo, taken: DateTime(2026, 10, 15 + i % 4, 10)),
+      ZipFileInfo(name: 'VID_20261017_141502.mp4', size: 2590000000, type: 'video/mp4', kind: FileKind.video, taken: DateTime(2026, 10, 17, 14, 15)),
+    ];
+    final platform = FakePlatform()
+      ..zipArrival = ZipToPack(files)
+      ..zipSizes = [for (final f in files) f.size];
+    await startApp(tester, platform, FakeServer());
+    await tester.tap(find.text('Change'));
+    await shot(tester, 'en/103-zip-where');
+    await tester.tap(find.text('WhatsApp, Telegram').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Pack 4 ZIPs'));
+    await tester.pump();
+    platform.zipPackingEvents.add(const ZipPackState(
+      stage: ZipPackStage.ready,
+      plan: ZipPlanInfo(parts: [
+        ZipPartInfo(number: 1, bytes: 1900000000, files: 18),
+        ZipPartInfo(number: 2, bytes: 1900000000, files: 22),
+        ZipPartInfo(number: 3, bytes: 1900000000, files: 11, pieces: [ZipPieceInfo(file: 'VID_20261017_141502.mp4', number: 1, pieces: 2)]),
+        ZipPartInfo(number: 4, bytes: 1300000000, files: 0, pieces: [ZipPieceInfo(file: 'VID_20261017_141502.mp4', number: 2, pieces: 2)]),
+      ], cut: [ZipCutInfo(name: 'VID_20261017_141502.mp4', size: 2400000000, parts: [3, 4])]),
+    ));
+    await shot(tester, 'en/104-zip-parts');
+  }));
+
+  testWidgets('a ZIP opened: inside, and saved', (tester) => atTen(() async {
+    final platform = signedInPhone()
+      ..zipArrival = const ZipToOpen()
+      ..zipOpened = sundayZip();
+    await startApp(tester, platform, FakeServer());
+    await shot(tester, 'en/106-zip-inside');
+    await tester.tap(find.text('Save 14 to this phone'));
+    await tester.pump();
+    platform.zipOpened = sundayZip(saved: true);
+    platform.zipSavingEvents.add(const ZipSaveState(stage: ZipSaveStage.done, saved: 14, to: 'phone'));
+    await shot(tester, 'en/107-zip-saved');
+  }));
+
+  testWidgets('ZIPs opened: all parts at once', (tester) => atTen(() async {
+    final platform = signedInPhone()
+      ..zipArrival = const ZipToOpen()
+      ..zipOpened = ZipContents(
+        name: 'Dolomites 15–18 Oct 2026',
+        zips: 4,
+        bytes: 7000000000,
+        set: const ZipSetInfo(parts: 4, here: [1, 2, 3, 4]),
+        files: [
+          for (var i = 0; i < 51; i++) ZipEntryInfo(index: i, name: 'IMG_$i.jpg', kind: FileKind.photo, size: 110000000),
+          const ZipEntryInfo(index: 51, name: 'VID_20261017_141502.mp4.001', kind: FileKind.video, size: 1105000000, piece: ZipPieceInfo(file: 'VID_20261017_141502.mp4', number: 1, pieces: 2)),
+          const ZipEntryInfo(index: 52, name: 'VID_20261017_141502.mp4.002', kind: FileKind.video, size: 1307345678, piece: ZipPieceInfo(file: 'VID_20261017_141502.mp4', number: 2, pieces: 2)),
+        ],
+        joins: const [ZipJoinInfo(file: 'VID_20261017_141502.mp4', kind: FileKind.video, total: 2412345678, pieces: 2, have: [1, 2], parts: [3, 4])],
+      );
+    await startApp(tester, platform, FakeServer());
+    await shot(tester, 'en/108-zip-set');
+  }));
+
+  testWidgets('ZIPs opened: one part at a time', (tester) => atTen(() async {
+    final platform = FakePlatform()
+      ..zipArrival = const ZipToOpen()
+      ..zipOpened = dolomitesPart3();
+    await startApp(tester, platform, FakeServer());
+    platform.zipOpened = dolomitesPart3(saved: true);
+    platform.zipSavingEvents.add(const ZipSaveState(stage: ZipSaveStage.done, saved: 11, to: 'phone'));
+    await shot(tester, 'en/109-zip-part');
+  }));
+
+  testWidgets('ZIPs opened: the video back together', (tester) => atTen(() async {
+    final joined = FakePlatform()
+      ..zipArrival = const ZipToOpen()
+      ..zipOpened = const ZipContents(
+        name: 'Dolomites 15–18 Oct 2026',
+        bytes: 1300000000,
+        set: ZipSetInfo(parts: 4, here: [4], saved: [1, 2, 3], to: 'phone'),
+        files: [ZipEntryInfo(index: 0, name: 'VID_20261017_141502.mp4.002', kind: FileKind.video, size: 1307345678, piece: ZipPieceInfo(file: 'VID_20261017_141502.mp4', number: 2, pieces: 2))],
+        joins: [ZipJoinInfo(file: 'VID_20261017_141502.mp4', kind: FileKind.video, total: 2412345678, pieces: 2, have: [1, 2], parts: [3, 4])],
+      );
+    await startApp(tester, joined, FakeServer());
+    joined.zipSavingEvents.add(const ZipSaveState(
+      stage: ZipSaveStage.done,
+      saved: 1,
+      to: 'phone',
+      joined: [(file: 'VID_20261017_141502.mp4', kind: FileKind.video, total: 2412345678, parts: [3, 4])],
+    ));
+    await shot(tester, 'en/110-zip-joined');
   }));
 }

@@ -16,6 +16,7 @@ const dartOut = new URL('../../lib/ui/icons.dart', import.meta.url);
 // Dart name → Lucide name. Keep in step with the mockups' icons.
 const icons = {
   alert: 'circle-alert',
+  archive: 'archive',
   back: 'arrow-left',
   calendar: 'calendar',
   camera: 'camera',
@@ -48,6 +49,8 @@ const icons = {
   lock: 'lock',
   lockOpen: 'lock-open',
   logOut: 'log-out',
+  mail: 'mail',
+  message: 'message-circle',
   minus: 'minus',
   minusCircle: 'circle-minus',
   monitor: 'monitor',
@@ -63,7 +66,9 @@ const icons = {
   refresh: 'refresh-cw',
   rotate: 'rotate-ccw',
   scan: 'scan-qr-code',
+  scissors: 'scissors',
   search: 'search',
+  send: 'send',
   server: 'server',
   settings: 'settings',
   share: 'share-2',

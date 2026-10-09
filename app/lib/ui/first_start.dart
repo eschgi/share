@@ -10,6 +10,7 @@ import 'send/pin_entry_screen.dart';
 import 'sign_in.dart';
 import 'theme.dart';
 import 'widgets.dart';
+import 'zip/zip_entry.dart';
 
 /// Screen 7: two doors. Sending needs only a PIN, seeing needs an account or an invite.
 class FirstStartScreen extends StatelessWidget {
@@ -52,6 +53,9 @@ class FirstStartScreen extends StatelessWidget {
                     detail: t.firstStartSeeDetail,
                     onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const SignInScreen())),
                   ),
+                  const SizedBox(height: 14),
+                  // Without any server: photos in full quality over WhatsApp (docs/zip-plan.md).
+                  ChoiceCard(icon: AppIcons.archive, title: t.firstStartZip, detail: t.firstStartZipDetail, onTap: () => zipFromPicker(context)),
                   const Spacer(),
                   const SizedBox(height: 16),
                   TextButton.icon(

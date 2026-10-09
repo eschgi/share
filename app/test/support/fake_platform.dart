@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:share_app/data/models.dart';
 import 'package:share_app/data/platform.dart';
 import 'package:share_app/data/server.dart';
+import 'package:share_app/data/zip.dart';
 
 /// Android, as far as the Dart code can tell: secrets and settings in memory, a route that
 /// tests set, and a record of what was asked for.
@@ -413,4 +414,121 @@ class FakePlatform implements Platform {
 
   @override
   Future<void> forgetPinKeys() async => pinLinks.add((null, null));
+
+  // ZIPs (docs/zip-plan.md): what arrives, what a choice makes, and a record of what was asked.
+
+  /// Taken once by [takeZip]; [zipArrivalEvents] says that something arrived while the app is open.
+  ZipArrival? zipArrival;
+  final zipArrivalEvents = StreamController<void>.broadcast();
+
+  @override
+  Future<ZipArrival?> takeZip() async {
+    final a = zipArrival;
+    zipArrival = null;
+    return a;
+  }
+
+  @override
+  Stream<void> get zipArrivals => zipArrivalEvents.stream;
+
+  /// What the photo picker gives for a ZIP.
+  List<ZipFileInfo>? zipPicked;
+
+  @override
+  Future<List<ZipFileInfo>?> pickForZip() async => zipPicked;
+
+  final zipLibraries = <List<FileInfo>>[];
+
+  @override
+  Future<List<ZipFileInfo>> zipLibrary(List<FileInfo> files, {SendAuth auth = SendAuth.device}) async {
+    zipLibraries.add(files);
+    auths.add(auth);
+    return [for (final f in files) ZipFileInfo(name: f.name, size: f.size, type: f.mime, kind: f.kind, taken: f.uploadedAt, onPhone: saved.contains(f.id))];
+  }
+
+  @override
+  Future<Uint8List?> zipThumb(int index) async => null;
+
+  /// The files a plan is made of, for the default [zipPlanFor].
+  List<int> zipSizes = const [];
+
+  /// What a choice makes; by default as many parts as the sizes need, without cutting.
+  ZipPlanInfo Function(int? limit)? zipPlanFor;
+  final zipPlans = <({String name, int? limit})>[];
+
+  @override
+  Future<ZipPlanInfo> zipPlan({required String name, required String about, int? limit}) async {
+    zipPlans.add((name: name, limit: limit));
+    if (zipPlanFor != null) return zipPlanFor!(limit);
+    final total = zipSizes.fold(0, (s, n) => s + n);
+    final parts = limit == null ? 1 : (total / limit).ceil().clamp(1, 1 << 30);
+    if (parts > zipMaxParts) return const ZipPlanInfo(tooMany: true);
+    return ZipPlanInfo(parts: [for (var i = 1; i <= parts; i++) ZipPartInfo(number: i, bytes: (total / parts).round(), files: (zipSizes.length / parts).ceil())]);
+  }
+
+  final zipPacks = <({String name, String about, String partName, int? limit})>[];
+  final zipPackingEvents = StreamController<ZipPackState>.broadcast();
+  int zipStops = 0;
+
+  @override
+  Future<void> zipPack({required String name, required String about, required String partName, int? limit}) async =>
+      zipPacks.add((name: name, about: about, partName: partName, limit: limit));
+
+  @override
+  Future<void> zipStop() async => zipStops++;
+
+  @override
+  Stream<ZipPackState> get zipPacking => zipPackingEvents.stream;
+
+  final zipSends = <int?>[];
+  final zipSentEvents = StreamController<ZipSent>.broadcast();
+
+  @override
+  Future<void> zipSend({int? part}) async {
+    if (openError != null) throw openError!;
+    zipSends.add(part);
+  }
+
+  @override
+  Stream<ZipSent> get zipSent => zipSentEvents.stream;
+
+  int zipDownloads = 0;
+
+  @override
+  Future<int> zipSaveToDownloads() async => ++zipDownloads;
+
+  int zipCloses = 0;
+
+  @override
+  Future<void> zipClose() async => zipCloses++;
+
+  /// What the ZIPs opened with Share hold.
+  ZipContents? zipOpened;
+
+  @override
+  Future<ZipContents?> zipContents() async => zipOpened;
+
+  @override
+  Future<ZipThumb?> zipOpenThumb(int index) async => null;
+
+  final zipSaves = <({String to, String? folder})>[];
+  final zipSavingEvents = StreamController<ZipSaveState>.broadcast();
+  int zipOpenedCloses = 0;
+
+  @override
+  Future<void> zipSave({required String to, String? folder}) async => zipSaves.add((to: to, folder: folder));
+
+  @override
+  Stream<ZipSaveState> get zipSaving => zipSavingEvents.stream;
+
+  @override
+  Future<void> zipCloseOpened() async => zipOpenedCloses++;
+
+  int galleryOpened = 0, spaceFreed = 0;
+
+  @override
+  Future<void> openGallery() async => galleryOpened++;
+
+  @override
+  Future<void> freeUpSpace() async => spaceFreed++;
 }

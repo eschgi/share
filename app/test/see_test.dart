@@ -63,6 +63,8 @@ void main() {
     expect(find.text('Delete'), findsNothing);
     await tester.tap(find.byIcon(AppIcons.share));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('One by one'));
+    await tester.pumpAndSettle();
     expect(platform.auths.last, SendAuth.pin);
     await tester.tap(find.byIcon(AppIcons.more));
     await tester.pumpAndSettle();

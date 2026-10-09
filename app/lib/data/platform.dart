@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 
 import 'models.dart';
 import 'server.dart';
+import 'zip.dart';
 
 /// Which address the app uses now, and why.
 enum ServerRoute { local, public }
@@ -522,6 +523,55 @@ abstract class Platform {
   /// uploads to check the folder's key with, or forgotten for a typed code; how many keys opened.
   Future<int> pinLink({String? secret, String? root});
   Future<void> forgetPinKeys();
+
+  // Sending as ZIPs and opening them (docs/zip-plan.md). The bytes move in Kotlin.
+
+  /// What arrived from another app for a ZIP, once: files to pack (Send as ZIP), or ZIPs opened with
+  /// Share. [zipArrivals] says when something arrives while the app is open.
+  Future<ZipArrival?> takeZip();
+  Stream<void> get zipArrivals;
+
+  /// Opens the photo picker for a ZIP: the files picked, or null.
+  Future<List<ZipFileInfo>?> pickForZip();
+
+  /// Library files to pack; the ones not on the phone are fetched with [auth]'s key while packing.
+  Future<List<ZipFileInfo>> zipLibrary(List<FileInfo> files, {SendAuth auth = SendAuth.device});
+
+  /// A small picture of file [index] waiting to be packed, when it's on the phone.
+  Future<Uint8List?> zipThumb(int index);
+
+  /// What ZIPs of at most [limit] bytes, or one ZIP, make of the files waiting.
+  Future<ZipPlanInfo> zipPlan({required String name, required String about, int? limit});
+
+  /// Packs the files waiting; [zipPacking] says how far it is. [partName] names the parts, with
+  /// {name}, {part} and {parts} in it.
+  Future<void> zipPack({required String name, required String about, required String partName, int? limit});
+  Future<void> zipStop();
+  Stream<ZipPackState> get zipPacking;
+
+  /// Hands what was packed to another app, part [part] or all of them, in Android's share sheet.
+  /// Throws [OpenFailed] when no app takes it. [zipSent] says which app took it.
+  Future<void> zipSend({int? part});
+  Stream<ZipSent> get zipSent;
+
+  /// Copies what was packed into Downloads/Share; how many ZIPs.
+  Future<int> zipSaveToDownloads();
+
+  /// The ZIP screen closed: the files waiting are forgotten; the ZIPs go by themselves a day later.
+  Future<void> zipClose();
+
+  /// What the ZIPs opened with Share hold; null when none are open.
+  Future<ZipContents?> zipContents();
+  Future<ZipThumb?> zipOpenThumb(int index);
+
+  /// Saves what's open, [to] the phone, or into the outbox for [folder]; [zipSaving] says how far it is.
+  Future<void> zipSave({required String to, String? folder});
+  Stream<ZipSaveState> get zipSaving;
+  Future<void> zipCloseOpened();
+
+  /// Opens the phone's gallery app, or Android's own way to free up space.
+  Future<void> openGallery();
+  Future<void> freeUpSpace();
 }
 
 /// The real platform: MethodChannel com.eschgi.share/platform, and one event channel for
@@ -545,6 +595,14 @@ class ChannelPlatform implements Platform {
           _shared.add(SharedFiles.fromMap(e));
         case 'keys':
           _keys.add(KeysState.fromMap(e));
+        case 'zip_in':
+          _zipArrivals.add(null);
+        case 'zip':
+          _zipPacking.add(ZipPackState.fromMap(e));
+        case 'zip_sent':
+          _zipSent.add(ZipSent.fromMap(e));
+        case 'zip_save':
+          _zipSaving.add(ZipSaveState.fromMap(e));
       }
     }, onError: (Object _) {});
   }
@@ -559,6 +617,10 @@ class ChannelPlatform implements Platform {
   final _lastUploads = <String, UploadState>{};
   final _shared = StreamController<SharedFiles>.broadcast();
   final _keys = StreamController<KeysState>.broadcast();
+  final _zipArrivals = StreamController<void>.broadcast();
+  final _zipPacking = StreamController<ZipPackState>.broadcast();
+  final _zipSent = StreamController<ZipSent>.broadcast();
+  final _zipSaving = StreamController<ZipSaveState>.broadcast();
 
   Future<T?> _invoke<T>(String method, [Object? args]) async {
     try {
@@ -849,6 +911,84 @@ class ChannelPlatform implements Platform {
 
   @override
   Future<void> forgetPinKeys() => _keysCall('keys.forget_pin');
+
+  @override
+  Future<ZipArrival?> takeZip() async => ZipArrival.fromMap(await _soft<Map<Object?, Object?>>('zip.take'));
+
+  @override
+  Stream<void> get zipArrivals => _zipArrivals.stream;
+
+  @override
+  Future<List<ZipFileInfo>?> pickForZip() async {
+    final list = await _invoke<List<Object?>>('zip.pick');
+    return list == null ? null : [for (final f in list) if (f is Map) ZipFileInfo.fromMap(f)];
+  }
+
+  @override
+  Future<List<ZipFileInfo>> zipLibrary(List<FileInfo> files, {SendAuth auth = SendAuth.device}) async {
+    final list = await _invoke<List<Object?>>('zip.library', {
+      'files': jsonEncode([for (final f in files) f.toJson()]),
+      'taken': [for (final f in files) f.uploadedAt.millisecondsSinceEpoch],
+      'auth': auth.name,
+    });
+    return [for (final f in list ?? const []) if (f is Map) ZipFileInfo.fromMap(f)];
+  }
+
+  @override
+  Future<Uint8List?> zipThumb(int index) => _soft<Uint8List>('zip.thumb', {'index': index});
+
+  @override
+  Future<ZipPlanInfo> zipPlan({required String name, required String about, int? limit}) async =>
+      ZipPlanInfo.fromMap(await _invoke<Map<Object?, Object?>>('zip.plan', {'name': name, 'about': about, 'limit': limit}) ?? const {});
+
+  @override
+  Future<void> zipPack({required String name, required String about, required String partName, int? limit}) =>
+      _invoke('zip.pack', {'name': name, 'about': about, 'part_name': partName, 'limit': limit});
+
+  @override
+  Future<void> zipStop() => _soft('zip.stop');
+
+  @override
+  Stream<ZipPackState> get zipPacking => _zipPacking.stream;
+
+  @override
+  Future<void> zipSend({int? part}) => _opening(() => _invoke('zip.send', {'part': part}));
+
+  @override
+  Stream<ZipSent> get zipSent => _zipSent.stream;
+
+  @override
+  Future<int> zipSaveToDownloads() async => await _invoke<int>('zip.save_downloads') ?? 0;
+
+  @override
+  Future<void> zipClose() => _soft('zip.close');
+
+  @override
+  Future<ZipContents?> zipContents() async {
+    final m = await _soft<Map<Object?, Object?>>('zip.contents');
+    return m == null ? null : ZipContents.fromMap(m);
+  }
+
+  @override
+  Future<ZipThumb?> zipOpenThumb(int index) async {
+    final m = await _soft<Map<Object?, Object?>>('zip.open_thumb', {'index': index});
+    return m == null || m['jpeg'] is! Uint8List ? null : ZipThumb.fromMap(m);
+  }
+
+  @override
+  Future<void> zipSave({required String to, String? folder}) => _invoke('zip.save', {'to': to, 'folder': ?folder});
+
+  @override
+  Stream<ZipSaveState> get zipSaving => _zipSaving.stream;
+
+  @override
+  Future<void> zipCloseOpened() => _soft('zip.close_opened');
+
+  @override
+  Future<void> openGallery() => _opening(() => _invoke('gallery.open'));
+
+  @override
+  Future<void> freeUpSpace() => _soft('storage.free');
 
   /// Starts with how each batch stood last: the send screen may open long after the change.
   @override

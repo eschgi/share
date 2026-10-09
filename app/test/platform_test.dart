@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:share_app/data/models.dart';
 import 'package:share_app/data/platform.dart';
 import 'package:share_app/data/server.dart';
+import 'package:share_app/data/zip.dart';
 import 'package:video_player/video_player.dart';
 
 import 'support/contract.dart';
@@ -105,5 +106,55 @@ void main() {
     ]) {
       expect(PlaySource.fromMap({'uri': uri, 'headers': const {}}).uri.toString(), uri);
     }
+  });
+
+  test('ZIPs: the files to pack, a plan, and how packing goes', () {
+    final take = ZipArrival.fromMap(fixture['zip_take'] as Map) as ZipToPack;
+    expect(take.skipped, 1);
+    expect([for (final f in take.files) (f.name, f.size, f.kind, f.onPhone)], [
+      ('IMG_20261004_161502.jpg', 20000000, FileKind.photo, true),
+      ('VID_20261004_161944.mp4', 36000000, FileKind.video, false),
+    ]);
+    expect(take.files.first.taken, DateTime.fromMillisecondsSinceEpoch(1791123302000));
+    expect(ZipArrival.fromMap({'kind': 'open'}), isA<ZipToOpen>());
+    expect(ZipArrival.fromMap(null), isNull);
+
+    final plan = ZipPlanInfo.fromMap(fixture['zip_plan'] as Map);
+    expect(plan.tooMany, isFalse);
+    expect([for (final p in plan.parts) '${p.number}: ${p.files} files, pieces ${p.pieces.map((x) => x.number).join(',')}'], ['1: 2 files, pieces 1', '2: 0 files, pieces 2', '3: 0 files, pieces 3']);
+    expect([for (final c in plan.cut) (c.name, c.size)], [('VID_20261004_161944.mp4', 500000)]);
+    expect(plan.cut.single.parts, [1, 2, 3]);
+
+    final packing = ZipPackState.fromMap(fixture['zip_packing'] as Map);
+    expect([packing.stage, packing.filesDone, packing.files, packing.part, packing.parts, packing.fetching], [ZipPackStage.packing, 8, 14, 1, 1, null]);
+    expect(packing.progress, closeTo(0.641, 0.001));
+    final ready = ZipPackState.fromMap(fixture['zip_ready'] as Map);
+    expect(ready.stage, ZipPackStage.ready);
+    expect(ready.plan!.parts.single.name, 'Photos 4 Oct 2026.zip');
+    final noRoom = ZipPackState.fromMap(fixture['zip_no_room'] as Map);
+    expect([noRoom.stage, noRoom.needed, noRoom.free], [ZipPackStage.noRoom, 7012000000, 3100000000]);
+    final failed = ZipPackState.fromMap(fixture['zip_failed'] as Map);
+    expect([failed.stage, failed.reason, failed.failedFile], [ZipPackStage.failed, 'changed', 'IMG_20261004_161502.jpg']);
+    final sent = ZipSent.fromMap(fixture['zip_sent'] as Map);
+    expect((sent.part, sent.app), (0, 'WhatsApp'));
+  });
+
+  test('ZIPs opened: what they hold, and how saving goes', () {
+    final c = ZipContents.fromMap(fixture['zip_contents'] as Map);
+    expect(c.name, 'Dolomites 15–18 Oct 2026');
+    expect([c.set!.parts, c.set!.here, c.set!.saved, c.set!.to], [4, [3], [1, 2], 'phone']);
+    expect(c.fromWhatsapp, isTrue);
+    expect([for (final f in c.files) (f.index, f.kind, f.piece?.number)], [(0, FileKind.photo, null), (1, FileKind.video, 1)]);
+    final join = c.joinOf(c.files[1])!;
+    expect([join.whole, join.missingParts], [false, [4]]);
+    expect(c.toSave, 1);
+    expect(c.waiting.single.file, 'VID_20261017_141502.mp4');
+
+    final saving = ZipSaveState.fromMap(fixture['zip_saving'] as Map);
+    expect([saving.stage, saving.done, saving.total], [ZipSaveStage.saving, 7, 14]);
+    final saved = ZipSaveState.fromMap(fixture['zip_saved'] as Map);
+    expect([saved.stage, saved.saved, saved.to], [ZipSaveStage.done, 11, 'phone']);
+    expect(saved.joined.single.parts, [3, 4]);
+    expect(saved.broken.single, (file: 'IMG_20261017_103001.jpg', part: 3));
   });
 }

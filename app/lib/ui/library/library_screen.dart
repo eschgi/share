@@ -14,13 +14,13 @@ import '../../l10n/app_localizations.dart';
 import '../admin/delete.dart';
 import '../download_sheet.dart';
 import '../encryption.dart';
-import '../fetch.dart';
 import '../folders.dart';
 import '../format.dart';
 import '../icons.dart';
 import '../theme.dart';
 import '../viewer.dart';
 import '../widgets.dart';
+import '../zip/zip_entry.dart';
 import 'library_controller.dart';
 import 'move_sheet.dart';
 import 'tiles.dart';
@@ -465,8 +465,7 @@ class _LibraryScreenState extends State<LibraryScreen> with WidgetsBindingObserv
           child: InkWell(
             borderRadius: BorderRadius.circular(16),
             onTap: () {
-              final files = _c.selectedFiles;
-              withFetch(context, files.length, () => Services.read(context).platform.shareFiles(files));
+              shareHow(context, _c.selectedFiles);
             },
             child: SizedBox(width: 56, height: 56, child: Icon(AppIcons.share, size: 22, semanticLabel: t.shareSelected)),
           ),
