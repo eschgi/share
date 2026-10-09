@@ -908,6 +908,95 @@
   .pform .dopt:first-child{margin-top:0}
   .pprev{width:340px;height:481px;flex:none;border-radius:6px;overflow:hidden;box-shadow:0 12px 34px rgba(0,0,0,.45)}
   .pprev .paper{zoom:.436;box-shadow:none}
+  /* ---------- ZIP: photos in full quality over WhatsApp, packed and unpacked on the phones ---------- */
+  /* other apps' screens in Android's neutral greys: the gallery, a chat, and the system's sheets */
+  .phone.gal,.phone.chat{background:#000}
+  .ab.galbar{padding-left:8px}
+  .ab.galbar h2{font-family:var(--sans);font-size:20px;font-weight:500;letter-spacing:0;margin-left:4px}
+  .phone.gal .ib,.phone.chat .ib{color:#E2E2E2}
+  .syssheet{position:absolute;left:0;right:0;bottom:0;z-index:6;background:#262626;color:#ECECEC;border-radius:28px 28px 0 0;
+    padding:10px 18px 30px;box-shadow:0 -12px 40px rgba(0,0,0,.5)}
+  .syssheet .grip{background:#5C5C5C}
+  .ssh{display:flex;align-items:center;gap:16px;padding:2px 6px 18px;border-bottom:1px solid #3A3A3A}
+  .ssh b{display:block;font-size:17px;font-weight:500}
+  .ssh span{display:block;font-size:13.5px;color:#B8B8B8;margin-top:3px}
+  .sspv{position:relative;width:56px;height:46px;flex:none}
+  .sspv i{position:absolute;top:4px;width:38px;height:38px;border-radius:9px;border:2px solid #262626}
+  .sspv i:first-child{left:0;transform:rotate(-9deg)} .sspv i:last-child{left:15px}
+  .sstg{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding-top:22px}
+  .sstg > div{display:flex;flex-direction:column;align-items:center;gap:10px;font-size:13px;line-height:1.3;text-align:center;color:#E2E2E2}
+  .sti{width:58px;height:58px;border-radius:50%;background:#3B3B3B;color:#E2E2E2;display:grid;place-items:center;flex:none}
+  .sti .ic{width:26px;height:26px}
+  .sti.acc{background:var(--accent);color:#fff}
+  .sstg .hl{color:#fff;font-weight:700}
+  .sstg .hl .sti{box-shadow:0 0 0 3px #262626,0 0 0 5.5px var(--accent-text)}
+  .ssh.ow{display:block;border:0;padding:2px 6px 12px}
+  .ssh.ow b{font-size:19px}
+  .owrow{display:flex;align-items:center;gap:16px;padding:10px 12px;border-radius:20px;font-size:17px;font-weight:500}
+  .owrow.hl{background:#3A3A3A}
+  .owrow .sti{width:46px;height:46px} .owrow .sti .ic{width:22px;height:22px}
+  .owrow.hl .sti{box-shadow:0 0 0 2.5px #3A3A3A,0 0 0 4.5px var(--accent-text)}
+  .owbtns{display:flex;justify-content:flex-end;gap:28px;padding:16px 10px 0;font-size:15px;font-weight:600;color:#A8C7FA}
+  .chtop{display:flex;align-items:center;gap:10px;padding:2px 16px 10px 6px;background:#161A1C;flex:none;position:relative;z-index:1}
+  .chtop b{font-size:17.5px;font-weight:500}
+  .chbody{flex:1;min-height:0;display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:16px 12px;background:#0C0E0F}
+  .bub{max-width:80%;background:#22292C;color:#ECECEC;border-radius:4px 18px 18px 18px;padding:9px 12px;font-size:15.5px;line-height:1.45}
+  .bub + .bub{border-top-left-radius:18px}
+  .bub time{display:block;text-align:right;font-size:11.5px;color:#8E989C;margin-top:2px}
+  .bub.doc{display:flex;align-items:center;gap:12px;padding:10px 16px 10px 10px}
+  .bub.doc b{display:block;font-size:15px;font-weight:500}
+  .bub.doc div span{font-size:12.5px;color:#9AA4A8}
+  .bdico{width:46px;height:46px;border-radius:12px;background:rgba(255,255,255,.07);color:#C9D1D4;display:grid;place-items:center;flex:none}
+  .bdico .ic{width:22px;height:22px}
+  /* Share's ZIP screens: the photos as prints, the name, and where each file goes */
+  .stack.sm{zoom:.8;margin:2px 0 16px}
+  .pc.pcen.ph{background:linear-gradient(155deg,rgba(255,255,255,.09),rgba(0,0,0,.24)),var(--c);border:5px solid #D9CEC1}
+  .pc.pcen.ph .ic{color:rgba(255,255,255,.6);width:38px;height:38px}
+  .zipb{position:absolute;right:-18px;bottom:-14px;display:flex;align-items:center;gap:6px;height:36px;padding:0 13px 0 11px;border-radius:18px;
+    background:var(--accent-text);color:#2A140A;font-size:15.5px;font-weight:700;letter-spacing:.6px;box-shadow:0 0 0 4px var(--bg)}
+  .pc.pcen.ph .zipb .ic{width:17px;height:17px;color:#2A140A}
+  .zt{font-family:var(--serif);font-weight:700;font-size:25px;line-height:1.22;letter-spacing:-.2px;margin:0;text-wrap:balance;flex:none}
+  .zmeta{font-size:15px;color:var(--text-2);margin:6px 0 0;flex:none}
+  .input .sfx{margin-left:auto;padding-left:8px;color:var(--text-3)}
+  .card.prog .pct{font-size:16px;font-weight:600;color:var(--accent-text)}
+  .card .cnote{margin:12px 0 0;font-size:14.5px;line-height:1.5;color:var(--text-2)}
+  .card.prog + .btn.link{margin-top:6px}
+  .wb > .btn + .btn.outline{margin-top:12px}
+  .parts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:16px 0 0;flex:none}
+  .part{border:1.5px solid var(--line-soft);background:var(--s1);border-radius:14px;padding:8px 9px}
+  .part b{display:block;font-size:14.5px;font-weight:600}
+  .part span{display:flex;align-items:center;gap:4px;font-size:12.5px;color:var(--text-3);margin-top:2px;white-space:nowrap;overflow:hidden}
+  .part span .ic{width:13px;height:13px} .part span svg{stroke-width:2.8}
+  .part.ok span{color:var(--ok)}
+  .part.cur{border-color:var(--accent-text);background:var(--accent-soft)} .part.cur span{color:var(--accent-text)}
+  .part.wait{border-style:dashed;border-color:var(--line);background:none}
+  .grid.zgrid{margin-top:14px;flex:none}
+  .zcut{flex:1;min-height:0;overflow:hidden}
+  .part.ok.cur{border-color:var(--ok);background:var(--ok-soft)} .part.ok.cur span{color:var(--ok)}
+  .tile.piece::after{content:"";position:absolute;inset:6px;border:1.5px dashed rgba(255,255,255,.62);border-radius:3px}
+  .tile .pieceb{position:absolute;left:4px;right:4px;bottom:5px;text-align:center;font-size:10px;font-weight:700;color:#fff;
+    background:rgba(0,0,0,.6);border-radius:6px;padding:2px 0;z-index:1;white-space:nowrap}
+  .zwhere{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--text-2);margin-top:14px;flex:none}
+  .zwhere .ic{width:18px;height:18px;color:var(--text-3)}
+  .okline{display:flex;align-items:center;justify-content:center;gap:8px;font-size:15px;color:var(--text-2);margin-top:18px;flex:none}
+  .okline .ic{width:18px;height:18px;color:var(--ok)} .okline svg{stroke-width:2.8}
+  .vjoin{position:relative;width:210px;height:136px;border-radius:18px;margin:44px auto 30px;display:grid;place-items:center;flex:none;
+    box-shadow:0 16px 36px rgba(0,0,0,.5)}
+  .vjoin > .ic{width:48px;height:48px;color:rgba(255,255,255,.78)}
+  .vjoin .seam{position:absolute;left:50%;height:30px;border-left:2px dashed rgba(255,255,255,.5)}
+  .vjoin .seam.t{top:10px} .vjoin .seam.b{bottom:10px}
+  .vjoin .vsz{position:absolute;right:10px;bottom:10px;font-size:12.5px;font-weight:700;color:#fff;background:rgba(0,0,0,.55);border-radius:7px;padding:3px 7px}
+  .vjoin .vok{position:absolute;right:-13px;top:-13px;width:40px;height:40px;border-radius:50%;background:var(--ok);color:#10301E;display:grid;
+    place-items:center;box-shadow:0 0 0 4px var(--bg)}
+  .vjoin .vok .ic{width:21px;height:21px} .vjoin .vok svg{stroke-width:3}
+  /* where a ZIP goes: the size each choice allows, and how many ZIPs that makes of these files */
+  .row .rad{width:20px;height:20px;border-radius:50%;border:2px solid var(--text-3);flex:none}
+  .row .rad.on{border-color:var(--accent-text);background:radial-gradient(var(--accent-text) 0 4.5px,transparent 5px)}
+  .row .cnt{font-size:13.5px;font-weight:600;color:var(--text-2);white-space:nowrap}
+  .row.on .cnt{color:var(--accent-text)}
+  .row.dis{opacity:.45}
+  .rt span.numin{display:inline-block;min-width:50px;padding:0 8px;margin:0 2px;border-radius:7px;border:1.5px solid var(--line);background:var(--s1);
+    color:var(--text);font-weight:600;text-align:center}
 </style>
 </head>
 <body>
@@ -968,6 +1057,10 @@
   <symbol id="i-camera" viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></symbol>
   <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/></symbol>
   <symbol id="i-printer" viewBox="0 0 24 24"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/><rect x="6" y="14" width="12" height="8" rx="1"/></symbol>
+  <symbol id="i-message" viewBox="0 0 24 24"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></symbol>
+  <symbol id="i-scissors" viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/></symbol>
 </svg>
 
 <div class="page">
@@ -2235,6 +2328,99 @@
     </div>
   </section>
 
+  <section class="sec" id="zip">
+    <div class="sec-head">
+      <div class="sec-tag">Proposal · ZIP</div>
+      <h2>Full quality over WhatsApp, as a ZIP</h2>
+      <p>WhatsApp makes photos smaller and videos much smaller, unless they come as a document. So Share packs them into a ZIP, which WhatsApp passes on byte for byte, and Share on the other phone saves what's inside into the gallery. Making and opening a ZIP happens on the phones alone, with no server, no account and no internet. A ZIP may only be as big as the app that carries it takes, 2 GB for WhatsApp, so Share asks where it goes and makes as many as needed. Each one opens on its own; only a file bigger than one ZIP is cut into pieces, and Share on the other phone puts them back together. Every ZIP also holds share.json, a short list of what's in it and how the parts belong together. Without Share, any phone or computer unpacks the ZIPs, and 7-Zip joins a cut video's pieces. Only in the app, for now.</p>
+    </div>
+    <p class="sub-h">Anna's phone, with the app but no account</p>
+    <div class="board">
+
+      <div class="slot">
+        <h3><span class="n">97</span>From the gallery <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Android's share sheet gets a second entry from Share, next to Send with Share: Send as ZIP. It works signed out and offline: Anna has the app but no account on any server, and needs none.</p>
+        <div class="phone gal" data-shot="97-zip-gallery"><div class="sb" data-time="18:20"></div><div class="ab galbar"><span class="ib"><span data-i="x"></span></span><h2>14 selected</h2></div><div class="scroll"><div class="grid g4" data-tiles="p4/s p3/s v7@0:18/s p2/s p5/s p6/s p8/s p7/s p1/s v10@1:04/s p3/s p9/s p6/s p4/s p2/o p5/o p8/o p10/o p1/o p7/o p3/o p9/o p4/o p6/o"></div></div><div class="gest"></div><div class="scrim"></div><div class="syssheet"><div class="grip"></div><div class="ssh"><span class="sspv"><i class="ph t2"></i><i class="ph t4"></i></span><div><b>Sharing 14 items</b><span>12 photos, 2 videos</span></div></div><div class="sstg"><div><span class="sti acc"><span data-i="images"></span></span>Send with Share</div><div class="hl"><span class="sti acc"><span data-i="archive"></span></span>Send as ZIP</div><div><span class="sti"><span data-i="message"></span></span>WhatsApp</div><div><span class="sti"><span data-i="mail"></span></span>Gmail</div></div></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">98</span>Name, and where it goes <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Share proposes a name from what the files are and when they were taken: the ZIP's name, and on the other phone the album's. Where it goes sets how big a ZIP may be, WhatsApp unless Change picks something else (103); the phone remembers the last choice.</p>
+        <div class="phone" data-shot="98-zip-setup"><div class="sb" data-time="18:20"></div><div class="ab back"><span class="ib"><span data-i="x"></span></span><h2>Send as ZIP</h2></div><div class="wb"><div class="stack sm"><div class="pc pa ph t2"><span data-i="image"></span></div><div class="pc pb ph t3"><span data-i="image"></span></div><div class="pc pcen ph t4"><span data-i="image"></span></div></div><p class="zmeta center">12 photos, 2 videos · 312 MB</p><div class="label">Name</div><div class="input">Photos 4 Oct 2026<span class="sfx">.zip</span></div><p class="help sm">On the other phone, the album is called that too.</p><div class="label">Where it goes</div><div class="fsel"><span class="fcov all"><span data-i="message"></span></span><div class="rt"><b>WhatsApp, Telegram</b><span>Up to 2 GB each: all in one ZIP</span></div><span class="tbtn">Change</span></div><div class="grow"></div><div class="note slim"><span data-i="smartphone"></span><p>On the other phone, Share saves them into the gallery. Without Share, any ZIP app unpacks them.</p></div><div class="btn primary mt"><span data-i="archive"></span>Pack ZIP</div><p class="small">Photos and videos stay exactly as they are.</p></div><div class="gest"></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">99</span>Packing <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Packing copies the files as they are, nothing is made smaller, so it takes about as long as copying them: seconds for a few hundred MB. Stop packing leaves nothing behind.</p>
+        <div class="phone" data-shot="99-zip-packing"><div class="sb" data-time="18:21"></div><div class="ab back"><span class="ib"><span data-i="x"></span></span></div><div class="wb"><div class="stack"><div class="pc pa ph t2"><span data-i="image"></span></div><div class="pc pb ph t3"><span data-i="image"></span></div><div class="pc pcen ph t4"><span data-i="image"></span></div></div><h1 class="zt center">Photos 4 Oct 2026.zip</h1><p class="zmeta center">14 files · 312 MB</p><div class="grow"></div><div class="card prog"><div class="prow"><b>Packing 9 of 14</b><span class="pct">64%</span></div><div class="bar"><i style="width:64%"></i></div><p class="cnote">Photos and videos stay exactly as they are.</p></div><div class="btn link">Stop packing</div></div><div class="gest"></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">100</span>Ready to send <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Send ZIP opens Android's share sheet, without Share in it, and can send the ZIP again to another chat. The note says where this size fits. Save to Downloads keeps a copy; otherwise the ZIP goes by itself a day later.</p>
+        <div class="phone" data-shot="100-zip-ready"><div class="sb" data-time="18:21"></div><div class="ab back"><span class="ib"><span data-i="x"></span></span></div><div class="wb"><div class="stack"><div class="pc pa ph t2"><span data-i="image"></span></div><div class="pc pb ph t3"><span data-i="image"></span></div><div class="pc pcen ph t4"><span data-i="image"></span><span class="zipb"><span data-i="archive"></span>ZIP</span></div></div><h1 class="zt center">Photos 4 Oct 2026.zip</h1><p class="zmeta center">14 files · 312 MB</p><div class="grow"></div><div class="note"><span data-i="info"></span><p>Fits WhatsApp and Telegram, which take up to 2 GB. Too big for most email.</p></div><div class="btn primary"><span data-i="send"></span>Send ZIP</div><div class="btn link">Save to Downloads</div></div><div class="gest"></div></div>
+      </div>
+
+    </div>
+    <p class="sub-h">Stefan's phone, signed in</p>
+    <div class="board">
+
+      <div class="slot">
+        <h3><span class="n">101</span>From the library <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Share in the selection, and in the viewer, now asks how: as a ZIP in full quality, or one by one as today, when WhatsApp makes photos and videos smaller. Files not yet on the phone come from the server first, the only step that needs it; those of an encrypted folder go into the ZIP decrypted, as sharing does today.</p>
+        <div class="phone" data-shot="101-zip-library"><div class="sb" data-time="20:05"></div><div class="ab ctx"><span class="ib"><span data-i="x"></span></span><h2>52 selected</h2><span class="tbtn">Select all</span></div><div class="scroll"><div class="day"><div><h4>Sunday, 18 Oct</h4><div class="meta">9 of 31 selected</div></div><span class="dsel part"><span data-i="minus"></span></span></div><div class="grid g4" data-tiles="p5/s p2/s p9/o p7/s v3@0:42/s p1/o p4/s p8/s"></div><div class="day"><div><h4>Saturday, 17 Oct</h4><div class="meta">14 of 40 selected</div></div><span class="dsel part"><span data-i="minus"></span></span></div><div class="grid g4" data-tiles="v6@6:12/s p10/s p3/o p6/s"></div></div><div class="actionbar"><span class="abtn"><span data-i="share"></span></span><div class="btn primary"><span data-i="download"></span>Download 52 <small>· 7.0 GB</small></div></div><div class="gest"></div><div class="scrim"></div><div class="sheet"><div class="grip"></div><h3>Share 52 files</h3><div class="choice"><div class="cico"><span data-i="archive"></span></div><div class="ct"><b>As a ZIP</b><span>In full quality: 4 ZIPs of up to 2 GB, as WhatsApp takes them.</span></div><span class="chev" data-i="chev"></span></div><div class="choice"><div class="cico"><span data-i="images"></span></div><div class="ct"><b>One by one</b><span>WhatsApp makes photos and videos smaller.</span></div><span class="chev" data-i="chev"></span></div><div class="note slim"><span data-i="server"></span><p>11 of them aren't on this phone yet: Share gets them from the server first.</p></div></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">102</span>On the Send tab <span class="badge proposal">proposal</span></h3>
+        <p class="cap">For photos on the phone there's a card on the Send tab too: it picks them and opens the same screen (98). Signed out, the first screen (7) offers Send as ZIP as a third way, with no server needed.</p>
+        <div class="phone" data-shot="102-zip-send-tab"><div class="sb" data-time="20:10"></div><div class="ab"><h2>Send</h2><span class="av sm acc">S</span></div><div class="scroll pad"><p class="lead sm">No PIN needed while you're signed in.</p><div class="picks"><div class="pick"><span data-i="images"></span><b>Photos &amp; videos</b></div><div class="pick"><span data-i="file"></span><b>Other files</b></div></div><div class="card auto"><div class="ah"><span class="ri acc"><span data-i="archive"></span></span><div class="at"><b>Send as ZIP</b><span>For WhatsApp and the like: photos and videos in full quality, not through your server.</span></div></div><p>Also from the gallery: Share, then Send as ZIP.</p><div class="btn tonal sm"><span data-i="images"></span>Pick photos</div></div><div class="card auto"><div class="ah"><span class="ri acc"><span data-i="camera"></span></span><div class="at"><b>Send automatically</b><span>For a day others should see as it happens: a wedding, a trip, a birthday.</span></div></div><div class="btn tonal sm"><span data-i="camera"></span>Turn on for today</div></div></div><nav class="nav" data-on="send"></nav><div class="gest"></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">103</span>Where does it go? <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Each choice says what it makes of these 52 files, so nobody needs to know sizes. A choice that would make more than 100 ZIPs can't be picked; Somewhere else takes any size in MB.</p>
+        <div class="phone" data-shot="103-zip-where"><div class="sb" data-time="20:06"></div><div class="ab back"><span class="ib"><span data-i="x"></span></span><h2>Send as ZIP</h2></div><div class="wb"><div class="stack sm"><div class="pc pa ph t6"><span data-i="image"></span></div><div class="pc pb ph t10"><span data-i="image"></span></div><div class="pc pcen ph t5"><span data-i="image"></span></div></div><p class="zmeta center">49 photos, 3 videos · 7.0 GB</p><div class="label">Name</div><div class="input">Dolomites 15–18 Oct 2026<span class="sfx">.zip</span></div><p class="help sm">On the other phone, the album is called that too.</p><div class="label">Where it goes</div><div class="fsel"><span class="fcov all"><span data-i="message"></span></span><div class="rt"><b>WhatsApp, Telegram</b><span>Up to 2 GB each: 4 ZIPs</span></div><span class="tbtn">Change</span></div></div><div class="gest"></div><div class="scrim"></div><div class="sheet"><div class="grip"></div><h3>Where does it go?</h3><div class="group"><div class="row on"><span class="rad on"></span><div class="rt"><b>WhatsApp, Telegram</b><span>Up to 2 GB a ZIP</span></div><span class="cnt">4 ZIPs</span></div><div class="row"><span class="rad"></span><div class="rt"><b>Signal</b><span>Up to 100 MB a ZIP</span></div><span class="cnt">71 ZIPs</span></div><div class="row dis"><span class="rad"></span><div class="rt"><b>Email</b><span>Up to 15 MB a ZIP</span></div><span class="cnt">Too many</span></div><div class="row"><span class="rad"></span><div class="rt"><b>Quick Share, a computer</b><span>One ZIP of any size</span></div><span class="cnt">1 ZIP</span></div><div class="row"><span class="rad"></span><div class="rt"><b>Somewhere else</b><span>Up to <span class="numin">500</span> MB a ZIP</span></div><span class="cnt">15 ZIPs</span></div></div><p class="help sm">Share remembers it for next time.</p></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">104</span>Four ZIPs <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Each ZIP opens on its own; only the video, bigger than a ZIP may be, is cut, and its pieces go into parts 3 and 4. Send 4 ZIPs hands all four to one chat; a part's arrow sends just that one, as email needs. They're called Dolomites 15–18 Oct 2026 (1 of 4).zip and so on, each with its share.json.</p>
+        <div class="phone" data-shot="104-zip-parts"><div class="sb" data-time="20:07"></div><div class="ab back"><span class="ib"><span data-i="x"></span></span></div><div class="wb"><h1 class="zt">Dolomites 15–18 Oct 2026</h1><p class="zmeta">52 files in 4 ZIPs · 7.0 GB</p><div class="group mt"><div class="row"><span class="ri acc"><span data-i="archive"></span></span><div class="rt"><b>Part 1 of 4</b><span>18 files · 1.9 GB</span></div><span class="ib"><span data-i="send"></span></span></div><div class="row"><span class="ri acc"><span data-i="archive"></span></span><div class="rt"><b>Part 2 of 4</b><span>22 files · 1.9 GB</span></div><span class="ib"><span data-i="send"></span></span></div><div class="row"><span class="ri acc"><span data-i="archive"></span></span><div class="rt"><b>Part 3 of 4</b><span>11 files and a video's first piece · 1.9 GB</span></div><span class="ib"><span data-i="send"></span></span></div><div class="row"><span class="ri acc"><span data-i="archive"></span></span><div class="rt"><b>Part 4 of 4</b><span>The video's second piece · 1.3 GB</span></div><span class="ib"><span data-i="send"></span></span></div></div><div class="note"><span data-i="scissors"></span><p><b>1 video goes in 2 pieces.</b> VID_20261017_141502.mp4 is 2.4 GB, more than a ZIP may be. Share on the other phone puts it back together.</p></div><div class="grow"></div><div class="btn primary"><span data-i="send"></span>Send 4 ZIPs</div><div class="btn link">Save to Downloads</div></div><div class="gest"></div></div>
+      </div>
+
+    </div>
+    <p class="sub-h">Maria's phone, from the chat</p>
+    <div class="board">
+
+      <div class="slot">
+        <h3><span class="n">105</span>Open with Share <span class="badge proposal">proposal</span></h3>
+        <p class="cap">WhatsApp opens a document with Android's Open with, where Share is listed for every ZIP. Without Share, the phone's Files app unpacks it just as well; only a cut video would stay in pieces.</p>
+        <div class="phone chat" data-shot="105-zip-chat"><div class="sb" data-time="19:02"></div><div class="chtop"><span class="ib"><span data-i="back"></span></span><span class="av sky">A</span><b>Anna</b></div><div class="chbody"><div class="bub doc"><span class="bdico"><span data-i="archive"></span></span><div><b>Photos 4 Oct 2026.zip</b><span>312 MB · ZIP</span></div></div><div class="bub">All the photos from Sunday, in full quality.<time>18:24</time></div></div><div class="gest"></div><div class="scrim"></div><div class="syssheet"><div class="grip"></div><div class="ssh ow"><b>Open with</b><span>Photos 4 Oct 2026.zip</span></div><div class="owrow hl"><span class="sti acc"><span data-i="images"></span></span><span translate="no">Share</span></div><div class="owrow"><span class="sti"><span data-i="folder"></span></span>Files</div><div class="owbtns"><span>Just once</span><span>Always</span></div></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">106</span>What's inside <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Share shows what's inside before anything is saved. Save puts photos and videos into an album named after the ZIP, documents into Downloads › Share. Maria is signed in, so she can also send them into one of her folders; signed out, there's only Save.</p>
+        <div class="phone" data-shot="106-zip-inside"><div class="sb" data-time="19:03"></div><div class="ab back"><span class="ib"><span data-i="x"></span></span></div><div class="wb"><h1 class="zt">Photos 4 Oct 2026</h1><p class="zmeta">12 photos, 2 videos · 312 MB</p><div class="grid g4 zgrid" data-tiles="p4 p3 v7@0:18 p2 p5 p6 p8 p7 p1 v10@1:04 p3 p9 p6 p4"></div><div class="zwhere"><span data-i="images"></span><span>Into the gallery, album “Photos 4 Oct 2026”</span></div><div class="grow"></div><div class="btn primary"><span data-i="download"></span>Save 14 to this phone</div><div class="btn outline"><span data-i="upload"></span>Send into Family</div></div><div class="gest"></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">107</span>Saved <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Done, and where they went. WhatsApp keeps its own copy of the ZIP: the line says how much room deleting it in the chat frees. Share keeps nothing.</p>
+        <div class="phone" data-shot="107-zip-saved"><div class="sb" data-time="19:03"></div><div class="ab back"><span class="ib"><span data-i="x"></span></span></div><div class="wb"><div class="grow"></div><div class="donecircle"><span data-i="check"></span></div><h1 class="hero md center">14 files saved</h1><p class="lead center">In your gallery, in the album “Photos 4 Oct 2026”.</p><div class="note slim"><span data-i="info"></span><p>WhatsApp still keeps the ZIP. Deleting it in the chat frees 312 MB.</p></div><div class="grow"></div><div class="btn primary"><span data-i="images"></span>Open gallery</div><div class="btn outline">Done</div></div><div class="gest"></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">108</span>All parts at once <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Where several ZIPs can be shared at once, as from the Files app, Share's entry Open in Share takes them all, and the set opens as one, with the video whole at once. A single part opened from a chat shows the same, with the other parts Not yet.</p>
+        <div class="phone" data-shot="108-zip-set"><div class="sb" data-time="21:38"></div><div class="ab back"><span class="ib"><span data-i="x"></span></span></div><div class="wb"><h1 class="zt">Dolomites 15–18 Oct 2026</h1><p class="zmeta">52 files in 4 ZIPs · 7.0 GB</p><div class="parts"><div class="part ok"><b>Part 1</b><span><span data-i="check"></span>Here</span></div><div class="part ok"><b>Part 2</b><span><span data-i="check"></span>Here</span></div><div class="part ok"><b>Part 3</b><span><span data-i="check"></span>Here</span></div><div class="part ok"><b>Part 4</b><span><span data-i="check"></span>Here</span></div></div><div class="zcut"><div class="grid g4 zgrid" data-tiles="p7 p4 v6@6:12 p10 p2 p6 p8 p5 p1 p9 p4 p3 p5 p2 p9 p7 v3@0:42 p6 p10 p8"></div></div><div class="zwhere"><span data-i="images"></span><span>Into the gallery, album “Dolomites 15–18 Oct 2026”</span></div><div class="btn primary mt"><span data-i="download"></span>Save 52 to this phone</div><div class="btn outline"><span data-i="upload"></span>Send into Family</div></div><div class="gest"></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">109</span>One part at a time <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Parts also come one by one, in any order. Once a part is saved, the set's other parts are saved the same way as soon as they're opened, and the chips show which ones this phone has. The video's first piece waits in Share for part 4, two weeks at most.</p>
+        <div class="phone" data-shot="109-zip-part"><div class="sb" data-time="21:40"></div><div class="ab back"><span class="ib"><span data-i="x"></span></span></div><div class="wb"><h1 class="zt">Dolomites 15–18 Oct 2026</h1><p class="zmeta">Part 3 of 4 · saved like parts 1 and 2</p><div class="parts"><div class="part ok"><b>Part 1</b><span><span data-i="check"></span>Saved</span></div><div class="part ok"><b>Part 2</b><span><span data-i="check"></span>Saved</span></div><div class="part ok cur"><b>Part 3</b><span><span data-i="check"></span>Just now</span></div><div class="part wait"><b>Part 4</b><span>Not yet</span></div></div><div class="grid g4 zgrid" data-tiles="p7 p4 p9 p10 p2 p6 p8 p5 p1 p9 p4 v3/x1-2"></div><div class="note slim"><span data-i="clock"></span><p><b>The video waits for part 4.</b> Open part 4 from the chat too, and Share puts VID_20261017_141502.mp4 back together.</p></div><div class="grow"></div><div class="btn primary">Done</div><div class="btn outline"><span data-i="images"></span>Open gallery</div></div><div class="gest"></div></div>
+      </div>
+      <div class="slot">
+        <h3><span class="n">110</span>Back together <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Once the last piece is in, Share checks every piece and the video's size before saving it. A broken piece is named, so only its part has to come again. The pieces then go from Share's storage.</p>
+        <div class="phone" data-shot="110-zip-joined"><div class="sb" data-time="21:42"></div><div class="ab back"><span class="ib"><span data-i="x"></span></span></div><div class="wb"><div class="vjoin ph t3"><span data-i="play"></span><i class="seam t"></i><i class="seam b"></i><span class="vsz">2.4 GB</span><span class="vok"><span data-i="check"></span></span></div><h1 class="hero md center">Video put back together</h1><p class="lead center">VID_20261017_141502.mp4, 2.4 GB, from parts 3 and 4. Share checked that it's complete and saved it to your gallery.</p><div class="okline"><span data-i="check"></span>All 4 parts are in</div><div class="grow"></div><div class="btn primary"><span data-i="images"></span>Open gallery</div><div class="btn outline">Done</div></div><div class="gest"></div></div>
+      </div>
+
+    </div>
+  </section>
+
 </div>
 
 <script>
@@ -2254,11 +2440,13 @@
   // Tile shorthand: p<tone> photo, v<tone>@<duration> video, d#<EXT>[=<name>] document.
   // Flags after "/": k done, u<n> uploading n%, q queued, s selected, o selectable, h on this phone, c current,
   // l encrypted and locked (its key isn't open on the device), a<initial> sent by someone else,
-  // f saved into a folder on this computer.
+  // f saved into a folder on this computer, x<n>-<m> piece n of m of a file cut across ZIPs.
   function tile(tok) {
     const [spec, ...flags] = tok.split('/');
     const f = {};
-    flags.forEach(x => { if (x[0] === 'u') f.u = +x.slice(1); else if (x[0] === 'a') f.a = x.slice(1); else f[x] = true; });
+    flags.forEach(x => {
+      if (x[0] === 'u') f.u = +x.slice(1); else if (x[0] === 'a') f.a = x.slice(1); else if (x[0] === 'x') f.x = x.slice(1).split('-'); else f[x] = true;
+    });
     let cls = 'tile', inner = '';
     if (spec[0] === 'd') {
       const [, ext, name] = spec.match(/^d#([A-Z0-9]+)(?:=(.+))?$/);
@@ -2280,6 +2468,10 @@
     if (f.f) inner += `<span class="onph">${ic('folder')}</span>`;
     if (f.u != null) inner += `<span class="tprog"><i style="width:${f.u}%"></i></span>`;
     if (f.a) inner += `<span class="fromb">${f.a}</span>`;
+    if (f.x) {
+      cls += ' piece';
+      inner += `<span class="pieceb">Piece ${f.x[0]} of ${f.x[1]}</span>`;
+    }
     return `<div class="${cls}">${inner}</div>`;
   }
   document.querySelectorAll('[data-tiles]').forEach(el => {
@@ -4659,10 +4851,398 @@
       "Only admins": [
           "Nur Admins",
           "Solo admin"
+      ],
+      "14 selected": [
+          "14 ausgewählt",
+          "14 selezionati"
+      ],
+      "Sharing 14 items": [
+          "14 Elemente teilen",
+          "Condividi 14 elementi"
+      ],
+      "12 photos, 2 videos": [
+          "12 Fotos, 2 Videos",
+          "12 foto, 2 video"
+      ],
+      "Send with Share": [
+          "Mit Share senden",
+          "Invia con Share"
+      ],
+      "Send as ZIP": [
+          "Als ZIP senden",
+          "Invia come ZIP"
+      ],
+      "12 photos, 2 videos · 312 MB": [
+          "12 Fotos, 2 Videos · 312 MB",
+          "12 foto, 2 video · 312 MB"
+      ],
+      "Photos 4 Oct 2026": [
+          "Fotos 4. Okt. 2026",
+          "Foto 4 ott 2026"
+      ],
+      "On the other phone, the album is called that too.": [
+          "Auf dem anderen Handy heißt auch das Album so.",
+          "Sull'altro telefono anche l'album si chiama così."
+      ],
+      "Where it goes": [
+          "Wohin es geht",
+          "Dove va"
+      ],
+      "Up to 2 GB each: all in one ZIP": [
+          "Bis 2 GB pro ZIP: alles in einem",
+          "Fino a 2 GB l'uno: tutto in un solo ZIP"
+      ],
+      "On the other phone, Share saves them into the gallery. Without Share, any ZIP app unpacks them.": [
+          "Auf dem anderen Handy speichert Share sie in der Galerie. Ohne Share entpackt sie jede ZIP-App.",
+          "Sull'altro telefono Share le salva nella galleria. Senza Share, qualsiasi app per ZIP le estrae."
+      ],
+      "Pack ZIP": [
+          "ZIP packen",
+          "Prepara lo ZIP"
+      ],
+      "Photos and videos stay exactly as they are.": [
+          "Fotos und Videos bleiben genau, wie sie sind.",
+          "Foto e video restano esattamente come sono."
+      ],
+      "Photos 4 Oct 2026.zip": [
+          "Fotos 4. Okt. 2026.zip",
+          "Foto 4 ott 2026.zip"
+      ],
+      "14 files · 312 MB": [
+          "14 Dateien · 312 MB",
+          "14 file · 312 MB"
+      ],
+      "Packing 9 of 14": [
+          "Packen: 9 von 14",
+          "Preparazione: 9 di 14"
+      ],
+      "Stop packing": [
+          "Packen stoppen",
+          "Interrompi"
+      ],
+      "Fits WhatsApp and Telegram, which take up to 2 GB. Too big for most email.": [
+          "Passt für WhatsApp und Telegram, die bis 2 GB nehmen. Für die meisten E-Mails zu groß.",
+          "Va bene per WhatsApp e Telegram, che accettano fino a 2 GB. Troppo grande per quasi tutte le email."
+      ],
+      "Send ZIP": [
+          "ZIP senden",
+          "Invia lo ZIP"
+      ],
+      "Save to Downloads": [
+          "In Downloads speichern",
+          "Salva in Download"
+      ],
+      "52 selected": [
+          "52 ausgewählt",
+          "52 selezionati"
+      ],
+      "Sunday, 18 Oct": [
+          "Sonntag, 18. Oktober",
+          "Domenica 18 ottobre"
+      ],
+      "9 of 31 selected": [
+          "9 von 31 ausgewählt",
+          "9 di 31 selezionati"
+      ],
+      "Saturday, 17 Oct": [
+          "Samstag, 17. Oktober",
+          "Sabato 17 ottobre"
+      ],
+      "14 of 40 selected": [
+          "14 von 40 ausgewählt",
+          "14 di 40 selezionati"
+      ],
+      "Download 52": [
+          "52 herunterladen",
+          "Scarica 52"
+      ],
+      "· 7.0 GB": [
+          "· 7,0 GB",
+          "· 7,0 GB"
+      ],
+      "Share 52 files": [
+          "52 Dateien teilen",
+          "Condividi 52 file"
+      ],
+      "As a ZIP": [
+          "Als ZIP",
+          "Come ZIP"
+      ],
+      "In full quality: 4 ZIPs of up to 2 GB, as WhatsApp takes them.": [
+          "In voller Qualität: 4 ZIPs mit bis zu 2 GB, wie WhatsApp sie nimmt.",
+          "In qualità piena: 4 ZIP fino a 2 GB, come li accetta WhatsApp."
+      ],
+      "One by one": [
+          "Einzeln",
+          "Uno per uno"
+      ],
+      "WhatsApp makes photos and videos smaller.": [
+          "WhatsApp macht Fotos und Videos kleiner.",
+          "WhatsApp rimpicciolisce foto e video."
+      ],
+      "11 of them aren't on this phone yet: Share gets them from the server first.": [
+          "11 davon sind noch nicht auf dem Handy: Share holt sie zuerst vom Server.",
+          "11 non sono ancora sul telefono: Share li scarica prima dal server."
+      ],
+      "For WhatsApp and the like: photos and videos in full quality, not through your server.": [
+          "Für WhatsApp und Co.: Fotos und Videos in voller Qualität, nicht über deinen Server.",
+          "Per WhatsApp e simili: foto e video in qualità piena, senza passare dal tuo server."
+      ],
+      "Also from the gallery: Share, then Send as ZIP.": [
+          "Auch aus der Galerie: Teilen, dann Als ZIP senden.",
+          "Anche dalla galleria: Condividi, poi Invia come ZIP."
+      ],
+      "Pick photos": [
+          "Fotos auswählen",
+          "Scegli le foto"
+      ],
+      "49 photos, 3 videos · 7.0 GB": [
+          "49 Fotos, 3 Videos · 7,0 GB",
+          "49 foto, 3 video · 7,0 GB"
+      ],
+      "Dolomites 15–18 Oct 2026": [
+          "Dolomiten 15.–\u206018. Okt. 2026",
+          "Dolomiti 15–18 ott 2026"
+      ],
+      "Up to 2 GB each: 4 ZIPs": [
+          "Bis 2 GB pro ZIP: 4 ZIPs",
+          "Fino a 2 GB l'uno: 4 ZIP"
+      ],
+      "Where does it go?": [
+          "Wohin geht es?",
+          "Dove va?"
+      ],
+      "Up to 2 GB a ZIP": [
+          "Bis 2 GB pro ZIP",
+          "Fino a 2 GB per ZIP"
+      ],
+      "4 ZIPs": [
+          "4 ZIPs",
+          "4 ZIP"
+      ],
+      "Up to 100 MB a ZIP": [
+          "Bis 100 MB pro ZIP",
+          "Fino a 100 MB per ZIP"
+      ],
+      "71 ZIPs": [
+          "71 ZIPs",
+          "71 ZIP"
+      ],
+      "Email": [
+          "E-Mail",
+          "Email"
+      ],
+      "Up to 15 MB a ZIP": [
+          "Bis 15 MB pro ZIP",
+          "Fino a 15 MB per ZIP"
+      ],
+      "Too many": [
+          "Zu viele",
+          "Troppi"
+      ],
+      "Quick Share, a computer": [
+          "Quick Share, ein Computer",
+          "Quick Share, un computer"
+      ],
+      "One ZIP of any size": [
+          "Ein ZIP, beliebig groß",
+          "Un solo ZIP, grande quanto serve"
+      ],
+      "Somewhere else": [
+          "Woandershin",
+          "Altrove"
+      ],
+      "Up to": [
+          "Bis",
+          "Fino a"
+      ],
+      "MB a ZIP": [
+          "MB pro ZIP",
+          "MB per ZIP"
+      ],
+      "15 ZIPs": [
+          "15 ZIPs",
+          "15 ZIP"
+      ],
+      "Share remembers it for next time.": [
+          "Share merkt es sich fürs nächste Mal.",
+          "Share lo ricorda per la prossima volta."
+      ],
+      "52 files in 4 ZIPs · 7.0 GB": [
+          "52 Dateien in 4 ZIPs · 7,0 GB",
+          "52 file in 4 ZIP · 7,0 GB"
+      ],
+      "Part 1 of 4": [
+          "Teil 1 von 4",
+          "Parte 1 di 4"
+      ],
+      "Part 2 of 4": [
+          "Teil 2 von 4",
+          "Parte 2 di 4"
+      ],
+      "Part 3 of 4": [
+          "Teil 3 von 4",
+          "Parte 3 di 4"
+      ],
+      "Part 4 of 4": [
+          "Teil 4 von 4",
+          "Parte 4 di 4"
+      ],
+      "18 files · 1.9 GB": [
+          "18 Dateien · 1,9 GB",
+          "18 file · 1,9 GB"
+      ],
+      "22 files · 1.9 GB": [
+          "22 Dateien · 1,9 GB",
+          "22 file · 1,9 GB"
+      ],
+      "11 files and a video's first piece · 1.9 GB": [
+          "11 Dateien und das erste Stück eines Videos · 1,9 GB",
+          "11 file e il primo pezzo di un video · 1,9 GB"
+      ],
+      "The video's second piece · 1.3 GB": [
+          "Das zweite Stück des Videos · 1,3 GB",
+          "Il secondo pezzo del video · 1,3 GB"
+      ],
+      "1 video goes in 2 pieces.": [
+          "1 Video kommt in 2 Stücken.",
+          "1 video va in 2 pezzi."
+      ],
+      "VID_20261017_141502.mp4 is 2.4 GB, more than a ZIP may be. Share on the other phone puts it back together.": [
+          "VID_20261017_141502.mp4 hat 2,4 GB, mehr als ein ZIP haben darf. Share setzt es auf dem anderen Handy wieder zusammen.",
+          "VID_20261017_141502.mp4 pesa 2,4 GB, più di quanto possa uno ZIP. Share sull'altro telefono lo rimette insieme."
+      ],
+      "Send 4 ZIPs": [
+          "4 ZIPs senden",
+          "Invia 4 ZIP"
+      ],
+      "312 MB · ZIP": [
+          "312 MB · ZIP",
+          "312 MB · ZIP"
+      ],
+      "All the photos from Sunday, in full quality.": [
+          "Alle Fotos vom Sonntag, in voller Qualität.",
+          "Tutte le foto di domenica, in qualità piena."
+      ],
+      "Open with": [
+          "Öffnen mit",
+          "Apri con"
+      ],
+      "Files": [
+          "Files",
+          "Files"
+      ],
+      "Just once": [
+          "Nur diesmal",
+          "Solo una volta"
+      ],
+      "Always": [
+          "Immer",
+          "Sempre"
+      ],
+      "Into the gallery, album “Photos 4 Oct 2026”": [
+          "In die Galerie, Album „Fotos 4. Okt. 2026“",
+          "Nella galleria, album “Foto 4 ott 2026”"
+      ],
+      "Save 14 to this phone": [
+          "14 aufs Handy speichern",
+          "Salva 14 sul telefono"
+      ],
+      "Send into Family": [
+          "In Familie senden",
+          "Invia in Famiglia"
+      ],
+      "14 files saved": [
+          "14 Dateien gespeichert",
+          "14 file salvati"
+      ],
+      "In your gallery, in the album “Photos 4 Oct 2026”.": [
+          "In deiner Galerie, im Album „Fotos 4. Okt. 2026“.",
+          "Nella tua galleria, nell'album “Foto 4 ott 2026”."
+      ],
+      "WhatsApp still keeps the ZIP. Deleting it in the chat frees 312 MB.": [
+          "WhatsApp behält das ZIP noch. Löschst du es im Chat, werden 312 MB frei.",
+          "WhatsApp conserva ancora lo ZIP. Se lo elimini nella chat, liberi 312 MB."
+      ],
+      "Open gallery": [
+          "Galerie öffnen",
+          "Apri la galleria"
+      ],
+      "Part 1": [
+          "Teil 1",
+          "Parte 1"
+      ],
+      "Part 2": [
+          "Teil 2",
+          "Parte 2"
+      ],
+      "Part 3": [
+          "Teil 3",
+          "Parte 3"
+      ],
+      "Part 4": [
+          "Teil 4",
+          "Parte 4"
+      ],
+      "Saved": [
+          "Fertig",
+          "Salvata"
+      ],
+      "Not yet": [
+          "Noch nicht",
+          "Non ancora"
+      ],
+      "Piece 1 of 2": [
+          "Stück 1 von 2",
+          "Pezzo 1 di 2"
+      ],
+      "The video waits for part 4.": [
+          "Das Video wartet auf Teil 4.",
+          "Il video aspetta la parte 4."
+      ],
+      "Open part 4 from the chat too, and Share puts VID_20261017_141502.mp4 back together.": [
+          "Öffne auch Teil 4 aus dem Chat, dann setzt Share VID_20261017_141502.mp4 wieder zusammen.",
+          "Apri anche la parte 4 dalla chat e Share rimette insieme VID_20261017_141502.mp4."
+      ],
+      "2.4 GB": [
+          "2,4 GB",
+          "2,4 GB"
+      ],
+      "Video put back together": [
+          "Video wieder zusammengesetzt",
+          "Video rimesso insieme"
+      ],
+      "VID_20261017_141502.mp4, 2.4 GB, from parts 3 and 4. Share checked that it's complete and saved it to your gallery.": [
+          "VID_20261017_141502.mp4, 2,4 GB, aus Teil 3 und 4. Share hat geprüft, dass es vollständig ist, und es in deiner Galerie gespeichert.",
+          "VID_20261017_141502.mp4, 2,4 GB, dalle parti 3 e 4. Share ha controllato che sia completo e l'ha salvato nella tua galleria."
+      ],
+      "All 4 parts are in": [
+          "Alle 4 Teile sind da",
+          "Ci sono tutte e 4 le parti"
+      ],
+      "Here": [
+          "Da",
+          "Qui"
+      ],
+      "Into the gallery, album “Dolomites 15–18 Oct 2026”": [
+          "In die Galerie, Album „Dolomiten 15.–\u206018. Okt. 2026“",
+          "Nella galleria, album “Dolomiti 15–18 ott 2026”"
+      ],
+      "Save 52 to this phone": [
+          "52 aufs Handy speichern",
+          "Salva 52 sul telefono"
+      ],
+      "Part 3 of 4 · saved like parts 1 and 2": [
+          "Teil 3 von 4 · gespeichert wie Teil 1 und 2",
+          "Parte 3 di 4 · salvata come le parti 1 e 2"
+      ],
+      "Just now": [
+          "Eben",
+          "Adesso"
       ]
   };
   // Names, codes, numbers and file names that stay the same in every language.
-  const KEEP = /^(?:[A-Z0-9]|\d+(?::\d+)?|Stefan|Maria|Peter|Anna|Luca|maria|Admin|PIN|PDF|DOCX|ZIP|XLSX|•+|\d{8}_\d{6}\.(?:jpg|mp4)|\/srv\/share|(?:https:\/\/)?share\.example\.com(?:\/[a-z\/-]*)?|https:\/\/192\.168\.1\.20:8443|\d+ (?:KB|MB|GB)|@maria|Pixel 8|Chrome · Windows|IMG_\d+\.jpg|image\/jpeg|Quick Share|iPhone · Safari|Android · Chrome|\d+ MB\/s|Anna & Marco)$/;
+  const KEEP = /^(?:[A-Z0-9]|\d+(?::\d+)?|Stefan|Maria|Peter|Anna|Luca|maria|Admin|PIN|PDF|DOCX|ZIP|XLSX|•+|\d{8}_\d{6}\.(?:jpg|mp4)|\/srv\/share|(?:https:\/\/)?share\.example\.com(?:\/[a-z\/-]*)?|https:\/\/192\.168\.1\.20:8443|\d+ (?:KB|MB|GB)|@maria|Pixel 8|Chrome · Windows|IMG_\d+\.jpg|image\/jpeg|Quick Share|iPhone · Safari|Android · Chrome|\d+ MB\/s|Anna & Marco|WhatsApp(?:, Telegram)?|Signal|Gmail|\.zip|1 ZIP)$/;
   const LANGS = ['en', 'de', 'it'];
   const original = new WeakMap();
   function setLang(lang) {
