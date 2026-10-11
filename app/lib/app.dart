@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'data/access.dart';
 import 'data/admin.dart';
 import 'data/api.dart';
 import 'data/folders.dart';
@@ -29,6 +30,7 @@ class AppServices {
   AppServices({required this.platform, Api? api, MediaPlayerFactory? player})
       : api = api ?? Api(platform: platform),
         player = player ?? videoPlayer {
+    access = AccessRepository(api: this.api, platform: platform);
     session = SessionRepository(api: this.api, platform: platform);
     library = LibraryRepository(api: this.api, platform: platform);
     folders = FolderStore(library: library, platform: platform);
@@ -42,6 +44,8 @@ class AppServices {
 
   /// Plays videos and sound in the viewer.
   final MediaPlayerFactory player;
+  /// The Cloudflare Access service token, if the server is behind it.
+  late final AccessRepository access;
   late final SessionRepository session;
   late final LibraryRepository library;
   late final FolderStore folders;
@@ -65,6 +69,7 @@ class AppServices {
     shared.value = await platform.sharedCount();
     theme.value = await platform.readSecret('theme');
     language.value = await platform.readSecret('language');
+    await access.restore();
     await folders.start();
     // Signed out: the next person starts with their own folders.
     session.states.listen((s) {

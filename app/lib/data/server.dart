@@ -4,6 +4,7 @@ library;
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'access.dart';
 import 'models.dart';
 
 /// The addresses this phone uses for its server, and what it learned about them. Kotlin
@@ -128,14 +129,21 @@ sealed class ShareLink {
 /// An invite: `<server>/join#shi_…`, or `com.eschgi.share://join?server=…&token=…`, the form
 /// the invite page hands to the app.
 class InviteLink extends ShareLink {
-  const InviteLink(this.server, this.token, {this.secret});
+  const InviteLink(this.server, this.token, {this.secret, this.access});
   final Uri server;
   final String token;
 
   /// The secret after the token, which opens the keys the inviting device locked with it
   /// (docs/e2ee-plan.md); it never goes to the server.
   final String? secret;
+
+  /// The Cloudflare Access service token an admin's phone put into the QR code, after
+  /// `&cfa=` (docs/cloudflare-access-plan.md); it never goes to the server either.
+  final CloudflareAccess? access;
 }
+
+/// An invite's link for the QR code, with the Cloudflare Access token after `&cfa=`.
+String inviteLinkWithAccess(String link, CloudflareAccess access) => '$link&cfa=${access.linkValue}';
 
 /// A PIN link, `<server>/#K7M2Q`: the app sends with that PIN, as the website does.
 class PinLink extends ShareLink {
@@ -168,17 +176,25 @@ ShareLink? parseLink(String text) {
   if (uri.scheme == 'com.eschgi.share' && uri.host == 'join') {
     final server = normalizePublicAddress(uri.queryParameters['server'] ?? '');
     final token = uri.queryParameters['token'] ?? '';
-    return server != null && _inviteToken.hasMatch(token) ? InviteLink(server, token, secret: _secretOf(uri.queryParameters['key'])) : null;
+    if (server == null || !_inviteToken.hasMatch(token)) return null;
+    return InviteLink(server, token, secret: _secretOf(uri.queryParameters['key']), access: CloudflareAccess.fromLink(server.host, uri.queryParameters['cfa']));
   }
   if (uri.scheme != 'https' && !(uri.scheme == 'http' && isHomeHost(uri.host))) return null;
   final server = normalizePublicAddress('${uri.scheme}://${uri.authority}');
   if (server == null) return null;
-  final fragment = Uri.decodeComponent(uri.fragment);
+  // The token and its secret, then, after an &, what else the link carries: cfa=, the
+  // Cloudflare Access token.
+  final whole = Uri.decodeComponent(uri.fragment);
+  final amp = whole.indexOf('&');
+  final fragment = amp < 0 ? whole : whole.substring(0, amp);
+  final extra = amp < 0 ? const <String, String>{} : Uri.splitQueryString(whole.substring(amp + 1));
   final dot = fragment.indexOf('.');
   final head = dot < 0 ? fragment : fragment.substring(0, dot);
   final secret = dot < 0 ? null : _secretOf(fragment.substring(dot + 1));
   final root = dot >= 0 && _root.hasMatch(fragment.substring(dot + 1)) ? fragment.substring(dot + 1) : null;
-  if (uri.path == '/join' && _inviteToken.hasMatch(head)) return InviteLink(server, head, secret: secret);
+  if (uri.path == '/join' && _inviteToken.hasMatch(head)) {
+    return InviteLink(server, head, secret: secret, access: CloudflareAccess.fromLink(server.host, extra['cfa']));
+  }
   if ((uri.path == '/' || uri.path.isEmpty) && _pinCode.hasMatch(head)) return PinLink(server, head.toUpperCase(), secret: secret, root: root);
   return null;
 }

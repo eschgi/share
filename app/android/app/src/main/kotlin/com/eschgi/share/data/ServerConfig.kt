@@ -19,6 +19,8 @@ data class ServerConfig(
     val serverId: String?,
     /** This phone's id on the server, for the proof a server gives over plain http (HomeProof). */
     val deviceId: String? = null,
+    /** The Cloudflare Access token for the public address, kept apart with the secrets. */
+    val access: CloudflareAccess? = null,
 ) {
     /** An address at home to use: plain http, or https with the server's own pinned certificate. */
     val hasLocal: Boolean get() = !localUrl.isNullOrEmpty() && (isHttp(localUrl) || pins.isNotEmpty())
@@ -55,10 +57,12 @@ data class ServerConfig(
 
 /**
  * Where [ServerConfig] is kept: plain preferences, since none of it is secret. Two slots: the
- * server this phone is signed in to, and the one it sends to with a PIN.
+ * server this phone is signed in to, and the one it sends to with a PIN. The configs come with
+ * the Cloudflare Access token, if there is one, from [SecretStore].
  */
 class ServerStore(context: Context) {
-    private val prefs = context.applicationContext.getSharedPreferences("server", Context.MODE_PRIVATE)
+    private val app = context.applicationContext
+    private val prefs = app.getSharedPreferences("server", Context.MODE_PRIVATE)
 
     fun load(slot: String = DEVICE): String? = prefs.getString(key(slot), null)
 
@@ -66,9 +70,12 @@ class ServerStore(context: Context) {
         prefs.edit(commit = true) { if (json == null) remove(key(slot)) else putString(key(slot), json) }
     }
 
-    fun config(): ServerConfig? = ServerConfig.parse(load())
+    fun config(): ServerConfig? = ServerConfig.parse(load())?.withAccess()
 
-    fun pinConfig(): ServerConfig? = ServerConfig.parse(load(PIN))
+    fun pinConfig(): ServerConfig? = ServerConfig.parse(load(PIN))?.withAccess()
+
+    private fun ServerConfig.withAccess(): ServerConfig =
+        copy(access = CloudflareAccess.parse(SecretStore(app).read(SecretStore.CLOUDFLARE_ACCESS)))
 
     private fun key(slot: String) = if (slot == PIN) "pin_config" else "config"
 

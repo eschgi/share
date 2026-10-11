@@ -3,14 +3,20 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../app.dart';
+import '../data/api.dart';
 import '../data/platform.dart';
 import '../data/server.dart';
 import '../l10n/app_localizations.dart';
+import 'access_screen.dart';
 import 'icons.dart';
 import 'widgets.dart';
 
+/// What the last look at Cloudflare Access found (screen 114).
+enum _AccessCheck { checking, ok, refused, failed }
+
 /// Screen 16: the two addresses. The app uses the local one whenever it answers and proves to
-/// be the same server, otherwise the public one.
+/// be the same server, otherwise the public one. With Cloudflare Access in front of the server,
+/// also its service token (114).
 class ServerScreen extends StatefulWidget {
   const ServerScreen({super.key});
 
@@ -25,6 +31,7 @@ class _ServerScreenState extends State<ServerScreen> {
   StreamSubscription<RouteStatus>? _routes;
   String? _localError;
   bool _checking = false;
+  _AccessCheck? _access;
 
   @override
   void initState() {
@@ -35,6 +42,95 @@ class _ServerScreenState extends State<ServerScreen> {
     _local.text = c?.localUrl?.toString() ?? '';
     s.platform.route().then((r) => mounted ? setState(() => _route = r) : null);
     _routes = s.platform.routes.listen((r) => setState(() => _route = r));
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkAccess());
+  }
+
+  Uri? get _server => Services.read(context).api.config?.publicUrl;
+
+  /// Asks Cloudflare over the public address whether the token gets through.
+  Future<void> _checkAccess() async {
+    final server = _server;
+    final access = server == null ? null : Services.read(context).access.forServer(server);
+    if (server == null || access == null || !access.on) return setState(() => _access = null);
+    setState(() => _access = _AccessCheck.checking);
+    _AccessCheck result;
+    try {
+      await Services.read(context).access.check(server, access);
+      result = _AccessCheck.ok;
+    } on CloudflareAccessException {
+      result = _AccessCheck.refused;
+    } on ApiException catch (e) {
+      result = e.fromShare ? _AccessCheck.ok : _AccessCheck.failed;
+    } on NetworkException {
+      result = _AccessCheck.failed;
+    }
+    if (mounted) setState(() => _access = result);
+  }
+
+  /// Turns the token on, asking for one if there is none yet, or off without forgetting it.
+  Future<void> _switchAccess(bool on) async {
+    final server = _server;
+    if (server == null) return;
+    final repo = Services.read(context).access;
+    final known = repo.forServer(server);
+    if (on && known == null) {
+      final saved = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => AccessTokenScreen(server: server)));
+      if (saved == true && mounted) setState(() => _access = _AccessCheck.ok);
+      return;
+    }
+    if (known == null) return;
+    await repo.save(known.copyWith(on: on));
+    if (!mounted) return;
+    on ? await _checkAccess() : setState(() => _access = null);
+  }
+
+  Future<void> _editAccess() async {
+    final server = _server;
+    if (server == null) return;
+    final saved = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => AccessTokenScreen(server: server)));
+    if (saved == true && mounted) setState(() => _access = _AccessCheck.ok);
+  }
+
+  List<Widget> _accessPart(AppLocalizations t) {
+    final server = _server;
+    final access = server == null ? null : Services.of(context).access.forServer(server);
+    final on = access?.on == true;
+    final a = _access;
+    return [
+      const SizedBox(height: 8),
+      SectionLabel(t.accessTitle),
+      SettingsGroup(children: [
+        SettingsRow(
+          leading: SettingsRow.icon(context, AppIcons.shield),
+          title: t.accessSwitch,
+          subtitle: on ? t.accessOnlyPublic : t.accessSwitchHelp,
+          trailing: Switch(value: on, onChanged: _switchAccess),
+          onTap: () => _switchAccess(!on),
+        ),
+        if (access != null && on) ...[
+          SettingsRow(leading: SettingsRow.icon(context, AppIcons.key), title: t.accessClientId, subtitle: access.clientId, onTap: _editAccess),
+          SettingsRow(leading: SettingsRow.icon(context, AppIcons.lock), title: t.accessClientSecret, subtitle: '•' * 16, onTap: _editAccess),
+        ],
+      ]),
+      if (on && a != null) ...[
+        const SizedBox(height: 14),
+        StatusCard(
+          ok: a == _AccessCheck.ok,
+          busy: a == _AccessCheck.checking,
+          title: switch (a) {
+            _AccessCheck.checking => t.routeChecking,
+            _AccessCheck.ok => t.accessOk,
+            _AccessCheck.refused => t.accessRefused,
+            _AccessCheck.failed => t.accessUnchecked,
+          },
+          detail: switch (a) {
+            _AccessCheck.ok || _AccessCheck.checking => t.accessOkDetail,
+            _AccessCheck.refused => t.accessRefusedDetail,
+            _AccessCheck.failed => t.commonOffline,
+          },
+        ),
+      ],
+    ];
   }
 
   @override
@@ -63,6 +159,7 @@ class _ServerScreenState extends State<ServerScreen> {
         _route = r;
         _checking = false;
       });
+      unawaited(_checkAccess());
     }
   }
 
@@ -105,6 +202,7 @@ class _ServerScreenState extends State<ServerScreen> {
             onSubmitted: (_) => _check(),
           ),
           Help(t.serverLocalHelp),
+          ..._accessPart(t),
           const SizedBox(height: 20),
           StatusCard(
             ok: local,

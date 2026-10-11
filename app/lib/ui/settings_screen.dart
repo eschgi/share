@@ -85,6 +85,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (old.user.role != widget.user.role) _loadAdmin();
   }
 
+  /// Whether this phone sends a Cloudflare Access token to its server.
+  bool get _accessOn {
+    final services = Services.read(context);
+    final server = services.api.config?.publicUrl;
+    return server != null && services.access.forServer(server)?.on == true;
+  }
+
   Future<void> _loadAdmin() async {
     if (!widget.user.isAdmin) return;
     final admin = Services.read(context).admin;
@@ -333,8 +340,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           SettingsRow(
             leading: SettingsRow.icon(context, AppIcons.server),
             title: t.settingsServer,
-            subtitle: _route?.isLocal == true ? t.settingsServerLocal : t.settingsServerPublic,
-            onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const ServerScreen())),
+            subtitle: [
+              _route?.isLocal == true ? t.settingsServerLocal : t.settingsServerPublic,
+              if (_accessOn) t.accessTitle,
+            ].join(' · '),
+            onTap: () async {
+              await Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const ServerScreen()));
+              if (mounted) setState(() {}); // the token may have been switched on or off
+            },
           ),
         ]),
         if (u.isAdmin) ..._adminSections(t, phone) else const SizedBox(height: 14),

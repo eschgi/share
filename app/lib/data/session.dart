@@ -119,6 +119,8 @@ class SessionRepository {
       return ServerIdentity.fromJson(info);
     } on FormatException {
       throw const NotShareServer();
+    } on CloudflareAccessException {
+      rethrow; // Share may well be behind it
     } on ApiException {
       throw const NotShareServer();
     }

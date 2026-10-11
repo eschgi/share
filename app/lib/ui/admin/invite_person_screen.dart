@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../app.dart';
+import '../../data/access.dart';
 import '../../data/api.dart';
 import '../../data/folders.dart';
 import '../../data/models.dart';
 import '../../data/platform.dart' show KeysException, KeysStatus;
+import '../../data/server.dart' show inviteLinkWithAccess;
 import '../../l10n/app_localizations.dart';
 import '../folders.dart';
 import '../icons.dart';
@@ -12,7 +14,9 @@ import '../theme.dart';
 import '../widgets.dart';
 
 /// Screen 20: an invite as a QR code, or as a link, with the folders a new member gets (47).
-/// With [forPerson] it adds a phone for someone who has an account.
+/// With [forPerson] it adds a phone for someone who has an account. Behind Cloudflare Access,
+/// the QR code brings this phone's service token along, unless switched off (117); the link
+/// never does, since it would stay in the chat it's sent in.
 class InvitePersonScreen extends StatefulWidget {
   const InvitePersonScreen({super.key, this.forPerson});
   final Person? forPerson;
@@ -31,6 +35,17 @@ class _InvitePersonScreenState extends State<InvitePersonScreen> {
   /// Why the invite would go without the keys of the encrypted folders it gives: said first, and
   /// made only when asked again, since the new person would then wait for an OK with a code.
   String? _noKeys;
+
+  /// Whether the QR code brings the Cloudflare Access token, when this phone has one.
+  bool _withAccess = true;
+
+  /// This phone's Cloudflare Access token for its server, if it sends one.
+  CloudflareAccess? get _access {
+    final services = Services.read(context);
+    final server = services.api.config?.publicUrl;
+    final a = server == null ? null : services.access.forServer(server);
+    return a != null && a.on ? a : null;
+  }
 
   @override
   void initState() {
@@ -180,12 +195,25 @@ class _InvitePersonScreenState extends State<InvitePersonScreen> {
                 if (folders.length > 1) Help(t.folderAdminsSeeAll),
                 const SizedBox(height: 22),
               ],
+              if (_access != null) ...[
+                SettingsGroup(children: [
+                  SettingsRow(
+                    leading: SettingsRow.icon(context, AppIcons.shield),
+                    title: t.inviteAccess,
+                    subtitle: _who.isEmpty ? t.inviteAccessHelpNoName : t.inviteAccessHelp(_who),
+                    trailing: Switch(value: _withAccess, onChanged: (on) => setState(() => _withAccess = on)),
+                    onTap: () => setState(() => _withAccess = !_withAccess),
+                  ),
+                ]),
+                const SizedBox(height: 22),
+              ],
               if (invite != null)
                 Container(
                   padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
                   decoration: BoxDecoration(color: c.s1, borderRadius: BorderRadius.circular(22), border: Border.all(color: c.lineSoft)),
                   child: Column(children: [
-                    QrCodeView(invite.link, size: 196, label: t.inviteScanThis(_who)),
+                    QrCodeView(_access != null && _withAccess ? inviteLinkWithAccess(invite.link, _access!) : invite.link,
+                        size: 196, label: t.inviteScanThis(_who)),
                     const SizedBox(height: 18),
                     Text(person == null ? t.inviteScanThis(_who) : t.invitePhoneLead(person.name),
                         textAlign: TextAlign.center, style: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.w600, height: 1.35)),
@@ -226,7 +254,7 @@ class _InvitePersonScreenState extends State<InvitePersonScreen> {
                       style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(56)),
                       onPressed: () => Services.read(context).platform.shareText(t.inviteShareText(_who, invite.link)),
                       icon: const Icon(AppIcons.share, size: 22),
-                      label: Text(t.inviteSendLink),
+                      label: Text(_access != null && _withAccess ? t.inviteSendLinkNoToken : t.inviteSendLink),
                     ),
                     if (person == null) TextButton(onPressed: _again, child: Text(t.inviteAnother)),
                   ]),

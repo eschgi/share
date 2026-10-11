@@ -3,6 +3,7 @@ package com.eschgi.share.transfer
 import android.content.Context
 import android.net.Uri
 import com.eschgi.share.BuildConfig
+import com.eschgi.share.data.CloudflareAccess
 import com.eschgi.share.data.ServerConfig
 import com.eschgi.share.e2ee.Keys
 import com.eschgi.share.net.RouteMonitor
@@ -73,7 +74,7 @@ object Playback {
             }
         }
         return when (val way = way(false, config, home) { RouteMonitor.httpAllowed(config, it) }) {
-            is Way.Stream -> streamOf(way.base, file.id, token)
+            is Way.Stream -> streamOf(way.base, file.id, token, config.access)
             Way.Fetch -> Fetcher.fetch(app, listOf(file), auth)?.single()?.let { copyOf(it) }
             Way.Nowhere -> throw IOException("${config.publicUrl} hasn't shown to be this phone's server on this network")
             Way.Copy -> error("no copy")
@@ -85,8 +86,13 @@ object Playback {
     /** A file's link in the bucket, exactly as the server signed it, with only the app's name. */
     fun linkOf(url: String): Map<String, Any?> = mapOf("uri" to url, "headers" to mapOf("User-Agent" to "Share-Android/${BuildConfig.VERSION_NAME}"))
 
-    fun streamOf(base: String, id: String, token: String): Map<String, Any?> = mapOf(
-        "uri" to "$base/api/files/$id/content",
-        "headers" to mapOf("Authorization" to "Bearer $token", "User-Agent" to "Share-Android/${BuildConfig.VERSION_NAME}"),
-    )
+    /** The player streams from the server itself, with the key, and the Cloudflare Access token on the public address. */
+    fun streamOf(base: String, id: String, token: String, access: CloudflareAccess? = null): Map<String, Any?> {
+        val headers = mutableMapOf("Authorization" to "Bearer $token", "User-Agent" to "Share-Android/${BuildConfig.VERSION_NAME}")
+        if (access != null && access.appliesTo(base)) {
+            headers["CF-Access-Client-Id"] = access.clientId
+            headers["CF-Access-Client-Secret"] = access.clientSecret
+        }
+        return mapOf("uri" to "$base/api/files/$id/content", "headers" to headers)
+    }
 }

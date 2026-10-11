@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app.dart';
 import '../../data/api.dart';
+import '../access_screen.dart';
 import '../../l10n/app_localizations.dart';
 import '../admin/pins_screen.dart' show PinCodeField;
 import '../widgets.dart';
@@ -51,6 +52,10 @@ class _PinEntryScreenState extends State<PinEntryScreen> {
       final linked = _code.text == widget.code;
       await Services.read(context).pin.unlock(widget.server, _code.text, secret: linked ? widget.secret : null, root: linked ? widget.root : null);
       navigator.popUntil((r) => r.isFirst);
+    } on CloudflareAccessException catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      if (await passCloudflareAccess(context, widget.server, e)) return _unlock();
     } on ApiException catch (e) {
       setState(() => _error = switch (e.code) {
             'pin_wrong' => t.pinWrong(e.attemptsLeft ?? 0),

@@ -9,7 +9,9 @@ them: the phone's key in the Android KeyStore, the choice between the local and 
 address, the transfers, and the keys of encrypted folders (`e2ee/`, see docs/e2ee-plan.md), which
 the transfers and the player use to encrypt and decrypt on the phone. Downloads and uploads (in pieces, by tus or straight into the server's
 S3 bucket) keep going when the app is closed and continue where they stopped. Links to a bucket
-are fetched without the phone's key, which goes only to Share.
+are fetched without the phone's key, which goes only to Share. A server behind Cloudflare Access
+gets a service token with every request to its public address, which the app keeps with its
+secrets and an admin's invite QR code passes on (docs/cloudflare-access-plan.md).
 
 ## Running it
 

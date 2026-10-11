@@ -30,6 +30,8 @@ class ServerConnection(val config: ServerConfig, private val token: String?) {
         conn.instanceFollowRedirects = false
         conn.setRequestProperty("User-Agent", "Share-Android/${BuildConfig.VERSION_NAME}")
         token?.let { conn.setRequestProperty("Authorization", "Bearer $it") }
+        // Cloudflare Access stands in front of the public address only.
+        if (!useLocal) config.access?.applyTo(conn, base)
         return conn
     }
 

@@ -95,6 +95,9 @@ class SecretStore(context: Context) {
         /** The language picked in the app, or none for the phone's. */
         const val LANGUAGE = "language"
 
+        /** The Cloudflare Access service token (CloudflareAccess), written by lib/data/access.dart. */
+        const val CLOUDFLARE_ACCESS = "cloudflare_access"
+
         private const val TAG = "SecretStore"
         private const val KEYSTORE = "AndroidKeyStore"
         private const val ALIAS = "share_secrets"

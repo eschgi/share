@@ -372,9 +372,17 @@ class FakeServer {
   /// What a file holds, from the server or the bucket.
   static Uint8List contentOf(String id) => Uint8List.fromList(utf8.encode('the bytes of $id'));
 
+  /// Cloudflare Access in front of the server: a request without this service token
+  /// (`<client id>:<client secret>`) gets Cloudflare's redirect to its login.
+  String? accessToken;
+
   http.Client get client => MockClient((req) async {
         requests.add(req);
         final path = req.url.path;
+        final shown = '${req.headers['CF-Access-Client-Id']}:${req.headers['CF-Access-Client-Secret']}';
+        if (accessToken != null && req.url.host != bucketHost && shown != accessToken) {
+          return http.Response('', 302, headers: {'location': 'https://family.cloudflareaccess.com/cdn-cgi/access/login/share.example.com'});
+        }
         if (req.url.host == bucketHost) {
           if (req.headers.containsKey('Authorization')) return http.Response('a key at the bucket', 400);
           final id = path.split('/').last;

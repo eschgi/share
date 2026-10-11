@@ -13,6 +13,7 @@ import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 
+import 'access.dart';
 import 'models.dart';
 import 'platform.dart';
 import 'server.dart';
@@ -36,6 +37,18 @@ class ApiException implements Exception {
 
   @override
   String toString() => 'ApiException($status $code: $message)';
+}
+
+/// Cloudflare Access answered instead of Share (docs/cloudflare-access-plan.md): a redirect to
+/// its login, or its own 401 or 403. [tokenSent] says whether the request had a service token,
+/// which Cloudflare then turned away.
+class CloudflareAccessException extends ApiException {
+  const CloudflareAccessException(int status, {required this.tokenSent}) : super(status, 'cloudflare_access', 'Cloudflare Access', fromShare: false);
+
+  final bool tokenSent;
+
+  @override
+  String toString() => 'CloudflareAccessException($status, token sent: $tokenSent)';
 }
 
 /// The server couldn't be reached at all.
@@ -80,6 +93,23 @@ class Api {
   /// Called when the server says this phone's key stopped working.
   void Function()? onSignedOut;
 
+  /// The Cloudflare Access service token, sent to the public address it belongs to.
+  CloudflareAccess? access;
+
+  final _accessProblems = StreamController<AccessProblem?>.broadcast();
+  AccessProblem? _accessProblem;
+
+  /// Whether Cloudflare Access keeps this phone's server out of reach, from the last answer over
+  /// its public address; null when it lets the app through, or isn't there.
+  AccessProblem? get accessProblem => _accessProblem;
+  Stream<AccessProblem?> get accessProblems => _accessProblems.stream;
+
+  void _setAccessProblem(AccessProblem? p) {
+    if (p == _accessProblem) return;
+    _accessProblem = p;
+    _accessProblems.add(p);
+  }
+
   ServerConfig? get config => _config;
 
   final _storage = <String, Storage>{};
@@ -114,9 +144,9 @@ class Api {
   Future<Uint8List> bytes(String path) async => (await _send('GET', path, raw: true)).bodyBytes;
 
   /// A request to a server this phone isn't set up for yet, e.g. to look at an invite; with
-  /// [bearer], as a PIN session.
-  Future<Json> getFrom(Uri server, String path, {Map<String, String>? query, String? bearer}) async =>
-      _json(await _request(_public, server, 'GET', path, query: query, auth: false, bearer: bearer));
+  /// [bearer], as a PIN session; with [access], that service token instead of the stored one.
+  Future<Json> getFrom(Uri server, String path, {Map<String, String>? query, String? bearer, CloudflareAccess? access}) async =>
+      _json(await _request(_public, server, 'GET', path, query: query, auth: false, bearer: bearer, access: access));
 
   /// The bytes of a file, such as a thumbnail, as a PIN session sees them.
   Future<Uint8List> bytesFrom(Uri server, String path, {String? bearer}) async =>
@@ -170,16 +200,29 @@ class Api {
   }
 
   Future<http.Response> _request(http.Client client, Uri base, String method, String path,
-      {Map<String, String>? query, Object? body, bool auth = true, String? bearer}) async {
+      {Map<String, String>? query, Object? body, bool auth = true, String? bearer, CloudflareAccess? access}) async {
     final uri = base.replace(path: path, queryParameters: query == null || query.isEmpty ? null : query);
     final req = http.Request(method, uri);
+    // Share's API never redirects; Cloudflare Access does, to its login.
+    req.followRedirects = false;
     final key = bearer ?? (auth ? token : null);
     if (key != null) req.headers['Authorization'] = 'Bearer $key';
+    final cf = access ?? this.access;
+    final sent = cf != null && cf.appliesTo(base);
+    if (sent) req.headers.addAll(cf.headers);
     if (body != null) {
       req.headers['Content-Type'] = 'application/json';
       req.body = jsonEncode(body);
     }
     final res = await _fetch(client, req);
+    // Only answers from this phone's server over its public address say whether Cloudflare
+    // Access is in the way of the library.
+    final ours = _config != null && base.host == _config!.publicUrl.host && access == null;
+    if (_fromCloudflareAccess(res)) {
+      if (ours) _setAccessProblem(sent ? AccessProblem.refused : AccessProblem.missing);
+      throw CloudflareAccessException(res.statusCode, tokenSent: sent);
+    }
+    if (ours) _setAccessProblem(null);
     if (res.statusCode >= 200 && res.statusCode < 300) return res;
     final error = _errorOf(res);
     if (error.signedOut && auth && token != null) onSignedOut?.call();
@@ -199,6 +242,20 @@ class Api {
     } on http.ClientException catch (e) {
       throw NetworkException(e);
     }
+  }
+
+  /// Cloudflare Access's answer instead of Share's: a redirect to `<team>.cloudflareaccess.com`,
+  /// or, with "strict service token authentication", Cloudflare's own 401 or 403, which isn't
+  /// Share's JSON.
+  static bool _fromCloudflareAccess(http.Response res) {
+    final status = res.statusCode;
+    if (status >= 300 && status < 400) {
+      final host = Uri.tryParse(res.headers['location'] ?? '')?.host.toLowerCase() ?? '';
+      return host == 'cloudflareaccess.com' || host.endsWith('.cloudflareaccess.com');
+    }
+    if (status != 401 && status != 403) return false;
+    final cloudflare = res.headers.containsKey('cf-ray') || (res.headers['server'] ?? '').toLowerCase() == 'cloudflare';
+    return cloudflare && !_errorOf(res).fromShare;
   }
 
   static ApiException _errorOf(http.Response res) {

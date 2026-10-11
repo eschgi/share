@@ -5,11 +5,13 @@ import '../data/api.dart';
 import '../data/server.dart';
 import '../data/session.dart';
 import '../l10n/app_localizations.dart';
+import 'access_screen.dart';
 import 'first_start.dart';
 import 'icons.dart';
 import 'widgets.dart';
 
-/// Screen 8: username, password and the server. Most people come in through an invite.
+/// Screen 8: username, password and the server. Most people come in through an invite. A
+/// server behind Cloudflare Access also needs its service token (111).
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
 
@@ -29,6 +31,7 @@ class _SignInScreenState extends State<SignInScreen> {
   @override
   void initState() {
     super.initState();
+    _server.addListener(() => setState(() {}));
     // After a sign-out the address is still known.
     Services.read(context).platform.loadServer().then((c) {
       if (c != null && mounted && _server.text.isEmpty) {
@@ -55,6 +58,16 @@ class _SignInScreenState extends State<SignInScreen> {
             textInputAction: TextInputAction.next,
             decoration: InputDecoration(hintText: t.signInServerHint, errorText: _serverError),
           ),
+          const SizedBox(height: 14),
+          SettingsGroup(children: [
+            SettingsRow(
+              leading: SettingsRow.icon(context, AppIcons.shield),
+              title: t.accessSwitch,
+              subtitle: t.accessSwitchHelp,
+              trailing: Switch(value: _accessOn, onChanged: _switchAccess),
+              onTap: () => _switchAccess(!_accessOn),
+            ),
+          ]),
           FieldLabel(t.signInUsername),
           TextField(
             controller: _username,
@@ -93,6 +106,29 @@ class _SignInScreenState extends State<SignInScreen> {
     );
   }
 
+  /// Whether a Cloudflare Access token goes to the server typed in.
+  bool get _accessOn {
+    final server = normalizePublicAddress(_server.text);
+    return server != null && Services.read(context).access.forServer(server)?.on == true;
+  }
+
+  /// Asks for the token (112), or switches it off without forgetting it.
+  Future<void> _switchAccess(bool on) async {
+    final t = AppLocalizations.of(context);
+    final server = normalizePublicAddress(_server.text);
+    if (server == null) return setState(() => _serverError = t.serverBadAddress);
+    final repo = Services.read(context).access;
+    final known = repo.forServer(server);
+    if (!on) {
+      if (known != null) await repo.save(known.copyWith(on: false));
+    } else if (known != null && !known.on) {
+      await repo.save(known.copyWith(on: true));
+    } else {
+      await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => AccessTokenScreen(server: server)));
+    }
+    if (mounted) setState(() {});
+  }
+
   Future<void> _signIn() async {
     final t = AppLocalizations.of(context);
     final server = normalizePublicAddress(_server.text);
@@ -106,6 +142,10 @@ class _SignInScreenState extends State<SignInScreen> {
     try {
       await Services.read(context).session.signIn(server, _username.text, _password.text);
       navigator.popUntil((r) => r.isFirst);
+    } on CloudflareAccessException catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      if (await passCloudflareAccess(context, server, e)) return _signIn();
     } on NotShareServer {
       setState(() => _serverError = t.serverNotShare);
     } on NetworkException {

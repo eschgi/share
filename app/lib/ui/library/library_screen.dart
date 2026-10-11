@@ -11,6 +11,7 @@ import '../../data/folders.dart';
 import '../../data/models.dart';
 import '../../data/platform.dart' show KeysException;
 import '../../l10n/app_localizations.dart';
+import '../access_screen.dart';
 import '../admin/delete.dart';
 import '../download_sheet.dart';
 import '../encryption.dart';
@@ -311,6 +312,7 @@ class _LibraryScreenState extends State<LibraryScreen> with WidgetsBindingObserv
     final now = clock.now();
 
     final slivers = <Widget>[
+      if (!_c.selecting) const SliverToBoxAdapter(child: AccessBanner()),
       if (!_c.selecting) SliverToBoxAdapter(child: _Filters(kind: _c.filter.kind, onKind: _setKind)),
       if (!_c.selecting) SliverToBoxAdapter(child: KeysBanner(admin: widget.user.isAdmin)),
       if (_c.selecting)

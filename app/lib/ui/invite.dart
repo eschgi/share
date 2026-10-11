@@ -6,13 +6,15 @@ import '../data/api.dart';
 import '../data/models.dart';
 import '../data/server.dart';
 import '../l10n/app_localizations.dart';
+import 'access_screen.dart';
 import 'format.dart';
 import 'icons.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
 /// Screen 10: after scanning an invite or tapping its link. One tap, no password; the phone
-/// gets its own long-lived key.
+/// gets its own long-lived key. An admin's QR code may bring the Cloudflare Access token, which
+/// is kept right away, so that the invite itself gets through (118).
 class InviteScreen extends StatefulWidget {
   const InviteScreen({super.key, required this.link});
   final InviteLink link;
@@ -32,10 +34,18 @@ class _InviteScreenState extends State<InviteScreen> {
     _load();
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool again = false}) async {
+    final services = Services.read(context);
     try {
-      final peek = await Services.read(context).session.peekInvite(widget.link);
+      // Kept once: a token typed in after Cloudflare turned this one away stays.
+      final access = widget.link.access;
+      if (access != null && !again) await services.access.save(access);
+      final peek = await services.session.peekInvite(widget.link);
       if (mounted) setState(() => _peek = peek);
+    } on CloudflareAccessException catch (e) {
+      if (!mounted) return;
+      if (await passCloudflareAccess(context, widget.link.server, e)) return _load(again: true);
+      if (mounted) setState(() => _problem = _message(e));
     } on Exception catch (e) {
       if (mounted) setState(() => _problem = _message(e));
     }
@@ -43,6 +53,7 @@ class _InviteScreenState extends State<InviteScreen> {
 
   String _message(Exception e) {
     final t = AppLocalizations.of(context);
+    if (e is CloudflareAccessException) return e.tokenSent ? t.accessRefusedDetail : t.accessMissingDetail;
     if (e is ApiException) {
       return switch (e.code) {
         'invite_used' => t.joinUsed,
@@ -108,6 +119,10 @@ class _InviteScreenState extends State<InviteScreen> {
             _Fact(icon: AppIcons.shield, label: t.joinRole, value: peek.role == Role.admin ? t.roleAdminLong : t.roleMemberLong),
             Divider(color: c.lineSoft),
             _Fact(icon: AppIcons.clock, label: t.joinValid, value: t.joinValidUntil(formatWhen(peek.expiresAt, clock.now(), locale))),
+            if (widget.link.access != null) ...[
+              Divider(color: c.lineSoft),
+              _Fact(icon: AppIcons.key, label: t.joinAccess, value: t.joinAccessIncluded),
+            ],
           ]),
         ),
       ]);
