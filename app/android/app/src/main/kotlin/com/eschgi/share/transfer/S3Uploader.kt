@@ -45,6 +45,7 @@ class S3Uploader(
         onBytes: (Long) -> Unit = {},
         folder: String? = null,
         lastModified: Long? = null,
+        takenAt: Long? = null,
         enc: JSONObject? = null,
     ): UploadOutcome {
         var id = uploadId
@@ -60,6 +61,7 @@ class S3Uploader(
             val plan = if (id == null) {
                 val body = JSONObject().put("name", name).put("size", size)
                 lastModified?.let { body.put("last_modified_ms", it) }
+                takenAt?.let { body.put("taken_at_ms", it) }
                 folder?.let { body.put("folder", it) }
                 enc?.let { body.put("enc", it) }
                 when (val created = call(open, "POST", "/api/s3/uploads", body, abort)) {

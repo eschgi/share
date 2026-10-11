@@ -33,6 +33,7 @@ class TusUploader(private val bufferSize: Int = 256 * 1024) {
         onBytes: (Long) -> Unit = {},
         folder: String? = null,
         lastModified: Long? = null,
+        takenAt: Long? = null,
         enc: JSONObject? = null,
     ): UploadOutcome {
         var id = uploadId
@@ -42,7 +43,7 @@ class TusUploader(private val bufferSize: Int = 256 * 1024) {
         while (true) {
             if (abort.stopped) return UploadOutcome.Stopped
             if (id == null) {
-                when (val created = create(name, mime, size, folder, lastModified, enc, open, abort)) {
+                when (val created = create(name, mime, size, folder, lastModified, takenAt, enc, open, abort)) {
                     is Step.Ok -> {
                         id = created.value
                         onCreated(id)
@@ -90,13 +91,14 @@ class TusUploader(private val bufferSize: Int = 256 * 1024) {
         data class End(val outcome: UploadOutcome) : Step<Nothing>
     }
 
-    private fun create(name: String, mime: String, size: Long, folder: String?, lastModified: Long?, enc: JSONObject?, open: (String, String) -> HttpURLConnection, abort: Abort): Step<String> =
+    private fun create(name: String, mime: String, size: Long, folder: String?, lastModified: Long?, takenAt: Long?, enc: JSONObject?, open: (String, String) -> HttpURLConnection, abort: Abort): Step<String> =
         request(open, "POST", "/tus/", abort) { conn ->
             conn.setRequestProperty("Upload-Length", size.toString())
             conn.setRequestProperty(
                 "Upload-Metadata",
                 "filename ${b64(name)},filetype ${b64(mime)}" + (folder?.let { ",folder ${b64(it)}" } ?: "") +
-                    (lastModified?.let { ",lastModified ${b64(it.toString())}" } ?: "") + (enc?.let { ",enc ${b64(it.toString())}" } ?: ""),
+                    (lastModified?.let { ",lastModified ${b64(it.toString())}" } ?: "") + (takenAt?.let { ",takenAt ${b64(it.toString())}" } ?: "") +
+                    (enc?.let { ",enc ${b64(it.toString())}" } ?: ""),
             )
             // No body, so no streaming mode: in it the JDK hides the body of a 401.
             conn.doOutput = true

@@ -7,27 +7,32 @@ import '../../data/library.dart';
 import '../../data/models.dart';
 import '../../data/platform.dart';
 
-/// One upload day on the screen: its loaded files, and the server's totals for the day.
+/// One group on the screen, a day or a sender: its loaded files, and the server's totals for it.
 class DaySection {
-  const DaySection({required this.day, required this.files, required this.count, required this.bytes});
-  final String day;
+  const DaySection({required this.key, required this.files, required this.count, required this.bytes, required this.lastDay, this.from});
+  final String key; // the day, or the sender's id or "pin"
   final List<FileInfo> files;
   final int count;
   final int bytes;
+  final String lastDay; // the day its newest file arrived
+  final String? from; // a sender's name; null for days, PIN guests and someone no longer here
 }
 
 enum DaySelection { none, some, all }
 
-/// Some day has fewer files than before, or none: files were moved away or hidden, which adding
+/// Some group has fewer files than before, or none: files were moved away or hidden, which adding
 /// new files on top can't show.
 bool shrank(LibraryOverview before, LibraryOverview after) {
-  final now = {for (final d in after.days) d.day: d.count};
-  return before.days.any((d) => (now[d.day] ?? 0) < d.count);
+  final now = {for (final g in after.groups) g.key: g.count};
+  return before.groups.any((g) => (now[g.key] ?? 0) < g.count);
 }
 
-/// The library screen's state: files loaded page by page, newest first, and the selection.
+/// The library screen's state: files loaded page by page in the order of the sort, and the
+/// selection.
 class LibraryController extends ChangeNotifier {
-  LibraryController({required this.repo, required this.platform});
+  LibraryController({required this.repo, required this.platform, LibraryFilter? filter}) {
+    if (filter != null) _filter = filter;
+  }
 
   final LibraryRepository repo;
   final Platform platform;
@@ -111,9 +116,10 @@ class LibraryController extends ChangeNotifier {
   }
 
   /// Something changed on the server (the version grew): puts new files on top without
-  /// losing the place in the list; if files went away, such as into another folder, the list
-  /// starts over. A list that didn't load comes back once the server answers again. Says
-  /// whether the library changed.
+  /// losing the place in the list; if files went away, such as into another folder, or the list
+  /// isn't by the day files arrived newest first, where new ones may belong anywhere, it starts
+  /// over. A list that didn't load comes back once the server answers again. Says whether the
+  /// library changed.
   Future<bool> refreshIfChanged() async {
     final current = overview;
     if (loading) return false;
@@ -123,7 +129,7 @@ class LibraryController extends ChangeNotifier {
     try {
       final o = await repo.overview(_filter);
       if (gen != _generation || o.version == current.version) return false;
-      if (shrank(current, o)) {
+      if (shrank(current, o) || !_filter.newOnTop) {
         unawaited(reload());
         return true;
       }
@@ -161,7 +167,7 @@ class LibraryController extends ChangeNotifier {
   }
 
   /// Files gone from the library, such as one deleted in the viewer: off the list and the
-  /// selection at once; the days' totals follow from the server.
+  /// selection at once; the groups' totals follow from the server.
   void remove(Iterable<String> ids) {
     final gone = ids.toSet();
     files.removeWhere((f) => gone.contains(f.id));
@@ -182,19 +188,22 @@ class LibraryController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// The loaded files by group, in the server's order, with its totals for each.
   List<DaySection> get sections {
-    final byDay = <String, List<FileInfo>>{};
+    final byGroup = <String, List<FileInfo>>{};
     for (final f in files) {
-      byDay.putIfAbsent(f.day, () => []).add(f);
+      byGroup.putIfAbsent(f.groupOf(_filter.sort), () => []).add(f);
     }
-    final totals = {for (final d in overview?.days ?? const <DaySummary>[]) d.day: d};
+    final totals = {for (final g in overview?.groups ?? const <GroupSummary>[]) g.key: g};
     return [
-      for (final e in byDay.entries)
+      for (final e in byGroup.entries)
         DaySection(
-          day: e.key,
+          key: e.key,
           files: e.value,
           count: totals[e.key]?.count ?? e.value.length,
           bytes: totals[e.key]?.bytes ?? e.value.fold(0, (s, f) => s + f.size),
+          lastDay: totals[e.key]?.lastDay ?? e.value.first.day,
+          from: totals[e.key]?.from,
         ),
     ];
   }
@@ -222,26 +231,28 @@ class LibraryController extends ChangeNotifier {
   }
 
   DaySelection daySelection(DaySection s) {
-    final n = selectedOfDay(s.day);
+    final n = selectedOfDay(s.key);
     if (n == 0) return DaySelection.none;
     return n >= s.count ? DaySelection.all : DaySelection.some;
   }
 
-  int selectedOfDay(String day) => selected.where((id) => _known[id]?.day == day).length;
+  bool _inGroup(String id, String key) => _known[id]?.groupOf(_filter.sort) == key;
 
-  /// The day's circle: takes the whole day, including files not loaded yet, or lets it go.
+  int selectedOfDay(String key) => selected.where((id) => _inGroup(id, key)).length;
+
+  /// The group's circle: takes the whole group, including files not loaded yet, or lets it go.
   Future<void> toggleDay(DaySection s) async {
     if (daySelection(s) == DaySelection.all) {
-      selected.removeWhere((id) => _known[id]?.day == s.day);
+      selected.removeWhere((id) => _inGroup(id, s.key));
       notifyListeners();
       return;
     }
     if (s.files.length < s.count) {
-      for (final f in await repo.day(_filter, s.day)) {
+      for (final f in await repo.group(_filter, s.key)) {
         _known[f.id] = f;
       }
     }
-    selected.addAll(_known.values.where((f) => f.day == s.day).map((f) => f.id));
+    selected.addAll(_known.values.where((f) => f.groupOf(_filter.sort) == s.key).map((f) => f.id));
     notifyListeners();
   }
 

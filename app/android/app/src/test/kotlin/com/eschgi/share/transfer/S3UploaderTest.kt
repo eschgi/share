@@ -153,7 +153,7 @@ class S3UploaderTest {
         open: (String, String) -> HttpURLConnection = ::open,
         onBytes: (Long) -> Unit = {},
     ) = S3Uploader(bufferSize = 64 * 1024, now = { clock }).upload(
-        "VID_1.mp4", bytes.size.toLong(), source, uploadId, open, abort, { created += it }, onBytes, "f4mily5x2k7mbqz4bwdbyj6qsq", 1758960000000,
+        "VID_1.mp4", bytes.size.toLong(), source, uploadId, open, abort, { created += it }, onBytes, "f4mily5x2k7mbqz4bwdbyj6qsq", 1758960000000, 1758958872000,
     )
 
     private fun bytesOf(id: String) = ByteArrayOutputStream().apply {

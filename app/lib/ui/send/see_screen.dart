@@ -148,7 +148,7 @@ class _SeeScreenState extends State<SeeScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           sliver: SliverToBoxAdapter(
             child: DayHeader(
-              title: formatDay(s.day, now, locale, today: t.dayToday, yesterday: t.dayYesterday),
+              title: formatDay(s.key, now, locale, today: t.dayToday, yesterday: t.dayYesterday),
               meta: t.dayMeta(s.count, formatBytes(s.bytes, locale)),
             ),
           ),

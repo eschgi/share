@@ -136,7 +136,11 @@ class _ViewerState extends State<_Viewer> {
             Text(f.name, style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 12),
             for (final line in [
-              '${formatDay(f.day, clock.now(), locale, today: t.dayToday, yesterday: t.dayYesterday)}, ${formatTime(f.uploadedAt, locale)}',
+              // When it was taken, if its sender knew, whatever the library is sorted by (screen 123).
+              if (f.takenAt != null)
+                t.viewerTaken('${formatDay(f.takenDay ?? f.day, clock.now(), locale, today: t.dayToday, yesterday: t.dayYesterday)}, ${formatTime(f.takenAt!.toLocal(), locale)}'),
+              (f.takenAt != null ? t.viewerReceived : (String s) => s)(
+                  '${formatDay(f.day, clock.now(), locale, today: t.dayToday, yesterday: t.dayYesterday)}, ${formatTime(f.uploadedAt, locale)}'),
               if (senders) f.from == null ? t.viewerFromPin : t.viewerFrom(f.from!),
               if (folder != null) t.viewerInFolder(folder),
               [

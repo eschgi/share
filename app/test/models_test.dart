@@ -28,7 +28,8 @@ void main() {
 
   test('the library overview and ids', () {
     final lib = LibraryOverview.fromJson(contractResponse('api/library.json'));
-    expect(lib.days.single.count, 6);
+    expect(lib.groups.single.count, 6);
+    expect(lib.groups.single.lastDay, '2026-09-27');
     expect(FileIds.fromJson(contractResponse('api/file_ids.json')).ids, hasLength(1));
   });
 

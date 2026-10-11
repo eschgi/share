@@ -159,11 +159,14 @@ class FileInfo {
     required this.day,
     required this.uploadedAt,
     required this.updatedAt,
+    this.takenAt,
+    this.takenDay,
     this.width,
     this.height,
     this.durationMs,
     this.hasThumb = false,
     this.from,
+    this.fromId,
     this.enc,
   });
 
@@ -177,11 +180,14 @@ class FileInfo {
         day: _str(j['day']),
         uploadedAt: _time(j['uploaded_at']) ?? DateTime.fromMillisecondsSinceEpoch(0),
         updatedAt: _time(j['updated_at']) ?? DateTime.fromMillisecondsSinceEpoch(0),
+        takenAt: _time(j['taken_at']),
+        takenDay: j['taken_day'] is String ? j['taken_day'] as String : null,
         width: _intOrNull(j['width']),
         height: _intOrNull(j['height']),
         durationMs: _intOrNull(j['duration_ms']),
         hasThumb: _bool(j['has_thumb']),
         from: j['from'] is String ? j['from'] as String : null,
+        fromId: j['from_id'] is String ? j['from_id'] as String : null,
         enc: j['enc'] is Map ? FileEnc.fromJson(_obj(j['enc'])) : null,
       );
 
@@ -194,9 +200,22 @@ class FileInfo {
   final String day; // YYYY-MM-DD, the upload day on the server
   final DateTime uploadedAt;
   final DateTime updatedAt;
+
+  /// When the photo or video was taken, as its sender read it from the file, and that day on the
+  /// server; null when unknown, and always for an encrypted file.
+  final DateTime? takenAt;
+  final String? takenDay;
   final int? width, height, durationMs;
   final bool hasThumb;
   final String? from; // who sent it, if they have an account
+  final String? fromId; // their id, which the library's sender groups are keyed by
+
+  /// The group it is in when the library is sorted by [sort], as the server keys them.
+  String groupOf(LibrarySort sort) => switch (sort) {
+        LibrarySort.received => day,
+        LibrarySort.taken => takenDay ?? day,
+        LibrarySort.sender => fromId ?? 'pin',
+      };
 
   /// Encrypted end to end: opened only on the family's phones and browsers.
   final FileEnc? enc;
@@ -275,26 +294,49 @@ class FolderInfo {
   final int? keyVersion;
 }
 
-class DaySummary {
-  const DaySummary({required this.day, required this.count, required this.bytes});
+/// How the library is sorted (docs/sort-plan.md): what its groups are.
+enum LibrarySort {
+  /// By the day files arrived.
+  received,
 
-  factory DaySummary.fromJson(Json j) => DaySummary(day: _str(j['day']), count: _int(j['count']), bytes: _int(j['bytes']));
+  /// By the day they were taken, else the day they arrived.
+  taken,
 
-  final String day;
+  /// By who sent them; PIN guests share one group.
+  sender;
+
+  static LibrarySort parse(Object? v) => values.firstWhere((s) => s.name == v, orElse: () => received);
+}
+
+/// One group of the library: a day, or a sender ("pin" for PIN guests).
+class GroupSummary {
+  const GroupSummary({required this.key, required this.count, required this.bytes, required this.lastDay, this.from});
+
+  factory GroupSummary.fromJson(Json j) => GroupSummary(
+        key: _str(j['key']),
+        count: _int(j['count']),
+        bytes: _int(j['bytes']),
+        lastDay: _str(j['last_day']),
+        from: j['from'] is String ? j['from'] as String : null,
+      );
+
+  final String key;
   final int count;
   final int bytes;
+  final String lastDay; // the day its newest file arrived
+  final String? from; // a sender's name; null for days, PIN guests and someone no longer here
 }
 
 class LibraryOverview {
-  const LibraryOverview({required this.version, required this.days});
+  const LibraryOverview({required this.version, required this.groups});
 
   factory LibraryOverview.fromJson(Json j) => LibraryOverview(
         version: _int(j['version']),
-        days: [for (final d in _list(j['days'])) DaySummary.fromJson(_obj(d))],
+        groups: [for (final g in _list(j['groups'])) GroupSummary.fromJson(_obj(g))],
       );
 
   final int version;
-  final List<DaySummary> days;
+  final List<GroupSummary> groups;
 }
 
 class FilePage {

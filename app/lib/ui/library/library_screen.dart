@@ -8,6 +8,7 @@ import 'package:flutter/rendering.dart';
 import '../../app.dart';
 import '../../data/api.dart';
 import '../../data/folders.dart';
+import '../../data/library.dart' show LibraryFilter;
 import '../../data/models.dart';
 import '../../data/platform.dart' show KeysException;
 import '../../l10n/app_localizations.dart';
@@ -24,9 +25,11 @@ import '../widgets.dart';
 import '../zip/zip_entry.dart';
 import 'library_controller.dart';
 import 'move_sheet.dart';
+import 'sort_sheet.dart';
 import 'tiles.dart';
 
-/// Screens 11 and 12: everything that was sent, newest day first, and selecting many.
+/// Screens 11 and 12: everything that was sent, newest day first, and selecting many; sorted
+/// otherwise as this phone chose (screens 120 to 124).
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({super.key, required this.user, required this.navigation, required this.onAvatar});
   final User user;
@@ -64,7 +67,8 @@ class _LibraryScreenState extends State<LibraryScreen> with WidgetsBindingObserv
   void initState() {
     super.initState();
     final s = Services.read(context);
-    _c = LibraryController(repo: s.library, platform: s.platform)..addListener(_changed);
+    final sort = s.librarySort.value;
+    _c = LibraryController(repo: s.library, platform: s.platform, filter: LibraryFilter(sort: sort.sort, oldest: sort.oldest))..addListener(_changed);
     _folders.addListener(_foldersChanged);
     unawaited(_first());
     _scroll.addListener(() {
@@ -94,6 +98,31 @@ class _LibraryScreenState extends State<LibraryScreen> with WidgetsBindingObserv
   void _foldersChanged() {
     if (_started && _folders.shown?.id != _c.filter.folder) _c.setFilter(_c.filter.withFolder(_folders.shown?.id));
     setState(() {});
+  }
+
+  /// Screen 120: picks the sort, which this phone remembers for every folder.
+  void _sort() => showSortSheet(context, sort: _c.filter.sort, oldest: _c.filter.oldest, onChanged: (sort, oldest) {
+        unawaited(Services.read(context).setLibrarySort(sort, oldest: oldest));
+        unawaited(_c.setFilter(_c.filter.withSort(sort, oldest: oldest)));
+      });
+
+  /// A group's title: its day, or who sent its files.
+  String _groupTitle(AppLocalizations t, DaySection s, DateTime now, String locale) => _c.filter.sort == LibrarySort.sender
+      ? s.from ?? (s.key == 'pin' ? t.sortGuests : t.sortGone)
+      : formatDay(s.key, now, locale, today: t.dayToday, yesterday: t.dayYesterday);
+
+  /// When a group's newest file came: for the people, and for a day taken that isn't the day it came.
+  String? _groupNote(AppLocalizations t, DaySection s, DateTime now, String locale) {
+    final sort = _c.filter.sort;
+    if (sort == LibrarySort.received || (sort == LibrarySort.taken && s.lastDay == s.key)) return null;
+    final last = DateTime.tryParse(s.lastDay);
+    if (last == null) return null;
+    final ago = daysAgo(last, now);
+    final sender = sort == LibrarySort.sender;
+    if (ago == 0) return sender ? t.sortLastToday : t.sortSentToday;
+    if (ago == 1) return sender ? t.sortLastYesterday : t.sortSentYesterday;
+    final day = formatShortDate(last, now, locale);
+    return sender ? t.sortLastOn(day) : t.sortSentOn(day);
   }
 
   /// New files, and with them the folders' counts.
@@ -314,6 +343,20 @@ class _LibraryScreenState extends State<LibraryScreen> with WidgetsBindingObserv
     final slivers = <Widget>[
       if (!_c.selecting) const SliverToBoxAdapter(child: AccessBanner()),
       if (!_c.selecting) SliverToBoxAdapter(child: _Filters(kind: _c.filter.kind, onKind: _setKind)),
+      if (_c.selecting ? null : sortLine(t, _c.filter.sort, _c.filter.oldest) case final line?)
+        SliverToBoxAdapter(
+          child: InkWell(
+            onTap: _sort,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+              child: Row(children: [
+                Icon(AppIcons.sort, size: 15, color: c.accentText),
+                const SizedBox(width: 7),
+                Flexible(child: Text(line, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: c.accentText))),
+              ]),
+            ),
+          ),
+        ),
       if (!_c.selecting) SliverToBoxAdapter(child: KeysBanner(admin: widget.user.isAdmin)),
       if (_c.selecting)
         SliverToBoxAdapter(
@@ -327,14 +370,19 @@ class _LibraryScreenState extends State<LibraryScreen> with WidgetsBindingObserv
     for (final s in _c.sections) {
       final start = offset;
       offset += s.files.length;
-      final sel = _c.selectedOfDay(s.day);
+      final sel = _c.selectedOfDay(s.key);
+      final note = _groupNote(t, s, now, locale);
+      final sender = _c.filter.sort == LibrarySort.sender;
       slivers
         ..add(SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           sliver: SliverToBoxAdapter(
             child: DayHeader(
-              title: formatDay(s.day, now, locale, today: t.dayToday, yesterday: t.dayYesterday),
-              meta: sel > 0 && sel < s.count ? t.daySelected(sel, s.count) : t.dayMeta(s.count, formatBytes(s.bytes, locale)),
+              leading: sender ? Avatar(name: s.from ?? '?', id: s.key, size: 40, pending: s.from == null) : null,
+              title: _groupTitle(t, s, now, locale),
+              meta: sel > 0 && sel < s.count
+                  ? t.daySelected(sel, s.count)
+                  : [t.dayMeta(s.count, formatBytes(s.bytes, locale)), ?note].join(' · '),
               selection: _c.daySelection(s),
               circleLabel: t.selectDay,
               onCircle: () => _c.toggleDay(s),
@@ -429,6 +477,11 @@ class _LibraryScreenState extends State<LibraryScreen> with WidgetsBindingObserv
                 ? FolderTitle(shown: _folders.shown, onTap: () => showFolderSheet(context))
                 : Text(t.libraryTitle),
         actions: [
+          IconButton(
+            tooltip: t.sortTitle,
+            icon: Icon(AppIcons.sort, size: 22, color: _c.filter.sort == LibrarySort.received && !_c.filter.oldest ? null : c.accentText),
+            onPressed: _sort,
+          ),
           IconButton(
             tooltip: t.librarySearch,
             icon: Icon(_searching ? AppIcons.x : AppIcons.search, size: 22),

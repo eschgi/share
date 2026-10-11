@@ -72,6 +72,7 @@ const icons = {
   server: 'server',
   settings: 'settings',
   share: 'share-2',
+  sort: 'arrow-down-up',
   shield: 'shield',
   smartphone: 'smartphone',
   trash: 'trash-2',

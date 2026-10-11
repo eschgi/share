@@ -117,6 +117,8 @@ abstract final class AppIcons {
   static const IconData settings = IconData(0xe154, fontFamily: 'Lucide');
   /// share-2
   static const IconData share = IconData(0xe156, fontFamily: 'Lucide');
+  /// arrow-down-up
+  static const IconData sort = IconData(0xe046, fontFamily: 'Lucide');
   /// shield
   static const IconData shield = IconData(0xe158, fontFamily: 'Lucide');
   /// smartphone

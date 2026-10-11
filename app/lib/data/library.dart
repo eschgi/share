@@ -1,4 +1,4 @@
-/// The library: days, pages of files, and thumbnails.
+/// The library: its groups (days, or senders), pages of files, and thumbnails.
 library;
 
 import 'dart:io';
@@ -11,28 +11,46 @@ import 'models.dart';
 import 'platform.dart';
 
 class LibraryFilter {
-  const LibraryFilter({this.folder, this.kind, this.query = ''});
+  const LibraryFilter({this.folder, this.kind, this.query = '', this.sort = LibrarySort.received, this.oldest = false});
 
   final String? folder; // null: every folder the person sees
   final FileKind? kind;
   final String query;
+  final LibrarySort sort;
+  final bool oldest; // oldest first instead of newest first
 
-  LibraryFilter withFolder(String? folder) => LibraryFilter(folder: folder, kind: kind, query: query);
-  LibraryFilter withKind(FileKind? kind) => LibraryFilter(folder: folder, kind: kind, query: query);
-  LibraryFilter withQuery(String query) => LibraryFilter(folder: folder, kind: kind, query: query);
+  LibraryFilter _with({String? folder, FileKind? kind, String? query, LibrarySort? sort, bool? oldest, bool keepKind = true}) => LibraryFilter(
+        folder: folder,
+        kind: keepKind ? this.kind : kind,
+        query: query ?? this.query,
+        sort: sort ?? this.sort,
+        oldest: oldest ?? this.oldest,
+      );
 
-  Map<String, String> toQuery({String? day}) => {
+  LibraryFilter withFolder(String? folder) => _with(folder: folder);
+  LibraryFilter withKind(FileKind? kind) => _with(folder: folder, kind: kind, keepKind: false);
+  LibraryFilter withQuery(String query) => _with(folder: folder, query: query);
+  LibraryFilter withSort(LibrarySort sort, {required bool oldest}) => _with(folder: folder, sort: sort, oldest: oldest);
+
+  /// New files come on top only by the day they arrived, newest first; in another order they
+  /// may belong anywhere.
+  bool get newOnTop => sort == LibrarySort.received && !oldest;
+
+  Map<String, String> toQuery({String? group}) => {
         'folder': ?folder,
         'kind': ?kind?.name,
         if (query.trim().isNotEmpty) 'q': query.trim(),
-        'day': ?day,
+        if (sort != LibrarySort.received) 'sort': sort.name,
+        if (oldest) 'order': 'oldest',
+        'group': ?group,
       };
 
   @override
-  bool operator ==(Object other) => other is LibraryFilter && other.folder == folder && other.kind == kind && other.query == query;
+  bool operator ==(Object other) =>
+      other is LibraryFilter && other.folder == folder && other.kind == kind && other.query == query && other.sort == sort && other.oldest == oldest;
 
   @override
-  int get hashCode => Object.hash(folder, kind, query);
+  int get hashCode => Object.hash(folder, kind, query, sort, oldest);
 }
 
 /// A PIN that shows its folder: where it was unlocked, and its key.
@@ -70,16 +88,16 @@ class LibraryRepository {
         await _get('/api/files', query: {...filter.toQuery(), 'limit': '$limit', 'cursor': ?cursor}),
       );
 
-  Future<FileIds> ids(LibraryFilter filter, {String? day}) async =>
-      FileIds.fromJson(await _get('/api/files/ids', query: filter.toQuery(day: day)));
+  Future<FileIds> ids(LibraryFilter filter, {String? group}) async =>
+      FileIds.fromJson(await _get('/api/files/ids', query: filter.toQuery(group: group)));
 
-  /// Every file of one day, for selecting a whole day that isn't loaded yet.
-  Future<List<FileInfo>> day(LibraryFilter filter, String day) async {
+  /// Every file of one group (a day, or a sender), for selecting a whole group that isn't loaded yet.
+  Future<List<FileInfo>> group(LibraryFilter filter, String group) async {
     final out = <FileInfo>[];
     String? cursor;
     do {
       final p = FilePage.fromJson(await _get('/api/files',
-          query: {...filter.toQuery(day: day), 'limit': '500', 'cursor': ?cursor}));
+          query: {...filter.toQuery(group: group), 'limit': '500', 'cursor': ?cursor}));
       out.addAll(p.files);
       cursor = p.nextCursor;
     } while (cursor != null);

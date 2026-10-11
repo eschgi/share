@@ -8,6 +8,7 @@ import 'data/api.dart';
 import 'data/folders.dart';
 import 'data/keys.dart';
 import 'data/library.dart';
+import 'data/models.dart' show LibrarySort;
 import 'data/pin.dart';
 import 'data/platform.dart';
 import 'data/server.dart';
@@ -64,11 +65,17 @@ class AppServices {
   /// How many files shared from other apps wait to be sent (SharedSender).
   final shared = ValueNotifier<int>(0);
 
+  /// How this phone sorts the library (screen 120), for every folder: by the day files arrived,
+  /// newest first, until someone picks something else.
+  final librarySort = ValueNotifier<({LibrarySort sort, bool oldest})>((sort: LibrarySort.received, oldest: false));
+
   Future<void> start() async {
     platform.sharedChanges.listen((s) => shared.value = s.count);
     shared.value = await platform.sharedCount();
     theme.value = await platform.readSecret('theme');
     language.value = await platform.readSecret('language');
+    final sort = (await platform.readSecret('library_sort'))?.split(' ');
+    if (sort != null) librarySort.value = (sort: LibrarySort.parse(sort.first), oldest: sort.last == 'oldest');
     await access.restore();
     await folders.start();
     // Signed out: the next person starts with their own folders.
@@ -82,6 +89,11 @@ class AppServices {
   Future<void> setLanguage(String? code) async {
     language.value = code;
     await platform.writeSecret('language', code);
+  }
+
+  Future<void> setLibrarySort(LibrarySort sort, {required bool oldest}) async {
+    librarySort.value = (sort: sort, oldest: oldest);
+    await platform.writeSecret('library_sort', '${sort.name} ${oldest ? 'oldest' : 'newest'}');
   }
 
   Future<void> setTheme(String? choice) async {

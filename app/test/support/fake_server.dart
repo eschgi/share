@@ -407,23 +407,55 @@ class FakeServer {
         return json({'error': {'code': 'not_found', 'message': ''}}, 404);
       });
 
-  List<Map<String, dynamic>> _filtered(Map<String, String> q) => [
-        for (final f in files)
-          if ((q['folder'] == null || f['folder'] == q['folder']) &&
-              (q['kind'] == null || f['kind'] == q['kind']) &&
-              (q['day'] == null || f['day'] == q['day']) &&
-              (q['q'] == null || (f['name'] as String).toLowerCase().contains(q['q']!.toLowerCase())))
-            f,
-      ];
+  /// The group of a file in the library's sort, as the server keys it (contract/api/library.json).
+  static String _groupOf(Map<String, dynamic> f, String? sort) => switch (sort) {
+        'taken' => (f['taken_day'] ?? f['day']) as String,
+        'sender' => (f['from_id'] ?? 'pin') as String,
+        _ => f['day'] as String,
+      };
+
+  /// The files of the filter, in the order of sort and order: the groups' order (the day, or a
+  /// sender's newest or oldest upload), the group, the time, and the id.
+  List<Map<String, dynamic>> _filtered(Map<String, String> q) {
+    final sort = q['sort'];
+    final oldest = q['order'] == 'oldest';
+    final list = [
+      for (final f in files)
+        if ((q['folder'] == null || f['folder'] == q['folder']) &&
+            (q['kind'] == null || f['kind'] == q['kind']) &&
+            (q['group'] == null || _groupOf(f, sort) == q['group']) &&
+            (q['q'] == null || (f['name'] as String).toLowerCase().contains(q['q']!.toLowerCase())))
+          f,
+    ];
+    String time(Map<String, dynamic> f) => (sort == 'taken' ? f['taken_at'] ?? f['uploaded_at'] : f['uploaded_at']) as String;
+    final groupOrder = <String, String>{};
+    for (final f in list) {
+      final g = _groupOf(f, sort);
+      final at = sort == 'sender' ? f['uploaded_at'] as String : g;
+      final known = groupOrder[g];
+      if (known == null || (oldest ? at.compareTo(known) < 0 : at.compareTo(known) > 0)) groupOrder[g] = at;
+    }
+    int compare(Map<String, dynamic> a, Map<String, dynamic> b) {
+      final ga = _groupOf(a, sort), gb = _groupOf(b, sort);
+      for (final c in [groupOrder[ga]!.compareTo(groupOrder[gb]!), ga.compareTo(gb), time(a).compareTo(time(b))]) {
+        if (c != 0) return oldest ? c : -c;
+      }
+      return files.indexOf(a).compareTo(files.indexOf(b)); // as they were added, which the tests count on
+    }
+
+    return list..sort(compare);
+  }
 
   Map<String, dynamic> _library(Map<String, String> q) {
-    final days = <String, Map<String, dynamic>>{};
+    final groups = <String, Map<String, dynamic>>{};
     for (final f in _filtered(q)) {
-      final d = days.putIfAbsent(f['day'] as String, () => {'day': f['day'], 'count': 0, 'bytes': 0});
-      d['count'] = (d['count'] as int) + 1;
-      d['bytes'] = (d['bytes'] as int) + (f['size'] as int);
+      final key = _groupOf(f, q['sort']);
+      final g = groups.putIfAbsent(key, () => {'key': key, 'count': 0, 'bytes': 0, 'last_day': f['day'], 'from': q['sort'] == 'sender' ? f['from'] : null});
+      g['count'] = (g['count'] as int) + 1;
+      g['bytes'] = (g['bytes'] as int) + (f['size'] as int);
+      if ((f['day'] as String).compareTo(g['last_day'] as String) > 0) g['last_day'] = f['day'];
     }
-    return {'version': version, 'days': days.values.toList()};
+    return {'version': version, 'groups': groups.values.toList()};
   }
 
   Map<String, dynamic> _files(Map<String, String> q) {

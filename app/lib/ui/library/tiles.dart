@@ -210,10 +210,13 @@ class _Badge extends StatelessWidget {
 /// The heading of an upload day, with its circle for taking the whole day.
 /// A day's title and what it holds; with [onCircle], the circle that selects the whole day.
 class DayHeader extends StatelessWidget {
-  const DayHeader({super.key, required this.title, required this.meta, this.selection = DaySelection.none, this.onCircle, this.circleLabel = ''});
+  const DayHeader({super.key, required this.title, required this.meta, this.selection = DaySelection.none, this.onCircle, this.circleLabel = '', this.leading});
   final String title, meta, circleLabel;
   final DaySelection selection;
   final VoidCallback? onCircle;
+
+  /// Before the title, such as the person a group's files came from (screen 122).
+  final Widget? leading;
 
   @override
   Widget build(BuildContext context) {
@@ -221,6 +224,7 @@ class DayHeader extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 18, 0, 10),
       child: Row(children: [
+        if (leading != null) ...[leading!, const SizedBox(width: 12)],
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),

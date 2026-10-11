@@ -22,6 +22,7 @@ import 'support/contract.dart';
 import 'support/fake_platform.dart';
 import 'support/fake_server.dart';
 import 'support/fonts.dart';
+import 'sort_test.dart' show sortServer;
 import 'zip_test.dart' show dolomitesPart3, sundayFiles, sundayZip;
 
 /// Screenshots of the app's screens, for comparing with `docs/share-mockup/<lang>/*.png`.
@@ -167,6 +168,22 @@ void main() {
       batch: 'batch-1', running: true, total: 6, done: 3, failed: 0, skipped: 1,
       bytesTotal: 18000000, bytesDone: 9100000, media: 5, documents: 1, local: true));
     await shot(tester, 'en/13-downloading');
+  }));
+
+  testWidgets('sorting', (tester) => atTen(() async {
+    await startApp(tester, signedInPhone(), sortServer());
+    await tester.tap(find.byTooltip('Sort the library'));
+    await shot(tester, 'en/120-sort-sheet');
+    await tester.tap(find.text('Date taken').last);
+    await tester.pumpAndSettle();
+    await tester.tapAt(const Offset(200, 80));
+    await shot(tester, 'en/121-sort-taken');
+    await tester.tap(find.byTooltip('Sort the library'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Who sent it').last);
+    await tester.pumpAndSettle();
+    await tester.tapAt(const Offset(200, 80));
+    await shot(tester, 'en/122-sort-sender');
   }));
 
   testWidgets('server', (tester) => atTen(() async {

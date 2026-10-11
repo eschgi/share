@@ -128,6 +128,8 @@ object UploadEngine {
                         ).also { targets[batchId] = it }
                     }
                     seal = sealed
+                    // When it was taken, for sorting the library; never for an encrypted folder.
+                    val takenAt = if (seal == null) TakenDate.of(app, item.file.uri.toUri(), item.file.mime) else null
                     // The encrypted stream goes up for a file into an encrypted folder.
                     val source = seal?.let { SealedSource(it, plain) } ?: plain
                     val size = seal?.encryptedSize ?: item.file.size
@@ -142,6 +144,7 @@ object UploadEngine {
                             onBytes = onBytes,
                             folder = batch.folder,
                             lastModified = lastModified,
+                            takenAt = takenAt,
                             enc = seal?.enc(),
                         )
                         ServerInfo.Storage.S3 -> s3.upload(
@@ -152,6 +155,7 @@ object UploadEngine {
                             onBytes = onBytes,
                             folder = batch.folder,
                             lastModified = lastModified,
+                            takenAt = takenAt,
                             enc = seal?.enc(),
                         )
                     }

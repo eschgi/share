@@ -15,7 +15,6 @@ import android.provider.MediaStore
 import android.util.Log
 import android.util.Size
 import androidx.core.content.FileProvider
-import androidx.exifinterface.media.ExifInterface
 import com.eschgi.share.BuildConfig
 import com.eschgi.share.MainActivity
 import com.eschgi.share.transfer.Credentials
@@ -23,6 +22,7 @@ import com.eschgi.share.transfer.Downloads
 import com.eschgi.share.transfer.Fetcher
 import com.eschgi.share.transfer.FileRef
 import com.eschgi.share.transfer.MediaStoreSink
+import com.eschgi.share.transfer.TakenDate
 import com.eschgi.share.transfer.Outbox
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -31,10 +31,7 @@ import java.io.FileInputStream
 import java.io.IOException
 import java.io.InputStream
 import java.io.RandomAccessFile
-import java.time.LocalDateTime
 import java.time.ZoneId
-import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
 import java.util.UUID
 import java.util.concurrent.CopyOnWriteArraySet
 import kotlin.concurrent.thread
@@ -381,44 +378,13 @@ object ZipSending {
      * A photo's EXIF date, "2026:10:04 16:15:02", with its offset where the camera wrote one; without
      * one, in the phone's time zone, where it was most likely taken.
      */
-    private fun exifTime(exif: ExifInterface): Long? {
-        val text = exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL) ?: exif.getAttribute(ExifInterface.TAG_DATETIME) ?: return null
-        val local = runCatching { LocalDateTime.parse(text.trim(), EXIF_TIME) }.getOrNull() ?: return null
-        val offset = exif.getAttribute(ExifInterface.TAG_OFFSET_TIME_ORIGINAL)?.let { runCatching { ZoneOffset.of(it.trim()) }.getOrNull() }
-        return (if (offset != null) local.atOffset(offset).toInstant() else local.atZone(ZoneId.systemDefault()).toInstant()).toEpochMilli()
-    }
-
-    private val EXIF_TIME = DateTimeFormatter.ofPattern("yyyy:MM:dd HH:mm:ss")
-
     private fun kindOf(mime: String) = when {
         mime.startsWith("image/") -> "photo"
         mime.startsWith("video/") -> "video"
         else -> "document"
     }
 
-    /**
-     * When a lent file was taken, in ms since 1970: as MediaStore or the photo picker say, else a
-     * photo's EXIF date, else when the file last changed, else now.
-     */
-    private fun taken(app: Context, uri: Uri, mime: String): Long {
-        for (column in listOf(MediaStore.MediaColumns.DATE_TAKEN, "date_taken_millis")) {
-            val value = try {
-                app.contentResolver.query(uri, arrayOf(column), null, null, null)?.use { c ->
-                    val i = c.getColumnIndex(column)
-                    if (i >= 0 && c.moveToFirst() && !c.isNull(i)) c.getLong(i) else null
-                }
-            } catch (e: Exception) {
-                null // a provider that doesn't know the column
-            }
-            if (value != null && value > 0) return value
-        }
-        if (mime.startsWith("image/")) {
-            try {
-                app.contentResolver.openInputStream(uri)?.use { exifTime(ExifInterface(it)) }?.let { return it }
-            } catch (e: Exception) {
-                // no EXIF
-            }
-        }
-        return Outbox.lastModified(app, uri) ?: System.currentTimeMillis()
-    }
+    /** When a lent file was taken, in ms since 1970 (TakenDate), else when it last changed, else now. */
+    private fun taken(app: Context, uri: Uri, mime: String): Long =
+        TakenDate.of(app, uri, mime) ?: Outbox.lastModified(app, uri) ?: System.currentTimeMillis()
 }
