@@ -392,9 +392,6 @@ setups run Share and its database together. How visitors reach it decides the re
 | A server with a public address, without a proxy | Share's own HTTPS, with a certificate from files | [below](#https-without-a-proxy) |
 | Google Cloud Run, which runs Share only while someone visits, with the files in a bucket and the records in PostgreSQL | Its own address, or your domain | [`deploy/cloud-run`](deploy/cloud-run/README.md) |
 
-The release files and the image `ghcr.io/eschgi/share` come with the first release, 0.1.0; until
-it is out, build them as in [Development](#development).
-
 Without Docker:
 
 1. Take the server for the machine from the [latest release](https://github.com/eschgi/share/releases/latest):
