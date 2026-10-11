@@ -5,7 +5,8 @@ past it by signing in to Cloudflare, with an email code for example. The app can
 shows Cloudflare a **service token** instead: a Client ID and a Client Secret, sent as the headers
 `CF-Access-Client-Id` and `CF-Access-Client-Secret` with every request. Proposed on 2026-10-11,
 from the user's screenshot of another app; the screens are 111 to 119 of
-[share-mockup.html](share-mockup.html). Nothing is built yet.
+[share-mockup.html](share-mockup.html). Built on 2026-10-11, in the app, the server and the
+website; not yet tried against a real Cloudflare Access application.
 
 Asked by the user:
 - **Configure Cloudflare Access in the app**, as in the screenshot: a switch, the Client ID and
@@ -40,14 +41,24 @@ Asked by the user:
 - **Sent only to the public address.** Dart's API client, Kotlin's `ServerConnection`, the
   uploads and downloads, and the thumbnails and photos the app loads all add the two headers. They
   never go to the local address, which doesn't pass through Cloudflare, or to an S3 bucket.
-- **Spotting Cloudflare Access:** the server's answer is Cloudflare's instead of Share's JSON: a
-  redirect to `<team>.cloudflareaccess.com`, or a 403 page from Cloudflare. With no token, the
-  app shows 113; with a token, 116. **To check on a real setup before building:** exactly what
-  Cloudflare answers to the app with no token, and with a wrong or expired one.
+- **Spotting Cloudflare Access:** the answer is Cloudflare's instead of Share's: a redirect to
+  `<team>.cloudflareaccess.com` (the app follows no redirects; Share's API never sends one), or,
+  with Cloudflare's *strict service token authentication* (on by default for teams made after
+  2026-10-05), a 401 or 403 that comes from Cloudflare (`CF-Ray`, `Server: cloudflare`) and isn't
+  Share's JSON. That is `CloudflareAccessException`, with whether a token went along. A sign-in,
+  an invite or a PIN then shows 113 without a token and 112 with one, and goes on once a token
+  is in; answers over the public address of the phone's own server drive the library's banner
+  (116), which goes away with the next answer that gets through.
 - **In the invite:** the QR code's link carries the token after the `#`, which never reaches a
-  server: `<server>/join#shi_…&cfa=<id>:<secret>`. The app reads it when it scans the code;
-  a browser ignores it.
-- **The website stays almost the same.** Browsers handle Cloudflare Access themselves. The one
+  server: `<server>/join#shi_….<secret>&cfa=<id>:<secret>`. The app reads it when it scans the
+  code, or when the invite page hands the invite on (`com.eschgi.share://join?…&cfa=…`); the
+  website's join page passes it along and otherwise ignores it. The QR code's label still says
+  "with the phone camera": the camera opens the invite page, which hands the token to the app.
+- **Kotlin** reads the token from the same secret (`CloudflareAccess.kt`): `ServerConnection` adds
+  it on the public address, for the uploads, downloads and keys, and the video player gets it
+  with the stream's headers.
+- **The website stays almost the same.** The server answers a new invite with
+  `cloudflare_access` (contract/api/invite_create.json). Browsers handle Cloudflare Access themselves. The one
   change: an invite made on a computer can't bring the token, because neither the browser nor the
   server knows it, and the dialog says so (119). Decided with the user on 2026-10-11: the server
   doesn't keep the token, so invites with it come only from an admin's phone. The website shows

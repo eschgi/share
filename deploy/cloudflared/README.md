@@ -44,11 +44,27 @@ If `cloudflared` runs on another machine than Share, point the service at Share'
 Share takes the visitor's address from `CF-Connecting-IP`, and only from those addresses (with
 `"proxy": "cloudflare"`, this machine). It needs the address to limit wrong PIN tries per visitor.
 
-## No Cloudflare Access
+## Cloudflare Access, if you want it
 
-The website must open without a Cloudflare login; the PIN is the protection. Check that no Access
-application covers `share.example.com`, including wildcard applications such as `*.example.com`.
-With one in front, the family would get a Cloudflare login page, and uploads and the app would fail.
+Share doesn't need Cloudflare Access: the PINs and the accounts are the protection. Check that no
+Access application covers `share.example.com` by accident, including wildcard applications such as
+`*.example.com`.
+
+With an Access application in front on purpose, everyone has to get past it:
+
+- **Browsers** sign in to Cloudflare, e.g. with an email code, through an *Allow* policy.
+- **The app** shows a service token instead. Make one under *Zero Trust → Access → Service
+  Tokens*, and add a *Service Auth* policy for it to the application. On an admin's phone,
+  *Settings → Server → Behind Cloudflare Access* takes it, with *Paste from Cloudflare* for the
+  copied headers; the app also asks by itself when Cloudflare stands in the way. Invites made on
+  that phone bring the token in their QR code, so nobody else types it. It never goes to the
+  server, and is sent only to the public address, not to the one at home.
+- **Guests** opening a PIN link or an invite in a browser would meet the Cloudflare login. Give the
+  pages they use a *Bypass* policy, or leave PINs to people who sign in. For invite links to open
+  the app, Android must also reach `/.well-known/assetlinks.json`.
+
+Service tokens expire, after a year unless set otherwise; the app then says so at the top of the
+library. An invite made on the website says that it goes without the token.
 
 ## Settings for the hostname
 
