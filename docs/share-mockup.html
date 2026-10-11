@@ -789,6 +789,15 @@
   .dlib .keysban p{font-size:14.5px}
   .keysban.warn > .ic{color:var(--danger)}
   .keysban .btn{display:inline-flex;margin-top:12px}
+  .sortline{display:flex;align-items:center;gap:7px;padding:8px 20px 0;font-size:13px;font-weight:500;color:var(--accent-text);flex:none}
+  .sortline .ic{width:15px;height:15px}
+  .ab .ib.on{color:var(--accent-text)}
+  .day.who{gap:12px} .day.who > div{flex:1}
+  .sortsel{margin-left:auto;display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 14px;border-radius:12px;border:1px solid var(--line);font-size:14px;font-weight:500;color:var(--text)}
+  .sortsel .ic{width:16px;height:16px} .sortsel .down{transform:rotate(90deg)}
+  .dlib{position:relative}
+  .dmenu{position:absolute;right:0;top:50px;width:300px;background:var(--s2);border:1px solid var(--line-soft);border-radius:16px;padding:6px;box-shadow:0 18px 40px rgba(0,0,0,.35);z-index:3}
+  .dmenu .row{padding:10px 12px;gap:12px;min-height:0} .dmenu .mline{height:1px;background:var(--line-soft);margin:4px 8px}
   .kcode{gap:6px}
   .kcode b{width:38px;height:46px;font-size:21px}
   .kcode i{width:10px;flex:none}
@@ -1032,7 +1041,7 @@
   <symbol id="i-key" viewBox="0 0 24 24"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></symbol>
   <symbol id="i-qr" viewBox="0 0 24 24"><rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16v.01"/><path d="M16 12h1"/><path d="M21 12v.01"/><path d="M12 21v-1"/></symbol>
   <symbol id="i-scan" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><rect x="7.5" y="7.5" width="3.5" height="3.5" rx=".5"/><rect x="13" y="7.5" width="3.5" height="3.5" rx=".5"/><rect x="7.5" y="13" width="3.5" height="3.5" rx=".5"/><path d="M13 13h3.5v3.5"/></symbol>
-  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+  <symbol id="i-sort" viewBox="0 0 24 24"><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></symbol><symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
   <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
   <symbol id="i-hdd" viewBox="0 0 24 24"><path d="M22 12H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><path d="M6 16h.01"/><path d="M10 16h.01"/></symbol>
   <symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
@@ -2630,6 +2639,137 @@
         <p class="cap">The browser never knows the token, and the server doesn't keep it, so an invite made on a computer can't bring it along. The dialog says so where the token would matter, and only when the page came through Cloudflare Access: Cloudflare adds a header the server sees.</p>
         <div class="desktop" data-shot="119-access-invite-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>Settings · Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com/settings/people</span></div></div><div class="dview"><div class="ahd"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div><nav class="dtabs"><a><span data-i="images"></span>Library</a><a><span data-i="upload"></span>Send</a><a class="on"><span data-i="settings"></span>Settings</a></nav><span class="av acc">S</span></div><div class="dset"><div class="pane"><div class="profile"><span class="av lg acc">S</span><div><b>Stefan <span class="role admin"><span data-i="crown"></span>Admin</span></b><span class="sub">Signed in in this browser</span></div><span class="chev" data-i="chev"></span></div><div class="group"><div class="row"><span class="ri acc"><span data-i="key"></span></span><div class="rt"><b>Upload PINs</b><span>1 permanent · 1 for 24 hours</span></div><span class="chev" data-i="chev"></span></div><div class="row on"><span class="ri"><span data-i="users"></span></span><div class="rt"><b>People</b><span>3 people · 1 invite open</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="trash"></span></span><div class="rt"><b>Recently deleted</b><span>3 files · 9.3 MB</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="hdd"></span></span><div class="rt"><b>Storage</b><span>789 GB free of 931 GB</span></div></div></div><div class="group"><div class="row"><span class="ri"><span data-i="globe"></span></span><div class="rt"><b>Language</b><span>Automatic · English</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="palette"></span></span><div class="rt"><b>Theme</b><span>Ember</span></div><span class="chev" data-i="chev"></span></div><div class="row"><span class="ri"><span data-i="lock"></span></span><div class="rt"><b>Password</b><span>Set · username stefan</span></div><span class="chev" data-i="chev"></span></div></div><div class="group"><div class="row"><span class="ri"><span data-i="log-out"></span></span><div class="rt"><b>Sign out</b></div></div><div class="row dang"><span class="ri dang"><span data-i="user-x"></span></span><div class="rt"><b>Delete my account</b></div></div></div></div><div class="pane pane2"><div class="phead"><h2>People</h2><span class="btn tonal xs"><span data-i="user-plus"></span>Invite</span></div><div class="group"><div class="row"><span class="av acc">S</span><div class="rt"><b>Stefan</b><span>You · 1 phone, 1 browser</span></div><span class="role admin">Admin</span><span class="chev" data-i="chev"></span></div><div class="row"><span class="av tan">M</span><div class="rt"><b>Maria</b><span>1 phone, 1 browser · active today</span></div><span class="role">Member</span><span class="chev" data-i="chev"></span></div><div class="row"><span class="av sage">P</span><div class="rt"><b>Peter</b><span>1 phone · active today</span></div><span class="role">Member</span><span class="chev" data-i="chev"></span></div><div class="row"><span class="av pend">O</span><div class="rt"><b>Oma Rosa</b><span>Invite open until 21:00</span></div><span class="role pend">Invited</span><span class="chev" data-i="chev"></span></div></div></div></div><div class="scrim"></div><div class="ddlg wide"><div class="dlgh"><h3>Invite someone</h3><span class="ib"><span data-i="x"></span></span></div><div class="label t0">Name</div><div class="input">Oma Rosa</div><div class="label">Role</div><div class="seg"><span class="on"><span data-i="check"></span>Member</span><span>Admin</span></div><p class="help">Members see, download and send. Admins can also delete files, manage PINs and invite people.</p><div class="qrrow"><div class="qr" data-qr="11"></div><div><b>Let Oma Rosa scan this with the phone camera, or send her the link for a browser.</b><span class="exp"><span data-i="clock"></span>Works once · expires in 24 h</span><div class="btn tonal sm"><span data-i="copy"></span>Copy link</div></div></div><div class="note slim"><span data-i="shield"></span><p>This invite doesn't bring the Cloudflare Access token: only Share on your phone knows it. To include it, make the invite on your phone.</p></div><div class="dbtns"><span class="tbtn">Invite someone else</span><div class="btn outline sm">Close</div></div></div></div></div>
       </div>
+    </div>
+  </section>
+
+  <section class="sec" id="sort">
+    <div class="sec-head">
+      <div class="sec-tag">Proposal · sorting</div>
+      <h2>Sorted the way you look for them</h2>
+      <p>The library sorts by the day files arrived, which puts old holiday photos sent today next to this morning's. Sorted by the date they were taken, they land on the day they show. Each phone and browser remembers its choice, for every folder. The date taken comes from the photo or video itself: the app takes it from the phone's gallery when it sends, the website reads it from the file, and the server reads it for files that came without it, including the ones already there. Files without one, such as documents and screenshots, count on the day they arrived. On the drive, nothing moves: the files stay in the folders of the day they arrived.</p>
+    </div>
+    <p class="sub-h">In the app</p>
+    <div class="board">
+
+      <div class="slot">
+        <h3><span class="n">120</span>Sort the library <span class="badge proposal">proposal</span></h3>
+        <p class="cap">The new button next to search opens the choice. Oldest first suits an event read from start to end, such as a wedding. Remembered on this phone, for all folders; Date received stays the start.</p>
+        <div class="phone" data-shot="120-sort-sheet">
+          <div class="sb" data-time="9:41"></div>
+          <div class="ab"><h2>Library</h2><span class="ib"><span data-i="sort"></span></span><span class="ib"><span data-i="search"></span></span><span class="av sm tan">M</span></div>
+          <div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div>
+          <div class="scroll">
+            <div class="day"><div><h4>Today</h4><div class="meta">6 files · 74 MB</div></div><span class="dsel"></span></div>
+            <div class="grid g4" data-tiles="p3 p8 v2@0:18 d#PDF=Car_insurance.pdf p6 p1"></div>
+            <div class="day"><div><h4>Yesterday</h4><div class="meta">45 files · 620 MB</div></div><span class="dsel"></span></div>
+            <div class="grid g4" data-tiles="p4 p7 p9 v5@1:15 p2 p10 p6 p3"></div>
+          </div>
+          <nav class="nav" data-on="library"></nav>
+          <div class="gest"></div>
+          <div class="scrim"></div>
+          <div class="sheet">
+            <div class="grip"></div>
+            <h3>Sort the library</h3>
+            <div class="group">
+              <div class="row on"><span class="rad on"></span><div class="rt"><b>Date taken</b><span>When the photo or video was taken</span></div></div>
+              <div class="row"><span class="rad"></span><div class="rt"><b>Date received</b><span>When it arrived in Share</span></div></div>
+              <div class="row"><span class="rad"></span><div class="rt"><b>Who sent it</b><span>A group for each person</span></div></div>
+            </div>
+            <div class="label">Order</div>
+            <div class="seg"><span class="on"><span data-i="check"></span>Newest first</span><span>Oldest first</span></div>
+            <p class="help sm">Remembered on this phone. Documents and files without a date count on the day they arrived.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="slot">
+        <h3><span class="n">121</span>By date taken <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Maria sent her photos of June 2025 this morning: they sit in June 2025, not under Today. A line under the filters says how the library is sorted; tapping it opens the choice again.</p>
+        <div class="phone" data-shot="121-sort-taken">
+          <div class="sb" data-time="9:41"></div>
+          <div class="ab"><h2>Library</h2><span class="ib on"><span data-i="sort"></span></span><span class="ib"><span data-i="search"></span></span><span class="av sm tan">M</span></div>
+          <div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div>
+          <div class="sortline"><span data-i="sort"></span>By date taken, newest first</div>
+          <div class="scroll">
+            <div class="day"><div><h4>Today</h4><div class="meta">2 files · 9 MB</div></div><span class="dsel"></span></div>
+            <div class="grid g4" data-tiles="p3 d#PDF=Car_insurance.pdf"></div>
+            <div class="day"><div><h4>Yesterday</h4><div class="meta">41 files · 590 MB</div></div><span class="dsel"></span></div>
+            <div class="grid g4" data-tiles="p4 p7 p9 v5@1:15 p2 p10 p6 p8"></div>
+            <div class="day"><div><h4>Saturday, 14 Jun 2025</h4><div class="meta">18 files · 210 MB · sent today</div></div><span class="dsel"></span></div>
+            <div class="grid g4" data-tiles="p5 p1 p6 v2@0:31 p8 p2 p9 p4"></div>
+          </div>
+          <nav class="nav" data-on="library"></nav>
+          <div class="gest"></div>
+        </div>
+      </div>
+
+      <div class="slot">
+        <h3><span class="n">122</span>By who sent it <span class="badge proposal">proposal</span></h3>
+        <p class="cap">A group for each person, the one who sent last on top, and their files newest first. Guests with a PIN have no name, so their files share one group.</p>
+        <div class="phone" data-shot="122-sort-sender">
+          <div class="sb" data-time="9:41"></div>
+          <div class="ab"><h2>Library</h2><span class="ib on"><span data-i="sort"></span></span><span class="ib"><span data-i="search"></span></span><span class="av sm tan">M</span></div>
+          <div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div>
+          <div class="sortline"><span data-i="sort"></span>By who sent it</div>
+          <div class="scroll">
+            <div class="day who"><span class="av tan">M</span><div><h4>Maria</h4><div class="meta">62 files · last today</div></div><span class="dsel"></span></div>
+            <div class="grid g4" data-tiles="p5 p1 p6 v2@0:31 p8 p2 p9 p4"></div>
+            <div class="day who"><span class="av sage">P</span><div><h4>Peter</h4><div class="meta">45 files · last yesterday</div></div><span class="dsel"></span></div>
+            <div class="grid g4" data-tiles="p4 p7 p9 v5@1:15 p2 p10 p6 p3"></div>
+            <div class="day who"><span class="av pend">?</span><div><h4>Guests with a PIN</h4><div class="meta">14 files · last on 27 Sep</div></div><span class="dsel"></span></div>
+            <div class="grid g4" data-tiles="p1 p2 d#PDF=Invitation.pdf p3"></div>
+          </div>
+          <nav class="nav" data-on="library"></nav>
+          <div class="gest"></div>
+        </div>
+      </div>
+
+      <div class="slot">
+        <h3><span class="n">123</span>Both dates <span class="badge proposal">proposal</span></h3>
+        <p class="cap">A photo's details give both dates whatever the sorting, so nobody wonders why it isn't under Today.</p>
+        <div class="phone viewer" data-shot="123-sort-details"><div class="sb" data-time="9:44"></div><div class="vtop"><span class="ib"><span data-i="back"></span></span><div class="vt"><b>Saturday, 14 Jun 2025</b><span>Taken 18:32 · from Maria</span></div><span class="ib"><span data-i="more"></span></span></div><div class="vphoto"></div><div class="vbottom"><div class="film" data-tiles="p5 p1 p6/c p8 p2"></div><div class="vmeta">IMG_4471.jpg · 4.2 MB · 4032 × 3024</div><div class="vactions"><div><span data-i="download"></span>Download</div><div><span data-i="share"></span>Share</div><div><span data-i="info"></span>Details</div></div></div><div class="gest"></div>
+          <div class="scrim"></div>
+          <div class="sheet">
+            <div class="grip"></div>
+            <h3>IMG_4471.jpg</h3>
+            <div class="group">
+              <div class="row"><span class="ri"><span data-i="camera"></span></span><div class="rt"><b>Taken</b><span>Saturday, 14 Jun 2025, 18:32</span></div></div>
+              <div class="row"><span class="ri"><span data-i="upload"></span></span><div class="rt"><b>Received</b><span>Today, 8:57, from Maria</span></div></div>
+              <div class="row"><span class="ri"><span data-i="image"></span></span><div class="rt"><b>4.2 MB · 4032 × 3024</b><span>image/jpeg</span></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="slot">
+        <h3><span class="n">124</span>Oldest first <span class="badge proposal">proposal</span></h3>
+        <p class="cap">A wedding read from the ceremony on, across the photos of everyone who was there, however late they sent them.</p>
+        <div class="phone" data-shot="124-sort-oldest">
+          <div class="sb" data-time="9:41"></div>
+          <div class="ab"><h2 class="fpick"><span class="t">Wedding Anna &amp; Marco</span><span data-i="chev" class="down"></span></h2><span class="ib on"><span data-i="sort"></span></span><span class="av sm tan">M</span></div>
+          <div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div>
+          <div class="sortline"><span data-i="sort"></span>By date taken, oldest first</div>
+          <div class="scroll">
+            <div class="day"><div><h4>Saturday, 12 Sep</h4><div class="meta">364 files · 4.6 GB</div></div><span class="dsel"></span></div>
+            <div class="grid g4" data-tiles="p10 p2 p7 p1 v4@0:42 p5 p3 p9 p6 p8 p4 p2 p1 v7@1:58 p10 p5 p3 p6 p9 p7"></div>
+            <div class="day"><div><h4>Sunday, 13 Sep</h4><div class="meta">48 files · 610 MB</div></div><span class="dsel"></span></div>
+            <div class="grid g4" data-tiles="p4 p8 p2 p6"></div>
+          </div>
+          <nav class="nav" data-on="library"></nav>
+          <div class="gest"></div>
+        </div>
+      </div>
+
+    </div>
+    <p class="sub-h">On the website</p>
+    <div class="board">
+
+      <div class="slot wide">
+        <h3><span class="n">125</span>Sorting, on a computer <span class="badge proposal">proposal</span></h3>
+        <p class="cap">The same choice, next to the filters. This browser remembers it, apart from the phone.</p>
+        <div class="desktop" data-shot="125-sort-desktop"><div class="chrome"><div class="tabs"><span class="wdots"><i></i><i></i><i></i></span><span class="btab"><span data-i="images"></span><span>Library · Share</span></span></div><div class="addr"><span class="u"><span data-i="lock"></span>share.example.com/library</span></div></div><div class="dview"><div class="ahd"><div class="brand"><span data-i="images"></span><span translate="no">Share</span></div><nav class="dtabs"><a class="on"><span data-i="images"></span>Library</a><a><span data-i="upload"></span>Send</a><a><span data-i="settings"></span>Settings</a></nav><span class="dsearch"><span data-i="search"></span>Search file names</span><span class="av tan">M</span></div><div class="dlib"><div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span><span class="sortsel"><span data-i="sort"></span>Date taken<span data-i="chev" class="down"></span></span></div><div class="dmenu"><div class="row on"><span class="rad on"></span><div class="rt"><b>Date taken</b><span>When the photo or video was taken</span></div></div><div class="row"><span class="rad"></span><div class="rt"><b>Date received</b><span>When it arrived in Share</span></div></div><div class="row"><span class="rad"></span><div class="rt"><b>Who sent it</b><span>A group for each person</span></div></div><div class="mline"></div><div class="row"><span class="rad on"></span><div class="rt"><b>Newest first</b></div></div><div class="row"><span class="rad"></span><div class="rt"><b>Oldest first</b></div></div></div><div class="day"><div><h4>Today</h4><div class="meta">2 files · 9 MB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p3 d#PDF=Car_insurance.pdf"></div><div class="day"><div><h4>Yesterday</h4><div class="meta">41 files · 590 MB</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p4 p7 p9 v5@1:15 p2 p10 p6 p8 p1 p3 v3@0:42 p5 p9 p7 p2 p6"></div><div class="day"><div><h4>Saturday, 14 Jun 2025</h4><div class="meta">18 files · 210 MB · sent today</div></div><span class="dsel"></span></div><div class="grid g8" data-tiles="p5 p1 p6 v2@0:31 p8 p2 p9 p4"></div></div></div></div>
+      </div>
+
     </div>
   </section>
 
@@ -5579,10 +5719,142 @@
       "This invite doesn't bring the Cloudflare Access token: only Share on your phone knows it. To include it, make the invite on your phone.": [
           "Diese Einladung bringt das Cloudflare-Access-Token nicht mit: Nur Share auf deinem Handy kennt es. Damit es dabei ist, mach die Einladung auf dem Handy.",
           "Questo invito non porta il token di Cloudflare Access: lo conosce solo Share sul tuo telefono. Per includerlo, crea l'invito dal telefono."
+      ],
+      "Sort the library": [
+          "Mediathek sortieren",
+          "Ordina la libreria"
+      ],
+      "Date taken": [
+          "Aufnahmedatum",
+          "Data di scatto"
+      ],
+      "When the photo or video was taken": [
+          "Wann das Foto oder Video aufgenommen wurde",
+          "Quando è stata scattata la foto o girato il video"
+      ],
+      "Date received": [
+          "Empfangsdatum",
+          "Data di arrivo"
+      ],
+      "When it arrived in Share": [
+          "Wann es in Share angekommen ist",
+          "Quando è arrivato in Share"
+      ],
+      "Who sent it": [
+          "Wer es geschickt hat",
+          "Chi l'ha inviato"
+      ],
+      "A group for each person": [
+          "Eine Gruppe pro Person",
+          "Un gruppo per ogni persona"
+      ],
+      "Order": [
+          "Reihenfolge",
+          "Ordine"
+      ],
+      "Newest first": [
+          "Neueste zuerst",
+          "Prima i più recenti"
+      ],
+      "Oldest first": [
+          "Älteste zuerst",
+          "Prima i più vecchi"
+      ],
+      "Remembered on this phone. Documents and files without a date count on the day they arrived.": [
+          "Dieses Handy merkt es sich. Dokumente und Dateien ohne Datum zählen am Tag, an dem sie angekommen sind.",
+          "Questo telefono lo ricorda. Documenti e file senza data contano nel giorno in cui sono arrivati."
+      ],
+      "By date taken, newest first": [
+          "Nach Aufnahmedatum, neueste zuerst",
+          "Per data di scatto, prima i più recenti"
+      ],
+      "2 files · 9 MB": [
+          "2 Dateien · 9 MB",
+          "2 file · 9 MB"
+      ],
+      "41 files · 590 MB": [
+          "41 Dateien · 590 MB",
+          "41 file · 590 MB"
+      ],
+      "Saturday, 14 Jun 2025": [
+          "Samstag, 14. Juni 2025",
+          "Sabato 14 giugno 2025"
+      ],
+      "18 files · 210 MB · sent today": [
+          "18 Dateien · 210 MB · heute geschickt",
+          "18 file · 210 MB · inviati oggi"
+      ],
+      "By who sent it": [
+          "Nach Absender",
+          "Per chi l'ha inviato"
+      ],
+      "62 files · last today": [
+          "62 Dateien · zuletzt heute",
+          "62 file · ultimo oggi"
+      ],
+      "45 files · last yesterday": [
+          "45 Dateien · zuletzt gestern",
+          "45 file · ultimo ieri"
+      ],
+      "Guests with a PIN": [
+          "Gäste mit PIN",
+          "Ospiti con un PIN"
+      ],
+      "14 files · last on 27 Sep": [
+          "14 Dateien · zuletzt am 27. September",
+          "14 file · ultimo il 27 settembre"
+      ],
+      "Taken 18:32 · from Maria": [
+          "Aufgenommen 18:32 · von Maria",
+          "Scattata alle 18:32 · da Maria"
+      ],
+      "IMG_4471.jpg · 4.2 MB · 4032 × 3024": [
+          "IMG_4471.jpg · 4,2 MB · 4032 × 3024",
+          "IMG_4471.jpg · 4,2 MB · 4032 × 3024"
+      ],
+      "Taken": [
+          "Aufgenommen",
+          "Scattata"
+      ],
+      "Saturday, 14 Jun 2025, 18:32": [
+          "Samstag, 14. Juni 2025, 18:32",
+          "Sabato 14 giugno 2025, 18:32"
+      ],
+      "Received": [
+          "Empfangen",
+          "Arrivata"
+      ],
+      "Today, 8:57, from Maria": [
+          "Heute, 8:57, von Maria",
+          "Oggi, 8:57, da Maria"
+      ],
+      "4.2 MB · 4032 × 3024": [
+          "4,2 MB · 4032 × 3024",
+          "4,2 MB · 4032 × 3024"
+      ],
+      "By date taken, oldest first": [
+          "Nach Aufnahmedatum, älteste zuerst",
+          "Per data di scatto, prima i più vecchi"
+      ],
+      "Saturday, 12 Sep": [
+          "Samstag, 12. September",
+          "Sabato 12 settembre"
+      ],
+      "364 files · 4.6 GB": [
+          "364 Dateien · 4,6 GB",
+          "364 file · 4,6 GB"
+      ],
+      "Sunday, 13 Sep": [
+          "Sonntag, 13. September",
+          "Domenica 13 settembre"
+      ],
+      "48 files · 610 MB": [
+          "48 Dateien · 610 MB",
+          "48 file · 610 MB"
       ]
   };
   // Names, codes, numbers and file names that stay the same in every language.
-  const KEEP = /^(?:[A-Z0-9]|\d+(?::\d+)?|Stefan|Maria|Peter|Anna|Luca|maria|Admin|PIN|PDF|DOCX|ZIP|XLSX|•+|\d{8}_\d{6}\.(?:jpg|mp4)|\/srv\/share|(?:https:\/\/)?share\.example\.com(?:\/[a-z\/-]*)?|https:\/\/192\.168\.1\.20:8443|\d+ (?:KB|MB|GB)|@maria|Pixel 8|Chrome · Windows|IMG_\d+\.jpg|image\/jpeg|Quick Share|iPhone · Safari|Android · Chrome|\d+ MB\/s|Anna & Marco|WhatsApp(?:, Telegram)?|Signal|Gmail|\.zip|1 ZIP|Cloudflare Access|[0-9a-f]+\.access)$/;
+  const KEEP = /^(?:[A-Z0-9]|\d+(?::\d+)?|Stefan|Maria|Peter|Anna|Luca|maria|Admin|PIN|PDF|DOCX|ZIP|XLSX|•+|\d{8}_\d{6}\.(?:jpg|mp4)|\/srv\/share|(?:https:\/\/)?share\.example\.com(?:\/[a-z\/-]*)?|https:\/\/192\.168\.1\.20:8443|\d+ (?:KB|MB|GB)|@maria|Pixel 8|Chrome · Windows|IMG_\d+\.jpg|image\/jpeg|Quick Share|iPhone · Safari|Android · Chrome|\d+ MB\/s|Anna & Marco|WhatsApp(?:, Telegram)?|Signal|Gmail|\.zip|1 ZIP|Cloudflare Access|[0-9a-f]+\.access|\?)$/;
   const LANGS = ['en', 'de', 'it'];
   const original = new WeakMap();
   function setLang(lang) {
