@@ -39,9 +39,9 @@ server doesn't read files for it.
 - **Sent** as Unix ms: `takenAt` in the tus metadata, `taken_at_ms` with a bucket
   (contract/api/tus.json, s3_upload_create.json). The server keeps `taken_at` and its day in its
   `time_zone` (`taken_day`), and drops a date from before 1900 or more than two days ahead.
-- **Encrypted folders:** never sent, and the server drops one if it came; those files count on
-  the day they arrived, and the server never learns when they were taken. (Chosen while the
-  question was open; easy to change.)
+- **Encrypted folders send it too**, decided with the user on 2026-10-11, so they sort the same.
+  Like names and sizes, the date stays readable to the server: it learns when each photo was
+  taken, not what it shows.
 - **Files sent before** have no date taken and count on the day they arrived.
 - **Nothing moves on the drive:** files stay in the folder of the day they arrived.
 

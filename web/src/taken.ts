@@ -1,6 +1,6 @@
 // When a photo or video was taken, read from the file before it is sent (docs/sort-plan.md): the
 // EXIF DateTimeOriginal of a JPEG, HEIC or AVIF, or the creation time in an MP4 or MOV header.
-// Never for a file into an encrypted folder, whose dates the server must not learn.
+// Also for a file into an encrypted folder: like its name and size, the date stays readable.
 
 /** Unix ms when the file was taken, or null when it doesn't say. */
 export async function takenAtOf(file: Blob): Promise<number | null> {

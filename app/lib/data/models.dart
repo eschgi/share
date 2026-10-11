@@ -202,7 +202,7 @@ class FileInfo {
   final DateTime updatedAt;
 
   /// When the photo or video was taken, as its sender read it from the file, and that day on the
-  /// server; null when unknown, and always for an encrypted file.
+  /// server; null when unknown.
   final DateTime? takenAt;
   final String? takenDay;
   final int? width, height, durationMs;

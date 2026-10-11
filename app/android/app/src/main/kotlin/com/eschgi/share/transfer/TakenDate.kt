@@ -14,8 +14,8 @@ import java.time.format.DateTimeFormatter
 /**
  * When a photo or video was taken, in ms since 1970 (docs/sort-plan.md): as the gallery or the
  * photo picker say, else from the file itself, a photo's EXIF or a video's header. Null when
- * nothing says, such as for a document or a screenshot without a date; an upload into an
- * encrypted folder never asks, so that the server never learns it.
+ * nothing says, such as for a document or a screenshot without a date. An encrypted file sends it
+ * too: like its name and size, it stays readable to the server.
  */
 object TakenDate {
     fun of(context: Context, uri: Uri, mime: String): Long? {

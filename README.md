@@ -222,8 +222,9 @@ The design and the formats are in [docs/e2ee-plan.md](docs/e2ee-plan.md).
   can make it the default for new folders. From then on each new file is encrypted on the phone or
   browser that sends it, with a key of its own, contents and thumbnail alike; files already in the
   folder stay as they are. Turning it off makes new files plain again, and the encrypted ones still
-  open. Names, days, sizes, photo dimensions and video lengths, who sent each file and when, and who
-  sees which folder stay readable to the server, so the library, search and sorting work as before.
+  open. Names, days, sizes, photo dimensions and video lengths, when photos and videos were taken,
+  who sent each file and when, and who sees which folder stay readable to the server, so the library,
+  search and sorting work as before.
 - **Keys pass on with an OK.** Every phone and browser has a key of its own, which never leaves it.
   Signing in with the password opens the keys at once, once a phone or browser of the person has
   locked them with it; a new password from an admin ends that lock, and the next phone or browser

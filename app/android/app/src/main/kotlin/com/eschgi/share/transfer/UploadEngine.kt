@@ -128,8 +128,8 @@ object UploadEngine {
                         ).also { targets[batchId] = it }
                     }
                     seal = sealed
-                    // When it was taken, for sorting the library; never for an encrypted folder.
-                    val takenAt = if (seal == null) TakenDate.of(app, item.file.uri.toUri(), item.file.mime) else null
+                    // When it was taken, for sorting the library, encrypted or not.
+                    val takenAt = TakenDate.of(app, item.file.uri.toUri(), item.file.mime)
                     // The encrypted stream goes up for a file into an encrypted folder.
                     val source = seal?.let { SealedSource(it, plain) } ?: plain
                     val size = seal?.encryptedSize ?: item.file.size

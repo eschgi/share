@@ -319,7 +319,7 @@ func (h *TusHandler) preCreate(hook handler.HookEvent) (handler.HTTPResponse, ha
 		PinID: p.PinID, PinSessionID: p.PinSessionID, UserID: p.UserID, DeviceID: p.DeviceID, Enc: enc,
 	}
 	takenMS, _ := strconv.ParseInt(info.MetaData["takenAt"], 10, 64)
-	f.TakenAt, f.TakenDay = takenAt(takenMS, now, h.lib.Loc, enc != nil)
+	f.TakenAt, f.TakenDay = takenAt(takenMS, now, h.lib.Loc)
 	if err := h.db.InsertReceiving(ctx, f); err != nil {
 		return handler.HTTPResponse{}, handler.FileInfoChanges{}, err
 	}
@@ -373,10 +373,10 @@ func parseMillis(v string) *time.Time {
 }
 
 // takenAt is when a photo or video was taken, as its sender read it from the file (Unix ms), and
-// that day in the server's time zone; nil and "" when unknown or impossible, and for an encrypted
-// file, whose date the server must not learn (docs/sort-plan.md).
-func takenAt(ms int64, now time.Time, loc *time.Location, encrypted bool) (*time.Time, string) {
-	if ms == 0 || encrypted {
+// that day in the server's time zone; nil and "" when unknown or impossible. Encrypted files bring
+// it too, so that their folders sort the same (docs/sort-plan.md).
+func takenAt(ms int64, now time.Time, loc *time.Location) (*time.Time, string) {
+	if ms == 0 {
 		return nil, ""
 	}
 	t := time.UnixMilli(ms).UTC()

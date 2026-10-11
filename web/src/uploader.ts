@@ -195,13 +195,14 @@ export class Uploader {
 
     // Into an encrypted folder, each file gets its key just before its upload starts, and keeps
     // it across tries and a closed page. A file whose folder's keys can't be checked fails here,
-    // and leaves the batch; trying it again checks again. A plain file gets the date it was taken
-    // instead, read from it (taken.ts); an encrypted one never tells the server.
+    // and leaves the batch; trying it again checks again. Every file gets the date it was taken,
+    // read from it (taken.ts).
     this.uppy.addPreProcessor(async (ids, uploadID) => {
       const refused: string[] = [];
       for (const id of ids) {
         const f = this.uppy.getFile(id);
         if (!f || !(f.data instanceof Blob)) continue;
+        if (f.meta.takenAt === undefined) this.uppy.setFileMeta(id, { takenAt: String((await takenAtOf(f.data)) ?? '') });
         let seal = parseSeal(f.meta.e2ee);
         if (!seal) {
           let target: FolderPublicKey | null = null;
@@ -212,12 +213,9 @@ export class Uploader {
             refused.push(id);
             continue;
           }
-          if (!target) {
-            if (f.meta.takenAt === undefined) this.uppy.setFileMeta(id, { takenAt: String((await takenAtOf(f.data)) ?? '') });
-            continue;
-          }
+          if (!target) continue;
           seal = await newSeal(target, f.data.size, String(f.meta.lastModified ?? ''));
-          this.uppy.setFileMeta(id, { e2ee: JSON.stringify(seal), enc: JSON.stringify(encOf(seal)), takenAt: '' });
+          this.uppy.setFileMeta(id, { e2ee: JSON.stringify(seal), enc: JSON.stringify(encOf(seal)) });
         }
         remember(f.data, seal);
       }
@@ -268,7 +266,7 @@ export class Uploader {
         // Sealed for an older key, or plain into a folder now encrypted: a new seal, a new upload.
         this.reseal = false;
         this.resealed.set(file.id, tries + 1);
-        this.uppy.setFileMeta(file.id, { e2ee: undefined, enc: '', takenAt: undefined });
+        this.uppy.setFileMeta(file.id, { e2ee: undefined, enc: '' });
         this.uppy.setFileState(file.id, { s3: undefined, tus: undefined });
         void (events.refreshKeys?.() ?? Promise.resolve()).then(() => this.uppy.retryUpload(file.id).catch(() => {}));
         return;

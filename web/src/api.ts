@@ -285,8 +285,8 @@ export interface FileInfo {
   /** The upload day, in the server's time zone: 2026-09-27. */
   day: string;
   uploaded_at: string;
-  /** When the photo or video was taken, as its sender read it from the file; null when unknown,
-   * and always for an encrypted file. taken_day is that day in the server's time zone. */
+  /** When the photo or video was taken, as its sender read it from the file; null when unknown.
+   * taken_day is that day in the server's time zone. */
   taken_at: string | null;
   taken_day: string | null;
   /** Changes with the thumbnail. */

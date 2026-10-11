@@ -435,11 +435,13 @@ func (f encrypted) enc() map[string]any {
 	return map[string]any{"version": f.version, "key": b64u.EncodeToString(f.sealed), "header": b64u.EncodeToString(f.header), "plain_size": f.plainSize}
 }
 
-// tusEncrypted starts a tus upload of an encrypted file into a folder.
+// tusEncrypted starts a tus upload of an encrypted file into a folder, taken at 9:41 on the day
+// before the tests' first day, as phones and browsers say for encrypted files too.
 func (k *keyring) tusEncrypted(folderID, name string, f encrypted) response {
 	enc, _ := json.Marshal(f.enc())
+	taken := strconv.FormatInt(time.Date(2026, 9, 26, 9, 41, 0, 0, time.UTC).UnixMilli(), 10)
 	meta := "filename " + base64.StdEncoding.EncodeToString([]byte(name)) + ",folder " + base64.StdEncoding.EncodeToString([]byte(folderID)) +
-		",enc " + base64.StdEncoding.EncodeToString(enc)
+		",enc " + base64.StdEncoding.EncodeToString(enc) + ",takenAt " + base64.StdEncoding.EncodeToString([]byte(taken))
 	return k.e.do(nil, "POST", "/tus/", k.who.token, nil, tus{e: k.e, token: k.who.token}.headers(map[string]string{
 		"Upload-Length": strconv.Itoa(len(f.data)), "Upload-Metadata": meta,
 	}))
@@ -581,6 +583,10 @@ func TestEncryptedFolder(t *testing.T) {
 	f := e.file(id)
 	if f.State != db.StateReady || f.Enc == nil || f.Size != int64(len(sent.data)) || f.Enc.PlainSize != int64(len(plain)) || f.Mime != "image/jpeg" || f.Kind != db.KindPhoto {
 		t.Fatalf("the file: %+v", f)
+	}
+	// Its date taken stays readable, as its name does, so encrypted folders sort the same.
+	if f.TakenAt == nil || f.TakenDay != "2026-09-26" {
+		t.Errorf("the date taken of an encrypted file: %v, %q", f.TakenAt, f.TakenDay)
 	}
 	stored, err := os.ReadFile(e.disk(f))
 	if err != nil || !bytes.Equal(stored, sent.data) {

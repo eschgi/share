@@ -145,8 +145,8 @@ CREATE TABLE files (
   uploaded_at        TIMESTAMPTZ(3),
   client_modified_at TIMESTAMPTZ(3),
   -- When the photo or video was taken, as the sending phone or browser read it from the file,
-  -- and that day in the configured time zone; null when unknown, and always for an encrypted
-  -- file, so that the server never learns it.
+  -- and that day in the configured time zone; null when unknown. Encrypted files have it too,
+  -- like their names and sizes, so that their folders sort the same.
   taken_at           TIMESTAMPTZ(3),
   taken_day          DATE,
   width              INTEGER,

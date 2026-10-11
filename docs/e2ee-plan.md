@@ -9,7 +9,8 @@ code (`server/internal/e2ee`), the website and the app are tested against.
 ## Decided with the user
 
 - **Encrypted:** the contents of files and their thumbnails. Names, folders, days, sizes, photo
-  dimensions and video lengths stay readable on the server, so listing, sorting and search work as
+  dimensions and video lengths, and when photos and videos were taken (added 2026-10-11, for
+  sorting: docs/sort-plan.md) stay readable on the server, so listing, sorting and search work as
   before.
 - **Per folder:** admins turn it on or off for each folder, and an admin setting "new folders are
   encrypted" makes it the default. Each file records whether it is encrypted, so a folder can hold
