@@ -570,6 +570,9 @@ export interface NewInvite {
   token: string;
   link: string;
   invite: OpenInvite;
+  /** The request came through Cloudflare Access, whose service token only the admins' phones
+   * know: this invite goes without it. */
+  cloudflare_access: boolean;
 }
 
 export const getPeople = () => request<People>('GET', '/api/users');

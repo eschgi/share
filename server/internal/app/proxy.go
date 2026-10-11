@@ -46,6 +46,9 @@ func (a *App) throughProxy(w http.ResponseWriter, r *http.Request, next http.Han
 		return
 	}
 	r = auth.WithClientIP(r, visitor)
+	if r.Header.Get("Cf-Access-Jwt-Assertion") != "" {
+		r = auth.WithCloudflareAccess(r)
+	}
 	if homenet.Host(hostOf(r.Host)) {
 		if homenet.Addr(visitor) {
 			// https from the home network to an address at home, as on Share's own https port.

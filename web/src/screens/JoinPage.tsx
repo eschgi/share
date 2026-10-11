@@ -9,7 +9,7 @@ import { formatBytes, formatWhen } from '../format';
 import { setSignedInHint } from '../hint';
 import { I18nContext, isLang, languages, makeI18n, pickLanguage, storeLanguage, storedLanguage, type Lang } from '../i18n';
 import { keysFromInvite } from '../e2ee/keyring';
-import { intentLink, secretFromHash, tokenFromHash } from '../joinlink';
+import { accessFromHash, intentLink, secretFromHash, tokenFromHash } from '../joinlink';
 
 type State =
   | { kind: 'loading' }
@@ -33,6 +33,7 @@ export function JoinPage() {
   // Read the token before it leaves the address bar, so it doesn't stay in the history.
   const token = useMemo(() => tokenFromHash(location.hash), []);
   const secret = useMemo(() => secretFromHash(location.hash), []);
+  const access = useMemo(() => accessFromHash(location.hash), []);
   const link = token ? `${location.origin}/join#${token}${secret ? '.' + secret : ''}` : '';
   const [info, setInfo] = useState<Info | null>(null);
   const [lang, setLang] = useState<Lang>(() => pickLanguage(languages, storedLanguage(), navigator.languages, 'en'));
@@ -203,7 +204,7 @@ export function JoinPage() {
                 {t('join.download')}
               </a>
               {token && (
-                <a class="btn link" href={intentLink(app, location.origin, token, secret)}>
+                <a class="btn link" href={intentLink(app, location.origin, token, secret, access)}>
                   {t('join.already', { name: peek.name })}
                 </a>
               )}

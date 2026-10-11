@@ -370,6 +370,7 @@
   "invite.scanThis": "Lass {name} das mit der Handykamera scannen, oder schick den Link, um ihn im Browser zu öffnen.",
   "invite.deviceLead": "Scann das mit dem neuen Handy oder öffne den Link im neuen Browser. Angemeldet wird als {name}.",
   "invite.worksOnce": "Einmal gültig · läuft in 24 Std. ab",
+  "invite.noAccessToken": "Diese Einladung bringt das Cloudflare-Access-Token nicht mit: Nur Share auf deinem Handy kennt es. Damit es dabei ist, mach die Einladung auf dem Handy.",
   "invite.sendLink": "Lieber als Link schicken",
   "invite.copy": "Link kopieren",
   "invite.shareText": "{name}, mit dieser Einladung meldest du dich bei Share an. Sie gilt einmal, 24 Stunden lang: {link}",

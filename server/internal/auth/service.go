@@ -68,6 +68,21 @@ func AtHome(r *http.Request) bool {
 	return home || PlainHTTP(r)
 }
 
+type accessKey struct{}
+
+// WithCloudflareAccess marks a request that a trusted proxy passed on after Cloudflare Access
+// let it through: Cloudflare adds the header Cf-Access-Jwt-Assertion to each of those.
+func WithCloudflareAccess(r *http.Request) *http.Request {
+	return r.WithContext(context.WithValue(r.Context(), accessKey{}, true))
+}
+
+// CloudflareAccess reports whether a request came through Cloudflare Access (see
+// WithCloudflareAccess). Requests to the address at home skip Cloudflare, and say no.
+func CloudflareAccess(r *http.Request) bool {
+	access, _ := r.Context().Value(accessKey{}).(bool)
+	return access
+}
+
 const (
 	// DayPinLifetime is how long a 24-hour PIN works.
 	DayPinLifetime = 24 * time.Hour

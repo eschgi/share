@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/eschgi/share/server/internal/auth"
 	"github.com/eschgi/share/server/internal/db"
 	"github.com/eschgi/share/server/internal/e2ee"
 	"github.com/eschgi/share/server/internal/ids"
@@ -352,4 +353,46 @@ func TestIDsThatArentOne(t *testing.T) {
 	wantStatus(t, "a folder to move into", e.postJSON(nil, "/api/files/move", admin.token, map[string]any{"ids": []string{ids.New()}, "folder": notAnID}, nil), http.StatusNotFound, "not_found")
 	sealed := b64u.EncodeToString(make([]byte, e2ee.PrivateKeySize+e2ee.SealOverhead))
 	wantStatus(t, "a key for a phone", e.postJSON(nil, "/api/keys/grants", admin.token, map[string]any{"devices": []map[string]any{{"device": notAnID, "sealed": sealed}}}, nil), http.StatusBadRequest, "bad_request")
+}
+
+// An invite says whether its request came through Cloudflare Access, which the website tells the
+// admin: the service token is on the admins' phones only. Only a trusted proxy's word counts.
+func TestInviteSaysCloudflareAccess(t *testing.T) {
+	body := func(e *env) map[string]any {
+		return map[string]any{"name": "Oma Rosa", "role": "member", "folders": []string{e.firstFolder().ID}}
+	}
+	access := func(t *testing.T, name string, r response) bool {
+		t.Helper()
+		wantStatus(t, name, r, http.StatusCreated, "")
+		v, ok := r.json(t)["cloudflare_access"].(bool)
+		if !ok {
+			t.Fatalf("%s: no cloudflare_access in %s", name, r.body)
+		}
+		return v
+	}
+	jwt := "eyJhbGciOiJSUzI1NiIsImtpZCI6IjEifQ.eyJ0eXBlIjoiYXBwIn0.c2ln"
+
+	e := newEnvWith(t, `"proxy": "cloudflare"`)
+	tunnel := map[string]string{"CF-Connecting-IP": "203.0.113.9", "Cf-Visitor": `{"scheme":"https"}`}
+	first, _, err := e.app.Auth.CreateInvite(context.Background(), "Admin", db.RoleAdmin, "", "cli", nil, auth.InviteLifetime)
+	if err != nil {
+		t.Fatal(err)
+	}
+	accepted := e.postJSON(nil, "/api/invites/accept", "", map[string]string{"token": first, "device_name": "Stefan's phone"}, tunnel)
+	wantStatus(t, "the first admin", accepted, http.StatusOK, "")
+	admin := signedIn{token: accepted.json(t)["token"].(string)}
+	if access(t, "through the tunnel", e.postJSON(nil, "/api/invites", admin.token, body(e), tunnel)) {
+		t.Error("cloudflare_access without Cloudflare Access")
+	}
+	tunnel["Cf-Access-Jwt-Assertion"] = jwt
+	if !access(t, "through Cloudflare Access", e.postJSON(nil, "/api/invites", admin.token, body(e), tunnel)) {
+		t.Error("no cloudflare_access through Cloudflare Access")
+	}
+
+	// Without a proxy, the header is anybody's.
+	e = newEnv(t)
+	admin = e.admin()
+	if access(t, "straight to Share", e.postJSON(nil, "/api/invites", admin.token, body(e), map[string]string{"Cf-Access-Jwt-Assertion": jwt})) {
+		t.Error("cloudflare_access from a header nobody vouches for")
+	}
 }

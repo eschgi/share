@@ -507,6 +507,12 @@ export function InviteDialog({ forPerson, onClose }: { forPerson?: Person; onClo
           </div>
         </div>
       )}
+      {invite?.cloudflare_access && (
+        <div class="note invite-note">
+          <Icon name="shield" />
+          <p>{t('invite.noAccessToken')}</p>
+        </div>
+      )}
       {!invite && forPerson && busy && <span class="spinner" role="status" aria-label={t('common.loading')} />}
       {problem && (
         <p class="help err" role="alert">

@@ -563,6 +563,9 @@ type NewInvite struct {
 	Token  string     `json:"token"`
 	Link   string     `json:"link"`
 	Invite OpenInvite `json:"invite"`
+	// CloudflareAccess says that the request came through Cloudflare Access, whose service token
+	// only the admins' phones know: an invite made in a browser goes without it.
+	CloudflareAccess bool `json:"cloudflare_access"`
 }
 
 func (a *API) invite(w http.ResponseWriter, r *http.Request) {
@@ -635,7 +638,7 @@ func (a *API) newInvite(w http.ResponseWriter, r *http.Request, p *auth.Principa
 			return
 		}
 		invite := openInvite(in, in.Folders, folderIDs(live))
-		httpx.WriteJSON(w, http.StatusCreated, NewInvite{Token: token, Link: a.Cfg.PublicURL + "/join#" + token, Invite: invite})
+		httpx.WriteJSON(w, http.StatusCreated, NewInvite{Token: token, Link: a.Cfg.PublicURL + "/join#" + token, Invite: invite, CloudflareAccess: auth.CloudflareAccess(r)})
 	case errors.As(err, &input):
 		httpx.WriteError(w, http.StatusBadRequest, "bad_request", "The "+input.Field+" "+input.Problem+".")
 	case errors.Is(err, auth.ErrFolderGone):

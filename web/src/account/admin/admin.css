@@ -154,6 +154,21 @@
   margin-top: 14px;
   padding: 0 18px;
 }
+/* Through Cloudflare Access: the invite goes without the service token (screen 119). */
+.invite-note {
+  gap: 12px;
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--s2);
+}
+.invite-note p {
+  font-size: 13.5px;
+}
+.invite-note > .ic {
+  width: 20px;
+  height: 20px;
+}
 
 /* Upload PINs (screens 33 and 34). */
 .pgrid {

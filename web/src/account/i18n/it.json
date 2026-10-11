@@ -370,6 +370,7 @@
   "invite.scanThis": "Fai scansionare questo codice a {name} con la fotocamera, oppure manda il link da aprire nel browser.",
   "invite.deviceLead": "Scansiona questo codice con il nuovo telefono o apri il link nel nuovo browser. Accederà come {name}.",
   "invite.worksOnce": "Valido una volta · scade tra 24 ore",
+  "invite.noAccessToken": "Questo invito non porta il token di Cloudflare Access: lo conosce solo Share sul tuo telefono. Per includerlo, crea l'invito dal telefono.",
   "invite.sendLink": "Invia invece come link",
   "invite.copy": "Copia il link",
   "invite.shareText": "{name}, con questo invito accedi a Share. Vale una volta, per 24 ore: {link}",
