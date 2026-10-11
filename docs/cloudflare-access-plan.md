@@ -51,8 +51,10 @@ Asked by the user:
   change: an invite made on a computer can't bring the token, because neither the browser nor the
   server knows it, and the dialog says so (119). Decided with the user on 2026-10-11: the server
   doesn't keep the token, so invites with it come only from an admin's phone. The website shows
-  the line only if the server was told that Cloudflare Access is on; how it learns that is still
-  open, for example a flag the admin's app sets, without the token itself.
+  the line only when the request came through Cloudflare Access: Cloudflare adds the header
+  `Cf-Access-Jwt-Assertion` to every request it lets through, and the server believes it only
+  from the proxy in `proxy`, as it does the visitor's address. The server tells the dialog so
+  and stores nothing. On the local address at home, which skips Cloudflare, the line doesn't show.
 
 ## For whoever sets up Cloudflare
 
