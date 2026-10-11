@@ -190,3 +190,16 @@ func TestEnvSettings(t *testing.T) {
 		}
 	}
 }
+
+// The README lists every variable.
+func TestReadmeListsEveryVariable(t *testing.T) {
+	readme, err := os.ReadFile("../../../README.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range envSettings {
+		if row := "| `" + s.name + "` | `" + strings.Join(s.path, ".") + "` |"; !strings.Contains(string(readme), row) {
+			t.Errorf("README.md lacks the row %s", row)
+		}
+	}
+}

@@ -540,6 +540,41 @@ SHARE_PROXY=x-forwarded
   `config.json` does. The messages name the settings as `config.json` has them: `s3.bucket` is
   `SHARE_S3_BUCKET`.
 
+All of them, with the setting each one sets:
+
+| Variable | Setting |
+|----------|---------|
+| `SHARE_NAME` | `name` |
+| `SHARE_PUBLIC_URL` | `public_url` |
+| `SHARE_HOME_URL` | `home_url` |
+| `SHARE_HTTP_LISTEN` | `http.listen` |
+| `SHARE_HTTPS_LISTEN` | `https.listen` |
+| `SHARE_HTTPS_CERTIFICATE` | `https.certificate` |
+| `SHARE_PROXY` | `proxy` |
+| `SHARE_STORAGE_DIR` | `storage_dir` |
+| `SHARE_DATA_DIR` | `data_dir` |
+| `SHARE_DATABASE_POSTGRES` | `database.postgres` |
+| `SHARE_S3_ENDPOINT` | `s3.endpoint` |
+| `SHARE_S3_REGION` | `s3.region` |
+| `SHARE_S3_BUCKET` | `s3.bucket` |
+| `SHARE_S3_PREFIX` | `s3.prefix` |
+| `SHARE_S3_ACCESS_KEY_ID` | `s3.access_key_id` |
+| `SHARE_S3_SECRET_ACCESS_KEY` | `s3.secret_access_key` |
+| `SHARE_S3_PATH_STYLE` | `s3.path_style` |
+| `SHARE_TIME_ZONE` | `time_zone` |
+| `SHARE_LANGUAGES` | `languages` |
+| `SHARE_DEFAULT_LANGUAGE` | `default_language` |
+| `SHARE_UPLOAD_CHUNK_SIZE_MIB` | `upload.chunk_size_mib` |
+| `SHARE_UPLOAD_MAX_FILE_SIZE_GIB` | `upload.max_file_size_gib` |
+| `SHARE_UPLOAD_MIN_FREE_SPACE_MIB` | `upload.min_free_space_mib` |
+| `SHARE_UPLOAD_INCOMPLETE_TTL_HOURS` | `upload.incomplete_ttl_hours` |
+| `SHARE_TRASH_DAYS` | `trash_days` |
+| `SHARE_APP_APK_FILE` | `app.apk_file` |
+| `SHARE_APP_PLAY_STORE_URL` | `app.play_store_url` |
+| `SHARE_APP_ANDROID_PACKAGE` | `app.android_package` |
+| `SHARE_APP_LINK_SCHEME` | `app.link_scheme` |
+| `PORT` | `http.listen`, as `:PORT`, when nothing else names it |
+
 For the app, two settings matter:
 
 - `home_url`: with the server at home, the address the app uses whenever the phone reaches it
