@@ -514,6 +514,32 @@ The ports:
 
 The guides in [`deploy/`](deploy/) show each setup, with the settings it needs.
 
+### Environment variables
+
+Each setting can also come from an environment variable, for platforms where a file is awkward,
+such as Vercel: `SHARE_` and the setting's path in capitals, with `_` between the levels.
+
+```sh
+SHARE_PUBLIC_URL=https://share.example.com
+SHARE_DATABASE_POSTGRES=postgres://share:PASSWORD@db.example.com/share?sslmode=require
+SHARE_S3_BUCKET=family-share
+SHARE_UPLOAD_CHUNK_SIZE_MIB=10
+SHARE_LANGUAGES=en,de
+SHARE_PROXY=x-forwarded
+```
+
+- A variable wins over `config.json`, which wins over the defaults. Without `config.json`, the
+  variables alone are the settings; every command takes them, `share check` and `share invite`
+  too.
+- Numbers, `true` and `false` as in JSON, lists as words between commas (or a JSON list), and
+  `proxy` and `https.certificate` as a word or the JSON `config.json` takes:
+  `SHARE_PROXY={"headers": "x-forwarded", "trusted_proxies": ["192.168.1.30"]}`.
+- `PORT`, which platforms such as Vercel and Cloud Run set, is the http port when neither
+  `config.json` nor `SHARE_HTTP_LISTEN` names one.
+- An unknown `SHARE_` variable stops the server with its name, as a misspelled field in
+  `config.json` does. The messages name the settings as `config.json` has them: `s3.bucket` is
+  `SHARE_S3_BUCKET`.
+
 For the app, two settings matter:
 
 - `home_url`: with the server at home, the address the app uses whenever the phone reaches it
@@ -633,7 +659,8 @@ and `key=value` strings aren't taken.
   name ending in `.local`, `.home.arpa` or `.internal`, or a name without a dot, such as the Docker
   setups' `db`. Any other name needs one of those three, also one that only the router at home
   knows, such as `nas.lan`.
-- Share makes its tables and brings them up to date when it starts. It waits while the database
+- Share makes its tables and brings them up to date when it starts; servers that start together on
+  one database take turns. It waits while the database
   doesn't answer, as a sleeping Neon database does for a moment, and stops at once when the
   database refuses it: a wrong password, a database or user that isn't there, an encoding other
   than UTF8, or a PostgreSQL older than 18.
@@ -653,7 +680,7 @@ and `key=value` strings aren't taken.
 | `contract/` | JSON fixtures the server, website and app tests share: PIN rules, error codes, API responses, the website's paths (`web_routes.json`), the encryption's test vectors (`crypto/`), and what the app's Dart and Kotlin hand each other (`app/platform.json`) |
 | `deploy/` | Hosting guides: a Cloudflare Tunnel, a reverse proxy (Caddy, nginx, Traefik), Docker, Google Cloud Run, a systemd service |
 | `Dockerfile` | The Docker image: the website and the server, built for amd64 and arm64 |
-| `scripts/` | `build-linux` and `build-windows`, each as `.sh` and `.ps1`: the website, then the server for arm64 and amd64; `version.sh` for the version (`version.ps1` only prints it) |
+| `scripts/` | `build-linux` and `build-windows`, each as `.sh` and `.ps1`: the website, then the server for arm64 and amd64; `build-vercel.sh`, Vercel's build (`server/vercel.json`); `version.sh` for the version (`version.ps1` only prints it) |
 | `docs/` | The plans (`share-plan.md`, `s3-plan.md`, `e2ee-plan.md`) and proposals, the screen mockups and the screenshots above |
 | `VERSION`, `config.example.json`, `NOTICE` | The version, an example `config.json`, and the licenses of the fonts and icons |
 | `.github/workflows/ci.yml` | CI: the tests, the builds, the signed APK and the releases |
