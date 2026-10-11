@@ -82,6 +82,11 @@ export function Viewer({ files, id, more, onMove, onClose, onDelete, folderOf }:
 
   const day = formatDay(file.day, new Date(), lang, t('day.today'), t('day.yesterday'));
   const time = formatTime(new Date(file.uploaded_at), lang);
+  // When it was taken, if its sender knew, for whatever the library is sorted by (screen 123).
+  const taken =
+    file.taken_at && file.taken_day
+      ? `${formatDay(file.taken_day, new Date(), lang, t('day.today'), t('day.yesterday'))}, ${formatTime(new Date(file.taken_at), lang)}`
+      : null;
   const size = [
     formatBytes(file.size, lang),
     file.width && file.height ? `${file.width} × ${file.height}` : '',
@@ -105,11 +110,15 @@ export function Viewer({ files, id, more, onMove, onClose, onDelete, folderOf }:
   const folder = folderOf?.(file);
   const facts = (
     <>
+      {taken && (
+        <div class="vrow">
+          <Icon name="camera" />
+          <b>{t('viewer.taken', { when: taken })}</b>
+        </div>
+      )}
       <div class="vrow">
         <Icon name="clock" />
-        <b>
-          {day}, {time}
-        </b>
+        <b>{taken ? t('viewer.received', { when: `${day}, ${time}` }) : `${day}, ${time}`}</b>
       </div>
       <div class="vrow">
         <Icon name="user" />

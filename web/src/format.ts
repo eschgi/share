@@ -141,6 +141,15 @@ function writtenDay(d: Date, lang: Lang, month: 'short' | 'long', withYear: bool
   return text.charAt(0).toLocaleUpperCase(lang) + text.slice(1);
 }
 
+/** A day in few letters, with the year only when it isn't this one: "27 Sep", "27. Sept.",
+ * "27 set", "14 Jun 2025". */
+export function formatShortDay(day: string, now: Date, lang: Lang): string {
+  const d = dayDate(day);
+  if (Number.isNaN(d.getTime())) return day;
+  const year = d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined;
+  return new Intl.DateTimeFormat(lang, { day: 'numeric', month: 'short', year }).format(d);
+}
+
 /** A day as the API and date fields write it, 2026-10-10, here. */
 export function dayOf(when: Date): string {
   const two = (n: number) => String(n).padStart(2, '0');

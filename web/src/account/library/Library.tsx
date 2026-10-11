@@ -11,12 +11,12 @@ import {
   type FileInfo,
   type FileKind,
   type FolderInfo,
-  type LibraryDay,
+  type LibraryGroup,
   type LibraryFilter,
 } from '../../api';
 import { Icon } from '../../components/Icon';
 import { useMedia } from '../../device';
-import { formatBytes, formatDay } from '../../format';
+import { formatBytes, formatDay, formatShortDay } from '../../format';
 import { useI18n } from '../../i18n';
 import { useOverlay } from '../../router';
 import { Avatar, Link } from '../components/Bits';
@@ -48,7 +48,8 @@ import {
   startDownload,
   zipLimit,
 } from './actions';
-import { LibraryModel, sameFilter } from './model';
+import { LibraryModel, sameFilter, type GroupSection } from './model';
+import { SortMenu, storedSort, type SortChoice } from './SortMenu';
 import {
   commonFolder,
   dayCount,
@@ -56,7 +57,7 @@ import {
   isEmpty,
   isSelected,
   loadedSelected,
-  noSelection,
+  emptySelection,
   selectAll,
   selectedIds,
   setDay,
@@ -95,10 +96,13 @@ export function Library() {
       if (f.folder && e instanceof ApiError && e.status === 404) folderGone(f.folder);
       throw e;
     };
-    return new LibraryModel({
-      overview: (f) => getLibrary(f).catch(gone(f)),
-      page: (f, cursor, limit) => getFiles(f, cursor, limit).catch(gone(f)),
-    });
+    return new LibraryModel(
+      {
+        overview: (f) => getLibrary(f).catch(gone(f)),
+        page: (f, cursor, limit) => getFiles(f, cursor, limit).catch(gone(f)),
+      },
+      { folder: null, kind: null, q: '', ...storedSort() },
+    );
   }, []);
   const [, redraw] = useState(0);
   const [picking, setPicking] = useState(false);
@@ -107,7 +111,7 @@ export function Library() {
   const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
   const [viewing, setViewing] = useState<string | null>(null);
-  const [sel, setSel] = useState<Selection>(noSelection);
+  const [sel, setSel] = useState<Selection>(() => emptySelection(model.filter.sort));
   const [anchor, setAnchor] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState<Deleting | null>(null);
@@ -122,7 +126,8 @@ export function Library() {
   const end = useRef<HTMLDivElement>(null);
   const suppressClick = useRef(0);
 
-  const days: LibraryDay[] = model.overview?.days ?? [];
+  const days: LibraryGroup[] = model.overview?.groups ?? [];
+  const sort = model.filter.sort ?? 'received';
   const selecting = !isEmpty(sel);
   const picked = totals(sel, days);
   // What the listeners below need of the latest render.
@@ -130,7 +135,7 @@ export function Library() {
   live.current = { sel, files: model.files, days, selecting, admin };
 
   const clear = () => {
-    setSel(noSelection);
+    setSel(emptySelection(model.filter.sort));
     setAnchor(null);
   };
   // A selection takes a step in the history, so Back ends it, as on a phone.
@@ -169,9 +174,10 @@ export function Library() {
 
   const changeFilter = (f: LibraryFilter) => {
     if (sameFilter(f, model.filter)) return;
+    void model.setFilter(f); // first, so that the cleared selection groups as the new sort does
     clear();
-    void model.setFilter(f);
   };
+  const changeSort = (c: SortChoice) => changeFilter({ ...model.filter, ...c, q: query });
   // Typing searches after a short pause.
   useEffect(() => {
     const id = setTimeout(() => changeFilter({ ...model.filter, q: query }), 350);
@@ -290,7 +296,7 @@ export function Library() {
       if ((e.target as Element).closest('input, textarea, select')) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a' && days.length > 0) {
         e.preventDefault();
-        setSel(selectAll(days));
+        setSel(selectAll(days, sort));
       } else if ((e.key === 'Delete' || e.key === 'Backspace') && selecting && admin) {
         e.preventDefault();
         askDelete();
@@ -551,6 +557,18 @@ export function Library() {
 
   const now = new Date();
   const sections = model.sections;
+  /** A group's title: its day, or who sent its files. */
+  const groupTitle = (s: GroupSection) =>
+    sort !== 'sender' ? formatDay(s.key, now, lang, t('day.today'), t('day.yesterday')) : (s.from ?? t(s.key === 'pin' ? 'sort.guests' : 'sort.gone'));
+  /** When a group's newest file came: for the people, and for a day taken that isn't the day it came. */
+  const groupNote = (s: GroupSection) => {
+    if (sort === 'received' || (sort === 'taken' && s.lastDay === s.key)) return '';
+    const kind = sort === 'sender' ? 'last' : 'sent';
+    const ago = Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() - new Date(s.lastDay + 'T00:00').getTime()) / 86_400_000);
+    if (ago === 0) return t(`sort.${kind}Today`);
+    if (ago === 1) return t(`sort.${kind}Yesterday`);
+    return t(`sort.${kind}On`, { day: formatShortDay(s.lastDay, now, lang) });
+  };
   const empty = model.files.length === 0 && !model.loading;
   const filtered = model.filter.kind !== null || model.filter.q.trim() !== '';
   const size = formatBytes(picked.bytes, lang);
@@ -573,7 +591,7 @@ export function Library() {
             <Icon name="x" />
           </button>
           <h1>{tn('select.count', picked.count)}</h1>
-          <button type="button" class="tbtn" onClick={() => setSel(selectAll(days))}>
+          <button type="button" class="tbtn" onClick={() => setSel(selectAll(days, sort))}>
             {t('select.all')}
           </button>
         </header>
@@ -603,6 +621,7 @@ export function Library() {
               <FolderTitle shown={folders.shown} onOpen={() => setPicking(true)} />
             </div>
           )}
+          <div class="lfilters">
           <div class="chips">
             {kinds.map((k) => (
               <button
@@ -616,6 +635,8 @@ export function Library() {
               </button>
             ))}
           </div>
+          <SortMenu value={{ sort, order: model.filter.order ?? 'newest' }} onChange={changeSort} />
+          </div>
           {selecting && (
             <p class="tipbar">
               <Icon name="info" />
@@ -624,19 +645,20 @@ export function Library() {
           )}
           <KeysBanner />
           {sections.map((s) => {
-            const day: LibraryDay = { day: s.day, count: s.count, bytes: s.bytes };
+            const day = { key: s.key, count: s.count, bytes: s.bytes };
             const state = dayState(sel, day);
             const first = offset;
             offset += s.files.length;
             return (
-              <section class="lday" key={s.day}>
-                <header class="dayh">
+              <section class="lday" key={s.key}>
+                <header class={`dayh${sort === 'sender' ? ' who' : ''}`}>
+                  {sort === 'sender' && <Avatar id={s.key} name={s.from ?? '?'} pending={s.from === null} />}
                   <div>
-                    <h2>{formatDay(s.day, now, lang, t('day.today'), t('day.yesterday'))}</h2>
+                    <h2>{groupTitle(s)}</h2>
                     <p>
                       {state === 'some'
                         ? t('day.selected', { selected: dayCount(sel, day), count: s.count })
-                        : tn('library.dayMeta', s.count, { size: formatBytes(s.bytes, lang) })}
+                        : [tn('library.dayMeta', s.count, { size: formatBytes(s.bytes, lang) }), groupNote(s)].filter(Boolean).join(' · ')}
                     </p>
                   </div>
                   <button
@@ -644,7 +666,7 @@ export function Library() {
                     class={`dsel ${state}`}
                     aria-label={t('select.day')}
                     aria-pressed={state === 'all' ? 'true' : state === 'some' ? 'mixed' : 'false'}
-                    onClick={() => setSel(setDay(sel, s.day, state !== 'all'))}
+                    onClick={() => setSel(setDay(sel, s.key, state !== 'all'))}
                   >
                     {state === 'all' && <Icon name="check" />}
                     {state === 'some' && <Icon name="minus" />}
@@ -701,7 +723,7 @@ export function Library() {
           </button>
           <b class="sel-wide">{tn('select.count', picked.count)}</b>
           <span class="sel-size sel-wide">{size}</span>
-          <button type="button" class="tbtn sel-wide" onClick={() => setSel(selectAll(days))}>
+          <button type="button" class="tbtn sel-wide" onClick={() => setSel(selectAll(days, sort))}>
             {t('select.all')}
           </button>
           <span class="gap sel-wide" />

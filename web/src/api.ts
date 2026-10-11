@@ -269,7 +269,8 @@ export const getAbout = () => request<{ version: string }>('GET', '/api/about');
 
 export const signOutDevice = (id: string) => request<void>('DELETE', `/api/devices/${encodeURIComponent(id)}`);
 
-// The library: everything that was sent, by upload day, newest first.
+// The library: everything that was sent, in groups: by the day it arrived or was taken, or by
+// who sent it (docs/sort-plan.md).
 
 export type FileKind = 'photo' | 'video' | 'document';
 
@@ -284,6 +285,10 @@ export interface FileInfo {
   /** The upload day, in the server's time zone: 2026-09-27. */
   day: string;
   uploaded_at: string;
+  /** When the photo or video was taken, as its sender read it from the file; null when unknown,
+   * and always for an encrypted file. taken_day is that day in the server's time zone. */
+  taken_at: string | null;
+  taken_day: string | null;
   /** Changes with the thumbnail. */
   updated_at: string;
   width: number | null;
@@ -292,6 +297,8 @@ export interface FileInfo {
   has_thumb: boolean;
   /** Who sent it, if they have an account; null for a PIN. */
   from: string | null;
+  /** Their id, which the library's sender groups are keyed by. */
+  from_id: string | null;
   /** How it is encrypted (docs/e2ee-plan.md); null for a plain file. size is the plain size. */
   enc: FileEnc | null;
 }
@@ -304,16 +311,32 @@ export interface FileEnc {
   header: string;
 }
 
-export interface LibraryDay {
-  day: string;
+/** How the library is sorted: by the day files arrived, the day they were taken, or who sent them. */
+export type LibrarySort = 'received' | 'taken' | 'sender';
+export type LibraryOrder = 'newest' | 'oldest';
+
+/** One group of the library: a day, or a sender ("pin" for PIN guests). */
+export interface LibraryGroup {
+  key: string;
   count: number;
   bytes: number;
+  /** The day its newest file arrived. */
+  last_day: string;
+  /** A sender's name; null for days, PIN guests and someone no longer here. */
+  from: string | null;
 }
 
-/** The days that have files; version grows with every change to the library. */
+/** The groups that have files, in order; version grows with every change to the library. */
 export interface LibraryOverview {
   version: number;
-  days: LibraryDay[];
+  groups: LibraryGroup[];
+}
+
+/** The group a file is in, in the library's sort, as the server keys it. */
+export function groupOf(f: FileInfo, sort: LibrarySort = 'received'): string {
+  if (sort === 'sender') return f.from_id ?? 'pin';
+  if (sort === 'taken') return f.taken_day ?? f.day;
+  return f.day;
 }
 
 export interface FilePage {
@@ -321,11 +344,14 @@ export interface FilePage {
   next_cursor: string | null;
 }
 
-/** What the library shows: one folder or all, one kind or all, and part of a file name. */
+/** What the library shows: one folder or all, one kind or all, and part of a file name; and how
+ * it is sorted, by the day files arrived and newest first unless said. */
 export interface LibraryFilter {
   folder: string | null;
   kind: FileKind | null;
   q: string;
+  sort?: LibrarySort;
+  order?: LibraryOrder;
 }
 
 function libraryQuery(f: LibraryFilter, extra: Record<string, string | undefined> = {}): string {
@@ -333,6 +359,8 @@ function libraryQuery(f: LibraryFilter, extra: Record<string, string | undefined
   if (f.folder) p.set('folder', f.folder);
   if (f.kind) p.set('kind', f.kind);
   if (f.q.trim()) p.set('q', f.q.trim());
+  if (f.sort && f.sort !== 'received') p.set('sort', f.sort);
+  if (f.order === 'oldest') p.set('order', 'oldest');
   for (const [k, v] of Object.entries(extra)) if (v !== undefined) p.set(k, v);
   const s = p.toString();
   return s ? '?' + s : '';
@@ -356,8 +384,8 @@ export const getFile = (id: string) => request<FileInfo>('GET', `/api/files/${en
 
 /** Every file of a day that the filter shows, for selecting the day as a whole; without a day,
  * of every day. */
-export const getFileIds = (f: LibraryFilter, day?: string) =>
-  request<{ ids: string[]; bytes: number }>('GET', '/api/files/ids' + libraryQuery(f, { day }));
+export const getFileIds = (f: LibraryFilter, group?: string) =>
+  request<{ ids: string[]; bytes: number }>('GET', '/api/files/ids' + libraryQuery(f, { group }));
 
 /** A folder of the library: what it holds and how many see it. */
 export interface FolderInfo {

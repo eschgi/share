@@ -34,6 +34,106 @@
   outline: 2px solid var(--accent-text);
   outline-offset: 2px;
 }
+/* The kinds, and the sort next to them (screen 125). */
+.lfilters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.lfilters .chips {
+  flex: 1;
+  min-width: 0;
+  margin-right: 0;
+}
+.sortbox {
+  position: relative;
+  flex: none;
+}
+.sortsel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: none;
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 500;
+}
+.sortsel .ic {
+  width: 16px;
+  height: 16px;
+}
+.sortmenu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 20;
+  width: min(300px, calc(100vw - 32px));
+  padding: 6px;
+  border: 1px solid var(--line-soft);
+  border-radius: 16px;
+  background: var(--s2);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+}
+.sortmenu hr {
+  height: 1px;
+  margin: 4px 8px;
+  border: 0;
+  background: var(--line-soft);
+}
+.srow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--text);
+  text-align: left;
+}
+.srow.on {
+  background: var(--accent-soft);
+}
+.srow .rt b {
+  display: block;
+  font-size: 14.5px;
+  font-weight: 600;
+}
+.srow.on .rt b {
+  color: var(--accent-text);
+}
+.srow .rt span {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+.srow .rad {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--text-3);
+  border-radius: 50%;
+}
+.srow .rad.on {
+  border-color: var(--accent-text);
+  background: radial-gradient(var(--accent-text) 0 4px, transparent 4.5px);
+}
+@media (max-width: 480px) {
+  .sortname {
+    display: none;
+  }
+}
+/* By who sent it (screen 122): the person before the group's name. */
+.dayh.who .av {
+  width: 40px;
+  height: 40px;
+}
 /* Days far out of view aren't drawn until they come near. */
 .lday {
   content-visibility: auto;

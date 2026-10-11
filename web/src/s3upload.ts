@@ -244,6 +244,8 @@ export default class S3Upload<M extends Meta, B extends Body> extends BasePlugin
             name: file.name,
             size,
             last_modified_ms: lastModified,
+            // Read before the upload (taken.ts); never there for a file into an encrypted folder.
+            taken_at_ms: seal ? undefined : Number(file.meta.takenAt) || undefined,
             folder,
             enc: seal ? encOf(seal) : undefined,
           });

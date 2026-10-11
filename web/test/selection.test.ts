@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { FileInfo, LibraryDay } from '../src/api';
+import type { FileInfo } from '../src/api';
 import {
+  type GroupTotals,
   commonFolder,
   dayCount,
   dayState,
@@ -15,11 +16,11 @@ import {
   totals,
 } from '../src/account/library/selection';
 
-const f = (id: string, day: string, size = 10) => ({ id, day, size }) as FileInfo;
+const f = (id: string, day: string, size = 10) => ({ id, day, size, taken_day: null, from_id: null }) as FileInfo;
 // Today has 3 files, of which 2 are loaded; yesterday has 2.
-const days: LibraryDay[] = [
-  { day: 'today', count: 3, bytes: 300 },
-  { day: 'yesterday', count: 2, bytes: 25 },
+const days: GroupTotals[] = [
+  { key: 'today', count: 3, bytes: 300 },
+  { key: 'yesterday', count: 2, bytes: 25 },
 ];
 const a = f('a', 'today', 100);
 const b = f('b', 'today', 120);

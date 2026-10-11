@@ -145,7 +145,7 @@ export function See({ name, onEnded }: { name: string; onEnded: () => void }) {
   }
 
   const now = new Date();
-  const days = model.overview?.days ?? [];
+  const days = model.overview?.groups ?? [];
   const total = days.reduce((s, d) => s + d.bytes, 0);
   let offset = 0;
   return (
@@ -197,10 +197,10 @@ export function See({ name, onEnded }: { name: string; onEnded: () => void }) {
           const first = offset;
           offset += s.files.length;
           return (
-            <section class="lday" key={s.day}>
+            <section class="lday" key={s.key}>
               <header class="dayh">
                 <div>
-                  <h2>{formatDay(s.day, now, lang, t('day.today'), t('day.yesterday'))}</h2>
+                  <h2>{formatDay(s.key, now, lang, t('day.today'), t('day.yesterday'))}</h2>
                   <p>{tn('library.dayMeta', s.count, { size: formatBytes(s.bytes, lang) })}</p>
                 </div>
               </header>
@@ -229,7 +229,7 @@ export function See({ name, onEnded }: { name: string; onEnded: () => void }) {
         <SaveChoice
           count={choosing.ids.length}
           bytes={choosing.bytes}
-          zipName={s3 ? null : guestZipName(name, days.map((d) => d.day), now)}
+          zipName={s3 ? null : guestZipName(name, days.map((d) => d.key), now)}
           onOther={() => (s3 ? each(choosing.ids) : void zip(choosing.ids))}
           onFolder={(dir) => void intoFolder(choosing.ids, dir)}
           onClose={() => setChoosing(null)}

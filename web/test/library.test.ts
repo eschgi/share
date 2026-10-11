@@ -12,12 +12,15 @@ function file(id: string, day: string, size = 100): FileInfo {
     kind: 'photo',
     day,
     uploaded_at: `${day}T10:00:00Z`,
+    taken_at: null,
+    taken_day: null,
     updated_at: `${day}T10:00:00Z`,
     width: null,
     height: null,
     duration_ms: null,
     has_thumb: true,
     from: null,
+    from_id: null,
     enc: null,
   };
 }
@@ -50,7 +53,7 @@ const settle = () => new Promise((r) => setTimeout(r, 0));
 
 const overview = (version: number, days: [string, number, number][]): LibraryOverview => ({
   version,
-  days: days.map(([day, count, bytes]) => ({ day, count, bytes })),
+  groups: days.map(([key, count, bytes]) => ({ key, count, bytes, last_day: key, from: null })),
 });
 
 describe('LibraryModel', () => {
@@ -69,7 +72,7 @@ describe('LibraryModel', () => {
     expect(m.complete).toBe(true);
     expect(m.files.map((f) => f.id)).toEqual(['a', 'b', 'c', 'd']);
     // The days' totals are the server's, also while not every file of a day is loaded.
-    expect(m.sections.map((s) => [s.day, s.files.length, s.count, s.bytes])).toEqual([
+    expect(m.sections.map((s) => [s.key, s.files.length, s.count, s.bytes])).toEqual([
       ['2026-10-02', 3, 3, 900],
       ['2026-10-01', 1, 1, 100],
     ]);
@@ -195,6 +198,72 @@ describe('LibraryModel.remove', () => {
     await server.answer({ files: [file('a', '2026-10-02', 100), file('b', '2026-10-02', 200), file('c', '2026-10-01', 100)], next_cursor: null });
     m.remove(['b', 'c']);
     expect(m.files.map((f) => f.id)).toEqual(['a']);
-    expect(m.overview?.days).toEqual([{ day: '2026-10-02', count: 1, bytes: 100 }]);
+    expect(m.overview?.groups).toEqual([{ key: '2026-10-02', count: 1, bytes: 100, last_day: '2026-10-02', from: null }]);
+  });
+});
+
+describe('sorted otherwise', () => {
+  it('groups by the day taken, else the day it came, and by sender, as the server keys them', async () => {
+    const server = new FakeServer();
+    const m = new LibraryModel(server.requests, { folder: null, kind: null, q: '', sort: 'taken' });
+    void m.reload();
+    await server.answer({
+      version: 1,
+      groups: [
+        { key: '2026-10-02', count: 1, bytes: 100, last_day: '2026-10-02', from: null },
+        { key: '2025-06-14', count: 1, bytes: 100, last_day: '2026-10-02', from: null },
+      ],
+    });
+    const old = { ...file('a', '2026-10-02'), taken_at: '2025-06-14T16:32:00Z', taken_day: '2025-06-14' };
+    await server.answer({ files: [file('doc', '2026-10-02'), old], next_cursor: null });
+    expect(m.sections.map((s) => [s.key, s.files.map((f) => f.id), s.lastDay])).toEqual([
+      ['2026-10-02', ['doc'], '2026-10-02'],
+      ['2025-06-14', ['a'], '2026-10-02'],
+    ]);
+
+    void m.setFilter({ ...m.filter, sort: 'sender' });
+    await server.answer({
+      version: 1,
+      groups: [
+        { key: 'u1', count: 1, bytes: 100, last_day: '2026-10-02', from: 'Maria' },
+        { key: 'pin', count: 1, bytes: 100, last_day: '2026-10-01', from: null },
+      ],
+    });
+    await server.answer({ files: [{ ...file('m', '2026-10-02'), from: 'Maria', from_id: 'u1' }, file('g', '2026-10-01')], next_cursor: null });
+    expect(m.sections.map((s) => [s.key, s.from, s.files.length])).toEqual([
+      ['u1', 'Maria', 1],
+      ['pin', null, 1],
+    ]);
+  });
+
+  it('starts over when the library changes, since new files may belong anywhere', async () => {
+    const server = new FakeServer();
+    const m = new LibraryModel(server.requests, { folder: null, kind: null, q: '', order: 'oldest' });
+    void m.reload();
+    await server.answer(overview(1, [['2026-10-01', 1, 100]]));
+    await server.answer({ files: [file('a', '2026-10-01')], next_cursor: null });
+    void m.refreshIfChanged();
+    await server.answer(overview(2, [['2026-10-01', 1, 100], ['2026-10-02', 1, 100]]));
+    expect(server.calls[0]).toMatchObject({ what: 'overview' }); // the list starts over
+    expect(m.files).toEqual([]);
+  });
+
+  it('a different sort or order is a different list', async () => {
+    const { sameFilter } = await import('../src/account/library/model');
+    const base: LibraryFilter = { folder: null, kind: null, q: '' };
+    expect(sameFilter(base, { ...base, sort: 'received', order: 'newest' })).toBe(true);
+    expect(sameFilter(base, { ...base, sort: 'taken' })).toBe(false);
+    expect(sameFilter(base, { ...base, order: 'oldest' })).toBe(false);
+  });
+
+  it('each browser remembers its choice', async () => {
+    const { storedSort } = await import('../src/account/library/SortMenu');
+    const store = new Map<string, string>();
+    globalThis.localStorage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v) } as Storage;
+    expect(storedSort()).toEqual({ sort: 'received', order: 'newest' });
+    store.set('share.librarySort', JSON.stringify({ sort: 'taken', order: 'oldest' }));
+    expect(storedSort()).toEqual({ sort: 'taken', order: 'oldest' });
+    store.set('share.librarySort', '{"sort": "size"}');
+    expect(storedSort()).toEqual({ sort: 'received', order: 'newest' });
   });
 });
