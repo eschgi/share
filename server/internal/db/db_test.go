@@ -61,27 +61,6 @@ func TestMigrateIsIdempotentAndRefusesNewerDatabases(t *testing.T) {
 	}
 }
 
-// Servers that start together on a new database, as on Vercel, take turns migrating it.
-func TestMigrateTogether(t *testing.T) {
-	url := pgtest.URL(t)
-	errs := make(chan error, 3)
-	for range 3 {
-		go func() {
-			d, err := Open(context.Background(), url)
-			if err == nil {
-				err = d.Migrate(context.Background())
-				d.Close()
-			}
-			errs <- err
-		}()
-	}
-	for range 3 {
-		if err := <-errs; err != nil {
-			t.Error(err)
-		}
-	}
-}
-
 // A server Share can't use says why, and the server doesn't wait for that to change.
 func TestUsable(t *testing.T) {
 	for _, tc := range []struct {

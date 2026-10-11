@@ -1,5 +1,4 @@
-// Package config loads and checks config.json, and the environment variables that can stand
-// in for it.
+// Package config loads and checks config.json.
 package config
 
 import (
@@ -8,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"net"
 	"net/netip"
 	"net/url"
@@ -232,35 +230,13 @@ func (c *Config) IncompleteTTL() time.Duration {
 	return time.Duration(c.Upload.IncompleteTTLHours) * time.Hour
 }
 
-// Load reads, completes and checks the configuration at path, with the environment's SHARE_
-// variables over it (fromEnv). Without the file, the variables alone are the configuration.
-// The errors name where the configuration came from.
+// Load reads, completes and checks the configuration at path.
 func Load(path string) (*Config, error) {
-	return load(path, os.Environ())
-}
-
-func load(path string, environ []string) (*Config, error) {
 	data, err := os.ReadFile(path)
-	source := path
-	if errors.Is(err, fs.ErrNotExist) && envUsed(environ) {
-		data, err, source = []byte("{}"), nil, "the environment"
-	}
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil, fmt.Errorf("%w; or give the settings as SHARE_ environment variables", err)
-	} else if err != nil {
+	if err != nil {
 		return nil, err
 	}
-	data, used, err := fromEnv(data, environ)
-	if err == nil {
-		var cfg *Config
-		if cfg, err = Parse(data); err == nil {
-			return cfg, nil
-		}
-	}
-	if used && source == path {
-		source += " and the environment"
-	}
-	return nil, fmt.Errorf("%s: %w", source, err)
+	return Parse(data)
 }
 
 // Parse decodes config.json content on top of Default and checks it. Unknown fields are

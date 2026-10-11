@@ -46,8 +46,7 @@ A self-hosted place where family and friends drop photos, videos and documents.
 
 The server is one Go program with the website embedded in it, and keeps its records in PostgreSQL
 18 or newer. It runs on Linux and Windows: on a small computer at home such as a Raspberry Pi or a
-NAS, on a VPS, in Docker, or on Google Cloud Run or Vercel. [Hosting](#hosting) shows the ways to
-reach it.
+NAS, on a VPS, in Docker, or on Google Cloud Run. [Hosting](#hosting) shows the ways to reach it.
 
 ## Screenshots
 
@@ -388,7 +387,6 @@ setups run Share and its database together. How visitors reach it decides the re
 | A VPS or another server with a public address, also next to other apps under other names | A reverse proxy that makes the certificates: Caddy, nginx or Traefik | [`deploy/reverse-proxy`](deploy/reverse-proxy/README.md) |
 | A server with a public address, without a proxy | Share's own HTTPS, with a certificate from files | [below](#https-without-a-proxy) |
 | Google Cloud Run, which runs Share only while someone visits, with the files in a bucket and the records in PostgreSQL | Its own address, or your domain | [`deploy/cloud-run`](deploy/cloud-run/README.md) |
-| Vercel, the same way, built from your copy of this repository and set up with environment variables | Its own address, or your domain | [`deploy/vercel`](deploy/vercel/README.md) |
 
 The release files and the image `ghcr.io/eschgi/share` come with the first release, 0.1.0; until
 it is out, build them as in [Development](#development).
@@ -516,32 +514,6 @@ The ports:
 
 The guides in [`deploy/`](deploy/) show each setup, with the settings it needs.
 
-### Environment variables
-
-Each setting can also come from an environment variable, for platforms where a file is awkward,
-such as Vercel: `SHARE_` and the setting's path in capitals, with `_` between the levels.
-
-```sh
-SHARE_PUBLIC_URL=https://share.example.com
-SHARE_DATABASE_POSTGRES=postgres://share:PASSWORD@db.example.com/share?sslmode=require
-SHARE_S3_BUCKET=family-share
-SHARE_UPLOAD_CHUNK_SIZE_MIB=10
-SHARE_LANGUAGES=en,de
-SHARE_PROXY=x-forwarded
-```
-
-- A variable wins over `config.json`, which wins over the defaults. Without `config.json`, the
-  variables alone are the settings; every command takes them, `share check` and `share invite`
-  too.
-- Numbers, `true` and `false` as in JSON, lists as words between commas (or a JSON list), and
-  `proxy` and `https.certificate` as a word or the JSON `config.json` takes:
-  `SHARE_PROXY={"headers": "x-forwarded", "trusted_proxies": ["192.168.1.30"]}`.
-- `PORT`, which platforms such as Vercel and Cloud Run set, is the http port when neither
-  `config.json` nor `SHARE_HTTP_LISTEN` names one.
-- An unknown `SHARE_` variable stops the server with its name, as a misspelled field in
-  `config.json` does. The messages name the settings as `config.json` has them: `s3.bucket` is
-  `SHARE_S3_BUCKET`.
-
 For the app, two settings matter:
 
 - `home_url`: with the server at home, the address the app uses whenever the phone reaches it
@@ -667,9 +639,7 @@ and `key=value` strings aren't taken.
   than UTF8, or a PostgreSQL older than 18.
 - With the files in a bucket, nothing stays on the machine: `data_dir` can be left out, unless
   the https port uses Share's own certificate, which lives there. That is how Share runs on
-  [Google Cloud Run](deploy/cloud-run/README.md) and [Vercel](deploy/vercel/README.md).
-- Servers that start together on one database, as several copies on Vercel may, take turns
-  bringing it up to date.
+  [Google Cloud Run](deploy/cloud-run/README.md).
 - `share check` says whether the database answers. Back it up with `pg_dump` (in the Docker
   setups `docker compose exec db pg_dump -U share share > share.sql`), or the way its host offers.
 
@@ -681,9 +651,9 @@ and `key=value` strings aren't taken.
 | `web/` | The website: Vite, TypeScript, Preact and Uppy |
 | `app/` | The Android app: Flutter, with Kotlin for transfers, the local address, the phone's key and the keys of encrypted folders ([README](app/README.md)) |
 | `contract/` | JSON fixtures the server, website and app tests share: PIN rules, error codes, API responses, the website's paths (`web_routes.json`), the encryption's test vectors (`crypto/`), and what the app's Dart and Kotlin hand each other (`app/platform.json`) |
-| `deploy/` | Hosting guides: a Cloudflare Tunnel, a reverse proxy (Caddy, nginx, Traefik), Docker, Google Cloud Run, Vercel, a systemd service |
+| `deploy/` | Hosting guides: a Cloudflare Tunnel, a reverse proxy (Caddy, nginx, Traefik), Docker, Google Cloud Run, a systemd service |
 | `Dockerfile` | The Docker image: the website and the server, built for amd64 and arm64 |
-| `scripts/` | `build-linux` and `build-windows`, each as `.sh` and `.ps1`: the website, then the server for arm64 and amd64; `build-vercel.sh`, Vercel's build; `version.sh` for the version (`version.ps1` only prints it) |
+| `scripts/` | `build-linux` and `build-windows`, each as `.sh` and `.ps1`: the website, then the server for arm64 and amd64; `version.sh` for the version (`version.ps1` only prints it) |
 | `docs/` | The plans (`share-plan.md`, `s3-plan.md`, `e2ee-plan.md`) and proposals, the screen mockups and the screenshots above |
 | `VERSION`, `config.example.json`, `NOTICE` | The version, an example `config.json`, and the licenses of the fonts and icons |
 | `.github/workflows/ci.yml` | CI: the tests, the builds, the signed APK and the releases |

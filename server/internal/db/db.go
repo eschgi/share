@@ -145,26 +145,13 @@ func loadMigrations() ([]migration, error) {
 	return out, nil
 }
 
-// migrateLock names the advisory lock Migrate holds while it works.
-const migrateLock = 0x5368617265 // "Share"
-
 // Migrate brings the schema up to date, each migration in a transaction of its own. The
-// database's host keeps the backups. Servers that start together, as on Vercel, take turns: the
-// first brings the schema up to date, the others find it so.
+// database's host keeps the backups.
 func (d *DB) Migrate(ctx context.Context) error {
 	migrations, err := loadMigrations()
 	if err != nil {
 		return err
 	}
-	conn, err := d.pool.Conn(ctx)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-	if _, err := conn.ExecContext(ctx, `SELECT pg_advisory_lock($1)`, migrateLock); err != nil {
-		return err
-	}
-	defer conn.ExecContext(context.WithoutCancel(ctx), `SELECT pg_advisory_unlock($1)`, migrateLock)
 	current, err := d.SchemaVersion(ctx)
 	if err != nil {
 		return err
