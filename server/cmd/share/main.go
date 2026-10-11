@@ -27,6 +27,10 @@ import (
 // gives it: 0.1.0 for a release, else e.g. 0.1.0-dev+abc1234.
 var version = "dev"
 
+// defaultCommand runs when the program is started without one, set at build time
+// (-ldflags "-X main.defaultCommand=serve") for platforms that start it so, such as Vercel.
+var defaultCommand = ""
+
 const usage = `Share — a self-hosted file drop.
 
 Usage:
@@ -55,7 +59,8 @@ Usage:
   share version               print the version
 
 --folder may be left out while there is only one folder.
-Every command takes --config PATH (default ./config.json).
+Every command takes --config PATH (default ./config.json). Environment variables can set
+each of its settings, or stand in for the file: SHARE_PUBLIC_URL, SHARE_S3_BUCKET…
 `
 
 func main() {
@@ -67,6 +72,9 @@ func main() {
 }
 
 func run(args []string) error {
+	if len(args) == 0 && defaultCommand != "" {
+		args = []string{defaultCommand}
+	}
 	if len(args) == 0 {
 		fmt.Print(usage)
 		return nil
@@ -129,11 +137,7 @@ func (f *flags) parse(args []string) ([]string, error) {
 }
 
 func (f *flags) load() (*config.Config, error) {
-	cfg, err := config.Load(*f.config)
-	if err != nil {
-		return nil, fmt.Errorf("%s: %w", *f.config, err)
-	}
-	return cfg, nil
+	return config.Load(*f.config)
 }
 
 func serve(args []string) error {

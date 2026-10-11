@@ -1,0 +1,6 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "go",
+  "buildCommand": "sh ../scripts/build-vercel.sh",
+  "crons": [{"path": "/healthz", "schedule": "0 4 * * *"}]
+}
