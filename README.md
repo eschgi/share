@@ -628,8 +628,10 @@ Setting up the bucket:
 1. **CORS rules**, so that Share's pages may send to the bucket and fetch from it: `share check`
    tries them and, when they don't let the pages in, prints the rules to set, for `public_url` and
    `home_url`. On R2 they go into the bucket's settings; elsewhere, e.g.,
-   `aws s3api put-bucket-cors --bucket family-share --cors-configuration file://cors.json`, with
-   `--endpoint-url` for B2. For `npm run dev`, add `http://localhost:5173` to the origins.
+   `aws s3api put-bucket-cors --bucket family-share --cors-configuration file://cors.json`. On B2,
+   `scripts\b2-cors.ps1` sets them in PowerShell, with no other tool. `scripts\check-cors.ps1`
+   asks the bucket the same questions as `share check` and shows its answers, for any service.
+   For `npm run dev`, add `http://localhost:5173` to the origins.
 2. **A lifecycle rule** that aborts unfinished multipart uploads after 7 days, as a safety net:
    Share drops the uploads it gives up on itself, after `upload.incomplete_ttl_hours`. R2 adds
    such a rule to new buckets. With `incomplete_ttl_hours` above 168, make the rule longer too:
@@ -716,7 +718,7 @@ and `key=value` strings aren't taken.
 | `contract/` | JSON fixtures the server, website and app tests share: PIN rules, error codes, API responses, the website's paths (`web_routes.json`), the encryption's test vectors (`crypto/`), and what the app's Dart and Kotlin hand each other (`app/platform.json`) |
 | `deploy/` | Hosting guides: a Cloudflare Tunnel, a reverse proxy (Caddy, nginx, Traefik), Docker, Google Cloud Run, a systemd service |
 | `Dockerfile` | The Docker image: the website and the server, built for amd64 and arm64 |
-| `scripts/` | `build-linux` and `build-windows`, each as `.sh` and `.ps1`: the website, then the server for arm64 and amd64; `version.sh` for the version (`version.ps1` only prints it) |
+| `scripts/` | `build-linux` and `build-windows`, each as `.sh` and `.ps1`: the website, then the server for arm64 and amd64; `version.sh` for the version (`version.ps1` only prints it); `check-cors.ps1` and `b2-cors.ps1` check a bucket's CORS rules and set them on B2 |
 | `docs/` | The plans (`share-plan.md`, `s3-plan.md`, `e2ee-plan.md`) and proposals, the screen mockups and the screenshots above |
 | `VERSION`, `config.example.json`, `NOTICE` | The version, an example `config.json`, and the licenses of the fonts and icons |
 | `.github/workflows/ci.yml` | CI: the tests, the builds, the signed APK and the releases |
