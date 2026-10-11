@@ -787,6 +787,8 @@
   .keysban > .acts{flex:none;margin:-6px -8px 0 0}
   .dlib .keysban{margin:16px 0 6px;padding:18px 20px}
   .dlib .keysban p{font-size:14.5px}
+  .keysban.warn > .ic{color:var(--danger)}
+  .keysban .btn{display:inline-flex;margin-top:12px}
   .kcode{gap:6px}
   .kcode b{width:38px;height:46px;font-size:21px}
   .kcode i{width:10px;flex:none}
@@ -2416,6 +2418,211 @@
         <h3><span class="n">110</span>Back together <span class="badge proposal">proposal</span></h3>
         <p class="cap">Once the last piece is in, Share checks every piece and the video's size before saving it. A broken piece is named, so only its part has to come again. The pieces then go from Share's storage.</p>
         <div class="phone" data-shot="110-zip-joined"><div class="sb" data-time="21:42"></div><div class="ab back"><span class="ib"><span data-i="x"></span></span></div><div class="wb"><div class="vjoin ph t3"><span data-i="play"></span><i class="seam t"></i><i class="seam b"></i><span class="vsz">2.4 GB</span><span class="vok"><span data-i="check"></span></span></div><h1 class="hero md center">Video put back together</h1><p class="lead center">VID_20261017_141502.mp4, 2.4 GB, from parts 3 and 4. Share checked that it's complete and saved it to your gallery.</p><div class="okline"><span data-i="check"></span>All 4 parts are in</div><div class="grow"></div><div class="btn primary"><span data-i="images"></span>Open gallery</div><div class="btn outline">Done</div></div><div class="gest"></div></div>
+      </div>
+
+    </div>
+  </section>
+
+  <section class="sec" id="access">
+    <div class="sec-head">
+      <div class="sec-tag">Proposal · Cloudflare Access</div>
+      <h2>Behind Cloudflare Access, if you like</h2>
+      <p>Cloudflare Access can stand in front of the server and let through only who it knows. Browsers get past it by signing in to Cloudflare; the app can't, so it shows Cloudflare a service token instead: an ID and a secret, sent with every request to the public address. It's optional and off unless the server needs it. The app notices Cloudflare Access by itself, an admin's invite brings the token along, and the local address at home goes past Cloudflare without it. The token stays on the phone: the server never sees or keeps it.</p>
+    </div>
+    <p class="sub-h">Setting it up</p>
+    <div class="board">
+
+      <div class="slot">
+        <h3><span class="n">111</span>Sign in <span class="badge proposal">proposal</span></h3>
+        <p class="cap">The sign-in of 8 gets one switch, off for nearly everyone. Switching it on asks for the token (112). Most people never touch it: the app notices Cloudflare Access by itself (113), and an invite brings the token.</p>
+        <div class="phone" data-shot="111-access-sign-in">
+          <div class="sb" data-time="9:41"></div>
+          <div class="ab back"><span class="ib"><span data-i="back"></span></span></div>
+          <div class="wb">
+            <h1 class="hero md">Sign in</h1>
+            <p class="lead">To see and download the shared files.</p>
+            <div class="label">Server</div>
+            <div class="input">share.example.com</div>
+            <div class="group mt12"><div class="row"><span class="ri"><span data-i="shield"></span></span><div class="rt"><b>Behind Cloudflare Access</b><span>Only if your server asks for a service token</span></div><span class="sw"></span></div></div>
+            <div class="label">Username</div>
+            <div class="input">maria</div>
+            <div class="label">Password</div>
+            <div class="input focus"><span class="dots">••••••••••</span><span class="caret"></span><span class="trail" data-i="eye"></span></div>
+            <div class="btn primary mt24">Sign in</div>
+            <div class="grow"></div>
+            <p class="small">No password yet? Ask for an invite. One scan and you're in.</p>
+          </div>
+          <div class="gest"></div>
+        </div>
+      </div>
+
+      <div class="slot">
+        <h3><span class="n">112</span>The service token <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Cloudflare shows a new token's ID and secret only once, with a copy button for both together. Paste from Cloudflare fills both fields from that copy, so nobody types a 64-character secret. Continue first asks Cloudflare whether the token works.</p>
+        <div class="phone" data-shot="112-access-token">
+          <div class="sb" data-time="9:42"></div>
+          <div class="ab back"><span class="ib"><span data-i="back"></span></span><h2>Cloudflare Access</h2></div>
+          <div class="wb">
+            <p class="lead">Cloudflare asks for a service token before it lets the app reach share.example.com.</p>
+            <div class="btn tonal sm mt"><span data-i="copy"></span>Paste from Cloudflare</div>
+            <div class="label">Client ID</div>
+            <div class="input">8f2c1e0b7a6d4e93b5a1.access</div>
+            <div class="label">Client secret</div>
+            <div class="input focus"><span class="dots">••••••••••••••••</span><span class="caret"></span><span class="trail" data-i="eye"></span></div>
+            <p class="help">In Cloudflare Zero Trust, under Service Tokens. Ask whoever runs the server.</p>
+            <div class="grow"></div>
+            <div class="btn primary">Continue</div>
+            <p class="small">At home, on the local address, the app doesn't need the token.</p>
+          </div>
+          <div class="gest"></div>
+        </div>
+      </div>
+
+      <div class="slot">
+        <h3><span class="n">113</span>Found by itself <span class="badge proposal">proposal</span></h3>
+        <p class="cap">When a sign-in, an invite or a PIN link meets Cloudflare's login instead of Share, the app says what's in the way instead of a vague error. Scanning an admin's invite is the easy way out: it brings the token (117).</p>
+        <div class="phone" data-shot="113-access-found">
+          <div class="sb" data-time="18:05"></div>
+          <div class="ab back"><span class="ib"><span data-i="x"></span></span></div>
+          <div class="wb">
+            <div class="roundico"><span data-i="shield"></span></div>
+            <h1 class="hero md">Cloudflare Access is in the way</h1>
+            <p class="lead">share.example.com lets the app in only with a service token, which whoever runs the server can give you.</p>
+            <div class="choice">
+              <div class="cico"><span data-i="scan"></span></div>
+              <div class="ct"><b>Scan an invite</b><span>An invite from an admin brings the token along.</span></div>
+              <span class="chev" data-i="chev"></span>
+            </div>
+            <div class="choice">
+              <div class="cico"><span data-i="key"></span></div>
+              <div class="ct"><b>Enter the token</b><span>Client ID and secret, from Cloudflare.</span></div>
+              <span class="chev" data-i="chev"></span>
+            </div>
+            <div class="grow"></div>
+            <p class="small">The link you opened waits, and carries on once the token is in.</p>
+          </div>
+          <div class="gest"></div>
+        </div>
+      </div>
+
+    </div>
+    <p class="sub-h">In the settings</p>
+    <div class="board">
+
+      <div class="slot">
+        <h3><span class="n">114</span>Server, with Cloudflare Access <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Screen 16 gets a third part. The secret stays hidden; tapping the ID or the secret edits both (112), and the switch turns the token off without forgetting it. The check covers Cloudflare too.</p>
+        <div class="phone" data-shot="114-access-server">
+          <div class="sb" data-time="10:01"></div>
+          <div class="ab back"><span class="ib"><span data-i="back"></span></span><h2>Server</h2></div>
+          <div class="wb">
+            <div class="label t0">Public address</div>
+            <div class="input">https://share.example.com</div>
+            <div class="label">Local address <span class="optional">optional</span></div>
+            <div class="input">https://192.168.1.20:8443</div>
+            <div class="glabel">Cloudflare Access</div>
+            <div class="group">
+              <div class="row"><span class="ri"><span data-i="shield"></span></span><div class="rt"><b>Behind Cloudflare Access</b><span>Only to the public address, not at home</span></div><span class="sw on"></span></div>
+              <div class="row"><span class="ri"><span data-i="key"></span></span><div class="rt"><b>Client ID</b><span>8f2c1e0b7a6d4e93b5a1.access</span></div><span class="chev" data-i="chev"></span></div>
+              <div class="row"><span class="ri"><span data-i="lock"></span></span><div class="rt"><b>Client secret</b><span>••••••••••••••••</span></div><span class="chev" data-i="chev"></span></div>
+            </div>
+            <div class="card state"><span class="ri ok"><span data-i="check"></span></span><div><b>Cloudflare lets this phone in</b><span>Checked just now, over the public address</span></div></div>
+            <div class="grow"></div>
+            <div class="btn outline"><span data-i="refresh"></span>Check again</div>
+          </div>
+          <div class="gest"></div>
+        </div>
+      </div>
+
+      <div class="slot">
+        <h3><span class="n">115</span>In Settings <span class="badge proposal">proposal</span></h3>
+        <p class="cap">The Server row says that Cloudflare Access is on, next to the address in use. Members and admins alike: the token belongs to the phone, not to the account, and signing out keeps it for the next sign-in.</p>
+        <div class="phone" data-shot="115-access-settings">
+          <div class="sb" data-time="10:02"></div>
+          <div class="ab"><h2>Settings</h2></div>
+          <div class="scroll pad">
+            <div class="profile"><span class="av lg tan">M</span><div><b>Maria <span class="role">Member</span></b><span class="sub">Signed in on this phone</span></div></div>
+            <div class="group">
+              <div class="row"><span class="ri"><span data-i="globe"></span></span><div class="rt"><b>Language</b><span>Automatic · English</span></div><span class="chev" data-i="chev"></span></div>
+              <div class="row"><span class="ri"><span data-i="palette"></span></span><div class="rt"><b>Theme</b><span>Ember</span></div><span class="chev" data-i="chev"></span></div>
+              <div class="row"><span class="ri"><span data-i="server"></span></span><div class="rt"><b>Server</b><span>Local address in use · Cloudflare Access</span></div><span class="chev" data-i="chev"></span></div>
+              <div class="row"><span class="ri"><span data-i="lock"></span></span><div class="rt"><b>Password</b><span>Set · username maria</span></div><span class="chev" data-i="chev"></span></div>
+            </div>
+            <div class="group mt12">
+              <div class="row"><span class="ri"><span data-i="log-out"></span></span><div class="rt"><b>Sign out</b></div></div>
+              <div class="row dang"><span class="ri dang"><span data-i="user-x"></span></span><div class="rt"><b>Delete my account</b></div></div>
+            </div>
+          </div>
+          <nav class="nav" data-on="settings"></nav>
+          <div class="gest"></div>
+        </div>
+      </div>
+
+      <div class="slot">
+        <h3><span class="n">116</span>Turned away <span class="badge proposal">proposal</span></h3>
+        <p class="cap">Tokens expire, and can be revoked in Cloudflare. When Cloudflare starts turning the app away, the library keeps what it shows, says why at the top and leads to the fix. Nothing pops up.</p>
+        <div class="phone" data-shot="116-access-refused">
+          <div class="sb" data-time="9:15"></div>
+          <div class="ab"><h2>Library</h2><span class="ib"><span data-i="search"></span></span><span class="av sm tan">M</span></div>
+          <div class="keysban warn"><span data-i="alert"></span><div><b>Cloudflare turned the token away</b><p>It may have expired. Ask whoever runs the server for a new one, or scan a new invite.</p><div class="btn tonal xs">Update the token</div></div></div>
+          <div class="chips"><span class="chip on">All</span><span class="chip">Photos</span><span class="chip">Videos</span><span class="chip">Documents</span></div>
+          <div class="scroll">
+            <div class="day"><div><h4>Yesterday</h4><div class="meta">45 files · 620 MB</div></div><span class="dsel"></span></div>
+            <div class="grid g4" data-tiles="p4 p7 p9 v5@1:15 p2 p10 p6 p3 p5 p1 p8 p2"></div>
+            <div class="day"><div><h4>Sunday, 27 Sep</h4><div class="meta">48 files · 1.1 GB</div></div><span class="dsel"></span></div>
+            <div class="grid g4" data-tiles="p1 p2 p5 v4@0:42 p3 p8 p9 p10"></div>
+          </div>
+          <nav class="nav" data-on="library"></nav>
+          <div class="gest"></div>
+        </div>
+      </div>
+
+    </div>
+    <p class="sub-h">Passing it on</p>
+    <div class="board">
+
+      <div class="slot">
+        <h3><span class="n">117</span>Invite someone, with the token <span class="badge proposal">proposal</span></h3>
+        <p class="cap">On an admin's phone that has a token, the invite brings it along, on by default. Only in the QR code, which the app scans itself: a link sent by message would leave the secret in the chat.</p>
+        <div class="phone" data-shot="117-access-invite">
+          <div class="sb" data-time="10:06"></div>
+          <div class="ab back"><span class="ib"><span data-i="back"></span></span><h2>Invite someone</h2></div>
+          <div class="wb">
+            <div class="label t0">Name</div>
+            <div class="input">Oma Rosa</div>
+            <div class="label">Role</div>
+            <div class="seg"><span class="on"><span data-i="check"></span>Member</span><span>Admin</span></div>
+            <div class="group mt20"><div class="row"><span class="ri"><span data-i="shield"></span></span><div class="rt"><b>Bring the Cloudflare Access token</b><span>Oma Rosa's phone then gets past Cloudflare by itself</span></div><span class="sw on"></span></div></div>
+            <div class="qrcard"><div class="qr" data-qr="23"></div><b>Let Oma Rosa scan this with the Share app</b><span class="exp"><span data-i="clock"></span>Works once · expires in 24 h</span></div>
+            <div class="grow"></div>
+            <div class="btn outline"><span data-i="share"></span>Send as a link, without the token</div>
+          </div>
+          <div class="gest"></div>
+        </div>
+      </div>
+
+      <div class="slot">
+        <h3><span class="n">118</span>Invite accepted, with the token <span class="badge proposal">proposal</span></h3>
+        <p class="cap">The invite of 10 says the token came along. The app keeps it with the server's addresses, so its very first request already gets past Cloudflare.</p>
+        <div class="phone" data-shot="118-access-accepted">
+          <div class="sb" data-time="19:06"></div>
+          <div class="ab back"><span class="ib"><span data-i="x"></span></span></div>
+          <div class="wb">
+            <div class="bigav">O<i><span data-i="check"></span></i></div>
+            <h1 class="hero md center">Stefan invited you</h1>
+            <p class="lead center">This phone will be signed in as Oma Rosa. No password needed.</p>
+            <div class="facts">
+              <div><span data-i="user"></span><em>Name</em><b>Oma Rosa</b></div>
+              <div><span data-i="shield"></span><em>Role</em><b>Member: see, download, send</b></div>
+              <div><span data-i="clock"></span><em>Valid</em><b>Once, until 21:00</b></div>
+              <div><span data-i="key"></span><em>Access</em><b>Cloudflare token included</b></div>
+            </div>
+            <div class="grow"></div>
+            <div class="btn primary">Join as Oma Rosa</div>
+            <p class="small">Not Oma Rosa? Stop here and ask Stefan for your own invite.</p>
+          </div>
+          <div class="gest"></div>
+        </div>
       </div>
 
     </div>
@@ -5235,10 +5442,142 @@
       "In your gallery, in the album “Share”.": [
           "In deiner Galerie, im Album „Share“.",
           "Nella tua galleria, nell'album “Share”."
+      ],
+      "Behind Cloudflare Access": [
+          "Hinter Cloudflare Access",
+          "Dietro Cloudflare Access"
+      ],
+      "Only if your server asks for a service token": [
+          "Nur wenn dein Server ein Service-Token verlangt",
+          "Solo se il tuo server chiede un token di servizio"
+      ],
+      "Cloudflare asks for a service token before it lets the app reach share.example.com.": [
+          "Cloudflare verlangt ein Service-Token, bevor die App share.example.com erreichen darf.",
+          "Cloudflare chiede un token di servizio prima di lasciar arrivare l'app a share.example.com."
+      ],
+      "Paste from Cloudflare": [
+          "Aus Cloudflare einfügen",
+          "Incolla da Cloudflare"
+      ],
+      "Client ID": [
+          "Client-ID",
+          "ID client"
+      ],
+      "Client secret": [
+          "Client-Secret",
+          "Secret del client"
+      ],
+      "In Cloudflare Zero Trust, under Service Tokens. Ask whoever runs the server.": [
+          "In Cloudflare Zero Trust, unter Service Tokens. Frag, wer den Server betreibt.",
+          "In Cloudflare Zero Trust, sotto Service Tokens. Chiedi a chi gestisce il server."
+      ],
+      "Continue": [
+          "Weiter",
+          "Continua"
+      ],
+      "At home, on the local address, the app doesn't need the token.": [
+          "Zu Hause, über die lokale Adresse, braucht die App das Token nicht.",
+          "A casa, con l'indirizzo locale, l'app non ha bisogno del token."
+      ],
+      "Cloudflare Access is in the way": [
+          "Cloudflare Access steht im Weg",
+          "Cloudflare Access sbarra la strada"
+      ],
+      "share.example.com lets the app in only with a service token, which whoever runs the server can give you.": [
+          "share.example.com lässt die App nur mit einem Service-Token herein. Wer den Server betreibt, kann es dir geben.",
+          "share.example.com fa entrare l'app solo con un token di servizio, che può darti chi gestisce il server."
+      ],
+      "Scan an invite": [
+          "Einladung scannen",
+          "Scansiona un invito"
+      ],
+      "An invite from an admin brings the token along.": [
+          "Eine Einladung von einem Admin bringt das Token mit.",
+          "Un invito da un admin porta con sé il token."
+      ],
+      "Enter the token": [
+          "Token eingeben",
+          "Inserisci il token"
+      ],
+      "Client ID and secret, from Cloudflare.": [
+          "Client-ID und Secret, aus Cloudflare.",
+          "ID client e secret, da Cloudflare."
+      ],
+      "The link you opened waits, and carries on once the token is in.": [
+          "Der geöffnete Link wartet und geht weiter, sobald das Token da ist.",
+          "Il link che hai aperto aspetta, e riparte appena c'è il token."
+      ],
+      "Only to the public address, not at home": [
+          "Nur an die öffentliche Adresse, nicht zu Hause",
+          "Solo all'indirizzo pubblico, non a casa"
+      ],
+      "Cloudflare lets this phone in": [
+          "Cloudflare lässt dieses Handy herein",
+          "Cloudflare fa entrare questo telefono"
+      ],
+      "Checked just now, over the public address": [
+          "Gerade geprüft, über die öffentliche Adresse",
+          "Verificato ora, tramite l'indirizzo pubblico"
+      ],
+      "Local address in use · Cloudflare Access": [
+          "Lokale Adresse aktiv · Cloudflare Access",
+          "Indirizzo locale in uso · Cloudflare Access"
+      ],
+      "Set · username maria": [
+          "Festgelegt · Benutzername maria",
+          "Impostata · nome utente maria"
+      ],
+      "Cloudflare turned the token away": [
+          "Cloudflare hat das Token abgewiesen",
+          "Cloudflare ha rifiutato il token"
+      ],
+      "It may have expired. Ask whoever runs the server for a new one, or scan a new invite.": [
+          "Vielleicht ist es abgelaufen. Frag, wer den Server betreibt, nach einem neuen, oder scanne eine neue Einladung.",
+          "Forse è scaduto. Chiedine uno nuovo a chi gestisce il server, o scansiona un nuovo invito."
+      ],
+      "Update the token": [
+          "Token erneuern",
+          "Aggiorna il token"
+      ],
+      "Bring the Cloudflare Access token": [
+          "Cloudflare-Access-Token mitgeben",
+          "Includi il token di Cloudflare Access"
+      ],
+      "Oma Rosa's phone then gets past Cloudflare by itself": [
+          "Oma Rosas Handy kommt dann von selbst an Cloudflare vorbei",
+          "Il telefono di Nonna Rosa poi supera Cloudflare da solo"
+      ],
+      "Let Oma Rosa scan this with the Share app": [
+          "Lass Oma Rosa das mit der Share-App scannen",
+          "Fai scansionare questo codice a Nonna Rosa con l'app Share"
+      ],
+      "Send as a link, without the token": [
+          "Als Link schicken, ohne Token",
+          "Invia come link, senza token"
+      ],
+      "This phone will be signed in as Oma Rosa. No password needed.": [
+          "Dieses Handy wird als Oma Rosa angemeldet. Kein Passwort nötig.",
+          "Su questo telefono accederai come Nonna Rosa. Senza password."
+      ],
+      "Access": [
+          "Zugang",
+          "Accesso"
+      ],
+      "Cloudflare token included": [
+          "Cloudflare-Token dabei",
+          "Token di Cloudflare incluso"
+      ],
+      "Join as Oma Rosa": [
+          "Als Oma Rosa beitreten",
+          "Entra come Nonna Rosa"
+      ],
+      "Not Oma Rosa? Stop here and ask Stefan for your own invite.": [
+          "Du bist nicht Oma Rosa? Dann hör hier auf und frag Stefan nach einer eigenen Einladung.",
+          "Non sei Nonna Rosa? Fermati qui e chiedi a Stefan un invito tutto tuo."
       ]
   };
   // Names, codes, numbers and file names that stay the same in every language.
-  const KEEP = /^(?:[A-Z0-9]|\d+(?::\d+)?|Stefan|Maria|Peter|Anna|Luca|maria|Admin|PIN|PDF|DOCX|ZIP|XLSX|•+|\d{8}_\d{6}\.(?:jpg|mp4)|\/srv\/share|(?:https:\/\/)?share\.example\.com(?:\/[a-z\/-]*)?|https:\/\/192\.168\.1\.20:8443|\d+ (?:KB|MB|GB)|@maria|Pixel 8|Chrome · Windows|IMG_\d+\.jpg|image\/jpeg|Quick Share|iPhone · Safari|Android · Chrome|\d+ MB\/s|Anna & Marco|WhatsApp(?:, Telegram)?|Signal|Gmail|\.zip|1 ZIP)$/;
+  const KEEP = /^(?:[A-Z0-9]|\d+(?::\d+)?|Stefan|Maria|Peter|Anna|Luca|maria|Admin|PIN|PDF|DOCX|ZIP|XLSX|•+|\d{8}_\d{6}\.(?:jpg|mp4)|\/srv\/share|(?:https:\/\/)?share\.example\.com(?:\/[a-z\/-]*)?|https:\/\/192\.168\.1\.20:8443|\d+ (?:KB|MB|GB)|@maria|Pixel 8|Chrome · Windows|IMG_\d+\.jpg|image\/jpeg|Quick Share|iPhone · Safari|Android · Chrome|\d+ MB\/s|Anna & Marco|WhatsApp(?:, Telegram)?|Signal|Gmail|\.zip|1 ZIP|Cloudflare Access|[0-9a-f]+\.access)$/;
   const LANGS = ['en', 'de', 'it'];
   const original = new WeakMap();
   function setLang(lang) {
