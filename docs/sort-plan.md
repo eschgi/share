@@ -2,7 +2,8 @@
 
 The library sorts by the day files arrived. Asked on 2026-10-11: let people choose to sort by
 the date a photo or video was taken instead. The screens are 120 to 125 of
-[share-mockup.html](share-mockup.html). Nothing is built yet.
+[share-mockup.html](share-mockup.html). Built on 2026-10-11 in the server, the website and the
+app, as the mockups draw it.
 
 Asked by the user:
 - **Sort by date received**, as now, or **by date taken**.
@@ -26,21 +27,34 @@ Left out: by name and by size. Neither helps with photos, and search finds names
 
 ## Where the date taken comes from
 
-- **The app** sends it with each upload: Android's gallery knows it for photos and videos
-  (`DATE_TAKEN`).
-- **The website** reads it from the file before sending: EXIF `DateTimeOriginal` in JPEG and
-  HEIC, the creation time in MP4 and MOV.
-- **The server** reads it itself for files that came without it, from the first bytes on the
-  drive or in the bucket. A job in the background does the files already there, as the
-  thumbnails are made for photos that came without one.
-- **A photo's clock** has no time zone in EXIF: the date counts as written, in the server's
-  `time_zone`, where nothing says otherwise.
+Decided with the user on 2026-10-11: **the app and the website send it** with each upload; the
+server doesn't read files for it.
+
+- **The app** (`TakenDate.kt`): what Android's gallery or the photo picker say (`DATE_TAKEN`),
+  else a photo's EXIF (`DateTimeOriginal`, with `OffsetTimeOriginal` when there is one) or a
+  video's date (`MediaMetadataRetriever`). The ZIPs use the same.
+- **The website** (`web/src/taken.ts`): reads it from the file before sending: the EXIF of a
+  JPEG, HEIC or AVIF, or the creation time in an MP4 or MOV header (`moov` may be at the end).
+  EXIF without an offset counts as the browser's own time.
+- **Sent** as Unix ms: `takenAt` in the tus metadata, `taken_at_ms` with a bucket
+  (contract/api/tus.json, s3_upload_create.json). The server keeps `taken_at` and its day in its
+  `time_zone` (`taken_day`), and drops a date from before 1900 or more than two days ahead.
+- **Encrypted folders:** never sent, and the server drops one if it came; those files count on
+  the day they arrived, and the server never learns when they were taken. (Chosen while the
+  question was open; easy to change.)
+- **Files sent before** have no date taken and count on the day they arrived.
 - **Nothing moves on the drive:** files stay in the folder of the day they arrived.
 
-## Open questions
+## How it works
 
-- **Encrypted folders:** the server can't read their files. Either the sending phone or browser
-  sends the date taken unencrypted, which tells the server when each photo was taken, or those
-  folders sort by date taken only on the phone, from dates kept inside the encryption.
-- **One choice for every folder,** or one for each folder, for example oldest first only for
-  the wedding?
+- `GET /api/library?sort=received|taken|sender&order=newest|oldest` answers `groups` instead of
+  days: a day, or a sender's id (`"pin"` for PIN guests), with `last_day`, the day its newest file
+  arrived, and a sender's name in `from`. `/api/files` and `/api/files/ids` take the same sort and
+  `group`; the files come in the groups' order, a page at a time (contract/api/library.json,
+  files.json).
+- Files say `taken_at`, `taken_day` and `from_id`, so the website and the app group what they
+  load the way the server groups it.
+- **Remembered** in the app as the secret `library_sort`, on the website in `localStorage`, for
+  every folder. While the library isn't by the day files arrived newest first, new files may
+  belong anywhere, so a change on the server reloads the list instead of adding on top.
+- PIN sessions that see a folder can't sort by sender: they see no names.

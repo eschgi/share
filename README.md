@@ -158,9 +158,12 @@ Both speak English, German and Italian.
   and closing it in the middle asks first. An invite opened there shows a QR code for the phone.
 - A finished file moves into the day's folder. The sender's browser or phone makes its thumbnail; for
   JPEG, PNG and GIF the server makes one itself if none came, except in an encrypted folder.
-- The app shows the library by day. It saves photos and videos into the gallery, in the album
-  "Share", and documents into `Download/Share`. It sends the same way as the website. Transfers
-  keep going when the app is closed, and continue where they stopped after an interruption.
+- The app shows the library by the day files arrived, or, as each phone and browser chooses, by the
+  day photos and videos were taken, which the app and the website read from them when they send,
+  or by who sent them, newest or oldest first (docs/sort-plan.md). It saves photos and videos into
+  the gallery, in the album "Share", and documents into `Download/Share`. It sends the same way as
+  the website. Transfers keep going when the app is closed, and continue where they stopped after
+  an interruption.
 - With the server at home, the app reaches it there on its address at home (`home_url`), plain
   http or https, without the internet.
 - People with an account can use the website instead of the app, signed in with their password or
