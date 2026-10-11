@@ -125,7 +125,7 @@ func forwarded(r *http.Request) bool {
 // being at home.
 func (a *App) untrustedProxy(w http.ResponseWriter, r *http.Request) {
 	p := peer(r)
-	a.hint("untrusted", p, `requests from %s came through a proxy, but config.json doesn't name one there. For a proxy on this machine, set "proxy": "cloudflare" (cloudflared) or "proxy": "x-forwarded" (Caddy, nginx, Traefik, Vercel…); for one elsewhere, "proxy": {"headers": …, "trusted_proxies": [%q]}; or the same in SHARE_PROXY`, p, p.String())
+	a.hint("untrusted", p, `requests from %s came through a proxy, but config.json doesn't name one there. For a proxy on this machine, set "proxy": "cloudflare" (cloudflared) or "proxy": "x-forwarded" (Caddy, nginx, Traefik…); for one elsewhere, "proxy": {"headers": …, "trusted_proxies": [%q]}; or the same in SHARE_PROXY`, p, p.String())
 	httpx.WriteError(w, http.StatusForbidden, "proxy_untrusted",
 		"This request came through a proxy that Share doesn't trust. The server's log says more.")
 }

@@ -516,8 +516,8 @@ The guides in [`deploy/`](deploy/) show each setup, with the settings it needs.
 
 ### Environment variables
 
-Each setting can also come from an environment variable, for platforms where a file is awkward,
-such as Vercel: `SHARE_` and the setting's path in capitals, with `_` between the levels.
+Each setting can also come from an environment variable, for platforms where a file is awkward:
+`SHARE_` and the setting's path in capitals, with `_` between the levels.
 
 ```sh
 SHARE_PUBLIC_URL=https://share.example.com
@@ -534,8 +534,8 @@ SHARE_PROXY=x-forwarded
 - Numbers, `true` and `false` as in JSON, lists as words between commas (or a JSON list), and
   `proxy` and `https.certificate` as a word or the JSON `config.json` takes:
   `SHARE_PROXY={"headers": "x-forwarded", "trusted_proxies": ["192.168.1.30"]}`.
-- `PORT`, which platforms such as Vercel and Cloud Run set, is the http port when neither
-  `config.json` nor `SHARE_HTTP_LISTEN` names one.
+- `PORT`, which platforms such as Cloud Run set, is the http port when neither `config.json` nor
+  `SHARE_HTTP_LISTEN` names one.
 - An unknown `SHARE_` variable stops the server with its name, as a misspelled field in
   `config.json` does. The messages name the settings as `config.json` has them: `s3.bucket` is
   `SHARE_S3_BUCKET`.
@@ -680,7 +680,7 @@ and `key=value` strings aren't taken.
 | `contract/` | JSON fixtures the server, website and app tests share: PIN rules, error codes, API responses, the website's paths (`web_routes.json`), the encryption's test vectors (`crypto/`), and what the app's Dart and Kotlin hand each other (`app/platform.json`) |
 | `deploy/` | Hosting guides: a Cloudflare Tunnel, a reverse proxy (Caddy, nginx, Traefik), Docker, Google Cloud Run, a systemd service |
 | `Dockerfile` | The Docker image: the website and the server, built for amd64 and arm64 |
-| `scripts/` | `build-linux` and `build-windows`, each as `.sh` and `.ps1`: the website, then the server for arm64 and amd64; `build-vercel.sh`, Vercel's build (`server/vercel.json`); `version.sh` for the version (`version.ps1` only prints it) |
+| `scripts/` | `build-linux` and `build-windows`, each as `.sh` and `.ps1`: the website, then the server for arm64 and amd64; `version.sh` for the version (`version.ps1` only prints it) |
 | `docs/` | The plans (`share-plan.md`, `s3-plan.md`, `e2ee-plan.md`) and proposals, the screen mockups and the screenshots above |
 | `VERSION`, `config.example.json`, `NOTICE` | The version, an example `config.json`, and the licenses of the fonts and icons |
 | `.github/workflows/ci.yml` | CI: the tests, the builds, the signed APK and the releases |

@@ -27,10 +27,6 @@ import (
 // gives it: 0.1.0 for a release, else e.g. 0.1.0-dev+abc1234.
 var version = "dev"
 
-// defaultCommand runs when the program is started without one, set at build time
-// (-ldflags "-X main.defaultCommand=serve") for platforms that start it so, such as Vercel.
-var defaultCommand = ""
-
 const usage = `Share — a self-hosted file drop.
 
 Usage:
@@ -72,9 +68,6 @@ func main() {
 }
 
 func run(args []string) error {
-	if len(args) == 0 && defaultCommand != "" {
-		args = []string{defaultCommand}
-	}
 	if len(args) == 0 {
 		fmt.Print(usage)
 		return nil

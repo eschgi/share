@@ -61,7 +61,7 @@ func TestMigrateIsIdempotentAndRefusesNewerDatabases(t *testing.T) {
 	}
 }
 
-// Servers that start together on a new database, as on Vercel, take turns migrating it.
+// Servers that start together on a new database take turns migrating it.
 func TestMigrateTogether(t *testing.T) {
 	url := pgtest.URL(t)
 	errs := make(chan error, 3)

@@ -12,7 +12,7 @@ import (
 )
 
 // Every setting of config.json can also come from an environment variable, for platforms where
-// a file is awkward, such as Vercel: SHARE_ and the setting's path in capitals, with _ between
+// a file is awkward, such as Cloud Run: SHARE_ and the setting's path in capitals, with _ between
 // the levels, as in SHARE_PUBLIC_URL, SHARE_DATABASE_POSTGRES or SHARE_S3_BUCKET. A variable
 // wins over config.json, which wins over the defaults.
 const envPrefix = "SHARE_"
@@ -98,7 +98,7 @@ func (s envSetting) value(v string) (any, error) {
 }
 
 // fromEnv lays the settings in environ (KEY=value, as os.Environ gives them) over config.json's
-// data. PORT, which platforms such as Vercel and Cloud Run set, is the http port when neither
+// data. PORT, which platforms such as Cloud Run set, is the http port when neither
 // config.json nor SHARE_HTTP_LISTEN names one. used reports whether a SHARE_ variable set
 // anything.
 func fromEnv(data []byte, environ []string) (out []byte, used bool, err error) {

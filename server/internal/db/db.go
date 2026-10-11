@@ -149,8 +149,8 @@ func loadMigrations() ([]migration, error) {
 const migrateLock = 0x5368617265 // "Share"
 
 // Migrate brings the schema up to date, each migration in a transaction of its own. The
-// database's host keeps the backups. Servers that start together, as on Vercel, take turns: the
-// first brings the schema up to date, the others find it so.
+// database's host keeps the backups. Servers that start together take turns: the first brings
+// the schema up to date, the others find it so.
 func (d *DB) Migrate(ctx context.Context) error {
 	migrations, err := loadMigrations()
 	if err != nil {
