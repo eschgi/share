@@ -59,10 +59,8 @@ class _ServerScreenState extends State<ServerScreen> {
       result = _AccessCheck.ok;
     } on CloudflareAccessException {
       result = _AccessCheck.refused;
-    } on ApiException catch (e) {
-      result = e.fromShare ? _AccessCheck.ok : _AccessCheck.failed;
-    } on NetworkException {
-      result = _AccessCheck.failed;
+    } on Exception {
+      result = _AccessCheck.failed; // no Share behind Cloudflare, or no answer
     }
     if (mounted) setState(() => _access = result);
   }

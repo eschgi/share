@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
 import 'package:share_app/data/access.dart';
 import 'package:share_app/ui/widgets.dart';
 
@@ -127,5 +128,45 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Cloudflare token included'), findsOneWidget);
     expect(jsonDecode(platform.secrets[AccessRepository.key]!)['client_secret'], secret);
+  });
+
+  testWidgets('a token Cloudflare takes, for an address with no Share behind it, says so and isn\'t kept', (tester) async {
+    final server = FakeServer()..accessToken = '$id:$secret';
+    final platform = FakePlatform();
+    await startApp(tester, platform, server);
+    await tester.tap(find.text('See & download'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).at(0), 'share.example.com');
+    await tester.tap(find.byType(Switch));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).at(0), id);
+    await tester.enterText(find.byType(TextField).at(1), secret);
+
+    // Another app's page, behind the same Cloudflare Access.
+    server.routes['GET /api/info'] = (_) => http.Response('<html>Welcome to nginx!</html>', 200, headers: {'content-type': 'text/html', 'cf-ray': '8c1f-FRA'});
+    await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
+    await tester.pumpAndSettle();
+    expect(find.text("Cloudflare lets the token through, but there's no Share server behind it. Check the server address."), findsOneWidget);
+    expect(platform.secrets[AccessRepository.key], isNull);
+
+    // Something else that answers JSON isn't Share either.
+    server.routes['GET /api/info'] = (_) => server.json({'status': 'ok'});
+    await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
+    await tester.pumpAndSettle();
+    expect(find.text("Cloudflare lets the token through, but there's no Share server behind it. Check the server address."), findsOneWidget);
+
+    // The server behind Cloudflare is down: Cloudflare's own 502.
+    server.routes['GET /api/info'] = (_) => http.Response('<html>Bad gateway</html>', 502, headers: {'cf-ray': '8c1f-FRA'});
+    await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
+    await tester.pumpAndSettle();
+    expect(find.text("Cloudflare lets the token through, but the server behind it doesn't answer. Try again later."), findsOneWidget);
+    expect(platform.secrets[AccessRepository.key], isNull);
+  });
+
+  testWidgets('a PIN for an address with no Share behind it says so', (tester) async {
+    final server = FakeServer()..routes['POST /api/pin/unlock'] = (_) => http.Response('<html>Welcome to nginx!</html>', 200, headers: {'content-type': 'text/html'});
+    final platform = FakePlatform()..launchLink = 'https://share.example.com/#K7M2Q';
+    await startApp(tester, platform, server);
+    expect(find.text('There is no Share server at this address.'), findsOneWidget);
   });
 }

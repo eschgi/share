@@ -8,6 +8,7 @@ import 'dart:convert';
 import 'api.dart';
 import 'models.dart';
 import 'platform.dart';
+import 'session.dart' show NotShareServer;
 
 /// A service token: a Client ID and a Client Secret, sent as headers with every request to the
 /// public address of the server at [host]. It belongs to the phone, not to the account, and
@@ -125,9 +126,22 @@ class AccessRepository {
     _changes.add(a);
   }
 
-  /// Asks the server's public address with [a] whether Cloudflare lets it through. Throws
-  /// CloudflareAccessException if it doesn't, NetworkException without an answer.
+  /// Asks the server's public address with [a] whether Cloudflare lets it through to Share.
+  /// Throws CloudflareAccessException if Cloudflare turns it away; NotShareServer if Cloudflare
+  /// lets it through to something that isn't Share, such as another app's page; ApiException
+  /// when nothing answers behind Cloudflare (its 502 or 530); NetworkException without any answer.
   Future<void> check(Uri server, CloudflareAccess a) async {
-    await api.getFrom(server, '/api/info', access: a);
+    final Json info;
+    try {
+      info = await api.getFrom(server, '/api/info', access: a);
+    } on FormatException {
+      throw const NotShareServer(); // a page, not Share's JSON
+    } on CloudflareAccessException {
+      rethrow;
+    } on ApiException catch (e) {
+      if (e.fromShare || e.status >= 500) rethrow;
+      throw const NotShareServer();
+    }
+    if (info['server_id'] is! String) throw const NotShareServer();
   }
 }

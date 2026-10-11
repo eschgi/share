@@ -1587,5 +1587,7 @@
   "inviteAccessHelpNoName": "The new phone then gets past Cloudflare by itself",
   "inviteSendLinkNoToken": "Send as a link, without the token",
   "joinAccess": "Access",
-  "joinAccessIncluded": "Cloudflare token included"
+  "joinAccessIncluded": "Cloudflare token included",
+  "accessNotShare": "Cloudflare lets the token through, but there's no Share server behind it. Check the server address.",
+  "accessUnavailable": "Cloudflare lets the token through, but the server behind it doesn't answer. Try again later."
 }

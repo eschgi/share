@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../app.dart';
 import '../data/access.dart';
 import '../data/api.dart';
+import '../data/session.dart' show NotShareServer;
 import '../l10n/app_localizations.dart';
 import 'first_start.dart';
 import 'icons.dart';
@@ -91,22 +92,26 @@ class _AccessTokenScreenState extends State<AccessTokenScreen> {
     final navigator = Navigator.of(context);
     final token = CloudflareAccess(host: widget.server.host.toLowerCase(), clientId: id, clientSecret: secret);
     setState(() => _busy = true);
+    // Kept only once Cloudflare lets it through to Share; otherwise it says why, and stays here.
+    String? problem;
     try {
       await repo.check(widget.server, token);
     } on CloudflareAccessException {
-      if (mounted) setState(() => _error = t.accessRefusedHere);
-      return;
+      problem = t.accessRefusedHere;
+    } on NotShareServer {
+      problem = t.accessNotShare;
     } on ApiException catch (e) {
-      // Share's own answer came through, so Cloudflare let the token pass.
-      if (!e.fromShare) {
-        if (mounted) setState(() => _error = t.commonFailed);
-        return;
-      }
+      problem = e.fromShare ? t.commonFailed : t.accessUnavailable;
     } on NetworkException {
-      if (mounted) setState(() => _error = t.commonOffline);
-      return;
+      problem = t.commonOffline;
+    } on Exception {
+      problem = t.commonFailed;
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+    if (problem != null) {
+      if (mounted) setState(() => _error = problem);
+      return;
     }
     await repo.save(token);
     navigator.pop(true);

@@ -66,6 +66,8 @@ class _PinEntryScreenState extends State<PinEntryScreen> {
           });
     } on NetworkException {
       setState(() => _error = t.commonOffline);
+    } on FormatException {
+      setState(() => _error = t.serverNotShare); // a page, not Share's answer
     } finally {
       if (mounted) setState(() => _busy = false);
     }

@@ -639,5 +639,7 @@
   "inviteAccessHelpNoName": "Das neue Handy kommt dann von selbst an Cloudflare vorbei",
   "inviteSendLinkNoToken": "Als Link schicken, ohne Token",
   "joinAccess": "Zugang",
-  "joinAccessIncluded": "Cloudflare-Token dabei"
+  "joinAccessIncluded": "Cloudflare-Token dabei",
+  "accessNotShare": "Cloudflare lässt das Token durch, aber dahinter ist kein Share-Server. Prüf die Serveradresse.",
+  "accessUnavailable": "Cloudflare lässt das Token durch, aber der Server dahinter antwortet nicht. Versuch es später noch einmal."
 }
