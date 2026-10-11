@@ -4,7 +4,7 @@ Cloudflare Access can stand in front of a server and let through only who it kno
 past it by signing in to Cloudflare, with an email code for example. The app can't do that, so it
 shows Cloudflare a **service token** instead: a Client ID and a Client Secret, sent as the headers
 `CF-Access-Client-Id` and `CF-Access-Client-Secret` with every request. Proposed on 2026-10-11,
-from the user's screenshot of another app; the screens are 111 to 118 of
+from the user's screenshot of another app; the screens are 111 to 119 of
 [share-mockup.html](share-mockup.html). Nothing is built yet.
 
 Asked by the user:
@@ -47,7 +47,12 @@ Asked by the user:
 - **In the invite:** the QR code's link carries the token after the `#`, which never reaches a
   server: `<server>/join#shi_…&cfa=<id>:<secret>`. The app reads it when it scans the code;
   a browser ignores it.
-- **The website doesn't change.** Browsers handle Cloudflare Access themselves.
+- **The website stays almost the same.** Browsers handle Cloudflare Access themselves. The one
+  change: an invite made on a computer can't bring the token, because neither the browser nor the
+  server knows it, and the dialog says so (119). Decided with the user on 2026-10-11: the server
+  doesn't keep the token, so invites with it come only from an admin's phone. The website shows
+  the line only if the server was told that Cloudflare Access is on; how it learns that is still
+  open, for example a flag the admin's app sets, without the token itself.
 
 ## For whoever sets up Cloudflare
 
