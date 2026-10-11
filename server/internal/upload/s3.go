@@ -104,6 +104,7 @@ func (h *S3Handler) create(w http.ResponseWriter, r *http.Request, p *auth.Princ
 		Name           string `json:"name"`
 		Size           *int64 `json:"size"`
 		LastModifiedMS int64  `json:"last_modified_ms"`
+		TakenAtMS      int64  `json:"taken_at_ms"`
 		Folder         string `json:"folder"`
 		Enc            *Enc   `json:"enc"`
 	}
@@ -138,6 +139,7 @@ func (h *S3Handler) create(w http.ResponseWriter, r *http.Request, p *auth.Princ
 		PinID: p.PinID, PinSessionID: p.PinSessionID, UserID: p.UserID, DeviceID: p.DeviceID,
 		S3PartSize: storage.S3PartSize(size, h.cfg.ChunkSize), Enc: enc,
 	}
+	f.TakenAt, f.TakenDay = takenAt(req.TakenAtMS, now, h.lib.Loc, enc != nil)
 	// The bucket's upload comes first, so a row never waits without one; an empty file needs
 	// none and is finished by complete.
 	if size > 0 {

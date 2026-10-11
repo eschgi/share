@@ -1,6 +1,6 @@
 {
   "method": "GET",
-  "path": "/api/files/ids?day=2026-09-27",
+  "path": "/api/files/ids?sort=taken&group=2026-09-27",
   "auth": "device",
   "status": 200,
   "response": {
@@ -9,5 +9,5 @@
     ],
     "bytes": 74000000
   },
-  "notes": "Every matching file, for Select all, with their total size. Same filters as /api/files; without day, every day."
+  "notes": "Every matching file, for Select all, with their total size. Same filters as /api/files, sort and group included: one day or sender, or without group all of them."
 }

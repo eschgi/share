@@ -1,17 +1,19 @@
 {
   "method": "GET",
-  "path": "/api/library?kind=photo",
+  "path": "/api/library?kind=photo&sort=taken&order=newest",
   "auth": "device",
   "status": 200,
   "response": {
     "version": 42,
-    "days": [
+    "groups": [
       {
-        "day": "2026-09-27",
+        "key": "2026-09-27",
         "count": 6,
-        "bytes": 74000000
+        "bytes": 74000000,
+        "last_day": "2026-09-27",
+        "from": null
       }
     ]
   },
-  "notes": "The upload days that have files, newest first. version grows with every change to the library (new files, thumbnails, deletions): poll this and reload when it changes. folder narrows it to one folder (404 not_found for a folder the caller doesn't see); without it, every folder the caller sees: admins every folder, members the ones they were given. kind is photo, video or document; q matches part of the file name. PIN sessions get 403 forbidden on every library endpoint, unless their PIN shows its folder (shows_folder): then they see that folder, as a member given only it would, except that from is always null."
+  "notes": "The groups that have files, in order. sort says what they are: received (the default) groups by the day files arrived, taken by the day they were taken (files without a known date taken count on the day they arrived), sender by who sent them, keyed by their id, or \"pin\" for files that came with a PIN. order is newest (the default) or oldest: days newest or oldest first; senders by their newest file, or with oldest by their oldest. key is the day (YYYY-MM-DD) or the sender's id or \"pin\"; last_day is the day its newest file arrived; from is a sender's name, null for days, PIN guests and someone no longer here. version grows with every change to the library (new files, thumbnails, deletions): poll this and reload when it changes. folder narrows it to one folder (404 not_found for a folder the caller doesn't see); without it, every folder the caller sees: admins every folder, members the ones they were given. kind is photo, video or document; q matches part of the file name. 400 bad_request for another sort or order, and for sort=sender from a PIN session. PIN sessions get 403 forbidden on every library endpoint, unless their PIN shows its folder (shows_folder): then they see that folder, as a member given only it would, except that from is always null."
 }

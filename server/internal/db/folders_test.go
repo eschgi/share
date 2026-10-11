@@ -82,13 +82,13 @@ func TestNoFoldersShowNothing(t *testing.T) {
 	if err := d.MarkReady(ctx, f.ID, "image/jpeg", KindPhoto, t0); err != nil {
 		t.Fatal(err)
 	}
-	if days, _ := d.LibraryDays(ctx, LibraryFilter{}); len(days) != 0 {
+	if days, _ := d.LibraryGroups(ctx, LibraryFilter{}); len(days) != 0 {
 		t.Fatalf("no folders showed %v", days)
 	}
 	if ids, _, _ := d.LibraryIDs(ctx, LibraryFilter{}); len(ids) != 0 {
 		t.Fatalf("no folders showed %v", ids)
 	}
-	if days, _ := d.LibraryDays(ctx, LibraryFilter{Folders: []string{family}}); len(days) != 1 {
+	if days, _ := d.LibraryGroups(ctx, LibraryFilter{Folders: []string{family}}); len(days) != 1 {
 		t.Fatalf("the folder showed %v", days)
 	}
 }

@@ -38,6 +38,8 @@ type File struct {
 	UpdatedAt        time.Time
 	UploadedAt       *time.Time
 	ClientModifiedAt *time.Time
+	TakenAt          *time.Time // when the photo or video was taken, if the sender said
+	TakenDay         string     // YYYY-MM-DD of TakenAt in the configured time zone; "" when unknown
 	Width, Height    *int64
 	DurationMS       *int64
 	Thumb            string
@@ -66,18 +68,18 @@ type Enc struct {
 const fileColumns = `id, state, name, size, received, mime, kind, rel_path, upload_day, created_at, updated_at,
 	uploaded_at, client_modified_at, width, height, duration_ms, thumb, pin_id, pin_session_id, user_id,
 	device_id, deleted_at, deleted_by, crc32, folder_id, moved_from, s3_upload_id, s3_part_size, enc_version,
-	enc_key, enc_header, plain_size`
+	enc_key, enc_header, plain_size, taken_at, taken_day`
 
 func scanFile(row interface{ Scan(...any) error }) (File, error) {
 	var f File
 	var relPath, pinID, sessionID, userID, deviceID, deletedBy, folderID, movedFrom, s3Upload sql.NullString
-	var day sql.NullTime
+	var day, takenDay sql.NullTime
 	var width, height, duration, crc, s3PartSize, encVersion, plainSize sql.NullInt64
 	var encKey, encHeader []byte
 	err := row.Scan(&f.ID, &f.State, &f.Name, &f.Size, &f.Received, &f.Mime, &f.Kind, &relPath, &day,
 		&f.CreatedAt, &f.UpdatedAt, &f.UploadedAt, &f.ClientModifiedAt, &width, &height, &duration, &f.Thumb,
 		&pinID, &sessionID, &userID, &deviceID, &f.DeletedAt, &deletedBy, &crc, &folderID, &movedFrom, &s3Upload, &s3PartSize,
-		&encVersion, &encKey, &encHeader, &plainSize)
+		&encVersion, &encKey, &encHeader, &plainSize, &f.TakenAt, &takenDay)
 	if noRow(err) {
 		return f, ErrNotFound
 	}
@@ -87,6 +89,9 @@ func scanFile(row interface{ Scan(...any) error }) (File, error) {
 	f.FolderID, f.RelPath, f.MovedFrom = folderID.String, relPath.String, movedFrom.String
 	if day.Valid {
 		f.UploadDay = day.Time.Format(time.DateOnly)
+	}
+	if takenDay.Valid {
+		f.TakenDay = takenDay.Time.Format(time.DateOnly)
 	}
 	f.S3UploadID, f.S3PartSize = s3Upload.String, s3PartSize.Int64
 	f.Width, f.Height, f.DurationMS = optInt(width), optInt(height), optInt(duration)
@@ -130,11 +135,11 @@ func (d *DB) InsertReceiving(ctx context.Context, f File) error {
 	}
 	_, err := d.pool.ExecContext(ctx, `INSERT INTO files (id, state, name, size, received, mime, kind, created_at, updated_at,
 			client_modified_at, pin_id, pin_session_id, user_id, device_id, folder_id, s3_upload_id, s3_part_size,
-			enc_version, enc_key, enc_header, plain_size)
-		VALUES ($1, 'receiving', $2, $3, 0, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)`,
+			enc_version, enc_key, enc_header, plain_size, taken_at, taken_day)
+		VALUES ($1, 'receiving', $2, $3, 0, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)`,
 		f.ID, f.Name, f.Size, f.Mime, f.Kind, f.CreatedAt, f.UpdatedAt, f.ClientModifiedAt,
 		nullString(f.PinID), nullString(f.PinSessionID), nullString(f.UserID), nullString(f.DeviceID), f.FolderID,
-		nullString(f.S3UploadID), partSize, encVersion, encKey, encHeader, plainSize)
+		nullString(f.S3UploadID), partSize, encVersion, encKey, encHeader, plainSize, f.TakenAt, nullString(f.TakenDay))
 	return err
 }
 

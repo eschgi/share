@@ -44,7 +44,7 @@ func TestNamesIgnoreCaseInEveryLetter(t *testing.T) {
 		t.Errorf("RelPathTaken(ÜBER.PDF) next to Über.pdf = %v, %v", taken, err)
 	}
 	for _, q := range []string{"über", "ÜBER", "BER.P"} {
-		files, err := d.LibraryFiles(ctx, LibraryFilter{Folders: []string{doctors}, Query: q}, nil, 10)
+		files, _, err := d.LibraryFiles(ctx, LibraryFilter{Folders: []string{doctors}, Query: q}, nil, 10)
 		if err != nil || len(files) != 1 {
 			t.Errorf("searching %q: %d files, %v", q, len(files), err)
 		}

@@ -106,7 +106,7 @@ func TestMembersSeeOnlyTheirFolders(t *testing.T) {
 	if len(files) != 1 || files[0].(map[string]any)["id"] != photo.ID {
 		t.Fatalf("Maria's files: %v", files)
 	}
-	if days := e.get("/api/library", maria.token).json(t)["days"].([]any); len(days) != 1 || days[0].(map[string]any)["count"] != 1.0 {
+	if days := e.get("/api/library", maria.token).json(t)["groups"].([]any); len(days) != 1 || days[0].(map[string]any)["count"] != 1.0 {
 		t.Fatalf("Maria's days: %v", days)
 	}
 	if ids := e.get("/api/files/ids", maria.token).json(t)["ids"].([]any); len(ids) != 1 {
@@ -582,7 +582,7 @@ func TestPinsThatShowTheirFolder(t *testing.T) {
 	if len(files) != 1 || files[0].(map[string]any)["id"] != photo.ID || files[0].(map[string]any)["from"] != nil {
 		t.Fatalf("the guest's files: %v", files)
 	}
-	if days := e.get("/api/library", guest).json(t)["days"].([]any); len(days) != 1 {
+	if days := e.get("/api/library", guest).json(t)["groups"].([]any); len(days) != 1 {
 		t.Fatalf("the guest's days: %v", days)
 	}
 	for _, path := range []string{"/api/files/" + photo.ID, "/api/files/" + photo.ID + "/content", "/api/files/" + photo.ID + "/thumb", "/api/files/ids"} {

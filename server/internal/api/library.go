@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"io"
 	"io/fs"
@@ -22,21 +23,24 @@ import (
 
 // FileInfo is a file in the library.
 type FileInfo struct {
-	ID         string    `json:"id"`
-	Folder     string    `json:"folder"` // the id of the folder it lies in
-	Name       string    `json:"name"`
-	Size       int64     `json:"size"`
-	Mime       string    `json:"mime"`
-	Kind       string    `json:"kind"`
-	Day        string    `json:"day"`
-	UploadedAt time.Time `json:"uploaded_at"`
-	UpdatedAt  time.Time `json:"updated_at"` // changes with the thumbnail, for caches
-	Width      *int64    `json:"width"`
-	Height     *int64    `json:"height"`
-	DurationMS *int64    `json:"duration_ms"`
-	HasThumb   bool      `json:"has_thumb"`
-	From       *string   `json:"from"` // who sent it, if they have an account; null for a PIN
-	Enc        *EncInfo  `json:"enc"`  // how it is encrypted; null for a plain file
+	ID         string     `json:"id"`
+	Folder     string     `json:"folder"` // the id of the folder it lies in
+	Name       string     `json:"name"`
+	Size       int64      `json:"size"`
+	Mime       string     `json:"mime"`
+	Kind       string     `json:"kind"`
+	Day        string     `json:"day"` // the day it arrived, which is its folder on the drive
+	UploadedAt time.Time  `json:"uploaded_at"`
+	TakenAt    *time.Time `json:"taken_at"`   // when the photo or video was taken, if known
+	TakenDay   *string    `json:"taken_day"`  // that day in the server's time zone
+	UpdatedAt  time.Time  `json:"updated_at"` // changes with the thumbnail, for caches
+	Width      *int64     `json:"width"`
+	Height     *int64     `json:"height"`
+	DurationMS *int64     `json:"duration_ms"`
+	HasThumb   bool       `json:"has_thumb"`
+	From       *string    `json:"from"`    // who sent it, if they have an account; null for a PIN
+	FromID     *string    `json:"from_id"` // their id, which the library's sender groups are keyed by
+	Enc        *EncInfo   `json:"enc"`     // how it is encrypted; null for a plain file
 }
 
 // EncInfo is how a file is encrypted: the version of its folder's key that its file key is
@@ -63,6 +67,14 @@ func fileInfo(f db.File, names map[string]string) FileInfo {
 	if name, ok := names[f.UserID]; ok {
 		info.From = &name
 	}
+	if names != nil && f.UserID != "" {
+		id := f.UserID
+		info.FromID = &id
+	}
+	if f.TakenAt != nil {
+		at, day := *f.TakenAt, f.TakenDay
+		info.TakenAt, info.TakenDay = &at, &day
+	}
 	return info
 }
 
@@ -79,11 +91,33 @@ func (a *API) userNames(r *http.Request) (map[string]string, error) {
 	return names, nil
 }
 
-// filter reads folder, kind, q and day from the query. Without a folder it shows all the
-// folders the caller sees; a folder they don't see is answered with 404.
-func filter(w http.ResponseWriter, r *http.Request, folders []db.Folder) (db.LibraryFilter, bool) {
+// filter reads folder, kind, q, sort, order and group from the query. Without a folder it shows
+// all the folders the caller sees; a folder they don't see is answered with 404. PIN sessions,
+// which see no names, can't sort by sender.
+func filter(w http.ResponseWriter, r *http.Request, p *auth.Principal, folders []db.Folder) (db.LibraryFilter, bool) {
 	q := r.URL.Query()
-	f := db.LibraryFilter{Kind: q.Get("kind"), Query: strings.TrimSpace(q.Get("q")), Day: q.Get("day")}
+	f := db.LibraryFilter{Kind: q.Get("kind"), Query: strings.TrimSpace(q.Get("q")), Sort: q.Get("sort"), Group: q.Get("group")}
+	switch f.Sort {
+	case "":
+		f.Sort = db.SortReceived
+	case db.SortReceived, db.SortTaken:
+	case db.SortSender:
+		if p.Kind == auth.KindPin {
+			httpx.WriteError(w, http.StatusBadRequest, "bad_request", "A PIN sees no senders to sort by.")
+			return f, false
+		}
+	default:
+		httpx.WriteError(w, http.StatusBadRequest, "bad_request", "sort must be received, taken or sender.")
+		return f, false
+	}
+	switch q.Get("order") {
+	case "", "newest":
+	case "oldest":
+		f.Oldest = true
+	default:
+		httpx.WriteError(w, http.StatusBadRequest, "bad_request", "order must be newest or oldest.")
+		return f, false
+	}
 	if want := q.Get("folder"); want != "" {
 		if !slices.ContainsFunc(folders, func(x db.Folder) bool { return x.ID == want }) {
 			httpx.WriteError(w, http.StatusNotFound, "not_found", "No such folder.")
@@ -99,9 +133,14 @@ func filter(w http.ResponseWriter, r *http.Request, folders []db.Folder) (db.Lib
 		httpx.WriteError(w, http.StatusBadRequest, "bad_request", "kind must be photo, video or document.")
 		return f, false
 	}
-	if f.Day != "" {
-		if _, err := time.Parse(time.DateOnly, f.Day); err != nil {
-			httpx.WriteError(w, http.StatusBadRequest, "bad_request", "day must look like 2026-09-27.")
+	if f.Group != "" {
+		if f.Sort == db.SortSender {
+			if f.Group != db.SenderPIN && !ids.Valid(f.Group) {
+				httpx.WriteError(w, http.StatusBadRequest, "bad_request", "group must be a person's id, or pin.")
+				return f, false
+			}
+		} else if _, err := time.Parse(time.DateOnly, f.Group); err != nil {
+			httpx.WriteError(w, http.StatusBadRequest, "bad_request", "group must be a day like 2026-09-27.")
 			return f, false
 		}
 	}
@@ -112,47 +151,60 @@ func filter(w http.ResponseWriter, r *http.Request, folders []db.Folder) (db.Lib
 	return f, true
 }
 
-// Day is one upload day of the library.
-type Day struct {
-	Day   string `json:"day"`
-	Count int    `json:"count"`
-	Bytes int64  `json:"bytes"`
+// Group is one group of the library, in its sort: a day (taken or received), or a sender.
+type Group struct {
+	Key     string  `json:"key"` // the day, YYYY-MM-DD; or the sender's id, or "pin" for PIN guests
+	Count   int     `json:"count"`
+	Bytes   int64   `json:"bytes"`
+	LastDay string  `json:"last_day"` // the day its newest file arrived
+	From    *string `json:"from"`     // a sender's name; null for days, PIN guests, and someone no longer here
 }
 
-// Library is the overview: the version (it grows with every change) and the days.
+// Library is the overview: the version (it grows with every change) and the groups, in order.
 type Library struct {
-	Version int64 `json:"version"`
-	Days    []Day `json:"days"`
+	Version int64   `json:"version"`
+	Groups  []Group `json:"groups"`
 }
 
 func (a *API) library(w http.ResponseWriter, r *http.Request) {
-	_, folders, ok := a.viewer(w, r)
+	p, folders, ok := a.viewer(w, r)
 	if !ok {
 		return
 	}
-	f, ok := filter(w, r, folders)
+	f, ok := filter(w, r, p, folders)
 	if !ok {
 		return
 	}
-	f.Day = ""
+	f.Group = ""
 	version, err := a.Auth.DB.LibraryVersion(r.Context())
 	if err != nil {
 		internal(w, "library", err)
 		return
 	}
-	days, err := a.Auth.DB.LibraryDays(r.Context(), f)
+	groups, err := a.Auth.DB.LibraryGroups(r.Context(), f)
 	if err != nil {
 		internal(w, "library", err)
 		return
 	}
-	lib := Library{Version: version, Days: []Day{}}
-	for _, d := range days {
-		lib.Days = append(lib.Days, Day{Day: d.Day, Count: d.Count, Bytes: d.Bytes})
+	var names map[string]string
+	if f.Sort == db.SortSender {
+		if names, err = a.senderNames(r, p); err != nil {
+			internal(w, "library", err)
+			return
+		}
+	}
+	lib := Library{Version: version, Groups: []Group{}}
+	for _, g := range groups {
+		group := Group{Key: g.Key, Count: g.Count, Bytes: g.Bytes, LastDay: g.LastDay}
+		if name, ok := names[g.Key]; ok {
+			group.From = &name
+		}
+		lib.Groups = append(lib.Groups, group)
 	}
 	httpx.WriteJSON(w, http.StatusOK, lib)
 }
 
-// FilePage is one page of files, newest first; next_cursor continues it, null at the end.
+// FilePage is one page of files, in the order asked for; next_cursor continues it, null at the end.
 type FilePage struct {
 	Files      []FileInfo `json:"files"`
 	NextCursor *string    `json:"next_cursor"`
@@ -163,7 +215,7 @@ func (a *API) files(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	f, ok := filter(w, r, folders)
+	f, ok := filter(w, r, p, folders)
 	if !ok {
 		return
 	}
@@ -185,7 +237,7 @@ func (a *API) files(w http.ResponseWriter, r *http.Request) {
 		}
 		after = &p
 	}
-	files, err := a.Auth.DB.LibraryFiles(r.Context(), f, after, limit+1)
+	files, positions, err := a.Auth.DB.LibraryFiles(r.Context(), f, after, limit+1)
 	if err != nil {
 		internal(w, "files", err)
 		return
@@ -198,7 +250,7 @@ func (a *API) files(w http.ResponseWriter, r *http.Request) {
 	page := FilePage{Files: []FileInfo{}}
 	for i, file := range files {
 		if i == limit {
-			c := encodeCursor(files[i-1])
+			c := encodeCursor(positions[i-1])
 			page.NextCursor = &c
 			break
 		}
@@ -207,12 +259,18 @@ func (a *API) files(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, page)
 }
 
-func encodeCursor(f db.File) string {
-	var at int64
-	if f.UploadedAt != nil {
-		at = f.UploadedAt.UnixMilli()
-	}
-	return base64.RawURLEncoding.EncodeToString([]byte(strconv.FormatInt(at, 10) + "." + f.ID))
+// A cursor is where a page ended: the place of its last file in the order. It only makes sense
+// with the same filter and sort.
+type cursor struct {
+	GroupOrder string `json:"o"`
+	Group      string `json:"g"`
+	Time       int64  `json:"t"` // Unix ms
+	ID         string `json:"i"`
+}
+
+func encodeCursor(p db.Position) string {
+	raw, _ := json.Marshal(cursor{GroupOrder: p.GroupOrder, Group: p.Group, Time: p.Time.UnixMilli(), ID: p.ID})
+	return base64.RawURLEncoding.EncodeToString(raw)
 }
 
 func decodeCursor(c string) (db.Position, error) {
@@ -220,12 +278,11 @@ func decodeCursor(c string) (db.Position, error) {
 	if err != nil {
 		return db.Position{}, err
 	}
-	at, id, ok := strings.Cut(string(raw), ".")
-	ms, err := strconv.ParseInt(at, 10, 64)
-	if !ok || err != nil || !ids.Valid(id) {
+	var v cursor
+	if err := json.Unmarshal(raw, &v); err != nil || !ids.Valid(v.ID) || v.Group == "" || v.GroupOrder == "" {
 		return db.Position{}, errors.New("bad cursor")
 	}
-	return db.Position{UploadedAt: time.UnixMilli(ms).UTC(), ID: id}, nil
+	return db.Position{GroupOrder: v.GroupOrder, Group: v.Group, Time: time.UnixMilli(v.Time).UTC(), ID: v.ID}, nil
 }
 
 // FileIDs are all matching files, for "Select all", with their total size.
@@ -235,11 +292,11 @@ type FileIDs struct {
 }
 
 func (a *API) fileIDs(w http.ResponseWriter, r *http.Request) {
-	_, folders, ok := a.viewer(w, r)
+	p, folders, ok := a.viewer(w, r)
 	if !ok {
 		return
 	}
-	f, ok := filter(w, r, folders)
+	f, ok := filter(w, r, p, folders)
 	if !ok {
 		return
 	}

@@ -144,6 +144,11 @@ CREATE TABLE files (
   updated_at         TIMESTAMPTZ(3) NOT NULL,
   uploaded_at        TIMESTAMPTZ(3),
   client_modified_at TIMESTAMPTZ(3),
+  -- When the photo or video was taken, as the sending phone or browser read it from the file,
+  -- and that day in the configured time zone; null when unknown, and always for an encrypted
+  -- file, so that the server never learns it.
+  taken_at           TIMESTAMPTZ(3),
+  taken_day          DATE,
   width              INTEGER,
   height             INTEGER,
   duration_ms        INTEGER,
@@ -172,6 +177,7 @@ CREATE INDEX files_crc_pending ON files (uploaded_at) WHERE state = 'ready' AND 
 CREATE INDEX files_moving ON files (id) WHERE moved_from IS NOT NULL;
 CREATE INDEX files_ready_by_day ON files (upload_day, kind) WHERE state = 'ready';
 CREATE INDEX files_ready_by_time ON files (uploaded_at DESC, id) WHERE state = 'ready';
+CREATE INDEX files_ready_by_taken ON files ((COALESCE(taken_day, upload_day))) WHERE state = 'ready';
 CREATE INDEX files_receiving_by_session ON files (pin_session_id) WHERE state = 'receiving';
 CREATE UNIQUE INDEX files_rel_path ON files (folder_id, casefold(rel_path)) WHERE state IN ('finalizing', 'ready');
 CREATE INDEX files_thumb_pending ON files (uploaded_at) WHERE state = 'ready' AND thumb = 'none' AND kind = 'photo' AND enc_version IS NULL;

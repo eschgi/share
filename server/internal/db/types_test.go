@@ -45,8 +45,8 @@ func TestTypesRoundTrip(t *testing.T) {
 	if got, err := d.FileByID(ctx, f.ID); err != nil || got.UploadDay != "2026-10-06" || got.FolderID != folder || got.DeletedAt != nil {
 		t.Errorf("FileByID = %+v, %v", got, err)
 	}
-	if days, err := d.LibraryDays(ctx, LibraryFilter{Folders: []string{folder}}); err != nil || len(days) != 1 || days[0].Day != "2026-10-06" {
-		t.Errorf("LibraryDays = %+v, %v", days, err)
+	if days, err := d.LibraryGroups(ctx, LibraryFilter{Folders: []string{folder}}); err != nil || len(days) != 1 || days[0].Key != "2026-10-06" {
+		t.Errorf("LibraryGroups = %+v, %v", days, err)
 	}
 	if err := d.SetJobRun(ctx, "trash", at); err != nil {
 		t.Fatal(err)

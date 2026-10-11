@@ -284,11 +284,11 @@ func TestPhonesSeeTheLibraryAndPINsDont(t *testing.T) {
 
 	lib := get("/api/library", admin.token, nil)
 	assertShape(t, "library", readFixture(t, "api/library.json")["response"], lib.json(t))
-	days := lib.json(t)["days"].([]any)
-	if len(days) != 2 || days[0].(map[string]any)["day"] != "2026-09-28" || days[1].(map[string]any)["count"] != 2.0 {
+	days := lib.json(t)["groups"].([]any)
+	if len(days) != 2 || days[0].(map[string]any)["key"] != "2026-09-28" || days[1].(map[string]any)["count"] != 2.0 {
 		t.Errorf("days: %v", days)
 	}
-	if v := get("/api/library?kind=video", admin.token, nil).json(t)["days"].([]any); len(v) != 1 {
+	if v := get("/api/library?kind=video", admin.token, nil).json(t)["groups"].([]any); len(v) != 1 {
 		t.Errorf("videos: %v", v)
 	}
 
@@ -305,7 +305,7 @@ func TestPhonesSeeTheLibraryAndPINsDont(t *testing.T) {
 	if f := get("/api/files?q="+url.QueryEscape("kündig"), admin.token, nil).json(t)["files"].([]any); len(f) != 1 {
 		t.Errorf("search: %v", f)
 	}
-	ids := get("/api/files/ids?day=2026-09-27", admin.token, nil).json(t)
+	ids := get("/api/files/ids?group=2026-09-27", admin.token, nil).json(t)
 	assertShape(t, "ids", readFixture(t, "api/file_ids.json")["response"], ids)
 	if ids["bytes"] != float64(len(photo)+len(video)) || len(ids["ids"].([]any)) != 2 {
 		t.Errorf("ids: %v", ids)
